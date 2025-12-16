@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+
+# VitePress
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
+# Generated navigation artifacts (derived, but ok to commit if desired)
+# docs/.vitepress/generated/
+
+

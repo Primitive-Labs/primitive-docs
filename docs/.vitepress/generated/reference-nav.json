@@ -1,0 +1,1418 @@
+{
+  "items": [
+    {
+      "text": "js-bao",
+      "items": [
+        {
+          "text": "Api",
+          "items": [
+            {
+              "text": " Media",
+              "items": [
+                {
+                  "text": "model-autogen-plan",
+                  "link": "/reference/js-bao/api/_media/model-autogen-plan"
+                },
+                {
+                  "text": "model-migration-guide",
+                  "link": "/reference/js-bao/api/_media/model-migration-guide"
+                }
+              ]
+            },
+            {
+              "text": "Classes",
+              "items": [
+                {
+                  "text": "BaseModel",
+                  "link": "/reference/js-bao/api/classes/BaseModel"
+                },
+                {
+                  "text": "DatabaseEngine",
+                  "link": "/reference/js-bao/api/classes/DatabaseEngine"
+                },
+                {
+                  "text": "DocumentClosedError",
+                  "link": "/reference/js-bao/api/classes/DocumentClosedError"
+                },
+                {
+                  "text": "DocumentResolutionError",
+                  "link": "/reference/js-bao/api/classes/DocumentResolutionError"
+                },
+                {
+                  "text": "Logger",
+                  "link": "/reference/js-bao/api/classes/Logger"
+                },
+                {
+                  "text": "ModelRegistry",
+                  "link": "/reference/js-bao/api/classes/ModelRegistry"
+                },
+                {
+                  "text": "RecordNotFoundError",
+                  "link": "/reference/js-bao/api/classes/RecordNotFoundError"
+                },
+                {
+                  "text": "StringSet",
+                  "link": "/reference/js-bao/api/classes/StringSet"
+                },
+                {
+                  "text": "UniqueConstraintViolationError",
+                  "link": "/reference/js-bao/api/classes/UniqueConstraintViolationError"
+                }
+              ]
+            },
+            {
+              "text": "Enumerations",
+              "items": [
+                {
+                  "text": "LogLevel",
+                  "link": "/reference/js-bao/api/enumerations/LogLevel"
+                }
+              ]
+            },
+            {
+              "text": "Functions",
+              "items": [
+                {
+                  "text": "attachAndRegisterModel",
+                  "link": "/reference/js-bao/api/functions/attachAndRegisterModel"
+                },
+                {
+                  "text": "attachSchemaToClass",
+                  "link": "/reference/js-bao/api/functions/attachSchemaToClass"
+                },
+                {
+                  "text": "autoRegisterModel",
+                  "link": "/reference/js-bao/api/functions/autoRegisterModel"
+                },
+                {
+                  "text": "createModelClass",
+                  "link": "/reference/js-bao/api/functions/createModelClass"
+                },
+                {
+                  "text": "defineModelSchema",
+                  "link": "/reference/js-bao/api/functions/defineModelSchema"
+                },
+                {
+                  "text": "dumpYDocToPlain",
+                  "link": "/reference/js-bao/api/functions/dumpYDocToPlain"
+                },
+                {
+                  "text": "Field",
+                  "link": "/reference/js-bao/api/functions/Field"
+                },
+                {
+                  "text": "generateULID",
+                  "link": "/reference/js-bao/api/functions/generateULID"
+                },
+                {
+                  "text": "initJsBao",
+                  "link": "/reference/js-bao/api/functions/initJsBao"
+                },
+                {
+                  "text": "Model",
+                  "link": "/reference/js-bao/api/functions/Model"
+                },
+                {
+                  "text": "resetJsBao",
+                  "link": "/reference/js-bao/api/functions/resetJsBao"
+                },
+                {
+                  "text": "summarizePlainYDoc",
+                  "link": "/reference/js-bao/api/functions/summarizePlainYDoc"
+                }
+              ]
+            },
+            {
+              "text": "Interfaces",
+              "items": [
+                {
+                  "text": "ConnectedDocument",
+                  "link": "/reference/js-bao/api/interfaces/ConnectedDocument"
+                },
+                {
+                  "text": "DatabaseConfig",
+                  "link": "/reference/js-bao/api/interfaces/DatabaseConfig"
+                },
+                {
+                  "text": "DocumentConnectionEvent",
+                  "link": "/reference/js-bao/api/interfaces/DocumentConnectionEvent"
+                },
+                {
+                  "text": "DocumentManager",
+                  "link": "/reference/js-bao/api/interfaces/DocumentManager"
+                },
+                {
+                  "text": "DumpOptions",
+                  "link": "/reference/js-bao/api/interfaces/DumpOptions"
+                },
+                {
+                  "text": "DumpSummary",
+                  "link": "/reference/js-bao/api/interfaces/DumpSummary"
+                },
+                {
+                  "text": "DumpSummaryEntry",
+                  "link": "/reference/js-bao/api/interfaces/DumpSummaryEntry"
+                },
+                {
+                  "text": "FieldOptions",
+                  "link": "/reference/js-bao/api/interfaces/FieldOptions"
+                },
+                {
+                  "text": "InitJsBaoOptions",
+                  "link": "/reference/js-bao/api/interfaces/InitJsBaoOptions"
+                },
+                {
+                  "text": "InitJsBaoResult",
+                  "link": "/reference/js-bao/api/interfaces/InitJsBaoResult"
+                },
+                {
+                  "text": "ModelOptions",
+                  "link": "/reference/js-bao/api/interfaces/ModelOptions"
+                },
+                {
+                  "text": "PaginatedResult",
+                  "link": "/reference/js-bao/api/interfaces/PaginatedResult"
+                },
+                {
+                  "text": "PaginationOptions",
+                  "link": "/reference/js-bao/api/interfaces/PaginationOptions"
+                },
+                {
+                  "text": "QueryOptions",
+                  "link": "/reference/js-bao/api/interfaces/QueryOptions"
+                },
+                {
+                  "text": "SaveOptions",
+                  "link": "/reference/js-bao/api/interfaces/SaveOptions"
+                }
+              ]
+            },
+            {
+              "text": "Type Aliases",
+              "items": [
+                {
+                  "text": "DocumentConnectionCallback",
+                  "link": "/reference/js-bao/api/type-aliases/DocumentConnectionCallback"
+                },
+                {
+                  "text": "DocumentFilter",
+                  "link": "/reference/js-bao/api/type-aliases/DocumentFilter"
+                },
+                {
+                  "text": "DocumentPermissionHint",
+                  "link": "/reference/js-bao/api/type-aliases/DocumentPermissionHint"
+                },
+                {
+                  "text": "InferAttrs",
+                  "link": "/reference/js-bao/api/type-aliases/InferAttrs"
+                },
+                {
+                  "text": "ModelConstructor",
+                  "link": "/reference/js-bao/api/type-aliases/ModelConstructor"
+                },
+                {
+                  "text": "PlainYDoc",
+                  "link": "/reference/js-bao/api/type-aliases/PlainYDoc"
+                },
+                {
+                  "text": "ProjectionSpec",
+                  "link": "/reference/js-bao/api/type-aliases/ProjectionSpec"
+                },
+                {
+                  "text": "QueryResult",
+                  "link": "/reference/js-bao/api/type-aliases/QueryResult"
+                }
+              ]
+            },
+            {
+              "text": "globals",
+              "link": "/reference/js-bao/api/globals"
+            },
+            {
+              "text": "README",
+              "link": "/reference/js-bao/api/README"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "js-bao-wss-client",
+      "items": [
+        {
+          "text": "Api",
+          "items": [
+            {
+              "text": " Media",
+              "items": [
+                {
+                  "text": "LOCAL_TESTING",
+                  "link": "/reference/js-bao-wss-client/api/_media/LOCAL_TESTING"
+                }
+              ]
+            },
+            {
+              "text": "Classes",
+              "items": [
+                {
+                  "text": "JsBaoClient",
+                  "link": "/reference/js-bao-wss-client/api/classes/JsBaoClient"
+                },
+                {
+                  "text": "JsBaoError",
+                  "link": "/reference/js-bao-wss-client/api/classes/JsBaoError"
+                }
+              ]
+            },
+            {
+              "text": "Functions",
+              "items": [
+                {
+                  "text": "createModelClass",
+                  "link": "/reference/js-bao-wss-client/api/functions/createModelClass"
+                },
+                {
+                  "text": "defineModelSchema",
+                  "link": "/reference/js-bao-wss-client/api/functions/defineModelSchema"
+                },
+                {
+                  "text": "generateULID",
+                  "link": "/reference/js-bao-wss-client/api/functions/generateULID"
+                },
+                {
+                  "text": "initializeClient",
+                  "link": "/reference/js-bao-wss-client/api/functions/initializeClient"
+                },
+                {
+                  "text": "initJsBao",
+                  "link": "/reference/js-bao-wss-client/api/functions/initJsBao"
+                },
+                {
+                  "text": "isJsBaoError",
+                  "link": "/reference/js-bao-wss-client/api/functions/isJsBaoError"
+                }
+              ]
+            },
+            {
+              "text": "Interfaces",
+              "items": [
+                {
+                  "text": "AnalyticsAutoEventsOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/AnalyticsAutoEventsOptions"
+                },
+                {
+                  "text": "AnalyticsClient",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/AnalyticsClient"
+                },
+                {
+                  "text": "AnalyticsEventInput",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/AnalyticsEventInput"
+                },
+                {
+                  "text": "AuthStateEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/AuthStateEvent"
+                },
+                {
+                  "text": "BasicUserInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BasicUserInfo"
+                },
+                {
+                  "text": "BlobUploadCompletedEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobUploadCompletedEvent"
+                },
+                {
+                  "text": "BlobUploadFailedEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobUploadFailedEvent"
+                },
+                {
+                  "text": "BlobUploadProgressEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobUploadProgressEvent"
+                },
+                {
+                  "text": "CacheFacade",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CacheFacade"
+                },
+                {
+                  "text": "DatabaseConfig",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseConfig"
+                },
+                {
+                  "text": "DocumentAccessResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentAccessResult"
+                },
+                {
+                  "text": "DocumentCreateCommitFailedEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentCreateCommitFailedEvent"
+                },
+                {
+                  "text": "DocumentEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentEvent"
+                },
+                {
+                  "text": "DocumentInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentInfo"
+                },
+                {
+                  "text": "DocumentInvitation",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentInvitation"
+                },
+                {
+                  "text": "DocumentInvitationResponse",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentInvitationResponse"
+                },
+                {
+                  "text": "DocumentMetadataChangedEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentMetadataChangedEvent"
+                },
+                {
+                  "text": "DocumentPermissionEntry",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentPermissionEntry"
+                },
+                {
+                  "text": "GeminiGenerateRawOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GeminiGenerateRawOptions"
+                },
+                {
+                  "text": "GeminiGenerateResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GeminiGenerateResult"
+                },
+                {
+                  "text": "GeminiMessage",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GeminiMessage"
+                },
+                {
+                  "text": "GeminiModelSummary",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GeminiModelSummary"
+                },
+                {
+                  "text": "GeminiPromptOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GeminiPromptOptions"
+                },
+                {
+                  "text": "GeminiStructuredOutput",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GeminiStructuredOutput"
+                },
+                {
+                  "text": "IntegrationCallRequest",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/IntegrationCallRequest"
+                },
+                {
+                  "text": "IntegrationCallResponse",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/IntegrationCallResponse"
+                },
+                {
+                  "text": "IntegrationsAPI",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/IntegrationsAPI"
+                },
+                {
+                  "text": "InvitationEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/InvitationEvent"
+                },
+                {
+                  "text": "JsBaoClientOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/JsBaoClientOptions"
+                },
+                {
+                  "text": "JsBaoEvents",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/JsBaoEvents"
+                },
+                {
+                  "text": "LlmChatOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/LlmChatOptions"
+                },
+                {
+                  "text": "MeUpdatedEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/MeUpdatedEvent"
+                },
+                {
+                  "text": "MeUpdateFailedEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/MeUpdateFailedEvent"
+                },
+                {
+                  "text": "NetworkModeEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/NetworkModeEvent"
+                },
+                {
+                  "text": "OfflineAuthEnabledEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/OfflineAuthEnabledEvent"
+                },
+                {
+                  "text": "OfflineAuthExpiringSoonEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/OfflineAuthExpiringSoonEvent"
+                },
+                {
+                  "text": "OfflineAuthFailedEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/OfflineAuthFailedEvent"
+                },
+                {
+                  "text": "OfflineAuthRenewedEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/OfflineAuthRenewedEvent"
+                },
+                {
+                  "text": "OfflineAuthUnlockedEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/OfflineAuthUnlockedEvent"
+                },
+                {
+                  "text": "PaginatedResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PaginatedResult"
+                },
+                {
+                  "text": "PaginationOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PaginationOptions"
+                },
+                {
+                  "text": "PendingCreateCommittedEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PendingCreateCommittedEvent"
+                },
+                {
+                  "text": "PendingCreateFailedEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PendingCreateFailedEvent"
+                },
+                {
+                  "text": "PermissionEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PermissionEvent"
+                },
+                {
+                  "text": "ReasoningOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ReasoningOptions"
+                },
+                {
+                  "text": "SessionInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/SessionInfo"
+                },
+                {
+                  "text": "StatusChangedEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/StatusChangedEvent"
+                },
+                {
+                  "text": "UserProfile",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/UserProfile"
+                }
+              ]
+            },
+            {
+              "text": "Type Aliases",
+              "items": [
+                {
+                  "text": "GeminiContentPart",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/GeminiContentPart"
+                },
+                {
+                  "text": "GeminiGenerateOptions",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/GeminiGenerateOptions"
+                },
+                {
+                  "text": "GeminiRole",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/GeminiRole"
+                },
+                {
+                  "text": "InferAttrs",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/InferAttrs"
+                },
+                {
+                  "text": "JsBaoErrorCode",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/JsBaoErrorCode"
+                },
+                {
+                  "text": "TypedModelConstructor",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/TypedModelConstructor"
+                }
+              ]
+            },
+            {
+              "text": "globals",
+              "link": "/reference/js-bao-wss-client/api/globals"
+            },
+            {
+              "text": "README",
+              "link": "/reference/js-bao-wss-client/api/README"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "primitive-app",
+      "items": [
+        {
+          "text": "Components",
+          "items": [
+            {
+              "text": "Components",
+              "items": [
+                {
+                  "text": "Auth",
+                  "items": [
+                    {
+                      "text": "PrimitiveLogin",
+                      "link": "/reference/primitive-app/components/components/auth/PrimitiveLogin"
+                    },
+                    {
+                      "text": "PrimitiveLogout",
+                      "link": "/reference/primitive-app/components/components/auth/PrimitiveLogout"
+                    },
+                    {
+                      "text": "PrimitiveOauthCallback",
+                      "link": "/reference/primitive-app/components/components/auth/PrimitiveOauthCallback"
+                    }
+                  ]
+                },
+                {
+                  "text": "Debug Suite",
+                  "items": [
+                    {
+                      "text": "Document Debugger",
+                      "items": [
+                        {
+                          "text": "Dialogs",
+                          "items": [
+                            {
+                              "text": "MassDeleteDocsDialog",
+                              "link": "/reference/primitive-app/components/components/debug-suite/document-debugger/dialogs/MassDeleteDocsDialog"
+                            },
+                            {
+                              "text": "MassDeleteRecordsDialog",
+                              "link": "/reference/primitive-app/components/components/debug-suite/document-debugger/dialogs/MassDeleteRecordsDialog"
+                            }
+                          ]
+                        },
+                        {
+                          "text": "DocumentDebuggerIndex",
+                          "link": "/reference/primitive-app/components/components/debug-suite/document-debugger/DocumentDebuggerIndex"
+                        },
+                        {
+                          "text": "DocumentDebuggerModel",
+                          "link": "/reference/primitive-app/components/components/debug-suite/document-debugger/DocumentDebuggerModel"
+                        },
+                        {
+                          "text": "DocumentSidebar",
+                          "link": "/reference/primitive-app/components/components/debug-suite/document-debugger/DocumentSidebar"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Pages",
+                      "items": [
+                        {
+                          "text": "DebuggingSuiteDocuments",
+                          "link": "/reference/primitive-app/components/components/debug-suite/pages/DebuggingSuiteDocuments"
+                        },
+                        {
+                          "text": "DebuggingSuiteDocumentsModel",
+                          "link": "/reference/primitive-app/components/components/debug-suite/pages/DebuggingSuiteDocumentsModel"
+                        },
+                        {
+                          "text": "DebuggingSuiteHome",
+                          "link": "/reference/primitive-app/components/components/debug-suite/pages/DebuggingSuiteHome"
+                        },
+                        {
+                          "text": "DebuggingSuiteTests",
+                          "link": "/reference/primitive-app/components/components/debug-suite/pages/DebuggingSuiteTests"
+                        },
+                        {
+                          "text": "DebugSuiteLayout",
+                          "link": "/reference/primitive-app/components/components/debug-suite/pages/DebugSuiteLayout"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "PrimitiveDebuggingSuite",
+                      "link": "/reference/primitive-app/components/components/debug-suite/PrimitiveDebuggingSuite"
+                    },
+                    {
+                      "text": "PrimitiveTestRunner",
+                      "link": "/reference/primitive-app/components/components/debug-suite/PrimitiveTestRunner"
+                    }
+                  ]
+                },
+                {
+                  "text": "Documents",
+                  "items": [
+                    {
+                      "text": "PrimitiveManageDocuments",
+                      "link": "/reference/primitive-app/components/components/documents/PrimitiveManageDocuments"
+                    },
+                    {
+                      "text": "PrimitiveShareDocumentDialog",
+                      "link": "/reference/primitive-app/components/components/documents/PrimitiveShareDocumentDialog"
+                    },
+                    {
+                      "text": "PrimitiveSingleDocumentSwitcher",
+                      "link": "/reference/primitive-app/components/components/documents/PrimitiveSingleDocumentSwitcher"
+                    }
+                  ]
+                },
+                {
+                  "text": "Navigation",
+                  "items": [
+                    {
+                      "text": "PrimitiveAppBreadcrumb",
+                      "link": "/reference/primitive-app/components/components/navigation/PrimitiveAppBreadcrumb"
+                    },
+                    {
+                      "text": "PrimitiveAppSidebarHeader",
+                      "link": "/reference/primitive-app/components/components/navigation/PrimitiveAppSidebarHeader"
+                    },
+                    {
+                      "text": "PrimitiveBottomNav",
+                      "link": "/reference/primitive-app/components/components/navigation/PrimitiveBottomNav"
+                    },
+                    {
+                      "text": "PrimitiveNavigationBadge",
+                      "link": "/reference/primitive-app/components/components/navigation/PrimitiveNavigationBadge"
+                    },
+                    {
+                      "text": "PrimitiveSidebarNav",
+                      "link": "/reference/primitive-app/components/components/navigation/PrimitiveSidebarNav"
+                    },
+                    {
+                      "text": "PrimitiveUserMenu",
+                      "link": "/reference/primitive-app/components/components/navigation/PrimitiveUserMenu"
+                    }
+                  ]
+                },
+                {
+                  "text": "Shared",
+                  "items": [
+                    {
+                      "text": "DeleteConfirmationDialog",
+                      "link": "/reference/primitive-app/components/components/shared/DeleteConfirmationDialog"
+                    },
+                    {
+                      "text": "PrimitiveLogoSpinner",
+                      "link": "/reference/primitive-app/components/components/shared/PrimitiveLogoSpinner"
+                    },
+                    {
+                      "text": "PrimitiveSkeletonGate",
+                      "link": "/reference/primitive-app/components/components/shared/PrimitiveSkeletonGate"
+                    }
+                  ]
+                },
+                {
+                  "text": "Ui",
+                  "items": [
+                    {
+                      "text": "Avatar",
+                      "items": [
+                        {
+                          "text": "Avatar",
+                          "link": "/reference/primitive-app/components/components/ui/avatar/Avatar"
+                        },
+                        {
+                          "text": "AvatarFallback",
+                          "link": "/reference/primitive-app/components/components/ui/avatar/AvatarFallback"
+                        },
+                        {
+                          "text": "AvatarImage",
+                          "link": "/reference/primitive-app/components/components/ui/avatar/AvatarImage"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Badge",
+                      "items": [
+                        {
+                          "text": "Badge",
+                          "link": "/reference/primitive-app/components/components/ui/badge/Badge"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Breadcrumb",
+                      "items": [
+                        {
+                          "text": "Breadcrumb",
+                          "link": "/reference/primitive-app/components/components/ui/breadcrumb/Breadcrumb"
+                        },
+                        {
+                          "text": "BreadcrumbEllipsis",
+                          "link": "/reference/primitive-app/components/components/ui/breadcrumb/BreadcrumbEllipsis"
+                        },
+                        {
+                          "text": "BreadcrumbItem",
+                          "link": "/reference/primitive-app/components/components/ui/breadcrumb/BreadcrumbItem"
+                        },
+                        {
+                          "text": "BreadcrumbLink",
+                          "link": "/reference/primitive-app/components/components/ui/breadcrumb/BreadcrumbLink"
+                        },
+                        {
+                          "text": "BreadcrumbList",
+                          "link": "/reference/primitive-app/components/components/ui/breadcrumb/BreadcrumbList"
+                        },
+                        {
+                          "text": "BreadcrumbPage",
+                          "link": "/reference/primitive-app/components/components/ui/breadcrumb/BreadcrumbPage"
+                        },
+                        {
+                          "text": "BreadcrumbSeparator",
+                          "link": "/reference/primitive-app/components/components/ui/breadcrumb/BreadcrumbSeparator"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Button",
+                      "items": [
+                        {
+                          "text": "Button",
+                          "link": "/reference/primitive-app/components/components/ui/button/Button"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Calendar",
+                      "items": [
+                        {
+                          "text": "Calendar",
+                          "link": "/reference/primitive-app/components/components/ui/calendar/Calendar"
+                        },
+                        {
+                          "text": "CalendarCell",
+                          "link": "/reference/primitive-app/components/components/ui/calendar/CalendarCell"
+                        },
+                        {
+                          "text": "CalendarCellTrigger",
+                          "link": "/reference/primitive-app/components/components/ui/calendar/CalendarCellTrigger"
+                        },
+                        {
+                          "text": "CalendarGrid",
+                          "link": "/reference/primitive-app/components/components/ui/calendar/CalendarGrid"
+                        },
+                        {
+                          "text": "CalendarGridBody",
+                          "link": "/reference/primitive-app/components/components/ui/calendar/CalendarGridBody"
+                        },
+                        {
+                          "text": "CalendarGridHead",
+                          "link": "/reference/primitive-app/components/components/ui/calendar/CalendarGridHead"
+                        },
+                        {
+                          "text": "CalendarGridRow",
+                          "link": "/reference/primitive-app/components/components/ui/calendar/CalendarGridRow"
+                        },
+                        {
+                          "text": "CalendarHeadCell",
+                          "link": "/reference/primitive-app/components/components/ui/calendar/CalendarHeadCell"
+                        },
+                        {
+                          "text": "CalendarHeader",
+                          "link": "/reference/primitive-app/components/components/ui/calendar/CalendarHeader"
+                        },
+                        {
+                          "text": "CalendarHeading",
+                          "link": "/reference/primitive-app/components/components/ui/calendar/CalendarHeading"
+                        },
+                        {
+                          "text": "CalendarNextButton",
+                          "link": "/reference/primitive-app/components/components/ui/calendar/CalendarNextButton"
+                        },
+                        {
+                          "text": "CalendarPrevButton",
+                          "link": "/reference/primitive-app/components/components/ui/calendar/CalendarPrevButton"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Card",
+                      "items": [
+                        {
+                          "text": "Card",
+                          "link": "/reference/primitive-app/components/components/ui/card/Card"
+                        },
+                        {
+                          "text": "CardAction",
+                          "link": "/reference/primitive-app/components/components/ui/card/CardAction"
+                        },
+                        {
+                          "text": "CardContent",
+                          "link": "/reference/primitive-app/components/components/ui/card/CardContent"
+                        },
+                        {
+                          "text": "CardDescription",
+                          "link": "/reference/primitive-app/components/components/ui/card/CardDescription"
+                        },
+                        {
+                          "text": "CardFooter",
+                          "link": "/reference/primitive-app/components/components/ui/card/CardFooter"
+                        },
+                        {
+                          "text": "CardHeader",
+                          "link": "/reference/primitive-app/components/components/ui/card/CardHeader"
+                        },
+                        {
+                          "text": "CardTitle",
+                          "link": "/reference/primitive-app/components/components/ui/card/CardTitle"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Carousel",
+                      "items": [
+                        {
+                          "text": "Carousel",
+                          "link": "/reference/primitive-app/components/components/ui/carousel/Carousel"
+                        },
+                        {
+                          "text": "CarouselContent",
+                          "link": "/reference/primitive-app/components/components/ui/carousel/CarouselContent"
+                        },
+                        {
+                          "text": "CarouselItem",
+                          "link": "/reference/primitive-app/components/components/ui/carousel/CarouselItem"
+                        },
+                        {
+                          "text": "CarouselNext",
+                          "link": "/reference/primitive-app/components/components/ui/carousel/CarouselNext"
+                        },
+                        {
+                          "text": "CarouselPrevious",
+                          "link": "/reference/primitive-app/components/components/ui/carousel/CarouselPrevious"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Checkbox",
+                      "items": [
+                        {
+                          "text": "Checkbox",
+                          "link": "/reference/primitive-app/components/components/ui/checkbox/Checkbox"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Collapsible",
+                      "items": [
+                        {
+                          "text": "Collapsible",
+                          "link": "/reference/primitive-app/components/components/ui/collapsible/Collapsible"
+                        },
+                        {
+                          "text": "CollapsibleContent",
+                          "link": "/reference/primitive-app/components/components/ui/collapsible/CollapsibleContent"
+                        },
+                        {
+                          "text": "CollapsibleTrigger",
+                          "link": "/reference/primitive-app/components/components/ui/collapsible/CollapsibleTrigger"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Dialog",
+                      "items": [
+                        {
+                          "text": "Dialog",
+                          "link": "/reference/primitive-app/components/components/ui/dialog/Dialog"
+                        },
+                        {
+                          "text": "DialogClose",
+                          "link": "/reference/primitive-app/components/components/ui/dialog/DialogClose"
+                        },
+                        {
+                          "text": "DialogContent",
+                          "link": "/reference/primitive-app/components/components/ui/dialog/DialogContent"
+                        },
+                        {
+                          "text": "DialogDescription",
+                          "link": "/reference/primitive-app/components/components/ui/dialog/DialogDescription"
+                        },
+                        {
+                          "text": "DialogFooter",
+                          "link": "/reference/primitive-app/components/components/ui/dialog/DialogFooter"
+                        },
+                        {
+                          "text": "DialogHeader",
+                          "link": "/reference/primitive-app/components/components/ui/dialog/DialogHeader"
+                        },
+                        {
+                          "text": "DialogOverlay",
+                          "link": "/reference/primitive-app/components/components/ui/dialog/DialogOverlay"
+                        },
+                        {
+                          "text": "DialogScrollContent",
+                          "link": "/reference/primitive-app/components/components/ui/dialog/DialogScrollContent"
+                        },
+                        {
+                          "text": "DialogTitle",
+                          "link": "/reference/primitive-app/components/components/ui/dialog/DialogTitle"
+                        },
+                        {
+                          "text": "DialogTrigger",
+                          "link": "/reference/primitive-app/components/components/ui/dialog/DialogTrigger"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Dropdown Menu",
+                      "items": [
+                        {
+                          "text": "DropdownMenu",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenu"
+                        },
+                        {
+                          "text": "DropdownMenuCheckboxItem",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuCheckboxItem"
+                        },
+                        {
+                          "text": "DropdownMenuContent",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuContent"
+                        },
+                        {
+                          "text": "DropdownMenuGroup",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuGroup"
+                        },
+                        {
+                          "text": "DropdownMenuItem",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuItem"
+                        },
+                        {
+                          "text": "DropdownMenuLabel",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuLabel"
+                        },
+                        {
+                          "text": "DropdownMenuRadioGroup",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuRadioGroup"
+                        },
+                        {
+                          "text": "DropdownMenuRadioItem",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuRadioItem"
+                        },
+                        {
+                          "text": "DropdownMenuSeparator",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuSeparator"
+                        },
+                        {
+                          "text": "DropdownMenuShortcut",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuShortcut"
+                        },
+                        {
+                          "text": "DropdownMenuSub",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuSub"
+                        },
+                        {
+                          "text": "DropdownMenuSubContent",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuSubContent"
+                        },
+                        {
+                          "text": "DropdownMenuSubTrigger",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuSubTrigger"
+                        },
+                        {
+                          "text": "DropdownMenuTrigger",
+                          "link": "/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuTrigger"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Empty",
+                      "items": [
+                        {
+                          "text": "Empty",
+                          "link": "/reference/primitive-app/components/components/ui/empty/Empty"
+                        },
+                        {
+                          "text": "EmptyContent",
+                          "link": "/reference/primitive-app/components/components/ui/empty/EmptyContent"
+                        },
+                        {
+                          "text": "EmptyDescription",
+                          "link": "/reference/primitive-app/components/components/ui/empty/EmptyDescription"
+                        },
+                        {
+                          "text": "EmptyHeader",
+                          "link": "/reference/primitive-app/components/components/ui/empty/EmptyHeader"
+                        },
+                        {
+                          "text": "EmptyMedia",
+                          "link": "/reference/primitive-app/components/components/ui/empty/EmptyMedia"
+                        },
+                        {
+                          "text": "EmptyTitle",
+                          "link": "/reference/primitive-app/components/components/ui/empty/EmptyTitle"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Input",
+                      "items": [
+                        {
+                          "text": "Input",
+                          "link": "/reference/primitive-app/components/components/ui/input/Input"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Label",
+                      "items": [
+                        {
+                          "text": "Label",
+                          "link": "/reference/primitive-app/components/components/ui/label/Label"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Native Select",
+                      "items": [
+                        {
+                          "text": "NativeSelect",
+                          "link": "/reference/primitive-app/components/components/ui/native-select/NativeSelect"
+                        },
+                        {
+                          "text": "NativeSelectOptGroup",
+                          "link": "/reference/primitive-app/components/components/ui/native-select/NativeSelectOptGroup"
+                        },
+                        {
+                          "text": "NativeSelectOption",
+                          "link": "/reference/primitive-app/components/components/ui/native-select/NativeSelectOption"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Popover",
+                      "items": [
+                        {
+                          "text": "Popover",
+                          "link": "/reference/primitive-app/components/components/ui/popover/Popover"
+                        },
+                        {
+                          "text": "PopoverAnchor",
+                          "link": "/reference/primitive-app/components/components/ui/popover/PopoverAnchor"
+                        },
+                        {
+                          "text": "PopoverContent",
+                          "link": "/reference/primitive-app/components/components/ui/popover/PopoverContent"
+                        },
+                        {
+                          "text": "PopoverTrigger",
+                          "link": "/reference/primitive-app/components/components/ui/popover/PopoverTrigger"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Select",
+                      "items": [
+                        {
+                          "text": "Select",
+                          "link": "/reference/primitive-app/components/components/ui/select/Select"
+                        },
+                        {
+                          "text": "SelectContent",
+                          "link": "/reference/primitive-app/components/components/ui/select/SelectContent"
+                        },
+                        {
+                          "text": "SelectGroup",
+                          "link": "/reference/primitive-app/components/components/ui/select/SelectGroup"
+                        },
+                        {
+                          "text": "SelectItem",
+                          "link": "/reference/primitive-app/components/components/ui/select/SelectItem"
+                        },
+                        {
+                          "text": "SelectItemText",
+                          "link": "/reference/primitive-app/components/components/ui/select/SelectItemText"
+                        },
+                        {
+                          "text": "SelectLabel",
+                          "link": "/reference/primitive-app/components/components/ui/select/SelectLabel"
+                        },
+                        {
+                          "text": "SelectScrollDownButton",
+                          "link": "/reference/primitive-app/components/components/ui/select/SelectScrollDownButton"
+                        },
+                        {
+                          "text": "SelectScrollUpButton",
+                          "link": "/reference/primitive-app/components/components/ui/select/SelectScrollUpButton"
+                        },
+                        {
+                          "text": "SelectSeparator",
+                          "link": "/reference/primitive-app/components/components/ui/select/SelectSeparator"
+                        },
+                        {
+                          "text": "SelectTrigger",
+                          "link": "/reference/primitive-app/components/components/ui/select/SelectTrigger"
+                        },
+                        {
+                          "text": "SelectValue",
+                          "link": "/reference/primitive-app/components/components/ui/select/SelectValue"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Separator",
+                      "items": [
+                        {
+                          "text": "Separator",
+                          "link": "/reference/primitive-app/components/components/ui/separator/Separator"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Sheet",
+                      "items": [
+                        {
+                          "text": "Sheet",
+                          "link": "/reference/primitive-app/components/components/ui/sheet/Sheet"
+                        },
+                        {
+                          "text": "SheetClose",
+                          "link": "/reference/primitive-app/components/components/ui/sheet/SheetClose"
+                        },
+                        {
+                          "text": "SheetContent",
+                          "link": "/reference/primitive-app/components/components/ui/sheet/SheetContent"
+                        },
+                        {
+                          "text": "SheetDescription",
+                          "link": "/reference/primitive-app/components/components/ui/sheet/SheetDescription"
+                        },
+                        {
+                          "text": "SheetFooter",
+                          "link": "/reference/primitive-app/components/components/ui/sheet/SheetFooter"
+                        },
+                        {
+                          "text": "SheetHeader",
+                          "link": "/reference/primitive-app/components/components/ui/sheet/SheetHeader"
+                        },
+                        {
+                          "text": "SheetOverlay",
+                          "link": "/reference/primitive-app/components/components/ui/sheet/SheetOverlay"
+                        },
+                        {
+                          "text": "SheetTitle",
+                          "link": "/reference/primitive-app/components/components/ui/sheet/SheetTitle"
+                        },
+                        {
+                          "text": "SheetTrigger",
+                          "link": "/reference/primitive-app/components/components/ui/sheet/SheetTrigger"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Sidebar",
+                      "items": [
+                        {
+                          "text": "Sidebar",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/Sidebar"
+                        },
+                        {
+                          "text": "SidebarContent",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarContent"
+                        },
+                        {
+                          "text": "SidebarFooter",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarFooter"
+                        },
+                        {
+                          "text": "SidebarGroup",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarGroup"
+                        },
+                        {
+                          "text": "SidebarGroupAction",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarGroupAction"
+                        },
+                        {
+                          "text": "SidebarGroupContent",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarGroupContent"
+                        },
+                        {
+                          "text": "SidebarGroupLabel",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarGroupLabel"
+                        },
+                        {
+                          "text": "SidebarHeader",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarHeader"
+                        },
+                        {
+                          "text": "SidebarInput",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarInput"
+                        },
+                        {
+                          "text": "SidebarInset",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarInset"
+                        },
+                        {
+                          "text": "SidebarMenu",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarMenu"
+                        },
+                        {
+                          "text": "SidebarMenuAction",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarMenuAction"
+                        },
+                        {
+                          "text": "SidebarMenuBadge",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarMenuBadge"
+                        },
+                        {
+                          "text": "SidebarMenuButton",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarMenuButton"
+                        },
+                        {
+                          "text": "SidebarMenuButtonChild",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarMenuButtonChild"
+                        },
+                        {
+                          "text": "SidebarMenuItem",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarMenuItem"
+                        },
+                        {
+                          "text": "SidebarMenuSkeleton",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarMenuSkeleton"
+                        },
+                        {
+                          "text": "SidebarMenuSub",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarMenuSub"
+                        },
+                        {
+                          "text": "SidebarMenuSubButton",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarMenuSubButton"
+                        },
+                        {
+                          "text": "SidebarMenuSubItem",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarMenuSubItem"
+                        },
+                        {
+                          "text": "SidebarProvider",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarProvider"
+                        },
+                        {
+                          "text": "SidebarRail",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarRail"
+                        },
+                        {
+                          "text": "SidebarSeparator",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarSeparator"
+                        },
+                        {
+                          "text": "SidebarTrigger",
+                          "link": "/reference/primitive-app/components/components/ui/sidebar/SidebarTrigger"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Skeleton",
+                      "items": [
+                        {
+                          "text": "Skeleton",
+                          "link": "/reference/primitive-app/components/components/ui/skeleton/Skeleton"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Switch",
+                      "items": [
+                        {
+                          "text": "Switch",
+                          "link": "/reference/primitive-app/components/components/ui/switch/Switch"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Table",
+                      "items": [
+                        {
+                          "text": "Table",
+                          "link": "/reference/primitive-app/components/components/ui/table/Table"
+                        },
+                        {
+                          "text": "TableBody",
+                          "link": "/reference/primitive-app/components/components/ui/table/TableBody"
+                        },
+                        {
+                          "text": "TableCaption",
+                          "link": "/reference/primitive-app/components/components/ui/table/TableCaption"
+                        },
+                        {
+                          "text": "TableCell",
+                          "link": "/reference/primitive-app/components/components/ui/table/TableCell"
+                        },
+                        {
+                          "text": "TableEmpty",
+                          "link": "/reference/primitive-app/components/components/ui/table/TableEmpty"
+                        },
+                        {
+                          "text": "TableFooter",
+                          "link": "/reference/primitive-app/components/components/ui/table/TableFooter"
+                        },
+                        {
+                          "text": "TableHead",
+                          "link": "/reference/primitive-app/components/components/ui/table/TableHead"
+                        },
+                        {
+                          "text": "TableHeader",
+                          "link": "/reference/primitive-app/components/components/ui/table/TableHeader"
+                        },
+                        {
+                          "text": "TableRow",
+                          "link": "/reference/primitive-app/components/components/ui/table/TableRow"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Textarea",
+                      "items": [
+                        {
+                          "text": "Textarea",
+                          "link": "/reference/primitive-app/components/components/ui/textarea/Textarea"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Tooltip",
+                      "items": [
+                        {
+                          "text": "Tooltip",
+                          "link": "/reference/primitive-app/components/components/ui/tooltip/Tooltip"
+                        },
+                        {
+                          "text": "TooltipContent",
+                          "link": "/reference/primitive-app/components/components/ui/tooltip/TooltipContent"
+                        },
+                        {
+                          "text": "TooltipProvider",
+                          "link": "/reference/primitive-app/components/components/ui/tooltip/TooltipProvider"
+                        },
+                        {
+                          "text": "TooltipTrigger",
+                          "link": "/reference/primitive-app/components/components/ui/tooltip/TooltipTrigger"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Layouts",
+              "items": [
+                {
+                  "text": "PrimitiveAppLayout",
+                  "link": "/reference/primitive-app/components/layouts/PrimitiveAppLayout"
+                },
+                {
+                  "text": "PrimitiveLoginLayout",
+                  "link": "/reference/primitive-app/components/layouts/PrimitiveLoginLayout"
+                },
+                {
+                  "text": "PrimitiveStaticLayout",
+                  "link": "/reference/primitive-app/components/layouts/PrimitiveStaticLayout"
+                }
+              ]
+            },
+            {
+              "text": "Pages",
+              "items": [
+                {
+                  "text": "PrimitiveNotFound",
+                  "link": "/reference/primitive-app/components/pages/PrimitiveNotFound"
+                }
+              ]
+            },
+            {
+              "text": "PrimitiveNotFound",
+              "link": "/reference/primitive-app/components/PrimitiveNotFound"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+[submodule "packages/js-bao"]
+	path = packages/js-bao
+	url = https://github.com/Primitive-Labs/js-bao
+	branch = main
+[submodule "packages/js-bao-wss-client"]
+	path = packages/js-bao-wss-client
+	url = https://github.com/Primitive-Labs/js-bao-wss-client
+	branch = main
+[submodule "packages/primitive-app"]
+	path = packages/primitive-app
+	url = https://github.com/Primitive-Labs/primitive-app
+	branch = main
