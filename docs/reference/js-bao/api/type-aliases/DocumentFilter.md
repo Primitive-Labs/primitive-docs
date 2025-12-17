@@ -7,5 +7,3 @@
 # Type Alias: DocumentFilter
 
 > **DocumentFilter** = `object` & `LogicalOperators`
-
-Defined in: [packages/js-bao/src/types/queryTypes.ts:53](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/types/queryTypes.ts#L53)

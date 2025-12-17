@@ -48,11 +48,15 @@ for (const p of typedocProjects) {
     'typedoc',
     '--plugin',
     'typedoc-plugin-markdown',
+    '--plugin',
+    resolve('scripts/typedoc-plugin-hide-underscore.mjs'),
     '--theme',
     'markdown',
     ...(tsconfigPath ? ['--tsconfig', tsconfigPath] : []),
     // Keep doc builds resilient; we don't want non-doc type errors to block documentation.
     '--skipErrorChecking',
+    // Remove "Defined in: ..." (source locations / git links) from the generated Markdown.
+    '--disableSources',
     '--out',
     resolve(p.outDir),
     ...entryPoints,

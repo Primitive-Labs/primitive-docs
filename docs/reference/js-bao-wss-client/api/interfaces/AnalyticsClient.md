@@ -6,15 +6,11 @@
 
 # Interface: AnalyticsClient
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:458](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L458)
-
 ## Methods
 
 ### flush()
 
 > **flush**(): `void`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:460](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L460)
 
 #### Returns
 
@@ -25,8 +21,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:460](https://github.com/P
 ### logEvent()
 
 > **logEvent**(`event`): `void`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:459](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L459)
 
 #### Parameters
 
@@ -44,8 +38,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:459](https://github.com/P
 
 > **setAppVersionOverride**(`version`): `void`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:462](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L462)
-
 #### Parameters
 
 ##### version
@@ -61,8 +53,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:462](https://github.com/P
 ### setPlanOverride()
 
 > **setPlanOverride**(`plan`): `void`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:461](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L461)
 
 #### Parameters
 

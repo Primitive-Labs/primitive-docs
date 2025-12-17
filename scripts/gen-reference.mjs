@@ -7,6 +7,11 @@ function run(nodeScript) {
 
 run('scripts/gen-typedoc.mjs')
 run('scripts/gen-vue-docs.mjs')
+run('scripts/postprocess-vue-docs-overview-first.mjs')
+run('scripts/inject-primitive-app-component-types.mjs')
+run('scripts/gen-primitive-app-ts-reference.mjs')
+run('scripts/gen-primitive-app-type-symbols.mjs')
+run('scripts/postprocess-primitive-app-vue-docs-type-links.mjs')
 run('scripts/gen-reference-index.mjs')
 
 

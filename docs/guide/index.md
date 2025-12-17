@@ -9,7 +9,7 @@ This section contains hand-written documentation maintained in this repo:
 
 Next steps:
 
-- Add `docs/guide/getting-started.md`
+- Read: [Getting Started](/guide/getting-started)
 - Add `docs/guide/architecture.md`
 
 

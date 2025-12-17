@@ -6,15 +6,11 @@
 
 # Interface: InitJsBaoResult
 
-Defined in: [packages/js-bao/src/initialize.ts:40](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L40)
-
 ## Properties
 
 ### addDocumentModelMapping()
 
 > **addDocumentModelMapping**: (`modelName`, `docId`) => `void`
-
-Defined in: [packages/js-bao/src/initialize.ts:55](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L55)
 
 #### Parameters
 
@@ -36,8 +32,6 @@ Defined in: [packages/js-bao/src/initialize.ts:55](https://github.com/Primitive-
 
 > **clearDefaultDocumentId**: () => `void`
 
-Defined in: [packages/js-bao/src/initialize.ts:59](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L59)
-
 #### Returns
 
 `void`
@@ -48,8 +42,6 @@ Defined in: [packages/js-bao/src/initialize.ts:59](https://github.com/Primitive-
 
 > **clearDocumentModelMappings**: () => `void`
 
-Defined in: [packages/js-bao/src/initialize.ts:57](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L57)
-
 #### Returns
 
 `void`
@@ -59,8 +51,6 @@ Defined in: [packages/js-bao/src/initialize.ts:57](https://github.com/Primitive-
 ### connectDocument()
 
 > **connectDocument**: (`docId`, `yDoc`, `permissionHint`) => `Promise`\<`void`\>
-
-Defined in: [packages/js-bao/src/initialize.ts:43](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L43)
 
 #### Parameters
 
@@ -86,15 +76,11 @@ Defined in: [packages/js-bao/src/initialize.ts:43](https://github.com/Primitive-
 
 > **dbEngine**: [`DatabaseEngine`](../classes/DatabaseEngine.md)
 
-Defined in: [packages/js-bao/src/initialize.ts:41](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L41)
-
 ***
 
 ### disconnectDocument()
 
 > **disconnectDocument**: (`docId`) => `Promise`\<`void`\>
-
-Defined in: [packages/js-bao/src/initialize.ts:48](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L48)
 
 #### Parameters
 
@@ -112,8 +98,6 @@ Defined in: [packages/js-bao/src/initialize.ts:48](https://github.com/Primitive-
 
 > **getConnectedDocuments**: () => `Map`\<`string`, [`ConnectedDocument`](ConnectedDocument.md)\>
 
-Defined in: [packages/js-bao/src/initialize.ts:49](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L49)
-
 #### Returns
 
 `Map`\<`string`, [`ConnectedDocument`](ConnectedDocument.md)\>
@@ -124,8 +108,6 @@ Defined in: [packages/js-bao/src/initialize.ts:49](https://github.com/Primitive-
 
 > **getDefaultDocumentId**: () => `string` \| `undefined`
 
-Defined in: [packages/js-bao/src/initialize.ts:62](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L62)
-
 #### Returns
 
 `string` \| `undefined`
@@ -135,8 +117,6 @@ Defined in: [packages/js-bao/src/initialize.ts:62](https://github.com/Primitive-
 ### getDocumentIdForModel()
 
 > **getDocumentIdForModel**: (`modelName`) => `string` \| `undefined`
-
-Defined in: [packages/js-bao/src/initialize.ts:61](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L61)
 
 #### Parameters
 
@@ -154,8 +134,6 @@ Defined in: [packages/js-bao/src/initialize.ts:61](https://github.com/Primitive-
 
 > **getDocumentModelMapping**: () => `Record`\<`string`, `string`\>
 
-Defined in: [packages/js-bao/src/initialize.ts:60](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L60)
-
 #### Returns
 
 `Record`\<`string`, `string`\>
@@ -165,8 +143,6 @@ Defined in: [packages/js-bao/src/initialize.ts:60](https://github.com/Primitive-
 ### isDocumentConnected()
 
 > **isDocumentConnected**: (`docId`) => `boolean`
-
-Defined in: [packages/js-bao/src/initialize.ts:50](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L50)
 
 #### Parameters
 
@@ -184,15 +160,11 @@ Defined in: [packages/js-bao/src/initialize.ts:50](https://github.com/Primitive-
 
 > **modelRegistry**: [`ModelRegistry`](../classes/ModelRegistry.md)
 
-Defined in: [packages/js-bao/src/initialize.ts:42](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L42)
-
 ***
 
 ### onDefaultDocChanged()
 
 > **onDefaultDocChanged**: (`listener`) => () => `void`
-
-Defined in: [packages/js-bao/src/initialize.ts:63](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L63)
 
 #### Parameters
 
@@ -214,8 +186,6 @@ Defined in: [packages/js-bao/src/initialize.ts:63](https://github.com/Primitive-
 
 > **onDocumentConnectionChange**: (`callback`) => () => `void`
 
-Defined in: [packages/js-bao/src/initialize.ts:51](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L51)
-
 #### Parameters
 
 ##### callback
@@ -235,8 +205,6 @@ Defined in: [packages/js-bao/src/initialize.ts:51](https://github.com/Primitive-
 ### onModelDocMappingChanged()
 
 > **onModelDocMappingChanged**: (`listener`) => () => `void`
-
-Defined in: [packages/js-bao/src/initialize.ts:66](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L66)
 
 #### Parameters
 
@@ -258,8 +226,6 @@ Defined in: [packages/js-bao/src/initialize.ts:66](https://github.com/Primitive-
 
 > **removeDocumentModelMapping**: (`modelName`) => `void`
 
-Defined in: [packages/js-bao/src/initialize.ts:56](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L56)
-
 #### Parameters
 
 ##### modelName
@@ -275,8 +241,6 @@ Defined in: [packages/js-bao/src/initialize.ts:56](https://github.com/Primitive-
 ### setDefaultDocumentId()
 
 > **setDefaultDocumentId**: (`docId`) => `void`
-
-Defined in: [packages/js-bao/src/initialize.ts:58](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/initialize.ts#L58)
 
 #### Parameters
 

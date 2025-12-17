@@ -6,15 +6,11 @@
 
 # Class: ModelRegistry
 
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:22](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L22)
-
 ## Methods
 
 ### clearSessionState()
 
 > **clearSessionState**(): `void`
-
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:486](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L486)
 
 #### Returns
 
@@ -26,8 +22,6 @@ Defined in: [packages/js-bao/src/models/ModelRegistry.ts:486](https://github.com
 
 > **getActiveModels**(): `Map`\<`string`, *typeof* [`BaseModel`](BaseModel.md)\>
 
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:493](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L493)
-
 #### Returns
 
 `Map`\<`string`, *typeof* [`BaseModel`](BaseModel.md)\>
@@ -38,8 +32,6 @@ Defined in: [packages/js-bao/src/models/ModelRegistry.ts:493](https://github.com
 
 > **getAllRegisteredModelsInfo**(): `RegisteredModelInfo`[]
 
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:94](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L94)
-
 #### Returns
 
 `RegisteredModelInfo`[]
@@ -49,8 +41,6 @@ Defined in: [packages/js-bao/src/models/ModelRegistry.ts:94](https://github.com/
 ### getModelClass()
 
 > **getModelClass**(`name`): *typeof* [`BaseModel`](BaseModel.md) \| `undefined`
-
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:72](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L72)
 
 #### Parameters
 
@@ -68,8 +58,6 @@ Defined in: [packages/js-bao/src/models/ModelRegistry.ts:72](https://github.com/
 
 > **getModelInfo**(`modelName`): `RegisteredModelInfo` \| `undefined`
 
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:81](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L81)
-
 #### Parameters
 
 ##### modelName
@@ -86,8 +74,6 @@ Defined in: [packages/js-bao/src/models/ModelRegistry.ts:81](https://github.com/
 
 > **getModelOptions**(`name`): [`ModelOptions`](../interfaces/ModelOptions.md) \| `undefined`
 
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:76](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L76)
-
 #### Parameters
 
 ##### name
@@ -103,8 +89,6 @@ Defined in: [packages/js-bao/src/models/ModelRegistry.ts:76](https://github.com/
 ### initializeAll()
 
 > **initializeAll**(`yDoc`, `dbEngine`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:174](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L174)
 
 #### Parameters
 
@@ -125,8 +109,6 @@ Defined in: [packages/js-bao/src/models/ModelRegistry.ts:174](https://github.com
 ### initializeAllForDocument()
 
 > **initializeAllForDocument**(`yDoc`, `dbEngine`, `docId`, `permissionHint`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:211](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L211)
 
 #### Parameters
 
@@ -156,8 +138,6 @@ Defined in: [packages/js-bao/src/models/ModelRegistry.ts:211](https://github.com
 
 > **initializeRelationships**(): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:312](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L312)
-
 #### Returns
 
 `Promise`\<`void`\>
@@ -167,8 +147,6 @@ Defined in: [packages/js-bao/src/models/ModelRegistry.ts:312](https://github.com
 ### registerModel()
 
 > **registerModel**(`modelClass`, `options`, `fields`): `void`
-
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:45](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L45)
 
 #### Parameters
 
@@ -194,8 +172,6 @@ Defined in: [packages/js-bao/src/models/ModelRegistry.ts:45](https://github.com/
 
 > **removeDocumentData**(`docId`, `dbEngine`): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:268](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L268)
-
 #### Parameters
 
 ##### docId
@@ -216,8 +192,6 @@ Defined in: [packages/js-bao/src/models/ModelRegistry.ts:268](https://github.com
 
 > **setExplicitModelsForSession**(`modelClasses?`): `void`
 
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:113](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L113)
-
 #### Parameters
 
 ##### modelClasses?
@@ -233,8 +207,6 @@ Defined in: [packages/js-bao/src/models/ModelRegistry.ts:113](https://github.com
 ### getInstance()
 
 > `static` **getInstance**(): `ModelRegistry`
-
-Defined in: [packages/js-bao/src/models/ModelRegistry.ts:38](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/ModelRegistry.ts#L38)
 
 #### Returns
 

@@ -8,8 +8,6 @@
 
 > **createModelClass**\<`TSchema`, `TAttrs`\>(`config`): `ModelConstructor`\<`TAttrs`\>
 
-Defined in: packages/js-bao-wss-client/node\_modules/js-bao/dist/index.d.ts:768
-
 ## Type Parameters
 
 ### TSchema

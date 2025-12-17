@@ -55,6 +55,15 @@ pnpm docs:build
 pnpm docs:publish
 ```
 
+## Publish (recommended: GitHub Actions auto-deploy)
+
+This repo includes a workflow at `.github/workflows/deploy-docs.yml` that builds and pushes to the `gh-pages` branch on every push to `main`.
+
+GitHub Pages config:
+
+- Use **Repo Pages** for this repo
+- Set Pages source to **Deploy from branch** → `gh-pages` / `/ (root)`
+
 GitHub Pages config:
 
 - Use **Repo Pages** for this repo

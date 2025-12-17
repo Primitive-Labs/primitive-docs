@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 import { PROJECTS } from './config.mjs'
 import { cleanDir, ensureDepsInstalled, run } from './utils.mjs'
+import { rm } from 'node:fs/promises'
 
 function ensureRootToolingInstalled() {
   const bin =
@@ -49,6 +50,16 @@ for (const p of vueProjects) {
       ].join(' ')
     )
     throw e
+  }
+
+  // Suppress docs for primitive-app/src/components/ui/**
+  // (we still allow other components/layouts/pages)
+  if (p.id === 'primitive-app') {
+    const uiDocsDir = resolve(p.outDir, 'components', 'ui')
+    await rm(uiDocsDir, { recursive: true, force: true })
+
+    const debugSuiteDocsDir = resolve(p.outDir, 'components', 'debug-suite')
+    await rm(debugSuiteDocsDir, { recursive: true, force: true })
   }
 }
 

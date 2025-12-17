@@ -6,15 +6,11 @@
 
 # Interface: CacheFacade
 
-Defined in: [packages/js-bao-wss-client/api/cacheFacade.ts:3](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/api/cacheFacade.ts#L3)
-
 ## Properties
 
 ### clear()
 
 > **clear**: (`key`) => `Promise`\<`void`\>
-
-Defined in: [packages/js-bao-wss-client/api/cacheFacade.ts:21](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/api/cacheFacade.ts#L21)
 
 #### Parameters
 
@@ -32,8 +28,6 @@ Defined in: [packages/js-bao-wss-client/api/cacheFacade.ts:21](https://github.co
 
 > **clearAll**: () => `Promise`\<`void`\>
 
-Defined in: [packages/js-bao-wss-client/api/cacheFacade.ts:22](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/api/cacheFacade.ts#L22)
-
 #### Returns
 
 `Promise`\<`void`\>
@@ -43,8 +37,6 @@ Defined in: [packages/js-bao-wss-client/api/cacheFacade.ts:22](https://github.co
 ### fetchCached()
 
 > **fetchCached**: \<`T`\>(`keyOrParts`, `fetcher`, `options?`) => `Promise`\<`T` \| `null`\>
-
-Defined in: [packages/js-bao-wss-client/api/cacheFacade.ts:5](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/api/cacheFacade.ts#L5)
 
 #### Type Parameters
 
@@ -75,8 +67,6 @@ Defined in: [packages/js-bao-wss-client/api/cacheFacade.ts:5](https://github.com
 ### fetchHttp()
 
 > **fetchHttp**: \<`T`\>(`req`, `options?`) => `Promise`\<`T` \| `null`\>
-
-Defined in: [packages/js-bao-wss-client/api/cacheFacade.ts:10](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/api/cacheFacade.ts#L10)
 
 #### Type Parameters
 
@@ -122,8 +112,6 @@ Defined in: [packages/js-bao-wss-client/api/cacheFacade.ts:10](https://github.co
 
 > **info**: (`key`) => `Promise`\<\{ `ageMs?`: `number`; `updatedAt?`: `string`; \}\>
 
-Defined in: [packages/js-bao-wss-client/api/cacheFacade.ts:20](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/api/cacheFacade.ts#L20)
-
 #### Parameters
 
 ##### key
@@ -139,8 +127,6 @@ Defined in: [packages/js-bao-wss-client/api/cacheFacade.ts:20](https://github.co
 ### key()
 
 > **key**: (`base`, `params?`) => `string`
-
-Defined in: [packages/js-bao-wss-client/api/cacheFacade.ts:4](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/api/cacheFacade.ts#L4)
 
 #### Parameters
 

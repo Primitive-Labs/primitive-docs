@@ -139,6 +139,10 @@ Generated reference documentation for each project.
 
 ## primitive-app
 
+### Overview
+
+- [createPrimitiveApp](/reference/primitive-app/createPrimitiveApp)
+
 ### Components
 
 - **Components**
@@ -146,22 +150,6 @@ Generated reference documentation for each project.
     - [PrimitiveLogin](/reference/primitive-app/components/components/auth/PrimitiveLogin)
     - [PrimitiveLogout](/reference/primitive-app/components/components/auth/PrimitiveLogout)
     - [PrimitiveOauthCallback](/reference/primitive-app/components/components/auth/PrimitiveOauthCallback)
-  - **Debug Suite**
-    - **Document Debugger**
-      - **Dialogs**
-        - [MassDeleteDocsDialog](/reference/primitive-app/components/components/debug-suite/document-debugger/dialogs/MassDeleteDocsDialog)
-        - [MassDeleteRecordsDialog](/reference/primitive-app/components/components/debug-suite/document-debugger/dialogs/MassDeleteRecordsDialog)
-      - [DocumentDebuggerIndex](/reference/primitive-app/components/components/debug-suite/document-debugger/DocumentDebuggerIndex)
-      - [DocumentDebuggerModel](/reference/primitive-app/components/components/debug-suite/document-debugger/DocumentDebuggerModel)
-      - [DocumentSidebar](/reference/primitive-app/components/components/debug-suite/document-debugger/DocumentSidebar)
-    - **Pages**
-      - [DebuggingSuiteDocuments](/reference/primitive-app/components/components/debug-suite/pages/DebuggingSuiteDocuments)
-      - [DebuggingSuiteDocumentsModel](/reference/primitive-app/components/components/debug-suite/pages/DebuggingSuiteDocumentsModel)
-      - [DebuggingSuiteHome](/reference/primitive-app/components/components/debug-suite/pages/DebuggingSuiteHome)
-      - [DebuggingSuiteTests](/reference/primitive-app/components/components/debug-suite/pages/DebuggingSuiteTests)
-      - [DebugSuiteLayout](/reference/primitive-app/components/components/debug-suite/pages/DebugSuiteLayout)
-    - [PrimitiveDebuggingSuite](/reference/primitive-app/components/components/debug-suite/PrimitiveDebuggingSuite)
-    - [PrimitiveTestRunner](/reference/primitive-app/components/components/debug-suite/PrimitiveTestRunner)
   - **Documents**
     - [PrimitiveManageDocuments](/reference/primitive-app/components/components/documents/PrimitiveManageDocuments)
     - [PrimitiveShareDocumentDialog](/reference/primitive-app/components/components/documents/PrimitiveShareDocumentDialog)
@@ -177,172 +165,6 @@ Generated reference documentation for each project.
     - [DeleteConfirmationDialog](/reference/primitive-app/components/components/shared/DeleteConfirmationDialog)
     - [PrimitiveLogoSpinner](/reference/primitive-app/components/components/shared/PrimitiveLogoSpinner)
     - [PrimitiveSkeletonGate](/reference/primitive-app/components/components/shared/PrimitiveSkeletonGate)
-  - **Ui**
-    - **Avatar**
-      - [Avatar](/reference/primitive-app/components/components/ui/avatar/Avatar)
-      - [AvatarFallback](/reference/primitive-app/components/components/ui/avatar/AvatarFallback)
-      - [AvatarImage](/reference/primitive-app/components/components/ui/avatar/AvatarImage)
-    - **Badge**
-      - [Badge](/reference/primitive-app/components/components/ui/badge/Badge)
-    - **Breadcrumb**
-      - [Breadcrumb](/reference/primitive-app/components/components/ui/breadcrumb/Breadcrumb)
-      - [BreadcrumbEllipsis](/reference/primitive-app/components/components/ui/breadcrumb/BreadcrumbEllipsis)
-      - [BreadcrumbItem](/reference/primitive-app/components/components/ui/breadcrumb/BreadcrumbItem)
-      - [BreadcrumbLink](/reference/primitive-app/components/components/ui/breadcrumb/BreadcrumbLink)
-      - [BreadcrumbList](/reference/primitive-app/components/components/ui/breadcrumb/BreadcrumbList)
-      - [BreadcrumbPage](/reference/primitive-app/components/components/ui/breadcrumb/BreadcrumbPage)
-      - [BreadcrumbSeparator](/reference/primitive-app/components/components/ui/breadcrumb/BreadcrumbSeparator)
-    - **Button**
-      - [Button](/reference/primitive-app/components/components/ui/button/Button)
-    - **Calendar**
-      - [Calendar](/reference/primitive-app/components/components/ui/calendar/Calendar)
-      - [CalendarCell](/reference/primitive-app/components/components/ui/calendar/CalendarCell)
-      - [CalendarCellTrigger](/reference/primitive-app/components/components/ui/calendar/CalendarCellTrigger)
-      - [CalendarGrid](/reference/primitive-app/components/components/ui/calendar/CalendarGrid)
-      - [CalendarGridBody](/reference/primitive-app/components/components/ui/calendar/CalendarGridBody)
-      - [CalendarGridHead](/reference/primitive-app/components/components/ui/calendar/CalendarGridHead)
-      - [CalendarGridRow](/reference/primitive-app/components/components/ui/calendar/CalendarGridRow)
-      - [CalendarHeadCell](/reference/primitive-app/components/components/ui/calendar/CalendarHeadCell)
-      - [CalendarHeader](/reference/primitive-app/components/components/ui/calendar/CalendarHeader)
-      - [CalendarHeading](/reference/primitive-app/components/components/ui/calendar/CalendarHeading)
-      - [CalendarNextButton](/reference/primitive-app/components/components/ui/calendar/CalendarNextButton)
-      - [CalendarPrevButton](/reference/primitive-app/components/components/ui/calendar/CalendarPrevButton)
-    - **Card**
-      - [Card](/reference/primitive-app/components/components/ui/card/Card)
-      - [CardAction](/reference/primitive-app/components/components/ui/card/CardAction)
-      - [CardContent](/reference/primitive-app/components/components/ui/card/CardContent)
-      - [CardDescription](/reference/primitive-app/components/components/ui/card/CardDescription)
-      - [CardFooter](/reference/primitive-app/components/components/ui/card/CardFooter)
-      - [CardHeader](/reference/primitive-app/components/components/ui/card/CardHeader)
-      - [CardTitle](/reference/primitive-app/components/components/ui/card/CardTitle)
-    - **Carousel**
-      - [Carousel](/reference/primitive-app/components/components/ui/carousel/Carousel)
-      - [CarouselContent](/reference/primitive-app/components/components/ui/carousel/CarouselContent)
-      - [CarouselItem](/reference/primitive-app/components/components/ui/carousel/CarouselItem)
-      - [CarouselNext](/reference/primitive-app/components/components/ui/carousel/CarouselNext)
-      - [CarouselPrevious](/reference/primitive-app/components/components/ui/carousel/CarouselPrevious)
-    - **Checkbox**
-      - [Checkbox](/reference/primitive-app/components/components/ui/checkbox/Checkbox)
-    - **Collapsible**
-      - [Collapsible](/reference/primitive-app/components/components/ui/collapsible/Collapsible)
-      - [CollapsibleContent](/reference/primitive-app/components/components/ui/collapsible/CollapsibleContent)
-      - [CollapsibleTrigger](/reference/primitive-app/components/components/ui/collapsible/CollapsibleTrigger)
-    - **Dialog**
-      - [Dialog](/reference/primitive-app/components/components/ui/dialog/Dialog)
-      - [DialogClose](/reference/primitive-app/components/components/ui/dialog/DialogClose)
-      - [DialogContent](/reference/primitive-app/components/components/ui/dialog/DialogContent)
-      - [DialogDescription](/reference/primitive-app/components/components/ui/dialog/DialogDescription)
-      - [DialogFooter](/reference/primitive-app/components/components/ui/dialog/DialogFooter)
-      - [DialogHeader](/reference/primitive-app/components/components/ui/dialog/DialogHeader)
-      - [DialogOverlay](/reference/primitive-app/components/components/ui/dialog/DialogOverlay)
-      - [DialogScrollContent](/reference/primitive-app/components/components/ui/dialog/DialogScrollContent)
-      - [DialogTitle](/reference/primitive-app/components/components/ui/dialog/DialogTitle)
-      - [DialogTrigger](/reference/primitive-app/components/components/ui/dialog/DialogTrigger)
-    - **Dropdown Menu**
-      - [DropdownMenu](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenu)
-      - [DropdownMenuCheckboxItem](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuCheckboxItem)
-      - [DropdownMenuContent](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuContent)
-      - [DropdownMenuGroup](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuGroup)
-      - [DropdownMenuItem](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuItem)
-      - [DropdownMenuLabel](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuLabel)
-      - [DropdownMenuRadioGroup](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuRadioGroup)
-      - [DropdownMenuRadioItem](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuRadioItem)
-      - [DropdownMenuSeparator](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuSeparator)
-      - [DropdownMenuShortcut](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuShortcut)
-      - [DropdownMenuSub](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuSub)
-      - [DropdownMenuSubContent](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuSubContent)
-      - [DropdownMenuSubTrigger](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuSubTrigger)
-      - [DropdownMenuTrigger](/reference/primitive-app/components/components/ui/dropdown-menu/DropdownMenuTrigger)
-    - **Empty**
-      - [Empty](/reference/primitive-app/components/components/ui/empty/Empty)
-      - [EmptyContent](/reference/primitive-app/components/components/ui/empty/EmptyContent)
-      - [EmptyDescription](/reference/primitive-app/components/components/ui/empty/EmptyDescription)
-      - [EmptyHeader](/reference/primitive-app/components/components/ui/empty/EmptyHeader)
-      - [EmptyMedia](/reference/primitive-app/components/components/ui/empty/EmptyMedia)
-      - [EmptyTitle](/reference/primitive-app/components/components/ui/empty/EmptyTitle)
-    - **Input**
-      - [Input](/reference/primitive-app/components/components/ui/input/Input)
-    - **Label**
-      - [Label](/reference/primitive-app/components/components/ui/label/Label)
-    - **Native Select**
-      - [NativeSelect](/reference/primitive-app/components/components/ui/native-select/NativeSelect)
-      - [NativeSelectOptGroup](/reference/primitive-app/components/components/ui/native-select/NativeSelectOptGroup)
-      - [NativeSelectOption](/reference/primitive-app/components/components/ui/native-select/NativeSelectOption)
-    - **Popover**
-      - [Popover](/reference/primitive-app/components/components/ui/popover/Popover)
-      - [PopoverAnchor](/reference/primitive-app/components/components/ui/popover/PopoverAnchor)
-      - [PopoverContent](/reference/primitive-app/components/components/ui/popover/PopoverContent)
-      - [PopoverTrigger](/reference/primitive-app/components/components/ui/popover/PopoverTrigger)
-    - **Select**
-      - [Select](/reference/primitive-app/components/components/ui/select/Select)
-      - [SelectContent](/reference/primitive-app/components/components/ui/select/SelectContent)
-      - [SelectGroup](/reference/primitive-app/components/components/ui/select/SelectGroup)
-      - [SelectItem](/reference/primitive-app/components/components/ui/select/SelectItem)
-      - [SelectItemText](/reference/primitive-app/components/components/ui/select/SelectItemText)
-      - [SelectLabel](/reference/primitive-app/components/components/ui/select/SelectLabel)
-      - [SelectScrollDownButton](/reference/primitive-app/components/components/ui/select/SelectScrollDownButton)
-      - [SelectScrollUpButton](/reference/primitive-app/components/components/ui/select/SelectScrollUpButton)
-      - [SelectSeparator](/reference/primitive-app/components/components/ui/select/SelectSeparator)
-      - [SelectTrigger](/reference/primitive-app/components/components/ui/select/SelectTrigger)
-      - [SelectValue](/reference/primitive-app/components/components/ui/select/SelectValue)
-    - **Separator**
-      - [Separator](/reference/primitive-app/components/components/ui/separator/Separator)
-    - **Sheet**
-      - [Sheet](/reference/primitive-app/components/components/ui/sheet/Sheet)
-      - [SheetClose](/reference/primitive-app/components/components/ui/sheet/SheetClose)
-      - [SheetContent](/reference/primitive-app/components/components/ui/sheet/SheetContent)
-      - [SheetDescription](/reference/primitive-app/components/components/ui/sheet/SheetDescription)
-      - [SheetFooter](/reference/primitive-app/components/components/ui/sheet/SheetFooter)
-      - [SheetHeader](/reference/primitive-app/components/components/ui/sheet/SheetHeader)
-      - [SheetOverlay](/reference/primitive-app/components/components/ui/sheet/SheetOverlay)
-      - [SheetTitle](/reference/primitive-app/components/components/ui/sheet/SheetTitle)
-      - [SheetTrigger](/reference/primitive-app/components/components/ui/sheet/SheetTrigger)
-    - **Sidebar**
-      - [Sidebar](/reference/primitive-app/components/components/ui/sidebar/Sidebar)
-      - [SidebarContent](/reference/primitive-app/components/components/ui/sidebar/SidebarContent)
-      - [SidebarFooter](/reference/primitive-app/components/components/ui/sidebar/SidebarFooter)
-      - [SidebarGroup](/reference/primitive-app/components/components/ui/sidebar/SidebarGroup)
-      - [SidebarGroupAction](/reference/primitive-app/components/components/ui/sidebar/SidebarGroupAction)
-      - [SidebarGroupContent](/reference/primitive-app/components/components/ui/sidebar/SidebarGroupContent)
-      - [SidebarGroupLabel](/reference/primitive-app/components/components/ui/sidebar/SidebarGroupLabel)
-      - [SidebarHeader](/reference/primitive-app/components/components/ui/sidebar/SidebarHeader)
-      - [SidebarInput](/reference/primitive-app/components/components/ui/sidebar/SidebarInput)
-      - [SidebarInset](/reference/primitive-app/components/components/ui/sidebar/SidebarInset)
-      - [SidebarMenu](/reference/primitive-app/components/components/ui/sidebar/SidebarMenu)
-      - [SidebarMenuAction](/reference/primitive-app/components/components/ui/sidebar/SidebarMenuAction)
-      - [SidebarMenuBadge](/reference/primitive-app/components/components/ui/sidebar/SidebarMenuBadge)
-      - [SidebarMenuButton](/reference/primitive-app/components/components/ui/sidebar/SidebarMenuButton)
-      - [SidebarMenuButtonChild](/reference/primitive-app/components/components/ui/sidebar/SidebarMenuButtonChild)
-      - [SidebarMenuItem](/reference/primitive-app/components/components/ui/sidebar/SidebarMenuItem)
-      - [SidebarMenuSkeleton](/reference/primitive-app/components/components/ui/sidebar/SidebarMenuSkeleton)
-      - [SidebarMenuSub](/reference/primitive-app/components/components/ui/sidebar/SidebarMenuSub)
-      - [SidebarMenuSubButton](/reference/primitive-app/components/components/ui/sidebar/SidebarMenuSubButton)
-      - [SidebarMenuSubItem](/reference/primitive-app/components/components/ui/sidebar/SidebarMenuSubItem)
-      - [SidebarProvider](/reference/primitive-app/components/components/ui/sidebar/SidebarProvider)
-      - [SidebarRail](/reference/primitive-app/components/components/ui/sidebar/SidebarRail)
-      - [SidebarSeparator](/reference/primitive-app/components/components/ui/sidebar/SidebarSeparator)
-      - [SidebarTrigger](/reference/primitive-app/components/components/ui/sidebar/SidebarTrigger)
-    - **Skeleton**
-      - [Skeleton](/reference/primitive-app/components/components/ui/skeleton/Skeleton)
-    - **Switch**
-      - [Switch](/reference/primitive-app/components/components/ui/switch/Switch)
-    - **Table**
-      - [Table](/reference/primitive-app/components/components/ui/table/Table)
-      - [TableBody](/reference/primitive-app/components/components/ui/table/TableBody)
-      - [TableCaption](/reference/primitive-app/components/components/ui/table/TableCaption)
-      - [TableCell](/reference/primitive-app/components/components/ui/table/TableCell)
-      - [TableEmpty](/reference/primitive-app/components/components/ui/table/TableEmpty)
-      - [TableFooter](/reference/primitive-app/components/components/ui/table/TableFooter)
-      - [TableHead](/reference/primitive-app/components/components/ui/table/TableHead)
-      - [TableHeader](/reference/primitive-app/components/components/ui/table/TableHeader)
-      - [TableRow](/reference/primitive-app/components/components/ui/table/TableRow)
-    - **Textarea**
-      - [Textarea](/reference/primitive-app/components/components/ui/textarea/Textarea)
-    - **Tooltip**
-      - [Tooltip](/reference/primitive-app/components/components/ui/tooltip/Tooltip)
-      - [TooltipContent](/reference/primitive-app/components/components/ui/tooltip/TooltipContent)
-      - [TooltipProvider](/reference/primitive-app/components/components/ui/tooltip/TooltipProvider)
-      - [TooltipTrigger](/reference/primitive-app/components/components/ui/tooltip/TooltipTrigger)
 - **Layouts**
   - [PrimitiveAppLayout](/reference/primitive-app/components/layouts/PrimitiveAppLayout)
   - [PrimitiveLoginLayout](/reference/primitive-app/components/layouts/PrimitiveLoginLayout)
@@ -350,3 +172,19 @@ Generated reference documentation for each project.
 - **Pages**
   - [PrimitiveNotFound](/reference/primitive-app/components/pages/PrimitiveNotFound)
 - [PrimitiveNotFound](/reference/primitive-app/components/PrimitiveNotFound)
+
+### Composables
+
+- [useJsBaoDataLoader](/reference/primitive-app/composables/useJsBaoDataLoader)
+- [useTheme](/reference/primitive-app/composables/useTheme)
+
+### Config
+
+- [app-config](/reference/primitive-app/config/app-config)
+- [env-config](/reference/primitive-app/config/env-config)
+- [index](/reference/primitive-app/config/index)
+- [navigation-config](/reference/primitive-app/config/navigation-config)
+
+### Utils
+
+- [Logger](/reference/primitive-app/utils/Logger)

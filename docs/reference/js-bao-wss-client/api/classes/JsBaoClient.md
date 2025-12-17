@@ -6,8 +6,6 @@
 
 # Class: JsBaoClient
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:508](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L508)
-
 JsBaoClient - Multi-tenant client for js-bao-wss
 
 Provides a hierarchical API for:
@@ -25,8 +23,6 @@ Provides a hierarchical API for:
 
 > **new JsBaoClient**(`options`): `JsBaoClient`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:781](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L781)
-
 #### Parameters
 
 ##### options
@@ -43,25 +39,9 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:781](https://github.com/P
 
 ## Properties
 
-### \_observers
-
-> **\_observers**: `Map`\<`any`, `any`\>
-
-Defined in: packages/js-bao-wss-client/node\_modules/lib0/observable.d.ts:58
-
-Some desc.
-
-#### Inherited from
-
-`Observable._observers`
-
-***
-
 ### analytics
 
 > `readonly` **analytics**: [`AnalyticsClient`](../interfaces/AnalyticsClient.md)
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:539](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L539)
 
 ***
 
@@ -69,15 +49,11 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:539](https://github.com/P
 
 > **cache**: [`CacheFacade`](../interfaces/CacheFacade.md)
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:582](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L582)
-
 ***
 
 ### documents
 
 > **documents**: `DocumentsAPI`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:640](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L640)
 
 ***
 
@@ -85,15 +61,11 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:640](https://github.com/P
 
 > **gemini**: `GeminiAPI`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:648](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L648)
-
 ***
 
 ### integrations
 
 > **integrations**: [`IntegrationsAPI`](../interfaces/IntegrationsAPI.md)
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:650](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L650)
 
 ***
 
@@ -101,15 +73,11 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:650](https://github.com/P
 
 > **llm**: `LlmAPI`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:647](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L647)
-
 ***
 
 ### me
 
 > **me**: `MeAPI`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:645](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L645)
 
 ***
 
@@ -117,23 +85,17 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:645](https://github.com/P
 
 > **session**: `SessionAPI`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:646](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L646)
-
 ***
 
 ### users
 
 > **users**: `UsersAPI`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:649](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L649)
-
 ## Methods
 
 ### addDocumentModelMapping()
 
 > **addDocumentModelMapping**(`modelName`, `documentId`): `void`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5450](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5450)
 
 #### Parameters
 
@@ -154,8 +116,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5450](https://github.com/
 ### cancelPendingCreate()
 
 > **cancelPendingCreate**(`documentId`, `opts?`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6595](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6595)
 
 #### Parameters
 
@@ -179,8 +139,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6595](https://github.com/
 
 > **checkOAuthAvailable**(): `Promise`\<`boolean`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6193](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6193)
-
 #### Returns
 
 `Promise`\<`boolean`\>
@@ -191,8 +149,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6193](https://github.com/
 
 > **clearDefaultDocumentId**(): `void`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5528](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5528)
-
 #### Returns
 
 `void`
@@ -202,8 +158,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5528](https://github.com/
 ### clearDocumentModelMapping()
 
 > **clearDocumentModelMapping**(`modelName`): `void`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5473](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5473)
 
 #### Parameters
 
@@ -221,8 +175,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5473](https://github.com/
 
 > **clearSelfRemovalPending**(`documentId`): `void`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:690](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L690)
-
 #### Parameters
 
 ##### documentId
@@ -238,8 +190,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:690](https://github.com/P
 ### closeDocument()
 
 > **closeDocument**(`documentId`, `options?`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5426](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5426)
 
 #### Parameters
 
@@ -263,8 +213,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5426](https://github.com/
 
 > **commitOfflineCreate**(`documentId`, `opts?`): `Promise`\<\{ `created`: `boolean`; `linked?`: `boolean`; `reason?`: `string`; \}\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6574](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6574)
-
 #### Parameters
 
 ##### documentId
@@ -287,8 +235,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6574](https://github.com/
 
 > **connect**(): `void`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:4967](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L4967)
-
 #### Returns
 
 `void`
@@ -298,8 +244,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:4967](https://github.com/
 ### createDocument()
 
 > **createDocument**(`options`): `Promise`\<\{ `metadata`: `any`; \}\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6516](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6516)
 
 #### Parameters
 
@@ -323,8 +267,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6516](https://github.com/
 
 > **destroy**(): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:4991](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L4991)
-
 #### Returns
 
 `Promise`\<`void`\>
@@ -339,8 +281,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:4991](https://github.com/
 
 > **disconnect**(): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:4986](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L4986)
-
 #### Returns
 
 `Promise`\<`void`\>
@@ -350,8 +290,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:4986](https://github.com/
 ### document()
 
 > **document**(`documentId`): `DocumentContext`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:642](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L642)
 
 #### Parameters
 
@@ -368,8 +306,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:642](https://github.com/P
 ### emit()
 
 > **emit**\<`K`\>(`type`, `args`): `void`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1481](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1481)
 
 Emit a named event. All registered event listeners that listen to the
 specified name will receive the event.
@@ -410,8 +346,6 @@ This should catch exceptions
 
 > **enableOfflineAccess**(`options?`): `Promise`\<\{ `enabled`: `boolean`; `method?`: `"largeBlob"` \| `"pin"` \| `"signed"`; `reason?`: `string`; \}\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5591](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5591)
-
 #### Parameters
 
 ##### options?
@@ -450,8 +384,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5591](https://github.com/
 
 > **evictAllLocal**(`opts?`): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6484](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6484)
-
 #### Parameters
 
 ##### opts?
@@ -469,8 +401,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6484](https://github.com/
 ### evictLocalDocument()
 
 > **evictLocalDocument**(`documentId`, `opts?`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6464](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6464)
 
 #### Parameters
 
@@ -498,8 +428,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6464](https://github.com/
 
 > **forceReconnect**(): `void`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:4977](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L4977)
-
 #### Returns
 
 `void`
@@ -509,8 +437,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:4977](https://github.com/
 ### getApiUrl()
 
 > **getApiUrl**(): `string`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1834](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1834)
 
 #### Returns
 
@@ -522,8 +448,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1834](https://github.com/
 
 > **getAppId**(): `string`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1838](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1838)
-
 #### Returns
 
 `string`
@@ -533,8 +457,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1838](https://github.com/
 ### getAuthPersistenceInfo()
 
 > **getAuthPersistenceInfo**(): `object`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2833](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L2833)
 
 #### Returns
 
@@ -553,8 +475,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2833](https://github.com/
 ### getAuthState()
 
 > **getAuthState**(): `object`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2815](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L2815)
 
 #### Returns
 
@@ -578,8 +498,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2815](https://github.com/
 
 > **getAwarenessStates**(`documentId`): `Map`\<`string`, `any`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5952](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5952)
-
 #### Parameters
 
 ##### documentId
@@ -596,8 +514,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5952](https://github.com/
 
 > **getBlobManager**(): `BlobManager`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1842](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1842)
-
 #### Returns
 
 `BlobManager`
@@ -607,8 +523,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1842](https://github.com/
 ### getBlobUploadConcurrency()
 
 > **getBlobUploadConcurrency**(): `number`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1850](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1850)
 
 #### Returns
 
@@ -620,8 +534,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1850](https://github.com/
 
 > **getConnectionId**(): `string`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:4982](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L4982)
-
 #### Returns
 
 `string`
@@ -632,8 +544,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:4982](https://github.com/
 
 > **getDefaultDocumentId**(): `string` \| `null`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5539](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5539)
-
 #### Returns
 
 `string` \| `null`
@@ -643,8 +553,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5539](https://github.com/
 ### getDoc()
 
 > **getDoc**(`documentId`): `Doc` \| `undefined`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5735](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5735)
 
 #### Parameters
 
@@ -662,8 +570,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5735](https://github.com/
 
 > **getDocDebug**(`documentId`): `DocumentDebugSnapshot`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6614](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6614)
-
 #### Parameters
 
 ##### documentId
@@ -679,8 +585,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6614](https://github.com/
 ### getDocHash()
 
 > **getDocHash**(`documentId`): `Promise`\<`string`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:4010](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L4010)
 
 #### Parameters
 
@@ -698,8 +602,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:4010](https://github.com/
 
 > **getDocumentModelMapping**(`modelName`): `string` \| `null`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5490](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5490)
-
 #### Parameters
 
 ##### modelName
@@ -715,8 +617,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5490](https://github.com/
 ### getDocumentPermission()
 
 > **getDocumentPermission**(`documentId`): `DocumentPermission` \| `null`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2799](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L2799)
 
 #### Parameters
 
@@ -734,8 +634,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2799](https://github.com/
 
 > **getGeminiAnalyticsContext**(): \{ `isEnabled`: (`phase?`) => `boolean`; `logEvent`: (`event`) => `void`; \} \| `null`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3468](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L3468)
-
 #### Returns
 
 \{ `isEnabled`: (`phase?`) => `boolean`; `logEvent`: (`event`) => `void`; \} \| `null`
@@ -745,8 +643,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3468](https://github.com/
 ### getGlobalAdminAppId()
 
 > **getGlobalAdminAppId**(): `string`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1871](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1871)
 
 #### Returns
 
@@ -758,8 +654,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1871](https://github.com/
 
 > **getLlmAnalyticsContext**(): \{ `isEnabled`: (`phase?`) => `boolean`; `logEvent`: (`event`) => `void`; \} \| `null`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3446](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L3446)
-
 #### Returns
 
 \{ `isEnabled`: (`phase?`) => `boolean`; `logEvent`: (`event`) => `void`; \} \| `null`
@@ -769,8 +663,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3446](https://github.com/
 ### getLocalAwarenessState()
 
 > **getLocalAwarenessState**(`documentId`): `any`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5948](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5948)
 
 #### Parameters
 
@@ -788,8 +680,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5948](https://github.com/
 
 > **getLocalMetadata**(`documentId`): `Promise`\<`LocalMetadataEntry` \| `null`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6455](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6455)
-
 #### Parameters
 
 ##### documentId
@@ -805,8 +695,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6455](https://github.com/
 ### getNetworkStatus()
 
 > **getNetworkStatus**(): `object`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6312](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6312)
 
 #### Returns
 
@@ -842,8 +730,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6312](https://github.com/
 
 > **getOfflineGrantStatus**(): `object`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5615](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5615)
-
 #### Returns
 
 `object`
@@ -870,8 +756,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5615](https://github.com/
 
 > **getOfflineIdentity**(): \{ `appId`: `string`; `email?`: `string`; `name?`: `string`; `rootDocId`: `string`; `userId`: `string`; \} \| `null`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5636](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5636)
-
 #### Returns
 
 \{ `appId`: `string`; `email?`: `string`; `name?`: `string`; `rootDocId`: `string`; `userId`: `string`; \} \| `null`
@@ -881,8 +765,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5636](https://github.com/
 ### getOfflineInfo()
 
 > **getOfflineInfo**(`documentId`): `object`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5555](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5555)
 
 #### Parameters
 
@@ -920,8 +802,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5555](https://github.com/
 
 > **getRootDocId**(): `string` \| `null`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2806](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L2806)
-
 #### Returns
 
 `string` \| `null`
@@ -931,8 +811,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2806](https://github.com/
 ### getToken()
 
 > **getToken**(): `string` \| `null`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6094](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6094)
 
 #### Returns
 
@@ -944,8 +822,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6094](https://github.com/
 
 > **getUserId**(): `string` \| `null`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2811](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L2811)
-
 #### Returns
 
 `string` \| `null`
@@ -955,8 +831,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2811](https://github.com/
 ### goOffline()
 
 > **goOffline**(`opts?`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6406](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6406)
 
 #### Parameters
 
@@ -976,8 +850,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6406](https://github.com/
 
 > **goOnline**(): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6411](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6411)
-
 #### Returns
 
 `Promise`\<`void`\>
@@ -987,8 +859,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6411](https://github.com/
 ### handleOAuthCallback()
 
 > **handleOAuthCallback**(`code`, `state`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6211](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6211)
 
 #### Parameters
 
@@ -1010,8 +880,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6211](https://github.com/
 
 > **hasIndexedDbPersistence**(`documentId`): `Promise`\<`boolean`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3581](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L3581)
-
 #### Parameters
 
 ##### documentId
@@ -1027,8 +895,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3581](https://github.com/
 ### hasLocalCopy()
 
 > **hasLocalCopy**(`documentId`): `boolean`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5579](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5579)
 
 #### Parameters
 
@@ -1046,8 +912,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5579](https://github.com/
 
 > **hasOfflineGrantStored**(): `Promise`\<`boolean`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5714](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5714)
-
 #### Returns
 
 `Promise`\<`boolean`\>
@@ -1057,8 +921,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5714](https://github.com/
 ### isAuthenticated()
 
 > **isAuthenticated**(): `boolean`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2829](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L2829)
 
 #### Returns
 
@@ -1070,8 +932,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2829](https://github.com/
 
 > **isConnected**(): `boolean`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5751](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5751)
-
 #### Returns
 
 `boolean`
@@ -1081,8 +941,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5751](https://github.com/
 ### isDocOpen()
 
 > **isDocOpen**(`documentId`): `boolean`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5747](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5747)
 
 #### Parameters
 
@@ -1100,8 +958,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5747](https://github.com/
 
 > **isDocumentReadOnly**(`documentId`): `boolean`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2794](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L2794)
-
 #### Parameters
 
 ##### documentId
@@ -1117,8 +973,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2794](https://github.com/
 ### isDocumentSynced()
 
 > **isDocumentSynced**(`documentId`): `boolean`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5755](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5755)
 
 #### Parameters
 
@@ -1136,8 +990,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5755](https://github.com/
 
 > **isMetadataDeleted**(`documentId`): `boolean`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1863](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1863)
-
 #### Parameters
 
 ##### documentId
@@ -1154,8 +1006,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1863](https://github.com/
 
 > **isOfflineGrantAvailable**(): `boolean`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5611](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5611)
-
 #### Returns
 
 `boolean`
@@ -1166,8 +1016,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5611](https://github.com/
 
 > **isOnline**(): `boolean`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6338](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6338)
-
 #### Returns
 
 `boolean`
@@ -1177,8 +1025,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6338](https://github.com/
 ### isPendingCreate()
 
 > **isPendingCreate**(`documentId`): `boolean`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6591](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6591)
 
 #### Parameters
 
@@ -1196,8 +1042,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6591](https://github.com/
 
 > **isRootDocument**(`documentId`): `boolean`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2855](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L2855)
-
 #### Parameters
 
 ##### documentId
@@ -1213,8 +1057,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2855](https://github.com/
 ### isSynced()
 
 > **isSynced**(`documentId`): `boolean`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3511](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L3511)
 
 #### Parameters
 
@@ -1232,8 +1074,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3511](https://github.com/
 
 > **listLocalDocuments**(): `Promise`\<`LocalDocumentEntry`[]\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6432](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6432)
-
 #### Returns
 
 `Promise`\<`LocalDocumentEntry`[]\>
@@ -1243,8 +1083,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6432](https://github.com/
 ### listLocalDocumentsUnified()
 
 > **listLocalDocumentsUnified**(`options?`): `Promise`\<[`DocumentInfo`](../interfaces/DocumentInfo.md)[]\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6440](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6440)
 
 #### Parameters
 
@@ -1268,8 +1106,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6440](https://github.com/
 
 > **listOpenDocuments**(): `string`[]
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6428](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6428)
-
 #### Returns
 
 `string`[]
@@ -1280,8 +1116,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6428](https://github.com/
 
 > **listPendingCreates**(): `Promise`\<`object`[]\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6585](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6585)
-
 #### Returns
 
 `Promise`\<`object`[]\>
@@ -1291,8 +1125,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6585](https://github.com/
 ### logout()
 
 > **logout**(`options?`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6115](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6115)
 
 Logout: best-effort server cookie clear, shutdown networking, clear auth state, and optional local eviction.
 - Preserves stored offline grant by default (does not delete it)
@@ -1332,8 +1164,6 @@ Logout: best-effort server cookie clear, shutdown networking, clear auth state, 
 
 > **makeRequest**(`method`, `path`, `data?`): `Promise`\<`any`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2611](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L2611)
-
 #### Parameters
 
 ##### method
@@ -1358,8 +1188,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2611](https://github.com/
 
 > **markMetadataDeleted**(`documentId`): `number` \| `undefined`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1854](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1854)
-
 #### Parameters
 
 ##### documentId
@@ -1376,8 +1204,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1854](https://github.com/
 
 > **markSelfRemovalPending**(`documentId`): `void`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:676](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L676)
-
 #### Parameters
 
 ##### documentId
@@ -1393,8 +1219,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:676](https://github.com/P
 ### off()
 
 > **off**\<`K`\>(`type`, `f`): `void`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1472](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1472)
 
 #### Type Parameters
 
@@ -1426,8 +1250,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1472](https://github.com/
 
 > **on**\<`K`\>(`type`, `f`): `void`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1463](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1463)
-
 #### Type Parameters
 
 ##### K
@@ -1458,8 +1280,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1463](https://github.com/
 
 > **once**(`name`, `f`): `void`
 
-Defined in: packages/js-bao-wss-client/node\_modules/lib0/observable.d.ts:68
-
 #### Parameters
 
 ##### name
@@ -1483,8 +1303,6 @@ Defined in: packages/js-bao-wss-client/node\_modules/lib0/observable.d.ts:68
 ### openDocument()
 
 > **openDocument**(`documentId`, `options?`): `Promise`\<`Doc`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5149](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5149)
 
 #### Parameters
 
@@ -1524,8 +1342,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5149](https://github.com/
 
 > **openDocumentByAlias**(`alias`, `options?`): `Promise`\<\{ `doc`: `Doc`; `metadata`: `LocalMetadataEntry` \| `null`; \}\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5357](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5357)
-
 #### Parameters
 
 ##### alias
@@ -1560,8 +1376,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5357](https://github.com/
 
 > **removeAwareness**(`documentId`, `clientIds`, `reason?`): `void`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3649](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L3649)
-
 #### Parameters
 
 ##### documentId
@@ -1585,8 +1399,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3649](https://github.com/
 ### removeAwarenessStates()
 
 > **removeAwarenessStates**(`documentId`, `clientIds`, `reason?`): `void`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5964](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5964)
 
 #### Parameters
 
@@ -1612,8 +1424,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5964](https://github.com/
 
 > **renewOfflineGrantOnline**(`pinProvider?`): `Promise`\<`boolean`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5624](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5624)
-
 #### Parameters
 
 ##### pinProvider?
@@ -1630,8 +1440,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5624](https://github.com/
 
 > **retryCommit**(`documentId`): `Promise`\<\{ `created`: `boolean`; \} \| `null`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6554](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6554)
-
 #### Parameters
 
 ##### documentId
@@ -1647,8 +1455,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6554](https://github.com/
 ### revokeOfflineGrant()
 
 > **revokeOfflineGrant**(`opts?`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5630](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5630)
 
 #### Parameters
 
@@ -1667,8 +1473,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5630](https://github.com/
 ### runLocalTransaction()
 
 > **runLocalTransaction**(`documentId`, `fn`): `void`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5739](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5739)
 
 #### Parameters
 
@@ -1690,8 +1494,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5739](https://github.com/
 
 > **setAwareness**(`documentId`, `state`): `void`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3516](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L3516)
-
 #### Parameters
 
 ##### documentId
@@ -1712,8 +1514,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3516](https://github.com/
 
 > **setBlobUploadConcurrency**(`value`): `void`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1846](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1846)
-
 #### Parameters
 
 ##### value
@@ -1730,8 +1530,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1846](https://github.com/
 
 > **setDefaultDocumentId**(`documentId`): `void`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5513](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5513)
-
 #### Parameters
 
 ##### documentId
@@ -1747,8 +1545,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5513](https://github.com/
 ### setLocalAwarenessState()
 
 > **setLocalAwarenessState**(`documentId`, `state`): `void`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5923](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5923)
 
 #### Parameters
 
@@ -1770,8 +1566,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5923](https://github.com/
 
 > **setLogLevel**(`level`): `void`
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5586](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5586)
-
 #### Parameters
 
 ##### level
@@ -1788,8 +1582,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5586](https://github.com/
 
 > **setNetworkMode**(`mode`): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6342](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6342)
-
 #### Parameters
 
 ##### mode
@@ -1805,8 +1597,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6342](https://github.com/
 ### setRetentionPolicy()
 
 > **setRetentionPolicy**(`opts`): `void`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6498](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6498)
 
 #### Parameters
 
@@ -1842,8 +1632,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6498](https://github.com/
 
 > **setShouldConnect**(`shouldConnect`): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5038](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5038)
-
 #### Parameters
 
 ##### shouldConnect
@@ -1859,8 +1647,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5038](https://github.com/
 ### setToken()
 
 > **setToken**(`token`, `options?`): `void`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6098](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6098)
 
 #### Parameters
 
@@ -1884,8 +1670,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6098](https://github.com/
 
 > **startNetworkSync**(`documentId`): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6416](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6416)
-
 #### Parameters
 
 ##### documentId
@@ -1901,8 +1685,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6416](https://github.com/
 ### startOAuthFlow()
 
 > **startOAuthFlow**(`continueUrl?`, `options?`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6197](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L6197)
 
 #### Parameters
 
@@ -1934,8 +1716,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:6197](https://github.com/
 
 > **syncMetadata**(`options?`): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1563](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1563)
-
 #### Parameters
 
 ##### options?
@@ -1951,8 +1731,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1563](https://github.com/
 ### syncMetadataForDocument()
 
 > **syncMetadataForDocument**(`documentId`, `options?`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1781](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1781)
 
 #### Parameters
 
@@ -1988,8 +1766,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1781](https://github.com/
 
 > **unlockOffline**(`pinProvider?`): `Promise`\<`boolean`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5605](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5605)
-
 #### Parameters
 
 ##### pinProvider?
@@ -2005,8 +1781,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5605](https://github.com/
 ### updateLocalMetadata()
 
 > **updateLocalMetadata**(`documentId`, `updates`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5106](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5106)
 
 #### Parameters
 
@@ -2034,8 +1808,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5106](https://github.com/
 
 > **updateLocalSnapshotFlag**(`documentId`, `hasSnapshot`): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3590](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L3590)
-
 #### Parameters
 
 ##### documentId
@@ -2055,8 +1827,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:3590](https://github.com/
 ### upsertServerDocuments()
 
 > **upsertServerDocuments**(`items`, `options?`): `void`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1802](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1802)
 
 #### Parameters
 
@@ -2100,8 +1870,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1802](https://github.com/
 
 > **waitForAuthBootstrap**(): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2576](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L2576)
-
 #### Returns
 
 `Promise`\<`void`\>
@@ -2111,8 +1879,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2576](https://github.com/
 ### waitForAuthReady()
 
 > **waitForAuthReady**(`options?`): `Promise`\<\{ `mode`: `"online"` \| `"offline"`; `userId`: `string`; \}\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2849](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L2849)
 
 #### Parameters
 
@@ -2131,8 +1897,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2849](https://github.com/
 ### waitForSync()
 
 > **waitForSync**(`documentId`, `timeoutMs`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5760](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L5760)
 
 #### Parameters
 
@@ -2154,8 +1918,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:5760](https://github.com/
 
 > **waitForUserId**(`options?`): `Promise`\<`string`\>
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2843](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L2843)
-
 #### Parameters
 
 ##### options?
@@ -2173,8 +1935,6 @@ Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:2843](https://github.com/
 ### exchangeOAuthCode()
 
 > `static` **exchangeOAuthCode**(`params`): `Promise`\<`string`\>
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:1522](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L1522)
 
 Exchange an OAuth authorization code for an access token without constructing a client instance.
 

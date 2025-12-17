@@ -64,14 +64,36 @@ async function buildNav() {
     const projectDir = resolve(referenceRoot, project)
     const projectItems = []
 
+    const projectEntries = await listDirSafe(projectDir)
+
+    // Top-level pages: e.g. reference/primitive-app/createPrimitiveApp.md
+    const topLevelFiles = projectEntries
+      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.md'))
+      .map((e) => e.name)
+      .sort((a, b) => a.localeCompare(b))
+
+    if (topLevelFiles.length > 0) {
+      const overviewItems = topLevelFiles.map((f) => {
+        const relFromDocs = posix.join('reference', project, f)
+        return { text: f.replace(/\.md$/i, ''), link: toVitePressLink(relFromDocs) }
+      })
+      projectItems.push({ text: 'Overview', items: overviewItems })
+    }
+
     // One level deep grouping: e.g. api/, components/
-    const sections = await listDirSafe(projectDir)
-    for (const sec of sections) {
-      if (!sec.isDirectory()) continue
-      const secDir = resolve(projectDir, sec.name)
-      const relFromReferenceRoot = posix.join(project, sec.name)
+    const sections = projectEntries
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name)
+      .sort((a, b) => a.localeCompare(b))
+
+    for (const secName of sections) {
+      // For now, we hide primitive-app "types" from the nav entirely. Component-tied types
+      // should be documented on the component pages instead.
+      if (project === 'primitive-app' && secName === 'types') continue
+      const secDir = resolve(projectDir, secName)
+      const relFromReferenceRoot = posix.join(project, secName)
       const tree = await buildTree(secDir, relFromReferenceRoot)
-      if (tree.length > 0) projectItems.push({ text: toTitle(sec.name), items: tree })
+      if (tree.length > 0) projectItems.push({ text: toTitle(secName), items: tree })
     }
 
     if (projectItems.length > 0) {

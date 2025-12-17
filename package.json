@@ -14,6 +14,7 @@
   "scripts": {
     "docs:dev": "pnpm gen:reference && vitepress dev docs",
     "docs:build": "pnpm submodules:update && pnpm gen:reference && vitepress build docs",
+    "docs:build:ci": "pnpm submodules:init && pnpm gen:reference && vitepress build docs",
     "docs:preview": "vitepress preview docs",
 
     "submodules:init": "node scripts/submodules.mjs init",
@@ -22,6 +23,7 @@
     "gen:reference": "node scripts/gen-reference.mjs",
     "gen:typedoc": "node scripts/gen-typedoc.mjs",
     "gen:vue-docs": "node scripts/gen-vue-docs.mjs",
+    "gen:primitive-app-ts": "node scripts/gen-primitive-app-ts-reference.mjs",
     "gen:reference-index": "node scripts/gen-reference-index.mjs",
 
     "docs:publish": "node scripts/publish-gh-pages.mjs"

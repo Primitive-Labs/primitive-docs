@@ -8,8 +8,6 @@
 
 > **InferAttrs**\<`TSchema`\> = `{ [K in keyof TSchema["fields"]]: FieldValue<TSchema["fields"][K]> }`
 
-Defined in: packages/js-bao-wss-client/node\_modules/js-bao/dist/index.d.ts:752
-
 ## Type Parameters
 
 ### TSchema

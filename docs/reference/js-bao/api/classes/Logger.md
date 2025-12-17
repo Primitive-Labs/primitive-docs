@@ -6,8 +6,6 @@
 
 # Class: Logger
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:81](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L81)
-
 ## Constructors
 
 ### Constructor
@@ -23,8 +21,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:81](https://github.com/Prim
 ### debug()
 
 > `static` **debug**(`message`, ...`args`): `void`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:152](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L152)
 
 #### Parameters
 
@@ -46,8 +42,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:152](https://github.com/Pri
 
 > `static` **error**(`message`, ...`args`): `void`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:101](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L101)
-
 #### Parameters
 
 ##### message
@@ -68,8 +62,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:101](https://github.com/Pri
 
 > `static` **getLogLevel**(): [`LogLevel`](../enumerations/LogLevel.md)
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:91](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L91)
-
 #### Returns
 
 [`LogLevel`](../enumerations/LogLevel.md)
@@ -79,8 +71,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:91](https://github.com/Prim
 ### info()
 
 > `static` **info**(`message`, ...`args`): `void`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:135](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L135)
 
 #### Parameters
 
@@ -102,8 +92,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:135](https://github.com/Pri
 
 > `static` **setLogCallback**(`callback`): `void`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:95](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L95)
-
 #### Parameters
 
 ##### callback
@@ -120,8 +108,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:95](https://github.com/Prim
 
 > `static` **setLogLevel**(`level`): `void`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:87](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L87)
-
 #### Parameters
 
 ##### level
@@ -137,8 +123,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:87](https://github.com/Prim
 ### verbose()
 
 > `static` **verbose**(`message`, ...`args`): `void`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:169](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L169)
 
 #### Parameters
 
@@ -159,8 +143,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:169](https://github.com/Pri
 ### warn()
 
 > `static` **warn**(`message`, ...`args`): `void`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:118](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L118)
 
 #### Parameters
 

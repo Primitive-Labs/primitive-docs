@@ -6,15 +6,11 @@
 
 # Interface: DocumentManager
 
-Defined in: [packages/js-bao/src/types/documentTypes.ts:20](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/types/documentTypes.ts#L20)
-
 ## Methods
 
 ### connectDocument()
 
 > **connectDocument**(`docId`, `yDoc`, `permissionHint`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao/src/types/documentTypes.ts:21](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/types/documentTypes.ts#L21)
 
 #### Parameters
 
@@ -40,8 +36,6 @@ Defined in: [packages/js-bao/src/types/documentTypes.ts:21](https://github.com/P
 
 > **disconnectDocument**(`docId`): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao/src/types/documentTypes.ts:26](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/types/documentTypes.ts#L26)
-
 #### Parameters
 
 ##### docId
@@ -58,8 +52,6 @@ Defined in: [packages/js-bao/src/types/documentTypes.ts:26](https://github.com/P
 
 > **getConnectedDocuments**(): `Map`\<`string`, [`ConnectedDocument`](ConnectedDocument.md)\>
 
-Defined in: [packages/js-bao/src/types/documentTypes.ts:27](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/types/documentTypes.ts#L27)
-
 #### Returns
 
 `Map`\<`string`, [`ConnectedDocument`](ConnectedDocument.md)\>
@@ -69,8 +61,6 @@ Defined in: [packages/js-bao/src/types/documentTypes.ts:27](https://github.com/P
 ### isDocumentConnected()
 
 > **isDocumentConnected**(`docId`): `boolean`
-
-Defined in: [packages/js-bao/src/types/documentTypes.ts:28](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/types/documentTypes.ts#L28)
 
 #### Parameters
 

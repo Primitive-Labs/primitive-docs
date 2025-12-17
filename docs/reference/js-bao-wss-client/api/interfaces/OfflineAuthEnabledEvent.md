@@ -6,12 +6,8 @@
 
 # Interface: OfflineAuthEnabledEvent
 
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:337](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L337)
-
 ## Properties
 
 ### method
 
 > **method**: `"largeBlob"` \| `"pin"` \| `"signed"`
-
-Defined in: [packages/js-bao-wss-client/JsBaoClient.ts:338](https://github.com/Primitive-Labs/js-bao-wss-client/blob/90911e51f7ddf72d9b0bf2042782071e5ad51418/JsBaoClient.ts#L338)

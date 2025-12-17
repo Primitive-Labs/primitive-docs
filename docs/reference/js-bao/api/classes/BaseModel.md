@@ -6,8 +6,6 @@
 
 # Class: BaseModel
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:229](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L229)
-
 ## Implements
 
 - `StringSetChangeTracker`
@@ -17,8 +15,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:229](https://github.com/Pri
 ### Constructor
 
 > **new BaseModel**(`data`): `BaseModel`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:439](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L439)
 
 #### Parameters
 
@@ -36,15 +32,11 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:439](https://github.com/Pri
 
 > **id**: `string`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:285](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L285)
-
 ***
 
 ### type
 
 > **type**: `string`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:286](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L286)
 
 ***
 
@@ -52,15 +44,11 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:286](https://github.com/Pri
 
 > `protected` `static` **connectedDocuments**: `Map`\<`string`, \{ `permissionHint`: [`DocumentPermissionHint`](../type-aliases/DocumentPermissionHint.md); `yDoc`: `Doc`; \}\>
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:259](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L259)
-
 ***
 
 ### dbInstance
 
 > `protected` `static` **dbInstance**: [`DatabaseEngine`](DatabaseEngine.md) \| `null` = `null`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:256](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L256)
 
 ***
 
@@ -68,15 +56,11 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:256](https://github.com/Pri
 
 > `protected` `static` **documentYMaps**: `Map`\<`string`, `YMap`\<`any`\>\>
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:263](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L263)
-
 ***
 
 ### modelName?
 
 > `static` `optional` **modelName**: `string`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:230](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L230)
 
 ## Accessors
 
@@ -85,8 +69,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:230](https://github.com/Pri
 #### Get Signature
 
 > **get** **hasUnsavedChanges**(): `boolean`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:809](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L809)
 
 ##### Returns
 
@@ -100,100 +82,15 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:809](https://github.com/Pri
 
 > **get** **isDirty**(): `boolean`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:805](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L805)
-
 ##### Returns
 
 `boolean`
 
 ## Methods
 
-### \_buildUniqueKey()
-
-> `protected` **\_buildUniqueKey**(`fields`, `data`, `modelName`, `constraintName`): `string` \| `null`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:1729](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L1729)
-
-#### Parameters
-
-##### fields
-
-`string`[]
-
-##### data
-
-`Record`\<`string`, `any`\>
-
-##### modelName
-
-`string`
-
-##### constraintName
-
-`string`
-
-#### Returns
-
-`string` \| `null`
-
-***
-
-### \_deepEqual()
-
-> `protected` **\_deepEqual**(`a`, `b`): `boolean`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:1678](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L1678)
-
-Deep equality check for comparing field values
-
-#### Parameters
-
-##### a
-
-`any`
-
-##### b
-
-`any`
-
-#### Returns
-
-`boolean`
-
-***
-
-### \_diffWithYjsData()
-
-> `protected` **\_diffWithYjsData**(): `object`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:1501](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L1501)
-
-Utility to diff current instance data against YJS nested map data
-Returns object with added, modified, and removed fields
-
-#### Returns
-
-`object`
-
-##### added
-
-> **added**: `Record`\<`string`, `any`\>
-
-##### modified
-
-> **modified**: `Record`\<`string`, `any`\>
-
-##### removed
-
-> **removed**: `string`[]
-
-***
-
 ### delete()
 
 > **delete**(): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:2186](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L2186)
 
 #### Returns
 
@@ -205,8 +102,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:2186](https://github.com/Pr
 
 > **discardChanges**(): `void`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:820](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L820)
-
 #### Returns
 
 `void`
@@ -216,8 +111,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:820](https://github.com/Pri
 ### getChangedFields()
 
 > **getChangedFields**(): `string`[]
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:883](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L883)
 
 #### Returns
 
@@ -229,8 +122,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:883](https://github.com/Pri
 
 > `protected` **getCurrentJSState**(): `Record`\<`string`, `any`\>
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:2278](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L2278)
-
 #### Returns
 
 `Record`\<`string`, `any`\>
@@ -240,8 +131,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:2278](https://github.com/Pr
 ### getCurrentValue()
 
 > **getCurrentValue**(`fieldKey`): `any`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:891](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L891)
 
 #### Parameters
 
@@ -259,8 +148,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:891](https://github.com/Pri
 
 > **getDocumentId**(): `string` \| `null`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:280](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L280)
-
 Returns the document id this instance is associated with, or null if not resolved yet.
 
 #### Returns
@@ -272,8 +159,6 @@ Returns the document id this instance is associated with, or null if not resolve
 ### getOriginalValue()
 
 > **getOriginalValue**(`fieldKey`): `any`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:887](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L887)
 
 #### Parameters
 
@@ -291,8 +176,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:887](https://github.com/Pri
 
 > **hasFieldChanged**(`fieldKey`): `boolean`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:895](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L895)
-
 #### Parameters
 
 ##### fieldKey
@@ -308,8 +191,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:895](https://github.com/Pri
 ### markStringSetChange()
 
 > **markStringSetChange**(`fieldName`, `operation`, `value?`): `void`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:900](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L900)
 
 #### Parameters
 
@@ -339,8 +220,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:900](https://github.com/Pri
 
 > **save**(`options?`): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:1744](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L1744)
-
 #### Parameters
 
 ##### options?
@@ -357,8 +236,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:1744](https://github.com/Pr
 
 > `protected` **toJSON**(): `Record`\<`string`, `any`\>
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:2325](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L2325)
-
 #### Returns
 
 `Record`\<`string`, `any`\>
@@ -369,8 +246,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:2325](https://github.com/Pr
 
 > `protected` **validateBeforeSave**(): `void`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:839](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L839)
-
 #### Returns
 
 `void`
@@ -380,8 +255,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:839](https://github.com/Pri
 ### validateFieldValue()
 
 > `protected` **validateFieldValue**(`fieldKey`, `value`): `void`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:825](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L825)
 
 #### Parameters
 
@@ -399,59 +272,9 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:825](https://github.com/Pri
 
 ***
 
-### \_buildKeyFromValues()
-
-> `protected` `static` **\_buildKeyFromValues**(`fields`, `keyValues`, `modelName`, `constraintName`): `string` \| `null`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:1706](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L1706)
-
-#### Parameters
-
-##### fields
-
-`string`[]
-
-##### keyValues
-
-`any`[]
-
-##### modelName
-
-`string`
-
-##### constraintName
-
-`string`
-
-#### Returns
-
-`string` \| `null`
-
-***
-
-### \_clearMappingsForDocId()
-
-> `static` **\_clearMappingsForDocId**(`docId`): `void`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:381](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L381)
-
-#### Parameters
-
-##### docId
-
-`string`
-
-#### Returns
-
-`void`
-
-***
-
 ### aggregate()
 
 > `static` **aggregate**\<`T`\>(`this`, `options`): `Promise`\<`AggregationResult`\>
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:2589](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L2589)
 
 Main aggregation API - performs grouping, faceting, and statistical operations
 
@@ -520,8 +343,6 @@ const urgentCounts = await Model.aggregate({
 
 > `static` **attachFieldAccessors**(`modelClass`, `fields`): `void`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:405](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L405)
-
 #### Parameters
 
 ##### modelClass
@@ -541,8 +362,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:405](https://github.com/Pri
 ### buildAggregationQuery()
 
 > `protected` `static` **buildAggregationQuery**(`options`, `schema`, `modelName`): `AggregationQueryPlan`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:2700](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L2700)
 
 Build SQL query for structured aggregation
 
@@ -569,8 +388,6 @@ Build SQL query for structured aggregation
 ### buildRegularAggregationQuery()
 
 > `protected` `static` **buildRegularAggregationQuery**(`regularGroupBy`, `stringSetMemberships`, `options`, `translator`, `modelName`): `AggregationQueryPlan`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:2852](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L2852)
 
 Build query for regular field aggregation
 
@@ -606,8 +423,6 @@ Build query for regular field aggregation
 
 > `protected` `static` **buildStringSetFacetQuery**(`stringSetFields`, `options`, `translator`, `modelName`): `AggregationQueryPlan`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:2778](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L2778)
-
 Build query for StringSet facet counts
 
 #### Parameters
@@ -638,8 +453,6 @@ Build query for StringSet facet counts
 
 > `static` **cleanupDocumentData**(`docId`): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:1419](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L1419)
-
 #### Parameters
 
 ##### docId
@@ -656,8 +469,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:1419](https://github.com/Pr
 
 > `static` **clearGlobalDefaultDocumentId**(): `void`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:340](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L340)
-
 #### Returns
 
 `void`
@@ -668,8 +479,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:340](https://github.com/Pri
 
 > `static` **clearModelDefaultDocumentIds**(): `void`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:318](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L318)
-
 #### Returns
 
 `void`
@@ -679,8 +488,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:318](https://github.com/Pri
 ### count()
 
 > `static` **count**(`this`, `filter`, `options?`): `Promise`\<`number`\>
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:3174](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L3174)
 
 Document-style count API
 
@@ -708,8 +515,6 @@ Document-style count API
 
 > `static` **find**\<`T`\>(`this`, `id`): `Promise`\<`T` \| `null`\>
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:2329](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L2329)
-
 #### Type Parameters
 
 ##### T
@@ -736,8 +541,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:2329](https://github.com/Pr
 
 > `static` **findAll**\<`T`\>(`this`): `Promise`\<`T`[]\>
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:3214](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L3214)
-
 #### Type Parameters
 
 ##### T
@@ -759,8 +562,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:3214](https://github.com/Pr
 ### findByUnique()
 
 > `static` **findByUnique**\<`T`\>(`this`, `constraintName`, `value`): `Promise`\<`T` \| `null`\>
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:3297](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L3297)
 
 #### Type Parameters
 
@@ -792,8 +593,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:3297](https://github.com/Pr
 
 > `protected` `static` **getDatabaseJunctionTableName**(`modelName`, `fieldName`): `string`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:2763](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L2763)
-
 Get the proper database junction table name for StringSet fields
 
 #### Parameters
@@ -816,8 +615,6 @@ Get the proper database junction table name for StringSet fields
 
 > `protected` `static` **getDatabaseTableName**(`modelName`): `string`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:2755](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L2755)
-
 Get the proper database table name (should match database engine naming)
 
 #### Parameters
@@ -836,8 +633,6 @@ Get the proper database table name (should match database engine naming)
 
 > `static` **getDocumentIdForModel**(`modelName`): `string` \| `undefined`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:354](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L354)
-
 #### Parameters
 
 ##### modelName
@@ -854,8 +649,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:354](https://github.com/Pri
 
 > `static` **getGlobalDefaultDocumentId**(): `string` \| `undefined`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:358](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L358)
-
 #### Returns
 
 `string` \| `undefined`
@@ -865,8 +658,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:358](https://github.com/Pri
 ### getLogLevel()
 
 > `static` **getLogLevel**(): [`LogLevel`](../enumerations/LogLevel.md)
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:293](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L293)
 
 #### Returns
 
@@ -878,8 +669,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:293](https://github.com/Pri
 
 > `static` **getModelDefaultDocumentMapping**(): `Record`\<`string`, `string`\>
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:350](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L350)
-
 #### Returns
 
 `Record`\<`string`, `string`\>
@@ -889,8 +678,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:350](https://github.com/Pri
 ### initialize()
 
 > `static` **initialize**(`_yDoc`, `_db`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:985](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L985)
 
 #### Parameters
 
@@ -911,8 +698,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:985](https://github.com/Pri
 ### initializeForDocument()
 
 > `static` **initializeForDocument**(`yDoc`, `db`, `docId`, `permissionHint`): `Promise`\<`void`\>
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:992](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L992)
 
 #### Parameters
 
@@ -942,8 +727,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:992](https://github.com/Pri
 
 > `static` **migrateToNestedYMaps**(): `Promise`\<`void`\>
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:1480](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L1480)
-
 Legacy migration method - no longer needed in the new multidoc architecture.
 Data migration is now handled during document initialization.
 
@@ -957,8 +740,6 @@ Data migration is now handled during document initialization.
 
 > `protected` `static` **notifyListeners**(): `void`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:1459](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L1459)
-
 #### Returns
 
 `void`
@@ -968,8 +749,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:1459](https://github.com/Pr
 ### onDefaultDocChanged()
 
 > `static` **onDefaultDocChanged**(`listener`): () => `void`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:362](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L362)
 
 #### Parameters
 
@@ -991,8 +770,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:362](https://github.com/Pri
 
 > `static` **onModelDocMappingChanged**(`listener`): () => `void`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:369](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L369)
-
 #### Parameters
 
 ##### listener
@@ -1012,8 +789,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:369](https://github.com/Pri
 ### processAggregationResults()
 
 > `protected` `static` **processAggregationResults**(`results`, `options`, `aliasMetadata?`): `AggregationResult`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:3039](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L3039)
 
 Process aggregation results into nested structure
 
@@ -1040,8 +815,6 @@ Process aggregation results into nested structure
 ### query()
 
 > `static` **query**\<`T`, `P`\>(`this`, `filter`, `options?`): `Promise`\<[`PaginatedResult`](../interfaces/PaginatedResult.md)\<[`QueryResult`](../type-aliases/QueryResult.md)\<`T`, `P`\>\>\>
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:2416](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L2416)
 
 Document-style query API - returns paginated results
 
@@ -1079,8 +852,6 @@ Document-style query API - returns paginated results
 
 > `static` **queryOne**\<`T`, `P`\>(`this`, `filter`, `options?`): `Promise`\<[`QueryResult`](../type-aliases/QueryResult.md)\<`T`, `P`\> \| `null`\>
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:3155](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L3155)
-
 Document-style query API - returns single result or null
 
 #### Type Parameters
@@ -1117,8 +888,6 @@ Document-style query API - returns single result or null
 
 > `static` **removeModelDefaultDocumentId**(`modelName`): `void`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:308](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L308)
-
 #### Parameters
 
 ##### modelName
@@ -1134,8 +903,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:308](https://github.com/Pri
 ### setGlobalDefaultDocumentId()
 
 > `static` **setGlobalDefaultDocumentId**(`docId`): `void`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:330](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L330)
 
 #### Parameters
 
@@ -1153,8 +920,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:330](https://github.com/Pri
 
 > `static` **setLogLevel**(`level`): `void`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:289](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L289)
-
 #### Parameters
 
 ##### level
@@ -1170,8 +935,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:289](https://github.com/Pri
 ### setModelDefaultDocumentId()
 
 > `static` **setModelDefaultDocumentId**(`modelName`, `docId`): `void`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:298](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L298)
 
 #### Parameters
 
@@ -1192,8 +955,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:298](https://github.com/Pri
 ### setupNestedYMapObserver()
 
 > `protected` `static` **setupNestedYMapObserver**(`recordId`, `recordYMap`): `void`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:3691](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L3691)
 
 Sets up deep observation on a nested YMap to sync field-level changes to the database
 
@@ -1216,8 +977,6 @@ Sets up deep observation on a nested YMap to sync field-level changes to the dat
 ### setupNestedYMapObserverForDocument()
 
 > `protected` `static` **setupNestedYMapObserverForDocument**(`recordId`, `recordYMap`, `docId`, `permissionHint`): `void`
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:3786](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L3786)
 
 Sets up deep observation on a nested YMap for a specific document to sync field-level changes to the database
 
@@ -1249,8 +1008,6 @@ Sets up deep observation on a nested YMap for a specific document to sync field-
 
 > `static` **subscribe**(`callback`): () => `void`
 
-Defined in: [packages/js-bao/src/models/BaseModel.ts:1443](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L1443)
-
 #### Parameters
 
 ##### callback
@@ -1270,8 +1027,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:1443](https://github.com/Pr
 ### upsertByUnique()
 
 > `static` **upsertByUnique**\<`T`\>(`this`, `constraintName`, `uniqueLookupValue`, `dataToUpsert`, `options?`): `Promise`\<`T`\>
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:3434](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L3434)
 
 #### Type Parameters
 
@@ -1320,8 +1075,6 @@ Defined in: [packages/js-bao/src/models/BaseModel.ts:3434](https://github.com/Pr
 ### withTransaction()
 
 > `static` **withTransaction**\<`T`\>(`callback`): `Promise`\<`T`\>
-
-Defined in: [packages/js-bao/src/models/BaseModel.ts:3629](https://github.com/Primitive-Labs/js-bao/blob/d6b81890987ee335c8e147209b438e3cc96658ff/src/models/BaseModel.ts#L3629)
 
 Execute a callback with automatic transaction handling for all modified models
 

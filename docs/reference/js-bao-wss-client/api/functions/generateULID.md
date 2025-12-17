@@ -8,8 +8,6 @@
 
 > **generateULID**(): `string`
 
-Defined in: packages/js-bao-wss-client/node\_modules/js-bao/dist/index.d.ts:451
-
 ## Returns
 
 `string`
