@@ -1325,7 +1325,7 @@ Logout: best-effort server cookie clear, shutdown networking, clear auth state, 
 
 ### removeAwareness()
 
-> **removeAwareness**(`documentId`, `clientIds`, `reason?`): `void`
+> **removeAwareness**(`documentId`, `clientIds`, `_reason?`): `void`
 
 #### Parameters
 
@@ -1337,7 +1337,7 @@ Logout: best-effort server cookie clear, shutdown networking, clear auth state, 
 
 `string`[]
 
-##### reason?
+##### \_reason?
 
 `string`
 
@@ -1349,7 +1349,7 @@ Logout: best-effort server cookie clear, shutdown networking, clear auth state, 
 
 ### removeAwarenessStates()
 
-> **removeAwarenessStates**(`documentId`, `clientIds`, `reason?`): `void`
+> **removeAwarenessStates**(`documentId`, `clientIds`, `_reason?`): `void`
 
 #### Parameters
 
@@ -1361,7 +1361,7 @@ Logout: best-effort server cookie clear, shutdown networking, clear auth state, 
 
 `string`[]
 
-##### reason?
+##### \_reason?
 
 `string`
 

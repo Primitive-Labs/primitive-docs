@@ -25,13 +25,22 @@ Create a new repo (e.g. `primitive-docs`) that:
 - Pulls in **generated reference documentation** from each library
 
 ### Git Submodules for Libraries
-Each library repo is included as a **git submodule** under:
+Each library monorepo is included as a **git submodule** under:
+
+```
+library_repos/
+  js-bao/
+  js-bao-wss/
+  primitive-app-dev/
+```
+
+And `packages/**` contains **symlinks** into those submodules to preserve the public package layout expected by generation scripts:
 
 ```
 packages/
-  js-bao/
-  js-bao-wss-client/
-  primitive-app/
+  js-bao/            -> ../library_repos/js-bao
+  js-bao-wss-client/ -> ../library_repos/js-bao-wss/src/client
+  primitive-app/     -> ../library_repos/primitive-app-dev/primitive-app
 ```
 
 This allows:

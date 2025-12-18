@@ -2,7 +2,8 @@
 
 This repo (`primitive-docs`) builds a unified documentation site for multiple projects by:
 
-- Keeping source code in `packages/**` (git submodules)
+- Keeping editable library repos in `library_repos/**` (git submodules)
+- Symlinking into `packages/**` to preserve the expected package layout
 - Generating reference docs into `docs/reference/**` (**committed**)
 - Serving and building the site with VitePress from `docs/`
 

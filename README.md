@@ -7,10 +7,14 @@ Unified documentation site for Primitive Labs projects, built with **VitePress**
 - `docs/`: VitePress site (manual guides + generated reference)
   - `docs/guide/**`: hand-written docs
   - `docs/reference/**`: generated reference docs (**committed**)
-- `packages/**`: git submodules (source-of-truth code)
-  - `packages/js-bao`
-  - `packages/js-bao-wss-client`
-  - `packages/primitive-app`
+- `library_repos/**`: git submodules (editable source-of-truth repos)
+  - `library_repos/js-bao`
+  - `library_repos/js-bao-wss`
+  - `library_repos/primitive-app-dev`
+- `packages/**`: symlinks into `library_repos/**` that preserve the public package layout used by scripts/docs
+  - `packages/js-bao` → `../library_repos/js-bao`
+  - `packages/js-bao-wss-client` → `../library_repos/js-bao-wss/src/client`
+  - `packages/primitive-app` → `../library_repos/primitive-app-dev/primitive-app`
 
 ## Setup
 
