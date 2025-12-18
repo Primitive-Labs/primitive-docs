@@ -6,9 +6,9 @@
     "node": ">=22"
   },
   "devDependencies": {
-    "typedoc": "^0.28.0",
+    "typedoc": "^0.28.15",
     "typedoc-plugin-markdown": "^4.9.0",
-    "vitepress": "^2.0.0-alpha.15",
+    "vitepress": "2.0.0-alpha.15",
     "vue-docgen-cli": "^4.79.0"
   },
   "scripts": {
@@ -16,16 +16,13 @@
     "docs:build": "pnpm submodules:update && pnpm gen:reference && vitepress build docs",
     "docs:build:ci": "pnpm submodules:init && pnpm gen:reference && vitepress build docs",
     "docs:preview": "vitepress preview docs",
-
     "submodules:init": "node scripts/submodules.mjs init",
     "submodules:update": "node scripts/submodules.mjs update",
-
     "gen:reference": "node scripts/gen-reference.mjs",
     "gen:typedoc": "node scripts/gen-typedoc.mjs",
     "gen:vue-docs": "node scripts/gen-vue-docs.mjs",
     "gen:primitive-app-ts": "node scripts/gen-primitive-app-ts-reference.mjs",
     "gen:reference-index": "node scripts/gen-reference-index.mjs",
-
     "docs:publish": "node scripts/publish-gh-pages.mjs"
   }
 }

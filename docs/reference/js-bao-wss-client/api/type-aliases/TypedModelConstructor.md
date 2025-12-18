@@ -6,7 +6,7 @@
 
 # Type Alias: TypedModelConstructor\<TModel\>
 
-> **TypedModelConstructor**\<`TModel`\> = (`attrs?`) => `TModel` & *typeof* `BaseModel` & `object`
+> **TypedModelConstructor**\<`TModel`\> = (`attrs?`) => `TModel` & *typeof* [`initJsBao`](../variables/initJsBao.md) & `object`
 
 Helper type that preserves the instance + static typing of schema-built models.
 Use this to annotate models passed into JsBaoClient so constructor + statics stay typed.
@@ -21,4 +21,4 @@ Use this to annotate models passed into JsBaoClient so constructor + statics sta
 
 ### TModel
 
-`TModel` *extends* `BaseModel` = `BaseModel`
+`TModel` *extends* [`initJsBao`](../variables/initJsBao.md) = [`initJsBao`](../variables/initJsBao.md)

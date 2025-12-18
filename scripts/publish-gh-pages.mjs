@@ -6,6 +6,11 @@ function run(cmd, args, opts = {}) {
   if (res.status !== 0) process.exit(res.status ?? 1)
 }
 
+function tryRun(cmd, args, opts = {}) {
+  const res = spawnSync(cmd, args, { stdio: 'inherit', ...opts })
+  return res.status ?? 1
+}
+
 function ensureGitRepo() {
   const res = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], { stdio: 'ignore' })
   if (res.status !== 0) {
@@ -14,7 +19,16 @@ function ensureGitRepo() {
   }
 }
 
+function ensureOriginRemote() {
+  const res = spawnSync('git', ['remote', 'get-url', 'origin'], { stdio: 'ignore' })
+  if (res.status !== 0) {
+    console.error('Missing git remote "origin". Add it, or edit this script to push to a different remote.')
+    process.exit(1)
+  }
+}
+
 ensureGitRepo()
+ensureOriginRemote()
 
 if (!existsSync('docs/.vitepress/dist')) {
   console.log('[publish] Building site...')
@@ -26,7 +40,8 @@ if (!existsSync('docs/.vitepress/dist')) {
 const worktreeDir = '.gh-pages-worktree'
 
 console.log('[publish] Preparing gh-pages worktree...')
-run('git', ['worktree', 'remove', '--force', worktreeDir], { stdio: 'ignore' })
+// If the worktree doesn't exist yet, git exits non-zero (often 128). That's fine.
+tryRun('git', ['worktree', 'remove', '--force', worktreeDir], { stdio: 'ignore' })
 
 // Create gh-pages branch if needed
 const hasGhPages =

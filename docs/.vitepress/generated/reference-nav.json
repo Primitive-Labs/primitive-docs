@@ -268,24 +268,8 @@
               "text": "Functions",
               "items": [
                 {
-                  "text": "createModelClass",
-                  "link": "/reference/js-bao-wss-client/api/functions/createModelClass"
-                },
-                {
-                  "text": "defineModelSchema",
-                  "link": "/reference/js-bao-wss-client/api/functions/defineModelSchema"
-                },
-                {
-                  "text": "generateULID",
-                  "link": "/reference/js-bao-wss-client/api/functions/generateULID"
-                },
-                {
                   "text": "initializeClient",
                   "link": "/reference/js-bao-wss-client/api/functions/initializeClient"
-                },
-                {
-                  "text": "initJsBao",
-                  "link": "/reference/js-bao-wss-client/api/functions/initJsBao"
                 },
                 {
                   "text": "isJsBaoError",
@@ -331,10 +315,6 @@
                 {
                   "text": "CacheFacade",
                   "link": "/reference/js-bao-wss-client/api/interfaces/CacheFacade"
-                },
-                {
-                  "text": "DatabaseConfig",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseConfig"
                 },
                 {
                   "text": "DocumentAccessResult",
@@ -453,14 +433,6 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/OfflineAuthUnlockedEvent"
                 },
                 {
-                  "text": "PaginatedResult",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/PaginatedResult"
-                },
-                {
-                  "text": "PaginationOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/PaginationOptions"
-                },
-                {
                   "text": "PendingCreateCommittedEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/PendingCreateCommittedEvent"
                 },
@@ -506,16 +478,21 @@
                   "link": "/reference/js-bao-wss-client/api/type-aliases/GeminiRole"
                 },
                 {
-                  "text": "InferAttrs",
-                  "link": "/reference/js-bao-wss-client/api/type-aliases/InferAttrs"
-                },
-                {
                   "text": "JsBaoErrorCode",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/JsBaoErrorCode"
                 },
                 {
                   "text": "TypedModelConstructor",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/TypedModelConstructor"
+                }
+              ]
+            },
+            {
+              "text": "Variables",
+              "items": [
+                {
+                  "text": "initJsBao",
+                  "link": "/reference/js-bao-wss-client/api/variables/initJsBao"
                 }
               ]
             },
