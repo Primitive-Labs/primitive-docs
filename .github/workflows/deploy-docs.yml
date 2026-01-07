@@ -25,6 +25,11 @@ jobs:
           # to the submodule repos and store it as a repo secret named SUBMODULES_TOKEN.
           token: ${{ secrets.SUBMODULES_TOKEN }}
 
+      - name: Configure git for private npm dependencies
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.SUBMODULES_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${{ secrets.SUBMODULES_TOKEN }}@github.com/".insteadOf "git@github.com:"
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
