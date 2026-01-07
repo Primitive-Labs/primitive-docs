@@ -171,12 +171,12 @@ export default defineConfig({
         text: 'Getting Started',
         items: [
           { text: 'Overview', link: '/' },
-          { text: 'Primitive Stack Overview', link: '/getting-started/stack-overview' },
           { text: 'Starting with the Template App', link: '/getting-started/template-app' },
           { text: 'The Local-First Model', link: '/getting-started/local-first-model' },
           { text: 'Understanding Documents', link: '/getting-started/understanding-documents' },
           { text: 'Working with Data', link: '/getting-started/working-with-data' },
           { text: 'Other Services', link: '/getting-started/other-services' },
+          { text: 'Primitive Stack Overview', link: '/getting-started/stack-overview' },
           { text: 'Is Primitive Right for You?', link: '/getting-started/good-and-bad-apps' },
         ],
         collapsible: true,
