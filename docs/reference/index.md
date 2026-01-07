@@ -179,6 +179,24 @@ Generated reference documentation for each project.
 - [index](/reference/primitive-app/config/index)
 - [navigation-config](/reference/primitive-app/config/navigation-config)
 
+### Router
+
+- [primitiveRouter](/reference/primitive-app/router/primitiveRouter)
+
+### Services
+
+- [JsBaoClientService](/reference/primitive-app/services/JsBaoClientService)
+
+### Stores
+
+- [appConfigStore](/reference/primitive-app/stores/appConfigStore)
+- [breadcrumbsStore](/reference/primitive-app/stores/breadcrumbsStore)
+- [jsBaoDocumentsStore](/reference/primitive-app/stores/jsBaoDocumentsStore)
+- [multiDocumentStore](/reference/primitive-app/stores/multiDocumentStore)
+- [navigationStore](/reference/primitive-app/stores/navigationStore)
+- [singleDocumentStore](/reference/primitive-app/stores/singleDocumentStore)
+- [userStore](/reference/primitive-app/stores/userStore)
+
 ### Utils
 
 - [Logger](/reference/primitive-app/utils/Logger)

@@ -2,6 +2,10 @@
 
 This guide covers how to define data models and perform create, read, update, and delete operations in your Primitive app. By the end, you'll understand how to model your app's data and work with it effectively.
 
+::: tip Framework Agnostic
+The js-bao library shown here is **plain JavaScript/TypeScript** and works with any framework—Vue, React, Svelte, or vanilla JS. The Vue-specific examples (like `useJsBaoDataLoader`) are helpers from our template; the core model and query APIs work everywhere.
+:::
+
 ## Defining Models
 
 Models define the shape of your data. Each model corresponds to a type of record in your app—like `Task`, `Project`, or `Contact`.
@@ -375,9 +379,9 @@ const unsubscribe = Task.subscribe(() => {
 unsubscribe();
 ```
 
-### Using the Data Loader (Recommended)
+### Using the Data Loader (Vue Template)
 
-In Vue components, use `useJsBaoDataLoader` for automatic subscription handling:
+If you're using our Vue template, `useJsBaoDataLoader` provides automatic subscription handling:
 
 ```typescript
 import { useJsBaoDataLoader, useSingleDocumentStore } from "primitive-app";

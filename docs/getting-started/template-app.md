@@ -87,6 +87,14 @@ Open `http://localhost:5173` in your browser. You should see your app's login sc
 - Offline support
 - A Vue + TypeScript + Tailwind foundation
 
+## Why Vue?
+
+The template uses Vue 3 because it produces cleaner, more maintainable code—especially when working with AI coding assistants. Vue's straightforward reactivity model avoids the complexity of patterns like React's `useEffect` chains.
+
+::: tip Using Other Frameworks
+The core libraries—**js-bao** and **js-bao-wss-client**—are plain JavaScript and work with any framework. If you prefer React, Svelte, Solid, or vanilla JS, you can use these libraries directly. You'll just need to handle the framework integration yourself rather than using our Vue-specific `primitive-app` helpers.
+:::
+
 ## What's in the Template?
 
 The template gives you a production-ready starting point:

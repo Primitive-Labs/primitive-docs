@@ -111,48 +111,12 @@ Apps that need significant processing that can't run in the browser:
 
 Apps that need to query across all users' data:
 
-- ❌ Admin dashboards showing aggregate user data
 - ❌ Recommendation engines based on all user behavior
 - ❌ Apps needing SQL joins across different users' data
 
-**Why it doesn't fit:** Each user's data lives in their own documents. Global queries across all users aren't part of the model.
+**Why it doesn't fit:** Each user's data lives in their own documents. You can't directly query data stored in documents across all users—there's no global database to run SQL against.
 
-## Gray Areas
-
-Some apps could go either way depending on your requirements:
-
-### Social Apps with Private + Public Data
-
-If your app has both private user data (my posts, my profile) and public feeds:
-
-- Consider: Can you use Primitive for the private/collaborative parts and a traditional backend for the public parts?
-- Example: A journaling app (Primitive) with optional public publishing (separate backend)
-
-### Apps with Optional Collaboration
-
-If collaboration is a "nice to have" rather than core:
-
-- Consider: Is the offline + instant update experience worth the architecture change?
-- If collaboration is rare, a simpler traditional architecture might be easier
-
-### Apps with Moderate Data Volumes
-
-If you're unsure whether your data will fit the document size guidelines:
-
-- Start with Primitive and see how it performs
-- You can split data across documents if needed
-- Consider what data is "active" vs. "archival"
-
-## Primitive's Sweet Spot
-
-The ideal Primitive app:
-
-1. **User-owned data** — Each user has their own data that they control
-2. **Collaboration is valuable** — Sharing and real-time updates improve the experience
-3. **Works on desktop and mobile web** — PWA-friendly apps
-4. **Moderate data volumes** — Up to ~10MB per document is comfortable
-5. **Offline is a feature** — Users benefit from working without connectivity
-6. **Simple backend needs** — Data storage, auth, sync are the main requirements
+However, Primitive includes a built-in analytics solution that captures events and enables cross-user analytics dashboards. So while you can't query the raw document data across users, you can track events and build admin dashboards showing aggregate metrics.
 
 ## Making the Decision
 

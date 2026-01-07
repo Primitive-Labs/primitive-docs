@@ -66,6 +66,37 @@ function cleanJsDocForMarkdown(jsDoc) {
   return out.length ? out : null
 }
 
+/**
+ * Extract module-level JSDoc comment (one that starts with @module).
+ * This is typically at the top of the file before any imports.
+ */
+function extractModuleLevelJsDoc(src) {
+  // Look for a JSDoc comment at the start of the file (possibly after shebang or whitespace)
+  const match = src.match(/^\s*(\/\*\*[\s\S]*?\*\/)/m)
+  if (!match) return null
+  
+  const jsDoc = match[1]
+  // Check if this is a module-level doc (contains @module)
+  if (!jsDoc.includes('@module')) return null
+  
+  return jsDoc
+}
+
+function cleanModuleJsDocForMarkdown(jsDoc) {
+  if (!jsDoc) return null
+  
+  // Strip /**, */, and leading * spacing
+  let lines = jsDoc
+    .split('\n')
+    .map((l) => l.replace(/^\s*\/\*\*\s?/, '').replace(/\*\/\s*$/, '').replace(/^\s*\*\s?/, ''))
+  
+  // Remove the @module line itself since we use the filename as title
+  lines = lines.filter((l) => !l.trim().startsWith('@module'))
+  
+  const out = lines.join('\n').trim()
+  return out.length ? out : null
+}
+
 function scanBalanced(src, startIdx, openChar, closeChar) {
   let i = startIdx
   while (i < src.length && src[i] !== openChar) i++
@@ -146,11 +177,13 @@ function extractExportedTypeSymbols(src) {
   return symbols
 }
 
-function mdForTsFile({ title, relFromRepoRoot, description, exportedTypes }) {
+function mdForTsFile({ title, relFromRepoRoot, description, moduleDescription, exportedTypes }) {
   const lines = [`# ${title}`, '']
 
-  if (description) {
-    lines.push(description, '')
+  // Prefer module-level description over function-level
+  const mainDescription = moduleDescription || description
+  if (mainDescription) {
+    lines.push(mainDescription, '')
   }
   if (exportedTypes && exportedTypes.length > 0) {
     lines.push('## Exported types', '')
@@ -161,6 +194,11 @@ function mdForTsFile({ title, relFromRepoRoot, description, exportedTypes }) {
   return lines.join('\n')
 }
 
+// Files to exclude from documentation generation (internal/debug utilities)
+const EXCLUDED_FILES = new Set([
+  'documentDebuggerStore.ts',
+])
+
 async function generateSection(sectionName, srcSubdir) {
   const srcDir = resolve(srcRoot, srcSubdir)
   if (!existsSync(srcDir)) return
@@ -168,7 +206,9 @@ async function generateSection(sectionName, srcSubdir) {
   const outDir = resolve(outBase, sectionName)
   await cleanDir(outDir)
 
-  const files = (await listTsFiles(srcDir)).sort((a, b) => a.localeCompare(b))
+  const files = (await listTsFiles(srcDir))
+    .filter((f) => !EXCLUDED_FILES.has(f.split('/').pop()))
+    .sort((a, b) => a.localeCompare(b))
   for (const abs of files) {
     const relFromSrcSubdir = abs.slice(srcDir.length + 1).replaceAll('\\', '/')
     const outPath = resolve(outDir, relFromSrcSubdir.replace(/\.ts$/, '.md'))
@@ -183,6 +223,12 @@ async function generateSection(sectionName, srcSubdir) {
     )
 
     const fileBaseName = relFromSrcSubdir.split('/').pop()?.replace(/\.ts$/, '') ?? relFromSrcSubdir
+    
+    // Try to extract module-level JSDoc first
+    const moduleJsDoc = extractModuleLevelJsDoc(src)
+    const moduleDescription = cleanModuleJsDocForMarkdown(moduleJsDoc)
+    
+    // Fall back to function-level JSDoc if no module doc
     const jsDoc = extractLeadingJsDocForExportedFunction(src, fileBaseName)
     const description = cleanJsDocForMarkdown(jsDoc)
     const exportedTypes = extractExportedTypeSymbols(src)
@@ -193,6 +239,7 @@ async function generateSection(sectionName, srcSubdir) {
         title: fileBaseName,
         relFromRepoRoot,
         description,
+        moduleDescription,
         exportedTypes,
       }),
       'utf-8'
@@ -202,5 +249,8 @@ async function generateSection(sectionName, srcSubdir) {
 
 await generateSection('composables', 'composables')
 await generateSection('types', 'types')
+await generateSection('stores', 'stores')
+await generateSection('services', 'services')
+await generateSection('router', 'router')
 
 

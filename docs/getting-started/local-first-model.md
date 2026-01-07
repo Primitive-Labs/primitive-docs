@@ -15,8 +15,8 @@ When you build with Primitive:
 ┌─────────────────────────────────────────────────────────────┐
 │                      Your App (Browser)                      │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────────┐  │
-│  │   Vue UI    │◄──►│  js-bao     │◄──►│  Local Database │  │
-│  │             │    │  (ORM)      │    │                 │  │
+│  │   Your UI   │◄──►│  js-bao     │◄──►│  Local Database │  │
+│  │  (any framework) │  (ORM)      │    │                 │  │
 │  └─────────────┘    └─────────────┘    └────────┬────────┘  │
 └────────────────────────────────────────────────│────────────┘
                                                   │
@@ -28,6 +28,8 @@ When you build with Primitive:
                                │  (Sync, Auth, Collaboration) │
                                └──────────────────────────────┘
 ```
+
+*The diagram shows Vue in our template, but js-bao works with any JavaScript framework.*
 
 ## Why This Matters
 

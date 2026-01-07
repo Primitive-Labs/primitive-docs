@@ -675,6 +675,57 @@
           ]
         },
         {
+          "text": "Router",
+          "items": [
+            {
+              "text": "primitiveRouter",
+              "link": "/reference/primitive-app/router/primitiveRouter"
+            }
+          ]
+        },
+        {
+          "text": "Services",
+          "items": [
+            {
+              "text": "JsBaoClientService",
+              "link": "/reference/primitive-app/services/JsBaoClientService"
+            }
+          ]
+        },
+        {
+          "text": "Stores",
+          "items": [
+            {
+              "text": "appConfigStore",
+              "link": "/reference/primitive-app/stores/appConfigStore"
+            },
+            {
+              "text": "breadcrumbsStore",
+              "link": "/reference/primitive-app/stores/breadcrumbsStore"
+            },
+            {
+              "text": "jsBaoDocumentsStore",
+              "link": "/reference/primitive-app/stores/jsBaoDocumentsStore"
+            },
+            {
+              "text": "multiDocumentStore",
+              "link": "/reference/primitive-app/stores/multiDocumentStore"
+            },
+            {
+              "text": "navigationStore",
+              "link": "/reference/primitive-app/stores/navigationStore"
+            },
+            {
+              "text": "singleDocumentStore",
+              "link": "/reference/primitive-app/stores/singleDocumentStore"
+            },
+            {
+              "text": "userStore",
+              "link": "/reference/primitive-app/stores/userStore"
+            }
+          ]
+        },
+        {
           "text": "Utils",
           "items": [
             {
