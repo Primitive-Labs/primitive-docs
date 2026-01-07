@@ -158,8 +158,13 @@ export default defineConfig({
       {
         text: 'Getting Started',
         items: [
-          { text: 'Page 1', link: '/getting-started/page-1' },
-          { text: 'Page 2', link: '/getting-started/page-2' },
+          { text: 'Overview', link: '/' },
+          { text: 'Starting with the Template App', link: '/getting-started/template-app' },
+          { text: 'The Local-First Model', link: '/getting-started/local-first-model' },
+          { text: 'Understanding Documents', link: '/getting-started/understanding-documents' },
+          { text: 'Working with Data', link: '/getting-started/working-with-data' },
+          { text: 'Other Services', link: '/getting-started/other-services' },
+          { text: 'Is Primitive Right for You?', link: '/getting-started/good-and-bad-apps' },
         ],
         collapsible: true,
         collapsed: false,
