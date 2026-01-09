@@ -31,6 +31,82 @@ await docStore.switchDocument('doc-id-123');
 Configured via `createPrimitiveApp` with `documentStoreMode: 'single'` or
 `documentStoreMode: 'singleWithSwitching'`.
 
+## State
+
+### `allowDocumentSwitching`
+
+Whether users can switch between documents.
+
+### `userVisibleDocumentName`
+
+User-facing name for documents (e.g., "Project", "Workspace").
+
+### `userVisibleDocumentNamePlural`
+
+Plural form of the document name (e.g., "Projects", "Workspaces").
+
+### `defaultDocumentTitle`
+
+Default title for newly created documents.
+
+### `manageDocumentsRouteName`
+
+Route name for the document management page.
+
+### `currentDocumentId`
+
+ID of the currently active document, or null if none is open.
+
+### `currentDocumentMetadata`
+
+Current document metadata, derived reactively from jsBaoDocumentsStore.
+Includes title, tags, and permission level.
+
+### `isReady`
+
+Whether the store is initialized and a document is ready for use.
+
+## Getters
+
+### `getCurrentDocumentName`
+
+The title of the current document.
+
+### `getCurrentDocumentPermission`
+
+The user's permission level on the current document ('owner', 'read-write', or 'reader').
+
+### `isCurrentDocReadOnly`
+
+Whether the current document is read-only for this user.
+
+## Actions
+
+### `initialize`
+
+Initialize the single document store with configuration options.
+This is typically called by `createPrimitiveApp` during app bootstrap.
+Opens the last-used document or creates/opens a default document via alias.
+
+| Parameter | Description |
+| --- | --- |
+| `options` | Configuration including document naming and switching options |
+
+### `reset`
+
+Reset the store state, closing any open document.
+Call this when the user logs out or the app is being torn down.
+
+### `switchDocument`
+
+Switch to a different document.
+Only available when `allowDocumentSwitching` is enabled.
+Closes the current document and opens the target document.
+
+| Parameter | Description |
+| --- | --- |
+| `targetDocumentId` | The ID of the document to switch to |
+
 ## Exported types
 
 ### DocumentPermission

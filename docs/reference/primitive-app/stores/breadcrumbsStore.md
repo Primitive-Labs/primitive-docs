@@ -48,6 +48,56 @@ await breadcrumbs.refreshCurrentRoute();
 }
 ```
 
+## State
+
+### `segments`
+
+The current breadcrumb segments to display.
+
+## Actions
+
+### `initialize`
+
+Wire the breadcrumbs store to a Vue Router instance.
+
+This should be called once at app startup (for example from
+`initNavigation`). Subsequent calls are ignored.
+
+### `refreshCurrentRoute`
+
+Re-generate breadcrumbs for the current route.
+
+This can be called when other reactive state changes (for example,
+when a user display name is updated) to refresh breadcrumb labels
+without performing a navigation.
+
+### `dispose`
+
+Clean up the store, removing router listeners and clearing segments.
+Call this when unmounting the app.
+
+### `clear`
+
+Clear all breadcrumb segments.
+
+### `setSegments`
+
+Manually set the breadcrumb segments.
+Use this for custom breadcrumb overrides.
+
+| Parameter | Description |
+| --- | --- |
+| `next` | Array of breadcrumb segments to display |
+
+### `generate`
+
+Generate breadcrumbs for a specific route.
+This is called automatically on navigation.
+
+| Parameter | Description |
+| --- | --- |
+| `to` | The target route to generate breadcrumbs for |
+
 ## Exported types
 
 ### BreadcrumbsInitializeOptions

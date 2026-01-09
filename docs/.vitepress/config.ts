@@ -112,10 +112,11 @@ function buildReferenceSidebar(tree: SidebarItem[]): SidebarItem[] {
     // Config (hand-authored docs under docs/reference/primitive-app/config)
     const config = projectNode?.items?.find((i) => normalizeTitle(i.text).toLowerCase() === 'config')
 
-    out.push(...comps)
+    // Order: Stores → Layouts → Pages → Components → rest
+    if (stores) out.push({ text: 'Stores', items: stores.items ?? [], collapsible: true, collapsed: true })
     out.push(...layouts)
     out.push(...pages)
-    if (stores) out.push({ text: 'Stores', items: stores.items ?? [], collapsible: true, collapsed: true })
+    out.push(...comps)
     if (services) out.push({ text: 'Services', items: services.items ?? [], collapsible: true, collapsed: true })
     if (router) out.push({ text: 'Router', items: router.items ?? [], collapsible: true, collapsed: true })
     if (utils) out.push({ text: 'Utils', items: utils.items ?? [], collapsible: true, collapsed: true })

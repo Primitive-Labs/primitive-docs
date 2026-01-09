@@ -28,6 +28,51 @@ console.log('App name:', appConfig.appName());
 console.log('Document mode:', appConfig.documentStoreMode());
 ```
 
+## State
+
+### `state`
+
+## Getters
+
+### `appName`
+
+Get the application display name.
+
+### `appIcon`
+
+Get the application icon component.
+
+### `homeRouteName`
+
+Get the route name for the home/landing page.
+
+### `loginRouteName`
+
+Get the route name for the login page.
+
+### `loadingComponent`
+
+Get the component to display during loading states.
+
+### `documentStoreMode`
+
+Get the active document store mode ('single', 'singleWithSwitching', or 'multi').
+
+### `pageTitleFormatter`
+
+Get the custom page title formatter function, if configured.
+
+## Actions
+
+### `initialize`
+
+Initialize the app configuration store with the provided options.
+This is typically called by `createPrimitiveApp` during app bootstrap.
+
+| Parameter | Description |
+| --- | --- |
+| `options` | Configuration options for the application |
+
 ## Exported types
 
 ### InitializeAppConfigOptions
