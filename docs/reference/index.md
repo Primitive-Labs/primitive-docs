@@ -69,6 +69,7 @@ Generated reference documentation for each project.
 - ** Media**
   - [LOCAL_TESTING](/reference/js-bao-wss-client/api/_media/LOCAL_TESTING)
 - **Classes**
+  - [AuthError](/reference/js-bao-wss-client/api/classes/AuthError)
   - [JsBaoClient](/reference/js-bao-wss-client/api/classes/JsBaoClient)
   - [JsBaoError](/reference/js-bao-wss-client/api/classes/JsBaoError)
 - **Functions**
@@ -104,6 +105,8 @@ Generated reference documentation for each project.
   - [InvitationEvent](/reference/js-bao-wss-client/api/interfaces/InvitationEvent)
   - [JsBaoClientOptions](/reference/js-bao-wss-client/api/interfaces/JsBaoClientOptions)
   - [JsBaoEvents](/reference/js-bao-wss-client/api/interfaces/JsBaoEvents)
+  - [ListWorkflowRunsOptions](/reference/js-bao-wss-client/api/interfaces/ListWorkflowRunsOptions)
+  - [ListWorkflowRunsResult](/reference/js-bao-wss-client/api/interfaces/ListWorkflowRunsResult)
   - [LlmChatOptions](/reference/js-bao-wss-client/api/interfaces/LlmChatOptions)
   - [MeUpdatedEvent](/reference/js-bao-wss-client/api/interfaces/MeUpdatedEvent)
   - [MeUpdateFailedEvent](/reference/js-bao-wss-client/api/interfaces/MeUpdateFailedEvent)
@@ -118,15 +121,23 @@ Generated reference documentation for each project.
   - [PermissionEvent](/reference/js-bao-wss-client/api/interfaces/PermissionEvent)
   - [ReasoningOptions](/reference/js-bao-wss-client/api/interfaces/ReasoningOptions)
   - [SessionInfo](/reference/js-bao-wss-client/api/interfaces/SessionInfo)
+  - [StartWorkflowOptions](/reference/js-bao-wss-client/api/interfaces/StartWorkflowOptions)
+  - [StartWorkflowResult](/reference/js-bao-wss-client/api/interfaces/StartWorkflowResult)
   - [StatusChangedEvent](/reference/js-bao-wss-client/api/interfaces/StatusChangedEvent)
   - [UserProfile](/reference/js-bao-wss-client/api/interfaces/UserProfile)
+  - [WorkflowRun](/reference/js-bao-wss-client/api/interfaces/WorkflowRun)
+  - [WorkflowsAPI](/reference/js-bao-wss-client/api/interfaces/WorkflowsAPI)
+  - [WorkflowStatusEvent](/reference/js-bao-wss-client/api/interfaces/WorkflowStatusEvent)
+  - [WorkflowStatusResult](/reference/js-bao-wss-client/api/interfaces/WorkflowStatusResult)
 - **Type Aliases**
+  - [AuthCode](/reference/js-bao-wss-client/api/type-aliases/AuthCode)
   - [GeminiContentPart](/reference/js-bao-wss-client/api/type-aliases/GeminiContentPart)
   - [GeminiGenerateOptions](/reference/js-bao-wss-client/api/type-aliases/GeminiGenerateOptions)
   - [GeminiRole](/reference/js-bao-wss-client/api/type-aliases/GeminiRole)
   - [JsBaoErrorCode](/reference/js-bao-wss-client/api/type-aliases/JsBaoErrorCode)
   - [TypedModelConstructor](/reference/js-bao-wss-client/api/type-aliases/TypedModelConstructor)
 - **Variables**
+  - [AUTH_CODES](/reference/js-bao-wss-client/api/variables/AUTH_CODES)
   - [initJsBao](/reference/js-bao-wss-client/api/variables/initJsBao)
 - [globals](/reference/js-bao-wss-client/api/globals)
 - [README](/reference/js-bao-wss-client/api/README)
@@ -141,6 +152,8 @@ Generated reference documentation for each project.
 
 - **Components**
   - **Auth**
+    - [EditProfile](/reference/primitive-app/components/components/auth/EditProfile)
+    - [PasskeyManagement](/reference/primitive-app/components/components/auth/PasskeyManagement)
     - [PrimitiveLogin](/reference/primitive-app/components/components/auth/PrimitiveLogin)
     - [PrimitiveLogout](/reference/primitive-app/components/components/auth/PrimitiveLogout)
     - [PrimitiveOauthCallback](/reference/primitive-app/components/components/auth/PrimitiveOauthCallback)

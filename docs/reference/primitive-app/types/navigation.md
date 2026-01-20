@@ -96,7 +96,7 @@ export interface NavItemConfig {
   navHeader?: string;
   /**
    * Named vue-router route for internal navigation.
-   * Either routeName or externalHref should be provided.
+   * Either routeName, externalHref, or action should be provided.
    */
   routeName?: string;
   routeParams?: Record<string, string>;
@@ -111,13 +111,27 @@ export interface NavItemConfig {
   matchRouteNames?: string[];
   /**
    * External URL for items that should link outside the app shell.
-   * Either externalHref or routeName should be provided.
+   * Either routeName, externalHref, or action should be provided.
    */
   externalHref?: string;
   /**
    * Target for external links. Ignored for internal route-based items.
    */
   target?: "_self" | "_blank";
+  /**
+   * Custom action identifier for items that trigger behavior rather than
+   * navigation. When provided, clicking the item emits an event with this
+   * action name instead of navigating.
+   * Either routeName, externalHref, or action should be provided.
+   */
+  action?: string;
+  /**
+   * Vue component to render when this action is triggered.
+   * When provided alongside `action`, PrimitiveAppLayout will automatically
+   * render this component as a dialog/modal when the action is activated.
+   * The component receives `open` (boolean) and emits `update:open` for closing.
+   */
+  actionComponent?: Component;
   hidden?: boolean;
   /**
    * Optional priority for inclusion in the mobile bottom navigation.

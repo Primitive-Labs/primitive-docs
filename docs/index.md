@@ -6,25 +6,17 @@ Welcome to Primitive! This guide will help you understand the platform and build
 
 New to Primitive? Start here:
 
-1. **[Primitive Stack Overview](./getting-started/stack-overview.md)** — Understand how js-bao, js-bao-wss-client, and primitive-app work together.
+1. **[Starting with the Template App](./getting-started/template-app.md)** — Create a new project, configure authentication, and run your first app in minutes.
 
-2. **[Starting with the Template App](./getting-started/template-app.md)** — Create a new project, configure authentication, and run your first app in minutes.
+2. **[The Local-First Model](./getting-started/local-first-model.md)** — Understand how Primitive apps work differently from traditional web apps.
 
-3. **[The Local-First Model](./getting-started/local-first-model.md)** — Understand how Primitive apps work differently from traditional web apps.
+3. **[Understanding Documents](./getting-started/understanding-documents.md)** — Learn about documents, sharing, and choosing the right pattern for your app.
 
-4. **[Understanding Documents](./getting-started/understanding-documents.md)** — Learn about documents, sharing, and choosing the right pattern for your app.
-
-5. **[Working with Data](./getting-started/working-with-data.md)** — Define data models and perform create, read, update, and delete operations.
-
-## Additional Topics
-
-- **[Other Services](./getting-started/other-services.md)** — Blob storage, AI integration, third-party APIs, analytics, and waitlist features.
-
-- **[Is Primitive Right for You?](./getting-started/good-and-bad-apps.md)** — Understand where Primitive shines and where it might not be the best fit.
+4. **[Working with Data](./getting-started/working-with-data.md)** — Define data models and perform create, read, update, and delete operations.
 
 ## What is Primitive?
 
-Primitive is a platform for building **local-first web applications**. You define data models in JavaScript, manipulate them on the client, and Primitive handles everything else—syncing data across devices, authenticating users, enabling real-time collaboration, and working offline. No APIs to build. No servers to manage. No complex client-server architecture to maintain.
+Primitive is a platform for building **local-first web applications**. You define data models in JavaScript, manipulate them on the client, and Primitive handles everything else—syncing data across devices, authenticating users, and enabling real-time collaboration. No APIs to build. No servers to manage. No complex client-server architecture to maintain.
 
 ### Why We Built Primitive
 
@@ -43,7 +35,7 @@ Primitive is a platform for building **local-first web applications**. You defin
 - **Data sync** — Changes automatically sync between devices and users
 - **Authentication** — Google OAuth built in
 - **Real-time collaboration** — Multiple users can edit shared data simultaneously
-- **Offline support** — Apps work without an internet connection
+- **Local persistence** — Data is stored locally for instant access with automatic background sync
 - **Additional services** — Blob storage, AI, third-party API proxy, analytics, and more coming
 
 You focus on building your product. Primitive handles the infrastructure.

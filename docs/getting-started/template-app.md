@@ -1,15 +1,15 @@
 # Starting with the Template App
 
-The fastest way to build an app on Primitive is to start from the official template. This guide walks you through creating a new project, configuring authentication, and running your first app.
+The fastest way to build an app on Primitive is to start from the official template. This guide walks you through creating a new project and running your first app.
 
 ## Prerequisites
 
-- **Node.js 18+** with pnpm installed
+- **Node.js 18+**
 - **GitHub account** with access to [Primitive-Labs/primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template)
 
 ### Installing pnpm
 
-If you don't have pnpm installed, the easiest way is through Corepack (included with Node.js 16+):
+This project uses [pnpm](https://pnpm.io/) as its package manager. The easiest way to install pnpm is through Corepack (included with Node.js 16+):
 
 ```bash
 corepack enable
@@ -32,36 +32,12 @@ cd my-app
 pnpm install
 ```
 
-## Configure Google OAuth
-
-Your app will use Google for authentication. You'll need to create OAuth credentials:
-
-1. Go to the [Google Cloud Console OAuth page](https://console.cloud.google.com/auth/clients)
-2. Create a new OAuth client (Web application type)
-3. Add these settings:
-
-| Setting | Value |
-|---------|-------|
-| Authorized JavaScript origins | `http://localhost:5173` |
-| Authorized redirect URIs | `http://localhost:5173/oauth/callback` |
-
-4. Save and note your **Client ID** and **Client Secret**
-
-::: tip Production Setup
-When deploying to production, you'll add your production domain to these settings alongside localhost.
-:::
-
 ## Create Your App on Primitive
 
 1. Go to the [Primitive Admin Console](https://admin.primitiveapi.com/login)
-2. Sign in with Google
-3. Click **Create New App**
-4. Enter your app details:
-   - **App Name**: Your app's display name
-   - **Google Client ID**: From the previous step
-   - **Google Client Secret**: From the previous step
-5. Under **Allowed Origins**, add `http://localhost:5173`
-6. Save and note your **App ID**
+2. Sign in and click **Create New App**
+3. Enter your app's display name
+4. Save and note your **App ID**
 
 ## Configure Your Environment
 
@@ -79,13 +55,40 @@ Start the development server:
 pnpm dev
 ```
 
-Open `http://localhost:5173` in your browser. You should see your app's login screen. Sign in with Google to access the app.
+Open `http://localhost:5173` in your browser. You should see your app running.
 
 **Congratulations!** You now have a working Primitive app with:
-- Google authentication
 - Real-time data sync
-- Offline support
+- Local-first data persistence
 - A Vue + TypeScript + Tailwind foundation
+
+## Setting Up Google Sign In (Optional)
+
+Google OAuth is optional. If you want to enable Google as a sign-in option for your app, follow these steps.
+
+### 1. Configure Google OAuth Client
+
+Go to the [Google Cloud Console OAuth page](https://console.cloud.google.com/auth/clients) and create a new OAuth client (Web application type):
+
+| Setting | Value |
+|---------|-------|
+| Authorized JavaScript origins | `http://localhost:5173` |
+| Authorized redirect URIs | `http://localhost:5173/oauth/callback` |
+
+Save and note your **Client ID** and **Client Secret**.
+
+::: tip Production Setup
+When deploying to production, you'll add your production domain to these settings alongside localhost.
+:::
+
+### 2. Enable Google OAuth in Primitive Admin
+
+Go to the [Primitive Admin Console](https://admin.primitiveapi.com/login) and navigate to your app's settings:
+
+1. Open the **Google OAuth** section
+2. Enable Google OAuth as a sign-in method
+3. Add your **Google Client ID** and **Client Secret** from step 1
+4. Add matching origin/callback URLs to match what you configured with Google
 
 ## Why Vue?
 
@@ -126,12 +129,4 @@ Now that your app is running:
 1. **[The Local-First Model](./local-first-model.md)** — Understand how Primitive apps work
 2. **[Understanding Documents](./understanding-documents.md)** — Learn about documents and sharing
 3. **[Working with Data](./working-with-data.md)** — Create your first data models
-
-## Deploying to Production
-
-When you're ready to deploy, the template includes configuration for Cloudflare Workers. See the template's README for detailed deployment instructions covering:
-
-- Setting up production environment variables
-- Configuring `wrangler.toml`
-- Building and deploying with `wrangler deploy`
-
+4. **[Deploying to Production](./deploying-to-production.md)** — Deploy your app to Cloudflare Workers

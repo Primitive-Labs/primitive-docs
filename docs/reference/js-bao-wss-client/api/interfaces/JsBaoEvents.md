@@ -239,3 +239,9 @@
 ### sync
 
 > **sync**: `SyncEvent`
+
+***
+
+### workflowStatus
+
+> **workflowStatus**: [`WorkflowStatusEvent`](WorkflowStatusEvent.md)

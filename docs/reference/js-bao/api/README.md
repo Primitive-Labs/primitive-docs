@@ -1066,14 +1066,35 @@ const tutorials = await Article.query({
   tags: { $contains: "tutorial" },
 });
 
-// Find articles with any of multiple tags
+// Find articles with any of multiple tags (OR)
 const techArticles = await Article.query({
-  tags: { $containsAny: ["javascript", "python", "react"] },
+  $or: [
+    { tags: { $contains: "javascript" } },
+    { tags: { $contains: "python" } },
+    { tags: { $contains: "react" } },
+  ],
 });
 
-// Find articles with all specified tags
+// Find articles that have multiple required tags (AND)
 const advancedTutorials = await Article.query({
-  tags: { $containsAll: ["tutorial", "advanced"] },
+  $and: [
+    { tags: { $contains: "tutorial" } },
+    { tags: { $contains: "advanced" } },
+  ],
+});
+
+// Nested AND/OR over StringSets: "javascript" AND ("react" OR "vue" OR "node.js")
+const jsFrameworkArticles = await Article.query({
+  $and: [
+    { tags: { $contains: "javascript" } },
+    {
+      $or: [
+        { tags: { $contains: "react" } },
+        { tags: { $contains: "vue" } },
+        { tags: { $contains: "node.js" } },
+      ],
+    },
+  ],
 });
 
 // Count by tag membership
@@ -1109,6 +1130,15 @@ const tagStats = await Article.aggregate({
 2.  Install dependencies: `npm install`
 3.  Build: `npm run build` (uses `tsup`)
     - Development watch mode: `npm run dev`
+
+## Publishing to npm
+
+To publish a new version to npm:
+
+1. Update the version in `package.json`
+2. Run `npm publish`
+
+The `prepublishOnly` script automatically runs the build before publishing.
 
 ## License
 

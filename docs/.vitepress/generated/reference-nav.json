@@ -255,6 +255,10 @@
               "text": "Classes",
               "items": [
                 {
+                  "text": "AuthError",
+                  "link": "/reference/js-bao-wss-client/api/classes/AuthError"
+                },
+                {
                   "text": "JsBaoClient",
                   "link": "/reference/js-bao-wss-client/api/classes/JsBaoClient"
                 },
@@ -397,6 +401,14 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/JsBaoEvents"
                 },
                 {
+                  "text": "ListWorkflowRunsOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ListWorkflowRunsOptions"
+                },
+                {
+                  "text": "ListWorkflowRunsResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ListWorkflowRunsResult"
+                },
+                {
                   "text": "LlmChatOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/LlmChatOptions"
                 },
@@ -453,18 +465,46 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/SessionInfo"
                 },
                 {
+                  "text": "StartWorkflowOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/StartWorkflowOptions"
+                },
+                {
+                  "text": "StartWorkflowResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/StartWorkflowResult"
+                },
+                {
                   "text": "StatusChangedEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/StatusChangedEvent"
                 },
                 {
                   "text": "UserProfile",
                   "link": "/reference/js-bao-wss-client/api/interfaces/UserProfile"
+                },
+                {
+                  "text": "WorkflowRun",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/WorkflowRun"
+                },
+                {
+                  "text": "WorkflowsAPI",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/WorkflowsAPI"
+                },
+                {
+                  "text": "WorkflowStatusEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/WorkflowStatusEvent"
+                },
+                {
+                  "text": "WorkflowStatusResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/WorkflowStatusResult"
                 }
               ]
             },
             {
               "text": "Type Aliases",
               "items": [
+                {
+                  "text": "AuthCode",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/AuthCode"
+                },
                 {
                   "text": "GeminiContentPart",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/GeminiContentPart"
@@ -490,6 +530,10 @@
             {
               "text": "Variables",
               "items": [
+                {
+                  "text": "AUTH_CODES",
+                  "link": "/reference/js-bao-wss-client/api/variables/AUTH_CODES"
+                },
                 {
                   "text": "initJsBao",
                   "link": "/reference/js-bao-wss-client/api/variables/initJsBao"
@@ -529,6 +573,14 @@
                 {
                   "text": "Auth",
                   "items": [
+                    {
+                      "text": "EditProfile",
+                      "link": "/reference/primitive-app/components/components/auth/EditProfile"
+                    },
+                    {
+                      "text": "PasskeyManagement",
+                      "link": "/reference/primitive-app/components/components/auth/PasskeyManagement"
+                    },
                     {
                       "text": "PrimitiveLogin",
                       "link": "/reference/primitive-app/components/components/auth/PrimitiveLogin"

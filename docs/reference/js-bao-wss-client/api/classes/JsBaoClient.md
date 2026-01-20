@@ -91,6 +91,12 @@ Provides a hierarchical API for:
 
 > **users**: `UsersAPI`
 
+***
+
+### workflows
+
+> **workflows**: [`WorkflowsAPI`](../interfaces/WorkflowsAPI.md)
+
 ## Methods
 
 ### addDocumentModelMapping()
@@ -427,6 +433,19 @@ Provides a hierarchical API for:
 
 ***
 
+### getAppConfig()
+
+> **getAppConfig**(): `Promise`\<\{ `appId`: `string`; `hasOAuth`: `boolean`; `hasPasskey`: `boolean`; `magicLinkEnabled`: `boolean`; `mode`: `"public"` \| `"invite-only"` \| `"domain"`; `name`: `string`; `waitlistEnabled`: `boolean`; \}\>
+
+Get the app's authentication configuration.
+Useful for checking what auth methods are available before showing login UI.
+
+#### Returns
+
+`Promise`\<\{ `appId`: `string`; `hasOAuth`: `boolean`; `hasPasskey`: `boolean`; `magicLinkEnabled`: `boolean`; `mode`: `"public"` \| `"invite-only"` \| `"domain"`; `name`: `string`; `waitlistEnabled`: `boolean`; \}\>
+
+***
+
 ### getAppId()
 
 > **getAppId**(): `string`
@@ -434,6 +453,16 @@ Provides a hierarchical API for:
 #### Returns
 
 `string`
+
+***
+
+### getAuthConfig()
+
+> **getAuthConfig**(): `Promise`\<\{ `appId`: `string`; `googleClientId`: `string` \| `null`; `googleOAuthEnabled`: `boolean`; `hasOAuth`: `boolean`; `hasPasskey`: `boolean`; `magicLinkEnabled`: `boolean`; `mode`: `string`; `name`: `string`; `passkeyEnabled`: `boolean`; `passkeyRpId`: `string` \| `null`; `passkeyRpName`: `string` \| `null`; `redirectUris`: `string`[] \| `null`; `waitlistEnabled`: `boolean`; \}\>
+
+#### Returns
+
+`Promise`\<\{ `appId`: `string`; `googleClientId`: `string` \| `null`; `googleOAuthEnabled`: `boolean`; `hasOAuth`: `boolean`; `hasPasskey`: `boolean`; `magicLinkEnabled`: `boolean`; `mode`: `string`; `name`: `string`; `passkeyEnabled`: `boolean`; `passkeyRpId`: `string` \| `null`; `passkeyRpName`: `string` \| `null`; `redirectUris`: `string`[] \| `null`; `waitlistEnabled`: `boolean`; \}\>
 
 ***
 
@@ -1143,9 +1172,47 @@ Logout: best-effort server cookie clear, shutdown networking, clear auth state, 
 
 ***
 
+### magicLinkRequest()
+
+> **magicLinkRequest**(`email`, `options?`): `Promise`\<\{ `success`: `boolean`; \}\>
+
+#### Parameters
+
+##### email
+
+`string`
+
+##### options?
+
+###### redirectUri?
+
+`string`
+
+#### Returns
+
+`Promise`\<\{ `success`: `boolean`; \}\>
+
+***
+
+### magicLinkVerify()
+
+> **magicLinkVerify**(`token`): `Promise`\<\{ `isNewUser?`: `boolean`; `promptAddPasskey?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
+
+#### Parameters
+
+##### token
+
+`string`
+
+#### Returns
+
+`Promise`\<\{ `isNewUser?`: `boolean`; `promptAddPasskey?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
+
+***
+
 ### makeRequest()
 
-> **makeRequest**(`method`, `path`, `data?`): `Promise`\<`any`\>
+> **makeRequest**(`method`, `path`, `data?`, `options?`): `Promise`\<`any`\>
 
 #### Parameters
 
@@ -1160,6 +1227,10 @@ Logout: best-effort server cookie clear, shutdown networking, clear auth state, 
 ##### data?
 
 `any`
+
+##### options?
+
+`RequestOptions`
 
 #### Returns
 
@@ -1320,6 +1391,118 @@ Logout: best-effort server cookie clear, shutdown networking, clear auth state, 
 #### Returns
 
 `Promise`\<\{ `doc`: `Doc`; `metadata`: `LocalMetadataEntry` \| `null`; \}\>
+
+***
+
+### passkeyAuthFinish()
+
+> **passkeyAuthFinish**(`credential`, `challengeToken`): `Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
+
+#### Parameters
+
+##### credential
+
+`any`
+
+##### challengeToken
+
+`string`
+
+#### Returns
+
+`Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
+
+***
+
+### passkeyAuthStart()
+
+> **passkeyAuthStart**(): `Promise`\<\{ `challengeToken`: `string`; `options`: `any`; \}\>
+
+#### Returns
+
+`Promise`\<\{ `challengeToken`: `string`; `options`: `any`; \}\>
+
+***
+
+### passkeyDelete()
+
+> **passkeyDelete**(`passkeyId`): `Promise`\<\{ `success`: `boolean`; \}\>
+
+#### Parameters
+
+##### passkeyId
+
+`string`
+
+#### Returns
+
+`Promise`\<\{ `success`: `boolean`; \}\>
+
+***
+
+### passkeyList()
+
+> **passkeyList**(): `Promise`\<\{ `passkeys`: `object`[]; \}\>
+
+#### Returns
+
+`Promise`\<\{ `passkeys`: `object`[]; \}\>
+
+***
+
+### passkeyRegisterFinish()
+
+> **passkeyRegisterFinish**(`credential`, `challengeToken`, `deviceName?`): `Promise`\<\{ `success`: `boolean`; \}\>
+
+#### Parameters
+
+##### credential
+
+`any`
+
+##### challengeToken
+
+`string`
+
+##### deviceName?
+
+`string`
+
+#### Returns
+
+`Promise`\<\{ `success`: `boolean`; \}\>
+
+***
+
+### passkeyRegisterStart()
+
+> **passkeyRegisterStart**(): `Promise`\<\{ `challengeToken`: `string`; `options`: `any`; \}\>
+
+#### Returns
+
+`Promise`\<\{ `challengeToken`: `string`; `options`: `any`; \}\>
+
+***
+
+### passkeyUpdate()
+
+> **passkeyUpdate**(`passkeyId`, `params`): `Promise`\<\{ `passkey`: \{ `createdAt`: `string`; `deviceName`: `string`; `lastUsedAt?`: `string`; `passkeyId`: `string`; \}; \}\>
+
+#### Parameters
+
+##### passkeyId
+
+`string`
+
+##### params
+
+###### deviceName
+
+`string`
+
+#### Returns
+
+`Promise`\<\{ `passkey`: \{ `createdAt`: `string`; `deviceName`: `string`; `lastUsedAt?`: `string`; `passkeyId`: `string`; \}; \}\>
 
 ***
 

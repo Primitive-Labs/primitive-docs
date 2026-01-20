@@ -2,9 +2,11 @@
 
 ***
 
-[js-bao-wss-client](../globals.md) / JsBaoError
+[js-bao-wss-client](../globals.md) / AuthError
 
-# Class: JsBaoError
+# Class: AuthError
+
+Error class with machine-readable code for auth errors.
 
 ## Extends
 
@@ -14,25 +16,21 @@
 
 ### Constructor
 
-> **new JsBaoError**(`code`, `message?`, `details?`): `JsBaoError`
+> **new AuthError**(`message`, `code?`): `AuthError`
 
 #### Parameters
 
-##### code
-
-[`JsBaoErrorCode`](../type-aliases/JsBaoErrorCode.md)
-
-##### message?
+##### message
 
 `string`
 
-##### details?
+##### code?
 
-`any`
+`string`
 
 #### Returns
 
-`JsBaoError`
+`AuthError`
 
 #### Overrides
 
@@ -42,13 +40,7 @@
 
 ### code
 
-> **code**: [`JsBaoErrorCode`](../type-aliases/JsBaoErrorCode.md)
-
-***
-
-### details?
-
-> `optional` **details**: `any`
+> `readonly` **code**: `string` \| `undefined`
 
 ***
 

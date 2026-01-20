@@ -14,11 +14,13 @@ A TypeScript/JavaScript client library for js-bao-wss that provides HTTP APIs an
 - **Realtime Collaboration**: Y.Doc sync over multi-tenant WebSocket
 - **Awareness**: Presence/cursor broadcast and server-triggered refresh
 - **Auth/OAuth**: Client-orchestrated OAuth and cookie refresh
+- **Passkey Authentication**: WebAuthn/passkey support for passwordless sign-in
 - **Automatic Reconnect**: Backoff + re-auth on 401
 - **Token Management**: Proactive refresh in HTTP calls
 - **Analytics**: Buffered event logging API with optional automatic lifecycle events
 - **Blob Storage**: Upload/list/get/downloadUrl/delete per document with offline cache
 - **LLM**: Chat API and model listing
+- **Workflows**: Server-side multi-step processes with LLM, delays, and transformations
 - **Offline-first Open**: Non-blocking open with IndexedDB-backed cache
 - **Offline Blob Cache**: Cache API + IndexedDB backed uploads/reads with eviction and retry
 - **Network Controls**: Online/offline modes, reachability, connection control
@@ -578,6 +580,123 @@ if (client.isAuthenticated()) {
 
 // Manually set token
 client.setToken("new-jwt-token");
+```
+
+## Magic Link Authentication
+
+The client supports passwordless email authentication via magic links. Magic links must be enabled in the admin console for your app.
+
+### Request Magic Link
+
+```typescript
+// Send a magic link email to the user
+await client.magicLinkRequest("user@example.com");
+```
+
+### Handle Magic Link Callback
+
+```typescript
+// In your callback page (e.g., /oauth/callback)
+const params = new URLSearchParams(window.location.search);
+const magicToken = params.get("magic_token");
+
+if (magicToken) {
+  // Verify the token and complete authentication
+  const { user, promptAddPasskey, isNewUser } = await client.magicLinkVerify(magicToken);
+  console.log("Logged in as:", user.email);
+
+  // isNewUser is true if this is the user's first sign-in (account was just created)
+  if (isNewUser) {
+    // Show onboarding flow for new users
+  }
+
+  // If promptAddPasskey is true, consider prompting the user to add a passkey
+  if (promptAddPasskey) {
+    // Show UI to add passkey for future logins
+  }
+}
+```
+
+## Passkey Authentication
+
+The client supports WebAuthn/passkey authentication for passwordless sign-in. Passkeys must be enabled in the admin console for your app.
+
+Note: Passkeys can only be added to existing accounts (created via OAuth or Magic Link). To use passkey authentication:
+1. User creates account via OAuth or Magic Link
+2. User adds a passkey to their account
+3. User can then sign in with the passkey on future visits
+
+### Check Auth Methods Availability
+
+```typescript
+// Get auth configuration for the app
+const config = await client.getAuthConfig();
+
+// Check available authentication methods
+if (config.hasPasskey) {
+  console.log("Passkeys are available");
+}
+if (config.magicLinkEnabled) {
+  console.log("Magic link sign-in is available");
+}
+if (config.hasOAuth) {
+  console.log("Google OAuth is available");
+}
+```
+
+### Sign In with Passkey
+
+```typescript
+import { startAuthentication } from "@simplewebauthn/browser";
+
+// 1. Get authentication options
+const { options, challengeToken } = await client.passkeyAuthStart();
+
+// 2. Authenticate with browser
+const credential = await startAuthentication({ optionsJSON: options });
+
+// 3. Complete authentication (sets token internally)
+const { user, isNewUser } = await client.passkeyAuthFinish(credential, challengeToken);
+console.log("Logged in as:", user.email);
+
+// isNewUser is true if this is the user's first sign-in to this app
+// (Note: for passkeys, this is rare since passkeys are added to existing accounts)
+if (isNewUser) {
+  // Show onboarding flow
+}
+```
+
+### Add Passkey to Existing Account
+
+```typescript
+import { startRegistration } from "@simplewebauthn/browser";
+
+// User must be authenticated
+
+// 1. Get registration options
+const { options, challengeToken } = await client.passkeyRegisterStart();
+
+// 2. Create passkey with browser
+const credential = await startRegistration({ optionsJSON: options });
+
+// 3. Complete registration
+await client.passkeyRegisterFinish(credential, challengeToken, "MacBook Pro");
+```
+
+### Manage Passkeys
+
+```typescript
+// List user's passkeys
+const { passkeys } = await client.passkeyList();
+console.log(passkeys); // [{ passkeyId, deviceName, createdAt, lastUsedAt }]
+
+// Update a passkey's device name
+const { passkey } = await client.passkeyUpdate(passkeyId, {
+  deviceName: "Work MacBook",
+});
+
+// Delete a passkey
+await client.passkeyDelete(passkeyId);
 ```
 
 ## Document Management
@@ -1324,6 +1443,463 @@ console.log(tokens.totalTokens);
 - Error handling surfaces `JsBaoError` with `code: "GEMINI_ERROR"`; the `details` property contains the raw upstream payload so you can log or render troubleshooting info.
 - See `.dev.local.example` for sample environment values and `docs/gemini-direct-plan.md` for architectural details.
 
+## Workflows
+
+Workflows allow you to execute server-side, multi-step processes that can include LLM calls, delays, transformations, and more. The client provides APIs to start workflows, monitor their status, and receive real-time completion events.
+
+### Starting a Workflow
+
+```typescript
+// Start a workflow with input data
+const result = await client.workflows.start("my-workflow-key", {
+  message: "Hello world",
+  value: 42,
+});
+
+console.log("Run started:", result.runKey);
+console.log("Run ID:", result.runId);
+console.log("Status:", result.status);
+```
+
+#### Start Options
+
+```typescript
+const result = await client.workflows.start(
+  "my-workflow-key",
+  { message: "Hello" },
+  {
+    // Provide a custom runKey for idempotency (auto-generated if omitted)
+    runKey: "unique-run-identifier",
+    // Associate the run with a document
+    contextDocId: "doc-123",
+    // Pass additional metadata
+    meta: { source: "user-action", priority: "high" },
+  }
+);
+```
+
+### Document-Scoped Workflows
+
+Workflows can be scoped to a specific document using `contextDocId`. This is useful when:
+- Processing document-specific data
+- Running workflows in the context of a particular document
+- Allowing the same `runKey` to be used across different documents
+
+The workflow instance ID is built from `{appId}:{contextDocId}:{runKey}`, so a workflow started with one `contextDocId` cannot be accessed with a different one.
+
+```typescript
+// Start a workflow scoped to a document
+const result = await client.workflows.start(
+  "process-document",
+  { action: "analyze" },
+  { contextDocId: "doc-123", runKey: "analyze-v1" }
+);
+
+// Must use the same contextDocId for all operations
+const status = await client.workflows.getStatus("process-document", "analyze-v1", "doc-123");
+await client.workflows.terminate("process-document", "analyze-v1", "doc-123");
+
+// List runs for this document
+const runs = await client.workflows.listRuns({ contextDocId: "doc-123" });
+```
+
+If `contextDocId` is omitted, the user's root document is used by default.
+
+### Duplicate Workflow Protection (Idempotency)
+
+When you provide a `runKey`, the server ensures only one workflow run exists for that key. If you call `start()` again with the same `runKey`, the existing run is returned instead of creating a new one:
+
+```typescript
+// First call creates the workflow
+const first = await client.workflows.start(
+  "process-document",
+  { docId: "abc" },
+  { runKey: "process-abc-v1" }
+);
+console.log(first.existing); // false - new run created
+
+// Second call with same runKey returns existing run
+const second = await client.workflows.start(
+  "process-document",
+  { docId: "abc" },
+  { runKey: "process-abc-v1" }
+);
+console.log(second.existing); // true - existing run returned
+console.log(second.runId === first.runId); // true - same run
+```
+
+This is useful for:
+- Preventing duplicate processing when users click a button multiple times
+- Safely retrying failed requests without creating duplicate work
+- Implementing exactly-once semantics for critical operations
+
+### Checking Workflow Status
+
+Poll the status of a running workflow:
+
+```typescript
+const status = await client.workflows.getStatus("my-workflow-key", runKey);
+
+console.log("Status:", status.status); // "running" | "complete" | "failed" | "terminated"
+
+if (status.status === "complete") {
+  console.log("Output:", status.output);
+}
+
+if (status.status === "failed") {
+  console.log("Error:", status.error);
+}
+```
+
+If you started the workflow with a specific `contextDocId`, you must provide the same `contextDocId` when checking status:
+
+```typescript
+// Start workflow with contextDocId
+const result = await client.workflows.start(
+  "my-workflow",
+  { data: "..." },
+  { contextDocId: "doc-123" }
+);
+
+// Get status - must provide the same contextDocId
+const status = await client.workflows.getStatus(
+  "my-workflow",
+  result.runKey,
+  "doc-123" // contextDocId
+);
+```
+
+If `contextDocId` is omitted, the user's root document is used by default.
+
+### Listening for Workflow Events
+
+Subscribe to real-time workflow completion events via WebSocket:
+
+```typescript
+// Listen for workflow status changes
+client.on("workflowStatus", (event) => {
+  console.log("Workflow event:", event.workflowKey, event.runKey);
+  console.log("Status:", event.status); // "completed" | "failed" | "terminated"
+
+  if (event.status === "completed") {
+    console.log("Output:", event.output);
+  }
+
+  if (event.status === "failed") {
+    console.log("Error:", event.error);
+  }
+});
+```
+
+**Note**: To receive workflow events, you must have an active WebSocket connection. Opening a document establishes this connection:
+
+```typescript
+// Open a document to establish WebSocket for receiving notifications
+await client.documents.open(documentId);
+
+// Now workflow events will be delivered
+const result = await client.workflows.start("my-workflow", { data: "..." });
+```
+
+#### Event Payload
+
+```typescript
+interface WorkflowStatusEvent {
+  type: "workflowStatus";
+  workflowKey: string;
+  workflowId: string;
+  runKey: string;
+  runId: string;
+  status: "completed" | "failed" | "terminated";
+  output?: any;
+  error?: string;
+  contextDocId?: string;
+}
+```
+
+### Listing Workflow Runs
+
+View all workflow runs for the current user:
+
+```typescript
+// List all runs
+const runs = await client.workflows.listRuns();
+console.log("Total runs:", runs.items.length);
+
+runs.items.forEach((run) => {
+  console.log(run.runKey, run.status, run.createdAt);
+});
+
+// Filter by workflow
+const filtered = await client.workflows.listRuns({
+  workflowKey: "my-workflow",
+});
+
+// Filter by status
+const running = await client.workflows.listRuns({
+  status: "running",
+});
+
+// Filter by document - list runs associated with a specific document
+const docRuns = await client.workflows.listRuns({
+  contextDocId: "doc-123",
+});
+
+// Pagination
+const page1 = await client.workflows.listRuns({ limit: 10 });
+if (page1.cursor) {
+  const page2 = await client.workflows.listRuns({
+    limit: 10,
+    cursor: page1.cursor,
+  });
+}
+
+// Sort order - default is newest first (descending by modifiedAt)
+const newestFirst = await client.workflows.listRuns(); // default
+const oldestFirst = await client.workflows.listRuns({ forward: true });
+
+// Combine filters
+const combined = await client.workflows.listRuns({
+  contextDocId: "doc-123",
+  status: "complete",
+  forward: true,
+  limit: 20,
+});
+```
+
+#### Run Record Fields
+
+```typescript
+interface WorkflowRun {
+  runId: string;
+  runKey: string;
+  instanceId: string;
+  workflowId: string;
+  workflowKey: string;
+  revisionId: string;
+  contextDocId?: string;
+  status: string;
+  createdAt: string;
+  endedAt?: string;
+}
+```
+
+### Terminating a Workflow
+
+Cancel a running workflow:
+
+```typescript
+const result = await client.workflows.terminate("my-workflow-key", runKey);
+console.log("Terminated, final status:", result.status);
+```
+
+If you started the workflow with a specific `contextDocId`, you must provide the same `contextDocId` when terminating:
+
+```typescript
+// Terminate a workflow started with contextDocId
+const result = await client.workflows.terminate(
+  "my-workflow-key",
+  runKey,
+  "doc-123" // contextDocId
+);
+```
+
+### Sending File Attachments (PDFs, Images)
+
+Workflows can process files like PDFs and images. Files must be base64-encoded before sending:
+
+```typescript
+/**
+ * Load a file and convert to base64.
+ * Works in browsers with fetch + FileReader or ArrayBuffer.
+ */
+async function loadFileAsBase64(url: string): Promise<string> {
+  const response = await fetch(url);
+  const arrayBuffer = await response.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+// Load a PDF and send to workflow
+const pdfBase64 = await loadFileAsBase64("/path/to/document.pdf");
+
+const result = await client.workflows.start("extract-pdf-data", {
+  attachments: [
+    {
+      data: pdfBase64,
+      type: "application/pdf",
+    },
+  ],
+});
+```
+
+#### Loading from File Input (Browser)
+
+```typescript
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      // Remove the data URL prefix (e.g., "data:application/pdf;base64,")
+      const base64 = dataUrl.split(",")[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Handle file input
+const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files?.[0];
+  if (!file) return;
+
+  const base64Data = await fileToBase64(file);
+
+  const result = await client.workflows.start("process-upload", {
+    attachments: [
+      {
+        data: base64Data,
+        type: file.type, // e.g., "image/png", "application/pdf"
+        filename: file.name,
+      },
+    ],
+  });
+});
+```
+
+#### Loading from URL (Node.js)
+
+```typescript
+import * as fs from "fs";
+import * as path from "path";
+
+function loadFileAsBase64Sync(filePath: string): string {
+  const buffer = fs.readFileSync(filePath);
+  return buffer.toString("base64");
+}
+
+const pdfPath = path.join(__dirname, "document.pdf");
+const pdfBase64 = loadFileAsBase64Sync(pdfPath);
+
+const result = await client.workflows.start("analyze-document", {
+  attachments: [
+    {
+      data: pdfBase64,
+      type: "application/pdf",
+    },
+  ],
+});
+```
+
+### Complete Example: PDF Processing Workflow
+
+```typescript
+import { initializeClient } from "js-bao-wss-client";
+
+async function processPDF(pdfUrl: string) {
+  const client = await initializeClient({
+    apiUrl: "https://api.example.com",
+    wsUrl: "wss://ws.example.com",
+    appId: "my-app",
+    token: "jwt-token",
+    databaseConfig: { type: "sqljs" },
+  });
+
+  // Set up event listener for completion
+  const completionPromise = new Promise<any>((resolve) => {
+    client.on("workflowStatus", (event) => {
+      if (event.status === "completed") {
+        resolve(event.output);
+      }
+    });
+  });
+
+  // Open a document to establish WebSocket connection
+  const { metadata } = await client.documents.create({ title: "temp" });
+  await client.documents.open(metadata.documentId);
+
+  // Load and encode the PDF
+  const response = await fetch(pdfUrl);
+  const arrayBuffer = await response.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const pdfBase64 = btoa(binary);
+
+  // Start the workflow
+  const result = await client.workflows.start("extract-pdf-data", {
+    attachments: [
+      {
+        data: pdfBase64,
+        type: "application/pdf",
+      },
+    ],
+  });
+
+  console.log("Workflow started:", result.runKey);
+
+  // Wait for completion (or poll with getStatus)
+  const output = await completionPromise;
+  console.log("Extracted data:", output);
+
+  // Cleanup
+  await client.documents.delete(metadata.documentId);
+  await client.destroy();
+
+  return output;
+}
+```
+
+### Polling for Completion
+
+If you prefer polling over WebSocket events:
+
+```typescript
+async function waitForCompletion(
+  client: JsBaoClient,
+  workflowKey: string,
+  runKey: string,
+  timeoutMs = 60000,
+  intervalMs = 2000
+): Promise<any> {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeoutMs) {
+    const status = await client.workflows.getStatus(workflowKey, runKey);
+
+    if (status.status === "complete") {
+      return status.output;
+    }
+
+    if (status.status === "failed") {
+      throw new Error(`Workflow failed: ${status.error}`);
+    }
+
+    if (status.status === "terminated") {
+      throw new Error("Workflow was terminated");
+    }
+
+    // Still running, wait and retry
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+
+  throw new Error("Workflow timed out");
+}
+
+// Usage
+const result = await client.workflows.start("my-workflow", { data: "..." });
+const output = await waitForCompletion(client, "my-workflow", result.runKey);
+```
+
 ## Integrations API
 
 Proxy HTTP calls through the tenant-specific integrations defined in the admin UI:
@@ -1692,6 +2268,31 @@ const profile = await client.me.get();
 console.log("User:", profile.name, profile.email);
 console.log("App role:", profile.appRole);
 console.log("User ID:", profile.userId);
+console.log("Avatar:", profile.avatarUrl);
+
+// Update user profile (name and/or external avatar URL)
+const updated = await client.me.update({
+  name: "New Display Name",
+});
+
+// Set an external avatar URL
+await client.me.update({
+  avatarUrl: "https://example.com/my-avatar.png",
+});
+
+// Clear avatar URL
+await client.me.update({
+  avatarUrl: null,
+});
+
+// Upload avatar image (stored in R2, proxied through the API)
+const imageBlob = await fetch("/path/to/image.png").then((r) => r.blob());
+const { avatarUrl } = await client.me.uploadAvatar(imageBlob, "image/png");
+console.log("New avatar URL:", avatarUrl);
+
+// Upload from ArrayBuffer
+const arrayBuffer = await file.arrayBuffer();
+await client.me.uploadAvatar(arrayBuffer, "image/jpeg");
 
 // Get session information
 const session = await client.session.get();
@@ -1728,6 +2329,51 @@ client.on("auth-failed", ({ message }) => {
   // Refresh token or redirect to login
 });
 ```
+
+### Auth Error Codes
+
+Authentication methods (OAuth, Magic Link, Passkey) throw `AuthError` with machine-readable codes for programmatic error handling:
+
+```typescript
+import { AuthError, AUTH_CODES } from "js-bao-wss-client";
+
+// Available error codes:
+// AUTH_CODES.ADDED_TO_WAITLIST      - User added to waitlist (invite-only app)
+// AUTH_CODES.INVITATION_REQUIRED    - User needs invitation to access app
+// AUTH_CODES.DOMAIN_NOT_ALLOWED     - User's email domain not in allowlist
+// AUTH_CODES.INVALID_TOKEN          - Token is invalid or malformed
+// AUTH_CODES.TOKEN_EXPIRED          - Token has expired
+// AUTH_CODES.PASSKEY_NOT_ENABLED    - Passkey auth not enabled for app
+// AUTH_CODES.MAGIC_LINK_NOT_ENABLED - Magic link auth not enabled for app
+// AUTH_CODES.WAITLIST_ENTRY_UPDATED - Waitlist entry was updated (success code)
+
+try {
+  await client.handleOAuthCallback(code, state);
+} catch (error) {
+  if (error instanceof AuthError) {
+    switch (error.code) {
+      case AUTH_CODES.ADDED_TO_WAITLIST:
+        showWaitlistMessage("You've been added to the waitlist.");
+        break;
+      case AUTH_CODES.INVITATION_REQUIRED:
+        showError("You need an invitation to access this app.");
+        break;
+      case AUTH_CODES.DOMAIN_NOT_ALLOWED:
+        showError("Your email domain is not allowed.");
+        break;
+      default:
+        showError(error.message);
+    }
+  }
+}
+
+// Check error code without instanceof
+if ((error as any).code === AUTH_CODES.ADDED_TO_WAITLIST) {
+  // Handle waitlist case
+}
+```
+
+The `AuthError` class extends `Error` with a `code` property containing the machine-readable error code. This enables reliable error handling without parsing error messages.
 
 ## Token Management
 
@@ -2058,7 +2704,7 @@ See [LOCAL_TESTING.md](_media/LOCAL_TESTING.md) for a comprehensive guide on tes
 **Quick test:**
 
 ```bash
-npm run build && npm pack
+pnpm run build && pnpm pack
 cd ../../../ && mkdir test-package && cd test-package
 npm init -y && npm install ../js-bao-wss/src/client/js-bao-wss-client-1.0.0.tgz
 echo 'import {JsBaoClient} from "js-bao-wss-client"; console.log("✅ Works!")' > test.js
@@ -2069,16 +2715,16 @@ sed -i '' 's/"type": "commonjs"/"type": "module"/' package.json && node test.js
 
 ```bash
 cd tests
-npm install
-npm run test:esm     # Test ESM imports
-npm run test:umd     # Instructions for UMD testing
+pnpm install
+pnpm run test:esm     # Test ESM imports
+pnpm run test:umd     # Instructions for UMD testing
 ```
 
 ### Build Commands
 
 ```bash
-npm run build        # Build both ESM and UMD
-npm run build:esm    # Build ESM only
-npm run build:umd    # Build UMD only
-npm pack             # Create publishable package
+pnpm run build        # Build both ESM and UMD
+pnpm run build:esm    # Build ESM only
+pnpm run build:umd    # Build UMD only
+pnpm pack             # Create publishable package
 ```

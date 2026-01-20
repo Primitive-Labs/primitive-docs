@@ -6,6 +6,7 @@
 
 ## Classes
 
+- [AuthError](classes/AuthError.md)
 - [JsBaoClient](classes/JsBaoClient.md)
 - [JsBaoError](classes/JsBaoError.md)
 
@@ -40,6 +41,8 @@
 - [InvitationEvent](interfaces/InvitationEvent.md)
 - [JsBaoClientOptions](interfaces/JsBaoClientOptions.md)
 - [JsBaoEvents](interfaces/JsBaoEvents.md)
+- [ListWorkflowRunsOptions](interfaces/ListWorkflowRunsOptions.md)
+- [ListWorkflowRunsResult](interfaces/ListWorkflowRunsResult.md)
 - [LlmChatOptions](interfaces/LlmChatOptions.md)
 - [MeUpdatedEvent](interfaces/MeUpdatedEvent.md)
 - [MeUpdateFailedEvent](interfaces/MeUpdateFailedEvent.md)
@@ -54,11 +57,18 @@
 - [PermissionEvent](interfaces/PermissionEvent.md)
 - [ReasoningOptions](interfaces/ReasoningOptions.md)
 - [SessionInfo](interfaces/SessionInfo.md)
+- [StartWorkflowOptions](interfaces/StartWorkflowOptions.md)
+- [StartWorkflowResult](interfaces/StartWorkflowResult.md)
 - [StatusChangedEvent](interfaces/StatusChangedEvent.md)
 - [UserProfile](interfaces/UserProfile.md)
+- [WorkflowRun](interfaces/WorkflowRun.md)
+- [WorkflowsAPI](interfaces/WorkflowsAPI.md)
+- [WorkflowStatusEvent](interfaces/WorkflowStatusEvent.md)
+- [WorkflowStatusResult](interfaces/WorkflowStatusResult.md)
 
 ## Type Aliases
 
+- [AuthCode](type-aliases/AuthCode.md)
 - [GeminiContentPart](type-aliases/GeminiContentPart.md)
 - [GeminiGenerateOptions](type-aliases/GeminiGenerateOptions.md)
 - [GeminiRole](type-aliases/GeminiRole.md)
@@ -67,6 +77,7 @@
 
 ## Variables
 
+- [AUTH\_CODES](variables/AUTH_CODES.md)
 - [initJsBao](variables/initJsBao.md)
 
 ## Functions

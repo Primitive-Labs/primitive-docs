@@ -1,8 +1,12 @@
 # PrimitiveLogin
 
-Renders the Primitive login screen and initiates OAuth sign-in via the user store.
+Renders the Primitive login screen with support for multiple authentication methods:
 
-Resolves a “continue URL” from (in order): the `continueURL` query param,
+- Email/Magic Link authentication
+- Passkey authentication (via WebAuthn Conditional UI)
+- Google OAuth sign-in
+
+Resolves a "continue URL" from (in order): the `continueURL` query param,
 `defaultContinueUrl`, `defaultContinueRoute`, or `/`.
 
 ---

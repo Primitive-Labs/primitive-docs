@@ -15,6 +15,7 @@ and components throughout the app.
 - `documentStoreMode`: Which document store mode is active
 - `loadingComponent`: Component to show during loading states
 - `pageTitleFormatter`: Custom function for formatting page titles
+- `profileConfig`: Profile completion/editing form configuration
 
 ## Usage
 
@@ -26,6 +27,10 @@ const appConfig = useAppConfigStore();
 // Access config values
 console.log('App name:', appConfig.appName());
 console.log('Document mode:', appConfig.documentStoreMode());
+
+// Profile config with defaults applied
+const profile = appConfig.profileConfig();
+console.log('Request name:', profile.requestName);
 ```
 
 ## State
@@ -62,6 +67,11 @@ Get the active document store mode ('single', 'singleWithSwitching', or 'multi')
 
 Get the custom page title formatter function, if configured.
 
+### `profileConfig`
+
+Get the profile configuration with defaults applied.
+Returns a fully-populated ProfileConfig object.
+
 ## Actions
 
 ### `initialize`
@@ -74,6 +84,25 @@ This is typically called by `createPrimitiveApp` during app bootstrap.
 | `options` | Configuration options for the application |
 
 ## Exported types
+
+### ProfileConfig
+
+```ts
+/**
+ * Configuration for profile completion and editing forms.
+ * Controls which fields are shown and whether they are required.
+ */
+export interface ProfileConfig {
+  /** Show name field in profile forms. Default: true */
+  requestName?: boolean;
+  /** Name is required before continuing. Default: true */
+  requireName?: boolean;
+  /** Show avatar field in profile forms. Default: true */
+  requestAvatar?: boolean;
+  /** Avatar is required before continuing. Default: false */
+  requireAvatar?: boolean;
+}
+```
 
 ### InitializeAppConfigOptions
 
@@ -103,5 +132,10 @@ export interface InitializeAppConfigOptions {
    */
   documentStoreMode: DocumentStoreMode;
   loadingComponent?: Component;
+  /**
+   * Profile completion and editing configuration.
+   * Controls which fields are shown in profile forms and whether they are required.
+   */
+  profileConfig?: ProfileConfig;
 }
 ```
