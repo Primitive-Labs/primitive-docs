@@ -108,7 +108,6 @@ function buildReferenceSidebar(tree: SidebarItem[]): SidebarItem[] {
     out.push(...comps)
     out.push(...layouts)
     out.push(...pages)
-    out.push(...comps)
     if (services) out.push({ text: 'Services', items: services.items ?? [], collapsed: true })
     if (router) out.push({ text: 'Router', items: router.items ?? [], collapsed: true })
     if (utils) out.push({ text: 'Utils', items: utils.items ?? [], collapsed: true })

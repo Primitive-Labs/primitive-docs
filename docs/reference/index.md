@@ -178,10 +178,7 @@ Generated reference documentation for each project.
 
 ### Config
 
-- [app-config](/reference/primitive-app/config/app-config)
 - [env-config](/reference/primitive-app/config/env-config)
-- [index](/reference/primitive-app/config/index)
-- [navigation-config](/reference/primitive-app/config/navigation-config)
 
 ### Router
 

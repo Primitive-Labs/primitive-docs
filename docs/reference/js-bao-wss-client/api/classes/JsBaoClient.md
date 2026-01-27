@@ -458,11 +458,11 @@ Useful for checking what auth methods are available before showing login UI.
 
 ### getAuthConfig()
 
-> **getAuthConfig**(): `Promise`\<\{ `appId`: `string`; `googleClientId`: `string` \| `null`; `googleOAuthEnabled`: `boolean`; `hasOAuth`: `boolean`; `hasPasskey`: `boolean`; `magicLinkEnabled`: `boolean`; `mode`: `string`; `name`: `string`; `passkeyEnabled`: `boolean`; `passkeyRpId`: `string` \| `null`; `passkeyRpName`: `string` \| `null`; `redirectUris`: `string`[] \| `null`; `waitlistEnabled`: `boolean`; \}\>
+> **getAuthConfig**(): `Promise`\<\{ `appId`: `string`; `googleClientId`: `string` \| `null`; `googleOAuthEnabled`: `boolean`; `hasOAuth`: `boolean`; `hasPasskey`: `boolean`; `magicLinkEnabled`: `boolean`; `mode`: `string`; `name`: `string`; `otpEnabled`: `boolean`; `passkeyEnabled`: `boolean`; `passkeyRpId`: `string` \| `null`; `passkeyRpName`: `string` \| `null`; `redirectUris`: `string`[] \| `null`; `waitlistEnabled`: `boolean`; \}\>
 
 #### Returns
 
-`Promise`\<\{ `appId`: `string`; `googleClientId`: `string` \| `null`; `googleOAuthEnabled`: `boolean`; `hasOAuth`: `boolean`; `hasPasskey`: `boolean`; `magicLinkEnabled`: `boolean`; `mode`: `string`; `name`: `string`; `passkeyEnabled`: `boolean`; `passkeyRpId`: `string` \| `null`; `passkeyRpName`: `string` \| `null`; `redirectUris`: `string`[] \| `null`; `waitlistEnabled`: `boolean`; \}\>
+`Promise`\<\{ `appId`: `string`; `googleClientId`: `string` \| `null`; `googleOAuthEnabled`: `boolean`; `hasOAuth`: `boolean`; `hasPasskey`: `boolean`; `magicLinkEnabled`: `boolean`; `mode`: `string`; `name`: `string`; `otpEnabled`: `boolean`; `passkeyEnabled`: `boolean`; `passkeyRpId`: `string` \| `null`; `passkeyRpName`: `string` \| `null`; `redirectUris`: `string`[] \| `null`; `waitlistEnabled`: `boolean`; \}\>
 
 ***
 
@@ -1391,6 +1391,48 @@ Logout: best-effort server cookie clear, shutdown networking, clear auth state, 
 #### Returns
 
 `Promise`\<\{ `doc`: `Doc`; `metadata`: `LocalMetadataEntry` \| `null`; \}\>
+
+***
+
+### otpRequest()
+
+> **otpRequest**(`email`): `Promise`\<\{ `success`: `boolean`; \}\>
+
+Request a one-time password (OTP) code to be sent to the specified email.
+The code can be verified using `otpVerify()`.
+
+#### Parameters
+
+##### email
+
+`string`
+
+#### Returns
+
+`Promise`\<\{ `success`: `boolean`; \}\>
+
+***
+
+### otpVerify()
+
+> **otpVerify**(`email`, `code`): `Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
+
+Verify a one-time password (OTP) code and authenticate the user.
+On success, the client will be authenticated and connected.
+
+#### Parameters
+
+##### email
+
+`string`
+
+##### code
+
+`string`
+
+#### Returns
+
+`Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
 
 ***
 

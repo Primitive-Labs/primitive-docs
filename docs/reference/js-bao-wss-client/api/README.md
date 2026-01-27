@@ -14,6 +14,8 @@ A TypeScript/JavaScript client library for js-bao-wss that provides HTTP APIs an
 - **Realtime Collaboration**: Y.Doc sync over multi-tenant WebSocket
 - **Awareness**: Presence/cursor broadcast and server-triggered refresh
 - **Auth/OAuth**: Client-orchestrated OAuth and cookie refresh
+- **Magic Link Authentication**: Passwordless email-based sign-in
+- **OTP Authentication**: Passwordless sign-in with 6-digit email codes
 - **Passkey Authentication**: WebAuthn/passkey support for passwordless sign-in
 - **Automatic Reconnect**: Backoff + re-auth on 401
 - **Token Management**: Proactive refresh in HTTP calls
@@ -617,6 +619,50 @@ if (magicToken) {
 }
 ```
 
+## OTP (Email Code) Authentication
+
+The client supports passwordless authentication via one-time 6-digit codes sent by email. OTP authentication must be enabled in the admin console for your app.
+
+### Request OTP Code
+
+```typescript
+// Send a 6-digit code to the user's email
+await client.otpRequest("user@example.com");
+```
+
+The code is valid for 10 minutes. Rate limits apply (5 codes per email per hour, 20 per IP per hour).
+
+### Verify OTP Code
+
+```typescript
+// Verify the code and complete authentication
+const { user, isNewUser } = await client.otpVerify("user@example.com", "123456");
+console.log("Logged in as:", user.email);
+
+// isNewUser is true if this is the user's first sign-in (account was just created)
+if (isNewUser) {
+  // Show onboarding flow for new users
+}
+```
+
+### Error Handling
+
+```typescript
+try {
+  await client.otpVerify("user@example.com", "123456");
+} catch (error) {
+  if (error.code === "OTP_NOT_ENABLED") {
+    // OTP auth not enabled for this app
+  } else if (error.code === "RATE_LIMITED") {
+    // Too many attempts, try again later
+  } else if (error.code === "OTP_MAX_ATTEMPTS") {
+    // Maximum verification attempts exceeded, request a new code
+  } else if (error.code === "INVALID_TOKEN") {
+    // Invalid or expired code
+  }
+}
+```
+
 ## Passkey Authentication
 
 The client supports WebAuthn/passkey authentication for passwordless sign-in. Passkeys must be enabled in the admin console for your app.
@@ -638,6 +684,9 @@ if (config.hasPasskey) {
 }
 if (config.magicLinkEnabled) {
   console.log("Magic link sign-in is available");
+}
+if (config.otpEnabled) {
+  console.log("OTP (email code) sign-in is available");
 }
 if (config.hasOAuth) {
   console.log("Google OAuth is available");

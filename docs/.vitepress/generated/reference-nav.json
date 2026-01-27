@@ -671,20 +671,8 @@
           "text": "Config",
           "items": [
             {
-              "text": "app-config",
-              "link": "/reference/primitive-app/config/app-config"
-            },
-            {
               "text": "env-config",
               "link": "/reference/primitive-app/config/env-config"
-            },
-            {
-              "text": "index",
-              "link": "/reference/primitive-app/config/index"
-            },
-            {
-              "text": "navigation-config",
-              "link": "/reference/primitive-app/config/navigation-config"
             }
           ]
         },
