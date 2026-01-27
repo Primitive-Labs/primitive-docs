@@ -9,9 +9,10 @@ Uses a dialog on larger screens and adapts to a full-width sheet on mobile.
 
 ## Props
 
-| Prop name | Description                 | Type    | Values | Default |
-| --------- | --------------------------- | ------- | ------ | ------- |
-| open      | Whether the dialog is open. | boolean | -      | false   |
+| Prop name     | Description                    | Type          | Values | Default                                                                                                                  |
+| ------------- | ------------------------------ | ------------- | ------ | ------------------------------------------------------------------------------------------------------------------------ |
+| open          | Whether the dialog is open.    | boolean       | -      | false                                                                                                                    |
+| profileConfig | Profile editing configuration. | ProfileConfig | -      | () =&gt; ({<br/> requestName: true,<br/> requireName: false,<br/> requestAvatar: true,<br/> requireAvatar: false,<br/>}) |
 
 ## Events
 

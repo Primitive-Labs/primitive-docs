@@ -15,7 +15,7 @@ Understanding how the Primitive libraries fit together will help you make the mo
 
 ```typescript
 // js-bao is pure JavaScript - works anywhere
-import { defineModelSchema, BaseModel, attachAndRegisterModel } from "js-bao";
+import { defineModelSchema, BaseModel } from "js-bao";
 
 const taskSchema = defineModelSchema({
   name: "tasks",
@@ -26,8 +26,9 @@ const taskSchema = defineModelSchema({
   },
 });
 
-class Task extends BaseModel {}
-attachAndRegisterModel(Task, taskSchema);
+export class Task extends BaseModel {
+  static schema = taskSchema;
+}
 
 // Query and manipulate data
 const tasks = await Task.query({ completed: false });
@@ -49,9 +50,9 @@ const tasks = await Task.query({ completed: false });
 
 ```typescript
 // js-bao-wss-client is also pure JavaScript
-import { initializeClient } from "js-bao-wss-client";
+import { JsBaoClient } from "js-bao-wss-client";
 
-const client = await initializeClient({
+const client = new JsBaoClient({
   apiUrl: "https://api.primitiveapi.com",
   wsUrl: "wss://api.primitiveapi.com",
   appId: "your-app-id",
@@ -59,11 +60,10 @@ const client = await initializeClient({
 });
 
 // Open a document
-const { doc } = await client.documents.open(documentId);
+await client.documents.open(documentId);
 
-// Upload a file
-const blobs = client.document(documentId).blobs();
-await blobs.upload(fileData, { filename: "photo.jpg" });
+// List available documents
+const documents = await client.documents.list();
 
 // Make an LLM call
 const reply = await client.llm.chat({
@@ -75,30 +75,41 @@ const reply = await client.llm.chat({
 
 ### primitive-app — Vue Integration Layer
 
-**What it does:** A collection of Pinia stores and Vue components that make it easier to build apps with js-bao and js-bao-wss-client:
+**What it does:** A lightweight collection of Vue components and composables that make it easier to build apps with js-bao and js-bao-wss-client. It provides building blocks rather than a complete framework, giving you flexibility to structure your app however you want.
 
-**Stores (reactive state):**
-- `useUserStore` — Current user, auth state, preferences
-- `useSingleDocumentStore` / `useMultiDocumentStore` — Document management
-- `useAppConfigStore` — App configuration
-- `useNavigationStore` — Sidebar and navigation state
-- `useBreadcrumbsStore` — Breadcrumb trail
+**Core:**
+- `createPrimitiveApp` — Bootstrap function that sets up Vue, Pinia, router, and js-bao
+- `useJsBaoDataLoader` — Composable for reactive data loading with automatic subscriptions
+- `useUserStore` — Current user info, auth state, and user preferences
 
-**UI Components:**
-- Authentication — Login, logout, OAuth callback handling
-- Navigation — Sidebar, bottom nav, user menu, breadcrumbs
-- Documents — Document switcher, sharing dialog, management UI
-- Layouts — App shell, login layout, static page layout
+**Authentication Components:**
+- `PrimitiveLogin` — Login page with email/passkey/OAuth support
+- `PrimitiveLogout` — Logout handling
+- `PrimitiveOauthCallback` — OAuth callback page
+- `EditProfile` / `PasskeyManagement` — User profile management
 
-**Router Helpers:**
-- Auth guards — Protect routes based on authentication
-- Breadcrumb generation — Automatic breadcrumb trails from route metadata
+**Document Components:**
+- `PrimitiveDocumentSwitcher` — Dropdown for switching between documents
+- `PrimitiveDocumentList` — Full document management table/list
+- `PrimitiveShareDocumentDialog` — Dialog for sharing documents
 
-**Key point:** primitive-app is **entirely optional**. You can:
-1. **Use everything** — Stores, components, and layouts for the fastest start
-2. **Use only stores** — Get reactive state without our UI components
-3. **Use selectively** — Pick specific components (e.g., just the auth flow)
-4. **Skip it entirely** — Use js-bao and js-bao-wss-client directly in any framework
+**Shared Components:**
+- `PrimitiveLoadingGate` — Show loading state while data loads
+- `PrimitiveUserMenu` / `PrimitiveUserTabItem` — User avatar menus
+- `PrimitiveMobileTabBar` — Mobile bottom navigation
+- `DeleteConfirmationDialog` — Reusable delete confirmation
+
+**Developer Tools:**
+- Debug suite with document debugger and test runner
+
+**Key point:** primitive-app is **entirely optional** and deliberately minimal. You can:
+1. **Use the components** — Drop in auth, document, and utility components as needed
+2. **Build your own UI** — Use js-bao-wss-client directly for document management
+3. **Skip it entirely** — Use js-bao and js-bao-wss-client in any framework
+
+::: tip Flexibility by Design
+Unlike opinionated frameworks, primitive-app doesn't dictate your app structure, navigation, or layouts. You decide how to organize documents, build navigation, and structure pages. The components are building blocks you can compose however you want.
+:::
 
 ::: warning Assumptions
 primitive-app assumes you're using:
@@ -114,45 +125,59 @@ If you're using a different stack, use js-bao and js-bao-wss-client directly.
 
 | Approach | Use When | What You Get |
 |----------|----------|--------------|
-| **Full primitive-app** | Starting fresh with Vue, want fastest setup | Stores + UI + routing helpers |
-| **Stores only** | Using Vue but want custom UI | Reactive state, no UI opinions |
+| **primitive-app + Template** | Starting fresh with Vue, want fastest setup | Bootstrap, components, data loader |
+| **Components only** | Using Vue but want full control over structure | Pick specific components as needed |
 | **Direct client** | Using React/Svelte/other, or need full control | Maximum flexibility |
 
-### Full primitive-app (Template Approach)
+### Using primitive-app (Template Approach)
 
 ```typescript
 // main.ts
 import { createPrimitiveApp } from "primitive-app";
+import { getJsBaoConfig, getLogLevel } from "@/config/envConfig";
+import App from "./App.vue";
+import router from "./router/routes";
 
 void createPrimitiveApp({
   mainComponent: App,
   router,
-  getAppConfig,
-  getJsBaoConfig,
-  // Everything wired up for you
+  jsBaoConfig: getJsBaoConfig(),
+  logLevel: getLogLevel(),
 });
 ```
 
-### Stores Only
+### Using Components Selectively
 
 ```typescript
-// Use stores without primitive-app UI components
-import { useUserStore, useSingleDocumentStore } from "primitive-app";
+// Use specific components without taking everything
+import {
+  PrimitiveDocumentSwitcher,
+  PrimitiveLoadingGate,
+  useJsBaoDataLoader,
+  useUserStore
+} from "primitive-app";
 
+// Build your own app structure using these building blocks
 const user = useUserStore();
-const docStore = useSingleDocumentStore();
 
-// Build your own UI with the reactive state
+const { data, initialDataLoaded } = useJsBaoDataLoader({
+  subscribeTo: [Task],
+  documentReady,
+  loadData: async () => {
+    const result = await Task.query({ completed: false });
+    return { tasks: result.data };
+  },
+});
 ```
 
 ### Direct Client (Any Framework)
 
 ```typescript
 // Works in React, Svelte, vanilla JS, etc.
-import { initializeClient } from "js-bao-wss-client";
+import { JsBaoClient } from "js-bao-wss-client";
 import { Task } from "./models/Task";
 
-const client = await initializeClient({
+const client = new JsBaoClient({
   apiUrl: "https://api.primitiveapi.com",
   wsUrl: "wss://api.primitiveapi.com",
   appId: "your-app-id",
@@ -160,7 +185,7 @@ const client = await initializeClient({
 });
 
 // Handle auth, documents, and UI yourself
-client.on("auth-success", () => { /* update your UI */ });
+client.on("authStateChanged", (event) => { /* update your UI */ });
 await client.documents.open(documentId);
 ```
 

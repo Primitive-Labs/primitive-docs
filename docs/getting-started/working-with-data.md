@@ -12,18 +12,14 @@ Models define the shape of your data. Each model corresponds to a type of record
 
 ### Creating Your First Model
 
-Create a new file in `src/models/`:
+When creating a new js-bao model file, follow this exact workflow:
+
+**Step 1: Create the minimal model file** with only the required sections:
 
 ```typescript
 // src/models/Task.ts
-import {
-  BaseModel,
-  defineModelSchema,
-  attachAndRegisterModel,
-  InferAttrs,
-} from "js-bao";
+import { BaseModel, defineModelSchema } from "js-bao";
 
-// 1. Define the schema
 const taskSchema = defineModelSchema({
   name: "tasks",
   fields: {
@@ -36,12 +32,9 @@ const taskSchema = defineModelSchema({
   },
 });
 
-// 2. Create TypeScript types
-export type TaskAttrs = InferAttrs<typeof taskSchema>;
-export interface Task extends TaskAttrs, BaseModel {}
-
-// 3. Define the class
 export class Task extends BaseModel {
+  static schema = taskSchema;
+
   // Add computed properties
   get isOverdue(): boolean {
     if (!this.dueDate || this.completed) return false;
@@ -53,35 +46,30 @@ export class Task extends BaseModel {
     return Task.query({ completed: false });
   }
 }
-
-// 4. Register the model
-attachAndRegisterModel(Task, taskSchema);
 ```
 
-### Registering Models with Your App
-
-After creating a model, add it to your js-bao configuration:
+**Step 2: Add the model to `getJsBaoConfig`** in your config file:
 
 ```typescript
-// src/config/envConfig.ts
+// src/config/envConfig.ts (in the models import)
 import { Task } from "@/models/Task";
-import { Project } from "@/models/Project";
 
-export function getJsBaoConfig() {
-  return {
-    appId: import.meta.env.VITE_APP_ID,
-    apiUrl: import.meta.env.VITE_API_URL,
-    wsUrl: import.meta.env.VITE_WS_URL,
-    models: [Task, Project],  // Register your models here
-  };
-}
+// Then in the allModels array or getJsBaoConfig models property
 ```
 
-Then run codegen to generate TypeScript helpers:
+**Step 3: Run `pnpm codegen`** to generate the auto-generated sections:
 
 ```bash
 pnpm codegen
 ```
+
+This generates TypeScript types, field accessors, and other boilerplate code automatically.
+
+**Step 4: Make any additional edits** to the schema (adding fields, constraints, etc.) and run `pnpm codegen` again.
+
+::: warning Critical
+**NEVER create or edit auto-generated sections yourself.** The codegen script maintains these code blocks. Look for comments like `// --- auto-generated ---` to identify them. If you manually edit these sections, your changes will be overwritten the next time codegen runs.
+:::
 
 ### Field Types
 
@@ -121,19 +109,27 @@ fields: {
 Enforce uniqueness across one or more fields:
 
 ```typescript
+const categorySchema = defineModelSchema({
+  name: "categories",
+  fields: {
+    id: { type: "id", autoAssign: true, indexed: true },
+    name: { type: "string" },
+    parentId: { type: "string" },
+  },
+  uniqueConstraints: [["name", "parentId"]], // name+parentId must be unique
+});
+```
+
+For a single field:
+
+```typescript
 const userSchema = defineModelSchema({
   name: "users",
   fields: {
     id: { type: "id", autoAssign: true, indexed: true },
     email: { type: "string", indexed: true },
-    username: { type: "string", indexed: true },
   },
-  options: {
-    uniqueConstraints: [
-      { name: "unique_email", fields: ["email"] },
-      { name: "unique_username", fields: ["username"] },
-    ],
-  },
+  uniqueConstraints: [["email"]], // email must be unique
 });
 ```
 
@@ -345,12 +341,12 @@ if (task) {
 Create a record if it doesn't exist, or update it if it does:
 
 ```typescript
-// Upsert by unique constraint
-const user = await User.upsertByUnique(
-  "unique_email",           // Constraint name
-  "alice@example.com",      // Lookup value
-  { name: "Alice Smith" },  // Data to set/update
-  { targetDocument: documentId }
+// Upsert by unique constraint fields
+// If a category with this name+parentId exists, update it; otherwise create it
+await Category.upsertByUnique(
+  ["name", "parentId"],           // Unique constraint fields
+  { name: "Work", parentId: null }, // Match values
+  { color: "blue" }               // Fields to set/update
 );
 ```
 
@@ -381,35 +377,52 @@ unsubscribe();
 
 ### Using the Data Loader (Vue Template)
 
-If you're using our Vue template, `useJsBaoDataLoader` provides automatic subscription handling:
+If you're using our Vue template, `useJsBaoDataLoader` provides automatic subscription handling. It handles four key concerns:
+
+1. **Waiting for documents to be ready** — Queries won't run until `documentReady` is true
+2. **Knowing when UI is ready to render** — `initialDataLoaded` becomes true after the first successful load
+3. **Subscribing to model changes** — Automatically re-runs `loadData` when subscribed models change
+4. **Reactive query parameters** — Re-runs `loadData` when `queryParams` change
 
 ```typescript
-import { useJsBaoDataLoader, useSingleDocumentStore } from "primitive-app";
+import { useJsBaoDataLoader } from "primitive-app";
 import { Task } from "@/models/Task";
-import { computed } from "vue";
-import { storeToRefs } from "pinia";
+import { computed, ref } from "vue";
 
-const docStore = useSingleDocumentStore();
-const { isReady: documentReady } = storeToRefs(docStore);
+// documentReady should be true after your document opening logic completes
+const documentReady = ref(false);
 
-const { data, initialDataLoaded, reload } = useJsBaoDataLoader({
+const { data, initialDataLoaded, reload } = useJsBaoDataLoader<{
+  tasks: Task[];
+  total: number;
+}>({
   subscribeTo: [Task],  // Auto-reload when Task data changes
+  queryParams: computed(() => ({ showCompleted: false })), // Reactive filters
   documentReady,
-  loadData: async () => {
-    const result = await Task.query({ completed: false });
-    return { tasks: result.data as Task[] };
+  async loadData({ showCompleted }) {
+    const query = showCompleted ? {} : { completed: false };
+    const result = await Task.query(query, { sort: { priority: -1 } });
+    return { tasks: result.data as Task[], total: result.data.length };
   },
 });
 
 const tasks = computed(() => data.value?.tasks ?? []);
 ```
 
-In your template, use `PrimitiveSkeletonGate` to show loading state:
+**Best practices:**
+- Use `useJsBaoDataLoader` no more than once per component
+- **Return a single structured object** from `loadData`
+- NEVER add a watch on `loadData` results—do processing inside `loadData`
+- NEVER rely on component remounting for route param changes—include them in `queryParams`
+- Use `initialDataLoaded` (not `documentReady`) with `PrimitiveLoadingGate`
+- For sequences of mutations, set `pauseUpdates` while mutating, then call `reload()` afterward
+
+In your template, use `PrimitiveLoadingGate` to show loading state:
 
 ```vue
 <template>
-  <PrimitiveSkeletonGate :is-ready="initialDataLoaded">
-    <template #skeleton>
+  <PrimitiveLoadingGate :is-ready="initialDataLoaded">
+    <template #loading>
       <div>Loading tasks...</div>
     </template>
 
@@ -418,7 +431,7 @@ In your template, use `PrimitiveSkeletonGate` to show loading state:
         {{ task.title }}
       </li>
     </ul>
-  </PrimitiveSkeletonGate>
+  </PrimitiveLoadingGate>
 </template>
 ```
 

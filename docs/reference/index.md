@@ -158,27 +158,18 @@ Generated reference documentation for each project.
     - [PrimitiveLogout](/reference/primitive-app/components/components/auth/PrimitiveLogout)
     - [PrimitiveOauthCallback](/reference/primitive-app/components/components/auth/PrimitiveOauthCallback)
   - **Documents**
-    - [PrimitiveManageDocuments](/reference/primitive-app/components/components/documents/PrimitiveManageDocuments)
+    - [PrimitiveDocumentList](/reference/primitive-app/components/components/documents/PrimitiveDocumentList)
+    - [PrimitiveDocumentSwitcher](/reference/primitive-app/components/components/documents/PrimitiveDocumentSwitcher)
     - [PrimitiveShareDocumentDialog](/reference/primitive-app/components/components/documents/PrimitiveShareDocumentDialog)
-    - [PrimitiveSingleDocumentSwitcher](/reference/primitive-app/components/components/documents/PrimitiveSingleDocumentSwitcher)
-  - **Navigation**
-    - [PrimitiveAppBreadcrumb](/reference/primitive-app/components/components/navigation/PrimitiveAppBreadcrumb)
-    - [PrimitiveAppSidebarHeader](/reference/primitive-app/components/components/navigation/PrimitiveAppSidebarHeader)
-    - [PrimitiveBottomNav](/reference/primitive-app/components/components/navigation/PrimitiveBottomNav)
-    - [PrimitiveNavigationBadge](/reference/primitive-app/components/components/navigation/PrimitiveNavigationBadge)
-    - [PrimitiveSidebarNav](/reference/primitive-app/components/components/navigation/PrimitiveSidebarNav)
-    - [PrimitiveUserMenu](/reference/primitive-app/components/components/navigation/PrimitiveUserMenu)
   - **Shared**
     - [DeleteConfirmationDialog](/reference/primitive-app/components/components/shared/DeleteConfirmationDialog)
+    - [PrimitiveLoadingGate](/reference/primitive-app/components/components/shared/PrimitiveLoadingGate)
     - [PrimitiveLogoSpinner](/reference/primitive-app/components/components/shared/PrimitiveLogoSpinner)
-    - [PrimitiveSkeletonGate](/reference/primitive-app/components/components/shared/PrimitiveSkeletonGate)
-- **Layouts**
-  - [PrimitiveAppLayout](/reference/primitive-app/components/layouts/PrimitiveAppLayout)
-  - [PrimitiveLoginLayout](/reference/primitive-app/components/layouts/PrimitiveLoginLayout)
-  - [PrimitiveStaticLayout](/reference/primitive-app/components/layouts/PrimitiveStaticLayout)
+    - [PrimitiveMobileTabBar](/reference/primitive-app/components/components/shared/PrimitiveMobileTabBar)
+    - [PrimitiveUserMenu](/reference/primitive-app/components/components/shared/PrimitiveUserMenu)
+    - [PrimitiveUserTabItem](/reference/primitive-app/components/components/shared/PrimitiveUserTabItem)
 - **Pages**
   - [PrimitiveNotFound](/reference/primitive-app/components/pages/PrimitiveNotFound)
-- [PrimitiveNotFound](/reference/primitive-app/components/PrimitiveNotFound)
 
 ### Composables
 
@@ -202,12 +193,6 @@ Generated reference documentation for each project.
 
 ### Stores
 
-- [appConfigStore](/reference/primitive-app/stores/appConfigStore)
-- [breadcrumbsStore](/reference/primitive-app/stores/breadcrumbsStore)
-- [jsBaoDocumentsStore](/reference/primitive-app/stores/jsBaoDocumentsStore)
-- [multiDocumentStore](/reference/primitive-app/stores/multiDocumentStore)
-- [navigationStore](/reference/primitive-app/stores/navigationStore)
-- [singleDocumentStore](/reference/primitive-app/stores/singleDocumentStore)
 - [userStore](/reference/primitive-app/stores/userStore)
 
 ### Utils

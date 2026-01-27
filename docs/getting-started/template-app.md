@@ -4,10 +4,16 @@ The fastest way to build an app on Primitive is to start from the official templ
 
 ## Prerequisites
 
-- **Node.js 18+**
+- **Node.js** ^20.19.0 or >=22.12.0
 - **GitHub account** with access to [Primitive-Labs/primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template)
 
-### Installing pnpm
+## 1. Create Your Repository
+
+1. Go to [primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template) on GitHub
+2. Click the green **"Use this template"** button in the upper right
+3. Choose a name for your new repository and create it
+
+## 2. Install pnpm
 
 This project uses [pnpm](https://pnpm.io/) as its package manager. The easiest way to install pnpm is through Corepack (included with Node.js 16+):
 
@@ -18,28 +24,60 @@ corepack prepare pnpm@latest --activate
 
 Alternatively, see the [pnpm installation guide](https://pnpm.io/installation) for other methods.
 
-## Create Your Repository
+## 3. Install the Primitive CLI
 
-1. Go to [primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template) on GitHub
-2. Click the green **"Use this template"** button in the upper right
-3. Choose a name for your new repository and create it
+The `primitive-admin` CLI tool provides command-line access to the Primitive Admin server for managing your app. Install it globally:
 
-Then clone your new repo:
+```bash
+npm install -g primitive-admin
+```
+
+Once installed, authenticate with your Primitive account:
+
+```bash
+primitive login
+```
+
+This will open a browser window for you to sign in. After signing in, you can verify your authentication:
+
+```bash
+primitive whoami
+```
+
+## 4. Clone Your Repository
 
 ```bash
 git clone https://github.com/your-username/my-app.git
 cd my-app
+```
+
+## 5. Install Dependencies
+
+```bash
 pnpm install
 ```
 
-## Create Your App on Primitive
+## 6. Create Your App on Primitive
 
-1. Go to the [Primitive Admin Console](https://admin.primitiveapi.com/login)
-2. Sign in and click **Create New App**
-3. Enter your app's display name
-4. Save and note your **App ID**
+You need to create an app in the Primitive Admin system to get an **App ID** for your project.
 
-## Configure Your Environment
+**Option A: Using the CLI (Recommended)**
+
+```bash
+primitive apps create "My New App"
+```
+
+This will output your new **App ID**. You can also list your apps at any time:
+
+```bash
+primitive apps list
+```
+
+**Option B: Using the Dashboard**
+
+Go to the [Primitive Admin Console](https://admin.primitiveapi.com/login) and create a new app through the web interface. Make note of your **App ID**.
+
+## 7. Configure Your Environment
 
 Open the `.env` file in your project and update the App ID:
 
@@ -47,7 +85,7 @@ Open the `.env` file in your project and update the App ID:
 VITE_APP_ID=your-app-id-here
 ```
 
-## Run Your App
+## 8. Run Your App
 
 Start the development server:
 
@@ -61,6 +99,8 @@ Open `http://localhost:5173` in your browser. You should see your app running.
 - Real-time data sync
 - Local-first data persistence
 - A Vue + TypeScript + Tailwind foundation
+- Built-in test harness for browser-based testing
+- Document debugger for inspecting your data
 
 ## Setting Up Google Sign In (Optional)
 
@@ -105,22 +145,48 @@ The template gives you a production-ready starting point:
 ```
 my-app/
 ├── src/
-│   ├── components/     # Vue components
-│   ├── config/         # App configuration
-│   ├── layouts/        # Page layouts
-│   ├── lib/            # Business logic
+│   ├── assets/         # Static images and assets
+│   ├── components/     # Vue components (organized by area)
+│   ├── components/ui/  # shadcn-vue base components
+│   ├── composables/    # Vue composables
+│   ├── config/         # Environment configuration
+│   ├── layouts/        # Page layout components
+│   ├── lib/            # Business logic (pure TypeScript)
 │   ├── models/         # js-bao data models
 │   ├── pages/          # Route components
-│   └── router/         # Vue Router setup
-├── .env                # Environment variables
+│   ├── router/         # Vue Router setup
+│   └── tests/          # Test harness test files
+├── docs/               # Agent guides for AI coding assistants
+├── .env                # Development environment variables
+├── .env.production     # Production environment variables
 └── wrangler.toml       # Cloudflare deployment config
 ```
 
 Key configuration files:
 
-- **`src/config/appConfig.ts`** — App name, document mode, navigation
-- **`src/config/envConfig.ts`** — API URLs, App ID, logging
+- **`src/config/envConfig.ts`** — API URLs, App ID, logging, js-bao configuration
 - **`src/models/`** — Your data models (start here!)
+- **`docs/`** — Guides for AI coding assistants working on your project
+
+## Development Workflow
+
+### Code Generation
+
+After creating or modifying js-bao models, run the codegen script to generate TypeScript types and field accessors:
+
+```bash
+pnpm codegen
+```
+
+This is automatically run when you start the dev server (`pnpm dev`) but should also be run after any model changes.
+
+### Type Checking
+
+Run type checking to catch errors:
+
+```bash
+pnpm type-check
+```
 
 ## Next Steps
 
@@ -129,4 +195,6 @@ Now that your app is running:
 1. **[The Local-First Model](./local-first-model.md)** — Understand how Primitive apps work
 2. **[Understanding Documents](./understanding-documents.md)** — Learn about documents and sharing
 3. **[Working with Data](./working-with-data.md)** — Create your first data models
-4. **[Deploying to Production](./deploying-to-production.md)** — Deploy your app to Cloudflare Workers
+4. **[Test Harness](./test-harness.md)** — Write browser-based tests for your app
+5. **[Document Debugger](./document-debugger.md)** — Inspect and debug your data
+6. **[Deploying to Production](./deploying-to-production.md)** — Deploy your app to Cloudflare Workers

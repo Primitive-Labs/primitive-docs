@@ -10,7 +10,6 @@ auth requirements using the `primitiveRouterMeta` property in route meta.
 
 - **Auth Guards**: Automatically redirects unauthenticated users to login
 - **Admin Routes**: Support for admin-only routes with automatic redirect
-- **Breadcrumb Support**: Routes can define static or dynamic breadcrumb labels
 - **Login Redirect**: Configurable login route or external URL with continue URL support
 
 ## Usage
@@ -27,12 +26,12 @@ const router = createPrimitiveRouter({
       meta: {
         primitiveRouterMeta: {
           requireAuth: 'member',
-          breadcrumb: { title: 'Dashboard' },
         },
       },
     },
   ],
   loginRouteName: 'login',
+  homeRouteName: 'home', // for admin redirect fallback
 });
 ```
 
@@ -51,47 +50,11 @@ const router = createPrimitiveRouter({
 export type AuthLevel = "member" | "admin" | "none";
 ```
 
-### PrimitiveRouterBreadcrumbMeta
-
-```ts
-export interface PrimitiveRouterBreadcrumbMeta {
-  /**
-   * Static breadcrumb label for this route.
-   * Used as a fallback when no generator is provided or when it fails.
-   */
-  title?: string;
-
-  /**
-   * Optional generator for dynamic/async breadcrumb labels.
-   *
-   * Receives the route params object for the *current navigation* and
-   * may return a string synchronously or a Promise<string>.
-   *
-   * Example:
-   * ```ts
-   * meta: {
-   *   primitiveRouterMeta: {
-   *     breadcrumb: {
-   *       title: "User", // fallback
-   *       generator: async (params) => {
-   *         const user = await fetchUser(params.id as string);
-   *         return `User: ${user.name}`;
-   *       },
-   *     },
-   *   },
-   * }
-   * ```
-   */
-  generator?: (params: Record<string, unknown>) => string | Promise<string>;
-}
-```
-
 ### PrimitiveRouterMeta
 
 ```ts
 /**
  * Shared route metadata used by primitive-app and consumer apps.
- * Extend this over time as we add more cross-app route meta fields.
  */
 export interface PrimitiveRouterMeta {
   /**
@@ -99,11 +62,6 @@ export interface PrimitiveRouterMeta {
    * Defaults to "none" when omitted.
    */
   requireAuth: AuthLevel;
-
-  /**
-   * Optional breadcrumb configuration used by primitive-app navigation.
-   */
-  breadcrumb?: PrimitiveRouterBreadcrumbMeta;
 }
 ```
 
@@ -137,5 +95,13 @@ export interface CreatePrimitiveRouterOptions {
    * route name with a `continueURL` query parameter in the querystring.
    */
   loginRouteName?: string;
+
+  /**
+   * Named home route to redirect non-admin users to when they attempt
+   * to access an admin-only route.
+   *
+   * When omitted, defaults to "home".
+   */
+  homeRouteName?: string;
 }
 ```

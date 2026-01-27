@@ -599,45 +599,16 @@
                   "text": "Documents",
                   "items": [
                     {
-                      "text": "PrimitiveManageDocuments",
-                      "link": "/reference/primitive-app/components/components/documents/PrimitiveManageDocuments"
+                      "text": "PrimitiveDocumentList",
+                      "link": "/reference/primitive-app/components/components/documents/PrimitiveDocumentList"
+                    },
+                    {
+                      "text": "PrimitiveDocumentSwitcher",
+                      "link": "/reference/primitive-app/components/components/documents/PrimitiveDocumentSwitcher"
                     },
                     {
                       "text": "PrimitiveShareDocumentDialog",
                       "link": "/reference/primitive-app/components/components/documents/PrimitiveShareDocumentDialog"
-                    },
-                    {
-                      "text": "PrimitiveSingleDocumentSwitcher",
-                      "link": "/reference/primitive-app/components/components/documents/PrimitiveSingleDocumentSwitcher"
-                    }
-                  ]
-                },
-                {
-                  "text": "Navigation",
-                  "items": [
-                    {
-                      "text": "PrimitiveAppBreadcrumb",
-                      "link": "/reference/primitive-app/components/components/navigation/PrimitiveAppBreadcrumb"
-                    },
-                    {
-                      "text": "PrimitiveAppSidebarHeader",
-                      "link": "/reference/primitive-app/components/components/navigation/PrimitiveAppSidebarHeader"
-                    },
-                    {
-                      "text": "PrimitiveBottomNav",
-                      "link": "/reference/primitive-app/components/components/navigation/PrimitiveBottomNav"
-                    },
-                    {
-                      "text": "PrimitiveNavigationBadge",
-                      "link": "/reference/primitive-app/components/components/navigation/PrimitiveNavigationBadge"
-                    },
-                    {
-                      "text": "PrimitiveSidebarNav",
-                      "link": "/reference/primitive-app/components/components/navigation/PrimitiveSidebarNav"
-                    },
-                    {
-                      "text": "PrimitiveUserMenu",
-                      "link": "/reference/primitive-app/components/components/navigation/PrimitiveUserMenu"
                     }
                   ]
                 },
@@ -649,31 +620,26 @@
                       "link": "/reference/primitive-app/components/components/shared/DeleteConfirmationDialog"
                     },
                     {
+                      "text": "PrimitiveLoadingGate",
+                      "link": "/reference/primitive-app/components/components/shared/PrimitiveLoadingGate"
+                    },
+                    {
                       "text": "PrimitiveLogoSpinner",
                       "link": "/reference/primitive-app/components/components/shared/PrimitiveLogoSpinner"
                     },
                     {
-                      "text": "PrimitiveSkeletonGate",
-                      "link": "/reference/primitive-app/components/components/shared/PrimitiveSkeletonGate"
+                      "text": "PrimitiveMobileTabBar",
+                      "link": "/reference/primitive-app/components/components/shared/PrimitiveMobileTabBar"
+                    },
+                    {
+                      "text": "PrimitiveUserMenu",
+                      "link": "/reference/primitive-app/components/components/shared/PrimitiveUserMenu"
+                    },
+                    {
+                      "text": "PrimitiveUserTabItem",
+                      "link": "/reference/primitive-app/components/components/shared/PrimitiveUserTabItem"
                     }
                   ]
-                }
-              ]
-            },
-            {
-              "text": "Layouts",
-              "items": [
-                {
-                  "text": "PrimitiveAppLayout",
-                  "link": "/reference/primitive-app/components/layouts/PrimitiveAppLayout"
-                },
-                {
-                  "text": "PrimitiveLoginLayout",
-                  "link": "/reference/primitive-app/components/layouts/PrimitiveLoginLayout"
-                },
-                {
-                  "text": "PrimitiveStaticLayout",
-                  "link": "/reference/primitive-app/components/layouts/PrimitiveStaticLayout"
                 }
               ]
             },
@@ -685,10 +651,6 @@
                   "link": "/reference/primitive-app/components/pages/PrimitiveNotFound"
                 }
               ]
-            },
-            {
-              "text": "PrimitiveNotFound",
-              "link": "/reference/primitive-app/components/PrimitiveNotFound"
             }
           ]
         },
@@ -747,30 +709,6 @@
         {
           "text": "Stores",
           "items": [
-            {
-              "text": "appConfigStore",
-              "link": "/reference/primitive-app/stores/appConfigStore"
-            },
-            {
-              "text": "breadcrumbsStore",
-              "link": "/reference/primitive-app/stores/breadcrumbsStore"
-            },
-            {
-              "text": "jsBaoDocumentsStore",
-              "link": "/reference/primitive-app/stores/jsBaoDocumentsStore"
-            },
-            {
-              "text": "multiDocumentStore",
-              "link": "/reference/primitive-app/stores/multiDocumentStore"
-            },
-            {
-              "text": "navigationStore",
-              "link": "/reference/primitive-app/stores/navigationStore"
-            },
-            {
-              "text": "singleDocumentStore",
-              "link": "/reference/primitive-app/stores/singleDocumentStore"
-            },
             {
               "text": "userStore",
               "link": "/reference/primitive-app/stores/userStore"

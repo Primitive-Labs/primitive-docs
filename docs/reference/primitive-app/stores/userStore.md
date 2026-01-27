@@ -35,10 +35,15 @@ const theme = userStore.getPref('theme', 'light');
 
 ## Initialization
 
-The store must be initialized before use, typically done by `createPrimitiveApp`:
+The store is initialized automatically by `createPrimitiveApp`. Apps should
+watch `isAuthenticated` to handle sign-out events (e.g., redirect to login):
 
 ```ts
-await userStore.initialize({ loginUrl: '/login' });
+watch(() => userStore.isAuthenticated, (isAuth, wasAuth) => {
+  if (wasAuth && !isAuth) {
+    router.push({ name: 'login' });
+  }
+});
 ```
 
 ## State
@@ -74,12 +79,11 @@ Whether the current user has admin privileges.
 
 ### `initialize`
 
-Initialize the user store with authentication configuration.
+Initialize the user store.
 This is typically called by `createPrimitiveApp` during app bootstrap.
 
-| Parameter | Description |
-| --- | --- |
-| `options` | Configuration options including the login URL |
+Apps should watch `isAuthenticated` to handle sign-out events and redirect
+to login as needed.
 
 ### `login`
 
@@ -125,6 +129,33 @@ Request a magic link to be sent to the specified email address.
 **Returns:** Result indicating success
 
 **Throws:** AuthError if request fails (e.g., INVITATION_REQUIRED, DOMAIN_NOT_ALLOWED)
+
+### `requestOtp`
+
+Request a one-time code to be sent to the specified email address.
+The code is valid for 10 minutes. Rate limits apply (5 codes per email
+per hour, 20 per IP per hour).
+
+| Parameter | Description |
+| --- | --- |
+| `email` | Email address to send the code to |
+
+**Returns:** Result indicating success
+
+**Throws:** AuthError if request fails (e.g., OTP_NOT_ENABLED, RATE_LIMITED)
+
+### `verifyOtp`
+
+Verify a one-time code and authenticate the user.
+
+| Parameter | Description |
+| --- | --- |
+| `email` | Email address the code was sent to |
+| `code` | The 6-digit code from the email |
+
+**Returns:** Result with user info
+
+**Throws:** AuthError if verification fails (e.g., INVALID_TOKEN, OTP_MAX_ATTEMPTS)
 
 ### `startPasskeyAuth`
 
@@ -268,14 +299,6 @@ Delete all user preferences.
 
 ## Exported types
 
-### InitializeOptions
-
-```ts
-export interface InitializeOptions {
-  loginUrl: string;
-}
-```
-
 ### AuthConfig
 
 ```ts
@@ -294,6 +317,10 @@ export interface AuthConfig {
   hasOAuth: boolean;
   /** Whether passkeys are fully configured (enabled + rpId + rpName) */
   hasPasskey: boolean;
+  /** Whether magic link authentication is enabled */
+  magicLinkEnabled: boolean;
+  /** Whether OTP (one-time code) authentication is enabled */
+  otpEnabled: boolean;
 }
 ```
 
@@ -348,5 +375,35 @@ export interface PasskeyInfo {
   deviceName: string;
   createdAt: string;
   lastUsedAt?: string;
+}
+```
+
+### OtpRequestResult
+
+```ts
+/**
+ * Result from requesting an OTP code.
+ */
+export interface OtpRequestResult {
+  ok: boolean;
+}
+```
+
+### OtpVerifyResult
+
+```ts
+/**
+ * Result from verifying an OTP code.
+ */
+export interface OtpVerifyResult {
+  ok: boolean;
+  /** User profile after successful verification */
+  user?: {
+    userId: string;
+    email: string;
+    name?: string;
+  };
+  /** True if this is a newly created user (first sign-in) */
+  isNewUser?: boolean;
 }
 ```

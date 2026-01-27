@@ -1,10 +1,13 @@
 # PrimitiveLogin
 
-Renders the Primitive login screen with support for multiple authentication methods:
+Renders the Primitive login form with support for multiple authentication methods:
 
 - Email/Magic Link authentication
 - Passkey authentication (via WebAuthn Conditional UI)
 - Google OAuth sign-in
+
+This component renders just the login form content. Use it inside your own
+layout (e.g., a two-column layout with marketing content).
 
 Resolves a "continue URL" from (in order): the `continueURL` query param,
 `defaultContinueUrl`, `defaultContinueRoute`, or `/`.
@@ -13,13 +16,13 @@ Resolves a "continue URL" from (in order): the `continueURL` query param,
 
 ## Props
 
-| Prop name            | Description                                                                                                                                             | Type            | Values | Default |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ------ | ------- |
-| appInfo              | App metadata displayed in the header (name + optional logo).                                                                                            | AppInfo         | -      |         |
-| carousel             | Optional marketing/help carousel configuration shown on large screens.                                                                                  | CarouselOptions | -      |         |
-| links                | Optional Terms of Service / Privacy Policy links displayed under the login button.                                                                      | LoginLinks      | -      |         |
-| defaultContinueUrl   | Default absolute/path URL to continue to after login when no `continueURL`<br/>query parameter is present.                                              | string          | -      |         |
-| defaultContinueRoute | Default named route to continue to after login when no `continueURL` query<br/>parameter is present. Used only if `defaultContinueUrl` is not provided. | string          | -      |         |
+| Prop name            | Description                                                                                                                                                                                   | Type            | Values | Default |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ------ | ------- |
+| appInfo              | App metadata displayed in the header (name + optional logo).                                                                                                                                  | AppInfo         | -      |         |
+| links                | Optional Terms of Service / Privacy Policy links displayed under the login button.                                                                                                            | LoginLinks      | -      |         |
+| defaultContinueUrl   | Default absolute/path URL to continue to after login when no `continueURL`<br/>query parameter is present.                                                                                    | string          | -      |         |
+| defaultContinueRoute | Default named route to continue to after login when no `continueURL` query<br/>parameter is present. Used only if `defaultContinueUrl` is not provided.                                       | string          | -      |         |
+| emailAuthMethod      | Which email authentication method to use.<br/>- `magic_link` (default): User receives a clickable link in their email<br/>- `one_time_code`: User receives a 6-digit code to enter in the app | EmailAuthMethod | -      |         |
 
 <!-- component-types:start -->
 ## Types
@@ -39,7 +42,7 @@ App metadata displayed in the header (name + optional logo).
  *
  * App metadata displayed in the header (name + optional logo).
  */
-interface AppInfo {
+export interface AppInfo {
   /**
    * App name displayed above the login button.
    */
@@ -76,7 +79,7 @@ Provide either an absolute/path URL or a named route for each link.
  *
  * Provide either an absolute/path URL or a named route for each link.
  */
-interface LoginLinks {
+export interface LoginLinks {
   /**
    * Absolute or path URL to your Terms of Service page.
    */
@@ -93,35 +96,6 @@ interface LoginLinks {
    * Named route to your Privacy Policy page (Vue Router).
    */
   privacyPolicyRoute?: string;
-}
-```
-
-### CarouselOptions
-
-Optional carousel content displayed on large screens.
-
-| Property | Type | Description |
-| --- | --- | --- |
-| `items` | `CarouselItemData[]` | Slides to display in the carousel. |
-| `autoplayDelay?` | `number` | Autoplay delay in milliseconds.<br/>Defaults to 5000ms when not provided. |
-
-```ts
-/**
- * @componentType
- *
- * Optional carousel content displayed on large screens.
- */
-interface CarouselOptions {
-  /**
-   * Slides to display in the carousel.
-   */
-  items: CarouselItemData[];
-  /**
-   * Autoplay delay in milliseconds.
-   *
-   * Defaults to 5000ms when not provided.
-   */
-  autoplayDelay?: number;
 }
 ```
 
