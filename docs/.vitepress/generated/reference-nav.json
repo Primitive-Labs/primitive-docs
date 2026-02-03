@@ -580,6 +580,103 @@
       "text": "primitive-app",
       "items": [
         {
+          "text": "Components",
+          "items": [
+            {
+              "text": "Components",
+              "items": [
+                {
+                  "text": "Shared",
+                  "items": [
+                    {
+                      "text": "DeleteConfirmationDialog",
+                      "link": "/reference/primitive-app/components/components/shared/DeleteConfirmationDialog"
+                    },
+                    {
+                      "text": "PrimitiveLoadingGate",
+                      "link": "/reference/primitive-app/components/components/shared/PrimitiveLoadingGate"
+                    },
+                    {
+                      "text": "PrimitiveLogoSpinner",
+                      "link": "/reference/primitive-app/components/components/shared/PrimitiveLogoSpinner"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Dev Tools",
+              "items": [
+                {
+                  "text": "Document Explorer",
+                  "items": [
+                    {
+                      "text": "Dialogs",
+                      "items": [
+                        {
+                          "text": "MassDeleteDocsDialog",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/dialogs/MassDeleteDocsDialog"
+                        },
+                        {
+                          "text": "MassDeleteRecordsDialog",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/dialogs/MassDeleteRecordsDialog"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "DocumentExplorerIndex",
+                      "link": "/reference/primitive-app/components/dev-tools/document-explorer/DocumentExplorerIndex"
+                    },
+                    {
+                      "text": "DocumentExplorerModel",
+                      "link": "/reference/primitive-app/components/dev-tools/document-explorer/DocumentExplorerModel"
+                    },
+                    {
+                      "text": "DocumentSidebar",
+                      "link": "/reference/primitive-app/components/dev-tools/document-explorer/DocumentSidebar"
+                    }
+                  ]
+                },
+                {
+                  "text": "Test Harness",
+                  "items": [
+                    {
+                      "text": "TestRunner",
+                      "link": "/reference/primitive-app/components/dev-tools/test-harness/TestRunner"
+                    }
+                  ]
+                },
+                {
+                  "text": "Vite Plugin",
+                  "items": [
+                    {
+                      "text": "DevToolsFloatingButton",
+                      "link": "/reference/primitive-app/components/dev-tools/vite-plugin/DevToolsFloatingButton"
+                    },
+                    {
+                      "text": "DevToolsOverlay",
+                      "link": "/reference/primitive-app/components/dev-tools/vite-plugin/DevToolsOverlay"
+                    },
+                    {
+                      "text": "DevToolsRoot",
+                      "link": "/reference/primitive-app/components/dev-tools/vite-plugin/DevToolsRoot"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Composables",
+          "items": [
+            {
+              "text": "useJsBaoDataLoader",
+              "link": "/reference/primitive-app/composables/useJsBaoDataLoader"
+            }
+          ]
+        },
+        {
           "text": "Services",
           "items": [
             {

@@ -150,6 +150,32 @@ Generated reference documentation for each project.
 
 ## primitive-app
 
+### Components
+
+- **Components**
+  - **Shared**
+    - [DeleteConfirmationDialog](/reference/primitive-app/components/components/shared/DeleteConfirmationDialog)
+    - [PrimitiveLoadingGate](/reference/primitive-app/components/components/shared/PrimitiveLoadingGate)
+    - [PrimitiveLogoSpinner](/reference/primitive-app/components/components/shared/PrimitiveLogoSpinner)
+- **Dev Tools**
+  - **Document Explorer**
+    - **Dialogs**
+      - [MassDeleteDocsDialog](/reference/primitive-app/components/dev-tools/document-explorer/dialogs/MassDeleteDocsDialog)
+      - [MassDeleteRecordsDialog](/reference/primitive-app/components/dev-tools/document-explorer/dialogs/MassDeleteRecordsDialog)
+    - [DocumentExplorerIndex](/reference/primitive-app/components/dev-tools/document-explorer/DocumentExplorerIndex)
+    - [DocumentExplorerModel](/reference/primitive-app/components/dev-tools/document-explorer/DocumentExplorerModel)
+    - [DocumentSidebar](/reference/primitive-app/components/dev-tools/document-explorer/DocumentSidebar)
+  - **Test Harness**
+    - [TestRunner](/reference/primitive-app/components/dev-tools/test-harness/TestRunner)
+  - **Vite Plugin**
+    - [DevToolsFloatingButton](/reference/primitive-app/components/dev-tools/vite-plugin/DevToolsFloatingButton)
+    - [DevToolsOverlay](/reference/primitive-app/components/dev-tools/vite-plugin/DevToolsOverlay)
+    - [DevToolsRoot](/reference/primitive-app/components/dev-tools/vite-plugin/DevToolsRoot)
+
+### Composables
+
+- [useJsBaoDataLoader](/reference/primitive-app/composables/useJsBaoDataLoader)
+
 ### Services
 
 - [JsBaoClientService](/reference/primitive-app/services/JsBaoClientService)
