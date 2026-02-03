@@ -73,46 +73,63 @@ const reply = await client.llm.chat({
 
 ---
 
-### primitive-app — Vue Integration Layer
+### primitive-app — Client Service & Dev Tools
 
-**What it does:** A lightweight collection of Vue components and composables that make it easier to build apps with js-bao and js-bao-wss-client. It provides building blocks rather than a complete framework, giving you flexibility to structure your app however you want.
+**What it does:** primitive-app provides two key things for Vue apps:
 
-**Core:**
-- `createPrimitiveApp` — Bootstrap function that sets up Vue, Pinia, router, and js-bao
-- `useJsBaoDataLoader` — Composable for reactive data loading with automatic subscriptions
-- `useUserStore` — Current user info, auth state, and user preferences
+**1. JsBao Client Service** — A singleton service for initializing and accessing the js-bao-wss-client:
+- `initializeJsBao(config)` — Initialize the client with your app configuration
+- `jsBaoClientService` — Access the shared client instance throughout your app
 
-**Authentication Components:**
-- `PrimitiveLogin` — Login page with email/passkey/OAuth support
-- `PrimitiveLogout` — Logout handling
-- `PrimitiveOauthCallback` — OAuth callback page
-- `EditProfile` / `PasskeyManagement` — User profile management
+**2. Developer Tools** — A Vite plugin that provides development utilities:
+- **Document Explorer** — Inspect and manage documents and records
+- **Test Harness** — Run browser-based tests for your app
 
-**Document Components:**
-- `PrimitiveDocumentSwitcher` — Dropdown for switching between documents
-- `PrimitiveDocumentList` — Full document management table/list
-- `PrimitiveShareDocumentDialog` — Dialog for sharing documents
+```typescript
+// Initialize the client (in main.ts)
+import { initializeJsBao } from "primitive-app";
 
-**Shared Components:**
-- `PrimitiveLoadingGate` — Show loading state while data loads
-- `PrimitiveUserMenu` / `PrimitiveUserTabItem` — User avatar menus
-- `PrimitiveMobileTabBar` — Mobile bottom navigation
-- `DeleteConfirmationDialog` — Reusable delete confirmation
+initializeJsBao({
+  appId: import.meta.env.VITE_APP_ID,
+  apiUrl: import.meta.env.VITE_API_URL,
+  wsUrl: import.meta.env.VITE_WS_URL,
+  oauthRedirectUri: import.meta.env.VITE_OAUTH_REDIRECT_URI,
+  models: [Task, Project],
+});
 
-**Developer Tools:**
-- Debug suite with document debugger and test runner
+// Add dev tools to vite.config.ts
+import { primitiveDevTools } from "primitive-app/vite";
 
-**Key point:** primitive-app is **entirely optional** and deliberately minimal. You can:
-1. **Use the components** — Drop in auth, document, and utility components as needed
-2. **Build your own UI** — Use js-bao-wss-client directly for document management
-3. **Skip it entirely** — Use js-bao and js-bao-wss-client in any framework
+export default defineConfig({
+  plugins: [
+    vue(),
+    primitiveDevTools({
+      appName: "My App",
+      testsDir: "src/tests",
+    }),
+  ],
+});
+```
 
-::: tip Flexibility by Design
-Unlike opinionated frameworks, primitive-app doesn't dictate your app structure, navigation, or layouts. You decide how to organize documents, build navigation, and structure pages. The components are building blocks you can compose however you want.
+### primitive-app-template — Starter Project
+
+**What it provides:** The [primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template) is a complete starter project that includes everything you need to build a Primitive app:
+
+- **Stores** — `useUserStore`, `useSingleDocumentStore`, `useMultiDocumentStore`
+- **Composables** — `useJsBaoDataLoader`, `useTheme`
+- **Auth Components** — Login, logout, OAuth callback, profile management
+- **Document Components** — Document list, switcher, sharing dialog
+- **Shared Components** — Loading gates, user menus, dialogs
+- **Router** — Auth-guarded routing with `createPrimitiveRouter`
+
+**Key point:** These are **your code to own and modify**. Unlike a library, you copy the template and have full control over every file. This gives you maximum flexibility to customize the app to your needs.
+
+::: tip Start from the Template
+For new projects, use the template as your starting point. It provides a production-ready foundation with all the Vue integration already set up.
 :::
 
 ::: warning Assumptions
-primitive-app assumes you're using:
+The template assumes you're using:
 - **Vue 3** with Composition API
 - **Pinia** for state management
 - **Tailwind CSS** for styling
@@ -125,39 +142,50 @@ If you're using a different stack, use js-bao and js-bao-wss-client directly.
 
 | Approach | Use When | What You Get |
 |----------|----------|--------------|
-| **primitive-app + Template** | Starting fresh with Vue, want fastest setup | Bootstrap, components, data loader |
-| **Components only** | Using Vue but want full control over structure | Pick specific components as needed |
+| **Template** | Starting fresh with Vue, want fastest setup | Full app structure, stores, components, data loader |
 | **Direct client** | Using React/Svelte/other, or need full control | Maximum flexibility |
 
-### Using primitive-app (Template Approach)
+### Using the Template (Vue)
+
+The template gives you a complete app structure with local copies of all Vue integration code:
 
 ```typescript
-// main.ts
-import { createPrimitiveApp } from "primitive-app";
-import { getJsBaoConfig, getLogLevel } from "@/config/envConfig";
+// main.ts - standard Vue/Pinia setup
+import { createApp } from "vue";
+import { createPinia } from "pinia";
+import { initializeJsBao } from "primitive-app";
 import App from "./App.vue";
 import router from "./router/routes";
+import { getJsBaoConfig } from "./config/envConfig";
+import { useUserStore } from "./stores/userStore";
 
-void createPrimitiveApp({
-  mainComponent: App,
-  router,
-  jsBaoConfig: getJsBaoConfig(),
-  logLevel: getLogLevel(),
-});
+async function bootstrap() {
+  const app = createApp(App);
+  const pinia = createPinia();
+  app.use(pinia);
+  
+  // Initialize the shared client
+  initializeJsBao(getJsBaoConfig());
+  
+  // Initialize user store
+  const userStore = useUserStore();
+  await userStore.initialize();
+  
+  app.use(router);
+  app.mount("#app");
+}
+
+bootstrap();
 ```
 
-### Using Components Selectively
+The template includes stores and composables as local files you own and can modify:
 
 ```typescript
-// Use specific components without taking everything
-import {
-  PrimitiveDocumentSwitcher,
-  PrimitiveLoadingGate,
-  useJsBaoDataLoader,
-  useUserStore
-} from "primitive-app";
+// Use your local stores and composables
+import { useUserStore } from "@/stores/userStore";
+import { useJsBaoDataLoader } from "@/composables/useJsBaoDataLoader";
+import { PrimitiveLoadingGate } from "@/components/shared/PrimitiveLoadingGate.vue";
 
-// Build your own app structure using these building blocks
 const user = useUserStore();
 
 const { data, initialDataLoaded } = useJsBaoDataLoader({
@@ -174,13 +202,14 @@ const { data, initialDataLoaded } = useJsBaoDataLoader({
 
 ```typescript
 // Works in React, Svelte, vanilla JS, etc.
-import { JsBaoClient } from "js-bao-wss-client";
+import { initializeClient } from "js-bao-wss-client";
 import { Task } from "./models/Task";
 
-const client = new JsBaoClient({
+const client = await initializeClient({
   apiUrl: "https://api.primitiveapi.com",
   wsUrl: "wss://api.primitiveapi.com",
   appId: "your-app-id",
+  oauthRedirectUri: "http://localhost:5173/oauth/callback",
   models: [Task],
 });
 

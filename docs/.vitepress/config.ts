@@ -161,6 +161,7 @@ export default defineConfig({
         text: 'Getting Started',
         items: [
           { text: 'Overview', link: '/' },
+          { text: 'Example Apps', link: '/getting-started/example-apps' },
           { text: 'Starting with the Template App', link: '/getting-started/template-app' },
           { text: 'The Local-First Model', link: '/getting-started/local-first-model' },
           { text: 'Understanding Documents', link: '/getting-started/understanding-documents' },

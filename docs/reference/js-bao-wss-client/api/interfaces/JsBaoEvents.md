@@ -242,6 +242,12 @@
 
 ***
 
+### workflowStarted
+
+> **workflowStarted**: [`WorkflowStartedEvent`](WorkflowStartedEvent.md)
+
+***
+
 ### workflowStatus
 
 > **workflowStatus**: [`WorkflowStatusEvent`](WorkflowStatusEvent.md)

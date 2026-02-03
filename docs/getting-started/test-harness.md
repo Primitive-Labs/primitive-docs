@@ -100,61 +100,37 @@ export const appTestGroups: PrimitiveTestGroup[] = [
 ];
 ```
 
-### 3. Register Tests in Routes
+### 3. Configure the Vite Plugin
 
-Pass your test groups to the `DebugSuiteLayout` in your routes:
+The test harness is provided by the `primitiveDevTools` Vite plugin. Configure it in your `vite.config.ts`:
 
 ```typescript
-// src/router/routes.ts
-import { appTestGroups } from "@/tests";
-import {
-  DebugSuiteLayout,
-  DebuggingSuiteHome,
-  DebuggingSuiteTests,
-  DebuggingSuiteDocuments,
-  DebuggingSuiteDocumentsModel,
-} from "primitive-app";
+// vite.config.ts
+import { defineConfig } from "vite";
+import vue from "@vitejs/plugin-vue";
+import { primitiveDevTools } from "primitive-app/vite";
 
-const routes = [
-  // ... your app routes ...
-  
-  {
-    path: "/debug",
-    component: DebugSuiteLayout,
-    props: {
-      testGroups: appTestGroups,
+export default defineConfig({
+  plugins: [
+    vue(),
+    primitiveDevTools({
       appName: "My App",
-    },
-    meta: {
-      primitiveRouterMeta: {
-        requireAuth: "member", // or "admin" to restrict access
-      },
-    },
-    children: [
-      {
-        path: "",
-        name: "debug-home",
-        component: DebuggingSuiteHome,
-      },
-      {
-        path: "test",
-        name: "debug-test",
-        component: DebuggingSuiteTests,
-      },
-      {
-        path: "documents",
-        name: "debug-documents",
-        component: DebuggingSuiteDocuments,
-      },
-      {
-        path: "documents/:model",
-        name: "debug-documents-model",
-        component: DebuggingSuiteDocumentsModel,
-      },
-    ],
-  },
-];
+      testsDir: "src/tests",  // Directory containing your test files
+    }),
+  ],
+});
 ```
+
+The plugin automatically:
+- Discovers test files matching `**/*.primitive-test.ts` in your tests directory
+- Adds a floating button (in dev mode) to open the dev tools overlay
+- Provides both the test runner and document explorer UIs
+
+::: tip File Naming
+Name your test files with the `.primitive-test.ts` suffix so the plugin can discover them automatically:
+- `src/tests/myFeature.primitive-test.ts`
+- `src/tests/userStore.primitive-test.ts`
+:::
 
 ## Writing Tests
 
@@ -193,10 +169,11 @@ export const onlineTests: PrimitiveTestGroup = {
 
 ### Using Stores in Tests
 
-You can use Pinia stores directly in your tests:
+You can use Pinia stores directly in your tests (these are local files in your project from the template):
 
 ```typescript
-import { useUserStore } from "primitive-app";
+// Import from your local stores (included in the template)
+import { useUserStore } from "@/stores/userStore";
 
 {
   id: "user-pref-read",
@@ -215,10 +192,11 @@ import { useUserStore } from "primitive-app";
 
 ### Testing with Documents
 
-For tests that create data, use the document stores:
+For tests that create data, use the document stores (local files from the template):
 
 ```typescript
-import { useJsBaoDocumentsStore, useMultiDocumentStore } from "primitive-app";
+// Import from your local stores (included in the template)
+import { useJsBaoDocumentsStore } from "@/stores/jsBaoDocumentsStore";
 import { Product } from "@/models/Product";
 
 {

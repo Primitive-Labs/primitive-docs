@@ -22,6 +22,12 @@ Workflow status response
 
 ***
 
+### run?
+
+> `optional` **run**: [`WorkflowRun`](WorkflowRun.md)
+
+***
+
 ### status
 
 > **status**: `string`

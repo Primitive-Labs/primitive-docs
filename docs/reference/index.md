@@ -93,12 +93,15 @@ Generated reference documentation for each project.
   - [DocumentInvitationResponse](/reference/js-bao-wss-client/api/interfaces/DocumentInvitationResponse)
   - [DocumentMetadataChangedEvent](/reference/js-bao-wss-client/api/interfaces/DocumentMetadataChangedEvent)
   - [DocumentPermissionEntry](/reference/js-bao-wss-client/api/interfaces/DocumentPermissionEntry)
+  - [ExecutePromptOptions](/reference/js-bao-wss-client/api/interfaces/ExecutePromptOptions)
+  - [ExecutePromptResult](/reference/js-bao-wss-client/api/interfaces/ExecutePromptResult)
   - [GeminiGenerateRawOptions](/reference/js-bao-wss-client/api/interfaces/GeminiGenerateRawOptions)
   - [GeminiGenerateResult](/reference/js-bao-wss-client/api/interfaces/GeminiGenerateResult)
   - [GeminiMessage](/reference/js-bao-wss-client/api/interfaces/GeminiMessage)
   - [GeminiModelSummary](/reference/js-bao-wss-client/api/interfaces/GeminiModelSummary)
   - [GeminiPromptOptions](/reference/js-bao-wss-client/api/interfaces/GeminiPromptOptions)
   - [GeminiStructuredOutput](/reference/js-bao-wss-client/api/interfaces/GeminiStructuredOutput)
+  - [GetWorkflowStatusOptions](/reference/js-bao-wss-client/api/interfaces/GetWorkflowStatusOptions)
   - [IntegrationCallRequest](/reference/js-bao-wss-client/api/interfaces/IntegrationCallRequest)
   - [IntegrationCallResponse](/reference/js-bao-wss-client/api/interfaces/IntegrationCallResponse)
   - [IntegrationsAPI](/reference/js-bao-wss-client/api/interfaces/IntegrationsAPI)
@@ -119,14 +122,17 @@ Generated reference documentation for each project.
   - [PendingCreateCommittedEvent](/reference/js-bao-wss-client/api/interfaces/PendingCreateCommittedEvent)
   - [PendingCreateFailedEvent](/reference/js-bao-wss-client/api/interfaces/PendingCreateFailedEvent)
   - [PermissionEvent](/reference/js-bao-wss-client/api/interfaces/PermissionEvent)
+  - [PromptsAPI](/reference/js-bao-wss-client/api/interfaces/PromptsAPI)
   - [ReasoningOptions](/reference/js-bao-wss-client/api/interfaces/ReasoningOptions)
   - [SessionInfo](/reference/js-bao-wss-client/api/interfaces/SessionInfo)
   - [StartWorkflowOptions](/reference/js-bao-wss-client/api/interfaces/StartWorkflowOptions)
   - [StartWorkflowResult](/reference/js-bao-wss-client/api/interfaces/StartWorkflowResult)
   - [StatusChangedEvent](/reference/js-bao-wss-client/api/interfaces/StatusChangedEvent)
+  - [TerminateWorkflowOptions](/reference/js-bao-wss-client/api/interfaces/TerminateWorkflowOptions)
   - [UserProfile](/reference/js-bao-wss-client/api/interfaces/UserProfile)
   - [WorkflowRun](/reference/js-bao-wss-client/api/interfaces/WorkflowRun)
   - [WorkflowsAPI](/reference/js-bao-wss-client/api/interfaces/WorkflowsAPI)
+  - [WorkflowStartedEvent](/reference/js-bao-wss-client/api/interfaces/WorkflowStartedEvent)
   - [WorkflowStatusEvent](/reference/js-bao-wss-client/api/interfaces/WorkflowStatusEvent)
   - [WorkflowStatusResult](/reference/js-bao-wss-client/api/interfaces/WorkflowStatusResult)
 - **Type Aliases**
@@ -144,54 +150,6 @@ Generated reference documentation for each project.
 
 ## primitive-app
 
-### Overview
-
-- [createPrimitiveApp](/reference/primitive-app/createPrimitiveApp)
-
-### Components
-
-- **Components**
-  - **Auth**
-    - [EditProfile](/reference/primitive-app/components/components/auth/EditProfile)
-    - [PasskeyManagement](/reference/primitive-app/components/components/auth/PasskeyManagement)
-    - [PrimitiveLogin](/reference/primitive-app/components/components/auth/PrimitiveLogin)
-    - [PrimitiveLogout](/reference/primitive-app/components/components/auth/PrimitiveLogout)
-    - [PrimitiveOauthCallback](/reference/primitive-app/components/components/auth/PrimitiveOauthCallback)
-  - **Documents**
-    - [PrimitiveDocumentList](/reference/primitive-app/components/components/documents/PrimitiveDocumentList)
-    - [PrimitiveDocumentSwitcher](/reference/primitive-app/components/components/documents/PrimitiveDocumentSwitcher)
-    - [PrimitiveShareDocumentDialog](/reference/primitive-app/components/components/documents/PrimitiveShareDocumentDialog)
-  - **Shared**
-    - [DeleteConfirmationDialog](/reference/primitive-app/components/components/shared/DeleteConfirmationDialog)
-    - [PrimitiveLoadingGate](/reference/primitive-app/components/components/shared/PrimitiveLoadingGate)
-    - [PrimitiveLogoSpinner](/reference/primitive-app/components/components/shared/PrimitiveLogoSpinner)
-    - [PrimitiveMobileTabBar](/reference/primitive-app/components/components/shared/PrimitiveMobileTabBar)
-    - [PrimitiveUserMenu](/reference/primitive-app/components/components/shared/PrimitiveUserMenu)
-    - [PrimitiveUserTabItem](/reference/primitive-app/components/components/shared/PrimitiveUserTabItem)
-- **Pages**
-  - [PrimitiveNotFound](/reference/primitive-app/components/pages/PrimitiveNotFound)
-
-### Composables
-
-- [useJsBaoDataLoader](/reference/primitive-app/composables/useJsBaoDataLoader)
-- [useTheme](/reference/primitive-app/composables/useTheme)
-
-### Config
-
-- [env-config](/reference/primitive-app/config/env-config)
-
-### Router
-
-- [primitiveRouter](/reference/primitive-app/router/primitiveRouter)
-
 ### Services
 
 - [JsBaoClientService](/reference/primitive-app/services/JsBaoClientService)
-
-### Stores
-
-- [userStore](/reference/primitive-app/stores/userStore)
-
-### Utils
-
-- [Logger](/reference/primitive-app/utils/Logger)

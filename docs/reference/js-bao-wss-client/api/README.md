@@ -1500,9 +1500,12 @@ Workflows allow you to execute server-side, multi-step processes that can includ
 
 ```typescript
 // Start a workflow with input data
-const result = await client.workflows.start("my-workflow-key", {
-  message: "Hello world",
-  value: 42,
+const result = await client.workflows.start({
+  workflowKey: "my-workflow-key",
+  input: {
+    message: "Hello world",
+    value: 42,
+  },
 });
 
 console.log("Run started:", result.runKey);
@@ -1513,18 +1516,18 @@ console.log("Status:", result.status);
 #### Start Options
 
 ```typescript
-const result = await client.workflows.start(
-  "my-workflow-key",
-  { message: "Hello" },
-  {
-    // Provide a custom runKey for idempotency (auto-generated if omitted)
-    runKey: "unique-run-identifier",
-    // Associate the run with a document
-    contextDocId: "doc-123",
-    // Pass additional metadata
-    meta: { source: "user-action", priority: "high" },
-  }
-);
+const result = await client.workflows.start({
+  // The workflow key (required)
+  workflowKey: "my-workflow-key",
+  // Input data passed to the workflow (optional, defaults to {})
+  input: { message: "Hello" },
+  // Provide a custom runKey for idempotency (auto-generated if omitted)
+  runKey: "unique-run-identifier",
+  // Associate the run with a document
+  contextDocId: "doc-123",
+  // Pass additional metadata (max 1KB, returned in listRuns/getStatus)
+  meta: { source: "user-action", priority: "high" },
+});
 ```
 
 ### Document-Scoped Workflows
@@ -1538,15 +1541,24 @@ The workflow instance ID is built from `{appId}:{contextDocId}:{runKey}`, so a w
 
 ```typescript
 // Start a workflow scoped to a document
-const result = await client.workflows.start(
-  "process-document",
-  { action: "analyze" },
-  { contextDocId: "doc-123", runKey: "analyze-v1" }
-);
+const result = await client.workflows.start({
+  workflowKey: "process-document",
+  input: { action: "analyze" },
+  contextDocId: "doc-123",
+  runKey: "analyze-v1",
+});
 
 // Must use the same contextDocId for all operations
-const status = await client.workflows.getStatus("process-document", "analyze-v1", "doc-123");
-await client.workflows.terminate("process-document", "analyze-v1", "doc-123");
+const status = await client.workflows.getStatus({
+  workflowKey: "process-document",
+  runKey: "analyze-v1",
+  contextDocId: "doc-123",
+});
+await client.workflows.terminate({
+  workflowKey: "process-document",
+  runKey: "analyze-v1",
+  contextDocId: "doc-123",
+});
 
 // List runs for this document
 const runs = await client.workflows.listRuns({ contextDocId: "doc-123" });
@@ -1560,19 +1572,19 @@ When you provide a `runKey`, the server ensures only one workflow run exists for
 
 ```typescript
 // First call creates the workflow
-const first = await client.workflows.start(
-  "process-document",
-  { docId: "abc" },
-  { runKey: "process-abc-v1" }
-);
+const first = await client.workflows.start({
+  workflowKey: "process-document",
+  input: { docId: "abc" },
+  runKey: "process-abc-v1",
+});
 console.log(first.existing); // false - new run created
 
 // Second call with same runKey returns existing run
-const second = await client.workflows.start(
-  "process-document",
-  { docId: "abc" },
-  { runKey: "process-abc-v1" }
-);
+const second = await client.workflows.start({
+  workflowKey: "process-document",
+  input: { docId: "abc" },
+  runKey: "process-abc-v1",
+});
 console.log(second.existing); // true - existing run returned
 console.log(second.runId === first.runId); // true - same run
 ```
@@ -1587,7 +1599,10 @@ This is useful for:
 Poll the status of a running workflow:
 
 ```typescript
-const status = await client.workflows.getStatus("my-workflow-key", runKey);
+const status = await client.workflows.getStatus({
+  workflowKey: "my-workflow-key",
+  runKey,
+});
 
 console.log("Status:", status.status); // "running" | "complete" | "failed" | "terminated"
 
@@ -1604,28 +1619,35 @@ If you started the workflow with a specific `contextDocId`, you must provide the
 
 ```typescript
 // Start workflow with contextDocId
-const result = await client.workflows.start(
-  "my-workflow",
-  { data: "..." },
-  { contextDocId: "doc-123" }
-);
+const result = await client.workflows.start({
+  workflowKey: "my-workflow",
+  input: { data: "..." },
+  contextDocId: "doc-123",
+});
 
 // Get status - must provide the same contextDocId
-const status = await client.workflows.getStatus(
-  "my-workflow",
-  result.runKey,
-  "doc-123" // contextDocId
-);
+const status = await client.workflows.getStatus({
+  workflowKey: "my-workflow",
+  runKey: result.runKey,
+  contextDocId: "doc-123",
+});
 ```
 
 If `contextDocId` is omitted, the user's root document is used by default.
 
 ### Listening for Workflow Events
 
-Subscribe to real-time workflow completion events via WebSocket:
+Subscribe to real-time workflow events via WebSocket:
 
 ```typescript
-// Listen for workflow status changes
+// Listen for when a workflow starts
+client.on("workflowStarted", (event) => {
+  console.log("Workflow started:", event.workflowKey, event.runKey);
+  console.log("Instance:", event.instanceId);
+  console.log("Meta:", event.meta);
+});
+
+// Listen for workflow completion/failure
 client.on("workflowStatus", (event) => {
   console.log("Workflow event:", event.workflowKey, event.runKey);
   console.log("Status:", event.status); // "completed" | "failed" | "terminated"
@@ -1647,7 +1669,7 @@ client.on("workflowStatus", (event) => {
 await client.documents.open(documentId);
 
 // Now workflow events will be delivered
-const result = await client.workflows.start("my-workflow", { data: "..." });
+const result = await client.workflows.start({ workflowKey: "my-workflow", input: { data: "..." } });
 ```
 
 #### Event Payload
@@ -1738,7 +1760,10 @@ interface WorkflowRun {
 Cancel a running workflow:
 
 ```typescript
-const result = await client.workflows.terminate("my-workflow-key", runKey);
+const result = await client.workflows.terminate({
+  workflowKey: "my-workflow-key",
+  runKey,
+});
 console.log("Terminated, final status:", result.status);
 ```
 
@@ -1746,11 +1771,11 @@ If you started the workflow with a specific `contextDocId`, you must provide the
 
 ```typescript
 // Terminate a workflow started with contextDocId
-const result = await client.workflows.terminate(
-  "my-workflow-key",
+const result = await client.workflows.terminate({
+  workflowKey: "my-workflow-key",
   runKey,
-  "doc-123" // contextDocId
-);
+  contextDocId: "doc-123",
+});
 ```
 
 ### Sending File Attachments (PDFs, Images)
@@ -1776,13 +1801,16 @@ async function loadFileAsBase64(url: string): Promise<string> {
 // Load a PDF and send to workflow
 const pdfBase64 = await loadFileAsBase64("/path/to/document.pdf");
 
-const result = await client.workflows.start("extract-pdf-data", {
-  attachments: [
-    {
-      data: pdfBase64,
-      type: "application/pdf",
-    },
-  ],
+const result = await client.workflows.start({
+  workflowKey: "extract-pdf-data",
+  input: {
+    attachments: [
+      {
+        data: pdfBase64,
+        type: "application/pdf",
+      },
+    ],
+  },
 });
 ```
 
@@ -1811,14 +1839,17 @@ fileInput.addEventListener("change", async () => {
 
   const base64Data = await fileToBase64(file);
 
-  const result = await client.workflows.start("process-upload", {
-    attachments: [
-      {
-        data: base64Data,
-        type: file.type, // e.g., "image/png", "application/pdf"
-        filename: file.name,
-      },
-    ],
+  const result = await client.workflows.start({
+    workflowKey: "process-upload",
+    input: {
+      attachments: [
+        {
+          data: base64Data,
+          type: file.type, // e.g., "image/png", "application/pdf"
+          filename: file.name,
+        },
+      ],
+    },
   });
 });
 ```
@@ -1837,13 +1868,16 @@ function loadFileAsBase64Sync(filePath: string): string {
 const pdfPath = path.join(__dirname, "document.pdf");
 const pdfBase64 = loadFileAsBase64Sync(pdfPath);
 
-const result = await client.workflows.start("analyze-document", {
-  attachments: [
-    {
-      data: pdfBase64,
-      type: "application/pdf",
-    },
-  ],
+const result = await client.workflows.start({
+  workflowKey: "analyze-document",
+  input: {
+    attachments: [
+      {
+        data: pdfBase64,
+        type: "application/pdf",
+      },
+    ],
+  },
 });
 ```
 
@@ -1885,13 +1919,16 @@ async function processPDF(pdfUrl: string) {
   const pdfBase64 = btoa(binary);
 
   // Start the workflow
-  const result = await client.workflows.start("extract-pdf-data", {
-    attachments: [
-      {
-        data: pdfBase64,
-        type: "application/pdf",
-      },
-    ],
+  const result = await client.workflows.start({
+    workflowKey: "extract-pdf-data",
+    input: {
+      attachments: [
+        {
+          data: pdfBase64,
+          type: "application/pdf",
+        },
+      ],
+    },
   });
 
   console.log("Workflow started:", result.runKey);
@@ -1923,7 +1960,7 @@ async function waitForCompletion(
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeoutMs) {
-    const status = await client.workflows.getStatus(workflowKey, runKey);
+    const status = await client.workflows.getStatus({ workflowKey, runKey });
 
     if (status.status === "complete") {
       return status.output;
@@ -1945,7 +1982,7 @@ async function waitForCompletion(
 }
 
 // Usage
-const result = await client.workflows.start("my-workflow", { data: "..." });
+const result = await client.workflows.start({ workflowKey: "my-workflow", input: { data: "..." } });
 const output = await waitForCompletion(client, "my-workflow", result.runKey);
 ```
 

@@ -4,9 +4,25 @@ The Document Debugger is a powerful development tool included with `primitive-ap
 
 ## Accessing the Debugger
 
-The Document Debugger is part of the Debugging Suite, available at `/debug/documents` in your app. By default, these routes are restricted to **admin users only** using the `requireAuth: "admin"` route meta.
+The Document Debugger is provided by the `primitiveDevTools` Vite plugin. In development mode, a floating button appears in the corner of your app that opens the dev tools overlay.
 
-You can also access it from the Debugging Suite home page at `/debug`.
+To enable it, configure the plugin in your `vite.config.ts`:
+
+```typescript
+import { primitiveDevTools } from "primitive-app/vite";
+
+export default defineConfig({
+  plugins: [
+    vue(),
+    primitiveDevTools({
+      appName: "My App",
+      testsDir: "src/tests",
+    }),
+  ],
+});
+```
+
+Click the floating dev tools button to open the overlay, then select "Document Explorer" to access the debugger.
 
 ## Document Management
 
@@ -118,9 +134,9 @@ All queries in the Document Debugger are **scoped to the selected document**. Th
 
 This matches how documents work in production—data is isolated per document unless you explicitly query across documents.
 
-## Disabling in Production
+## Production Behavior
 
-While the debugging suite routes are protected by admin authentication by default, you may want to remove them entirely in production builds. You can conditionally exclude the debug routes in your router configuration based on environment.
+The dev tools overlay only appears in development mode (`import.meta.env.DEV`). In production builds, the floating button and overlay are automatically excluded, so you don't need to manually disable them.
 
 ## Next Steps
 

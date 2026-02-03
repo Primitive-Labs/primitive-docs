@@ -2,6 +2,10 @@
 
 Welcome to Primitive! This guide will help you understand the platform and build your first app.
 
+::: tip Explore Example Apps
+Want to see Primitive in action? Check out our [Example Apps](./getting-started/example-apps.md) to interactively explore real-time collaboration, document sharing, and other features covered in these docs.
+:::
+
 ## Quick Start
 
 New to Primitive? Start here:

@@ -10,23 +10,15 @@
 
 ### getStatus()
 
-> **getStatus**(`workflowKey`, `runKey`, `contextDocId?`): `Promise`\<[`WorkflowStatusResult`](WorkflowStatusResult.md)\>
+> **getStatus**(`options`): `Promise`\<[`WorkflowStatusResult`](WorkflowStatusResult.md)\>
 
 Get the status of a workflow run. If contextDocId is not provided, uses the user's root document.
 
 #### Parameters
 
-##### workflowKey
+##### options
 
-`string`
-
-##### runKey
-
-`string`
-
-##### contextDocId?
-
-`string`
+[`GetWorkflowStatusOptions`](GetWorkflowStatusOptions.md)
 
 #### Returns
 
@@ -54,21 +46,13 @@ List workflow runs for the current user
 
 ### start()
 
-> **start**(`workflowKey`, `input`, `options?`): `Promise`\<[`StartWorkflowResult`](StartWorkflowResult.md)\>
+> **start**(`options`): `Promise`\<[`StartWorkflowResult`](StartWorkflowResult.md)\>
 
 Start a workflow and return the run information
 
 #### Parameters
 
-##### workflowKey
-
-`string`
-
-##### input
-
-`Record`\<`string`, `any`\>
-
-##### options?
+##### options
 
 [`StartWorkflowOptions`](StartWorkflowOptions.md)
 
@@ -80,23 +64,15 @@ Start a workflow and return the run information
 
 ### terminate()
 
-> **terminate**(`workflowKey`, `runKey`, `contextDocId?`): `Promise`\<[`WorkflowStatusResult`](WorkflowStatusResult.md)\>
+> **terminate**(`options`): `Promise`\<[`WorkflowStatusResult`](WorkflowStatusResult.md)\>
 
 Terminate a running workflow. If contextDocId is not provided, uses the user's root document.
 
 #### Parameters
 
-##### workflowKey
+##### options
 
-`string`
-
-##### runKey
-
-`string`
-
-##### contextDocId?
-
-`string`
+[`TerminateWorkflowOptions`](TerminateWorkflowOptions.md)
 
 #### Returns
 

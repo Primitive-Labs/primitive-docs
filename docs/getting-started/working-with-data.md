@@ -162,7 +162,8 @@ When you save a new record, you need to specify which document it belongs to:
 // Explicit document ID
 await task.save({ targetDocument: "doc-abc123" });
 
-// Using single document store
+// Using single document store (from your local stores, included in the template)
+import { useSingleDocumentStore } from "@/stores/singleDocumentStore";
 const docStore = useSingleDocumentStore();
 await task.save({ targetDocument: docStore.currentDocumentId });
 ```
@@ -377,7 +378,7 @@ unsubscribe();
 
 ### Using the Data Loader (Vue Template)
 
-If you're using our Vue template, `useJsBaoDataLoader` provides automatic subscription handling. It handles four key concerns:
+If you're using our Vue template, the `useJsBaoDataLoader` composable (included in the template) provides automatic subscription handling. It handles four key concerns:
 
 1. **Waiting for documents to be ready** — Queries won't run until `documentReady` is true
 2. **Knowing when UI is ready to render** — `initialDataLoaded` becomes true after the first successful load
@@ -385,7 +386,8 @@ If you're using our Vue template, `useJsBaoDataLoader` provides automatic subscr
 4. **Reactive query parameters** — Re-runs `loadData` when `queryParams` change
 
 ```typescript
-import { useJsBaoDataLoader } from "primitive-app";
+// Import from your local composables (included in the template)
+import { useJsBaoDataLoader } from "@/composables/useJsBaoDataLoader";
 import { Task } from "@/models/Task";
 import { computed, ref } from "vue";
 
@@ -399,8 +401,8 @@ const { data, initialDataLoaded, reload } = useJsBaoDataLoader<{
   subscribeTo: [Task],  // Auto-reload when Task data changes
   queryParams: computed(() => ({ showCompleted: false })), // Reactive filters
   documentReady,
-  async loadData({ showCompleted }) {
-    const query = showCompleted ? {} : { completed: false };
+  async loadData({ queryParams }) {
+    const query = queryParams.showCompleted ? {} : { completed: false };
     const result = await Task.query(query, { sort: { priority: -1 } });
     return { tasks: result.data as Task[], total: result.data.length };
   },
@@ -417,9 +419,13 @@ const tasks = computed(() => data.value?.tasks ?? []);
 - Use `initialDataLoaded` (not `documentReady`) with `PrimitiveLoadingGate`
 - For sequences of mutations, set `pauseUpdates` while mutating, then call `reload()` afterward
 
-In your template, use `PrimitiveLoadingGate` to show loading state:
+In your template, use `PrimitiveLoadingGate` (included in the template) to show loading state:
 
 ```vue
+<script setup>
+import PrimitiveLoadingGate from "@/components/shared/PrimitiveLoadingGate.vue";
+</script>
+
 <template>
   <PrimitiveLoadingGate :is-ready="initialDataLoaded">
     <template #loading>

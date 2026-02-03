@@ -5,7 +5,7 @@ The fastest way to build an app on Primitive is to start from the official templ
 ## Prerequisites
 
 - **Node.js** ^20.19.0 or >=22.12.0
-- **GitHub account** with access to [Primitive-Labs/primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template)
+- **GitHub account** (to create your own repository from the template)
 
 ## 1. Create Your Repository
 

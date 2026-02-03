@@ -328,11 +328,12 @@ Launch your app in invite-only mode to control early access.
 The client handles this automatically—unauthenticated users on invite-only apps see the waitlist UI. You can also check programmatically:
 
 ```typescript
-// In your app, the user store handles waitlist state
+// In your app, the user store (from the template) handles waitlist state
+import { useUserStore } from "@/stores/userStore";
 const user = useUserStore();
 
 // If the user isn't invited, they'll be redirected to waitlist
-// This is handled automatically by primitive-app's auth guards
+// This is handled automatically by the template's auth guards
 ```
 
 ### Use Cases

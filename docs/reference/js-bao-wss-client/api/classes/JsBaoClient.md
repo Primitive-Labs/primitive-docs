@@ -81,6 +81,12 @@ Provides a hierarchical API for:
 
 ***
 
+### prompts
+
+> **prompts**: [`PromptsAPI`](../interfaces/PromptsAPI.md)
+
+***
+
 ### session
 
 > **session**: `SessionAPI`

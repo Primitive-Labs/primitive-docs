@@ -2,29 +2,15 @@
 
 ***
 
-[js-bao-wss-client](../globals.md) / WorkflowRun
+[js-bao-wss-client](../globals.md) / WorkflowStartedEvent
 
-# Interface: WorkflowRun
-
-A workflow run record
+# Interface: WorkflowStartedEvent
 
 ## Properties
 
 ### contextDocId?
 
 > `optional` **contextDocId**: `string`
-
-***
-
-### createdAt
-
-> **createdAt**: `string`
-
-***
-
-### endedAt?
-
-> `optional` **endedAt**: `string`
 
 ***
 
@@ -37,14 +23,6 @@ A workflow run record
 ### meta?
 
 > `optional` **meta**: `Record`\<`string`, `any`\>
-
-User-defined metadata (max 1KB)
-
-***
-
-### revisionId
-
-> **revisionId**: `string`
 
 ***
 
@@ -60,9 +38,9 @@ User-defined metadata (max 1KB)
 
 ***
 
-### status
+### type
 
-> **status**: `string`
+> **type**: `"workflowStarted"`
 
 ***
 

@@ -353,6 +353,14 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/DocumentPermissionEntry"
                 },
                 {
+                  "text": "ExecutePromptOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ExecutePromptOptions"
+                },
+                {
+                  "text": "ExecutePromptResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ExecutePromptResult"
+                },
+                {
                   "text": "GeminiGenerateRawOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/GeminiGenerateRawOptions"
                 },
@@ -375,6 +383,10 @@
                 {
                   "text": "GeminiStructuredOutput",
                   "link": "/reference/js-bao-wss-client/api/interfaces/GeminiStructuredOutput"
+                },
+                {
+                  "text": "GetWorkflowStatusOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GetWorkflowStatusOptions"
                 },
                 {
                   "text": "IntegrationCallRequest",
@@ -457,6 +469,10 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/PermissionEvent"
                 },
                 {
+                  "text": "PromptsAPI",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PromptsAPI"
+                },
+                {
                   "text": "ReasoningOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/ReasoningOptions"
                 },
@@ -477,6 +493,10 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/StatusChangedEvent"
                 },
                 {
+                  "text": "TerminateWorkflowOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/TerminateWorkflowOptions"
+                },
+                {
                   "text": "UserProfile",
                   "link": "/reference/js-bao-wss-client/api/interfaces/UserProfile"
                 },
@@ -487,6 +507,10 @@
                 {
                   "text": "WorkflowsAPI",
                   "link": "/reference/js-bao-wss-client/api/interfaces/WorkflowsAPI"
+                },
+                {
+                  "text": "WorkflowStartedEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/WorkflowStartedEvent"
                 },
                 {
                   "text": "WorkflowStatusEvent",
@@ -556,159 +580,11 @@
       "text": "primitive-app",
       "items": [
         {
-          "text": "Overview",
-          "items": [
-            {
-              "text": "createPrimitiveApp",
-              "link": "/reference/primitive-app/createPrimitiveApp"
-            }
-          ]
-        },
-        {
-          "text": "Components",
-          "items": [
-            {
-              "text": "Components",
-              "items": [
-                {
-                  "text": "Auth",
-                  "items": [
-                    {
-                      "text": "EditProfile",
-                      "link": "/reference/primitive-app/components/components/auth/EditProfile"
-                    },
-                    {
-                      "text": "PasskeyManagement",
-                      "link": "/reference/primitive-app/components/components/auth/PasskeyManagement"
-                    },
-                    {
-                      "text": "PrimitiveLogin",
-                      "link": "/reference/primitive-app/components/components/auth/PrimitiveLogin"
-                    },
-                    {
-                      "text": "PrimitiveLogout",
-                      "link": "/reference/primitive-app/components/components/auth/PrimitiveLogout"
-                    },
-                    {
-                      "text": "PrimitiveOauthCallback",
-                      "link": "/reference/primitive-app/components/components/auth/PrimitiveOauthCallback"
-                    }
-                  ]
-                },
-                {
-                  "text": "Documents",
-                  "items": [
-                    {
-                      "text": "PrimitiveDocumentList",
-                      "link": "/reference/primitive-app/components/components/documents/PrimitiveDocumentList"
-                    },
-                    {
-                      "text": "PrimitiveDocumentSwitcher",
-                      "link": "/reference/primitive-app/components/components/documents/PrimitiveDocumentSwitcher"
-                    },
-                    {
-                      "text": "PrimitiveShareDocumentDialog",
-                      "link": "/reference/primitive-app/components/components/documents/PrimitiveShareDocumentDialog"
-                    }
-                  ]
-                },
-                {
-                  "text": "Shared",
-                  "items": [
-                    {
-                      "text": "DeleteConfirmationDialog",
-                      "link": "/reference/primitive-app/components/components/shared/DeleteConfirmationDialog"
-                    },
-                    {
-                      "text": "PrimitiveLoadingGate",
-                      "link": "/reference/primitive-app/components/components/shared/PrimitiveLoadingGate"
-                    },
-                    {
-                      "text": "PrimitiveLogoSpinner",
-                      "link": "/reference/primitive-app/components/components/shared/PrimitiveLogoSpinner"
-                    },
-                    {
-                      "text": "PrimitiveMobileTabBar",
-                      "link": "/reference/primitive-app/components/components/shared/PrimitiveMobileTabBar"
-                    },
-                    {
-                      "text": "PrimitiveUserMenu",
-                      "link": "/reference/primitive-app/components/components/shared/PrimitiveUserMenu"
-                    },
-                    {
-                      "text": "PrimitiveUserTabItem",
-                      "link": "/reference/primitive-app/components/components/shared/PrimitiveUserTabItem"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "text": "Pages",
-              "items": [
-                {
-                  "text": "PrimitiveNotFound",
-                  "link": "/reference/primitive-app/components/pages/PrimitiveNotFound"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "text": "Composables",
-          "items": [
-            {
-              "text": "useJsBaoDataLoader",
-              "link": "/reference/primitive-app/composables/useJsBaoDataLoader"
-            },
-            {
-              "text": "useTheme",
-              "link": "/reference/primitive-app/composables/useTheme"
-            }
-          ]
-        },
-        {
-          "text": "Config",
-          "items": [
-            {
-              "text": "env-config",
-              "link": "/reference/primitive-app/config/env-config"
-            }
-          ]
-        },
-        {
-          "text": "Router",
-          "items": [
-            {
-              "text": "primitiveRouter",
-              "link": "/reference/primitive-app/router/primitiveRouter"
-            }
-          ]
-        },
-        {
           "text": "Services",
           "items": [
             {
               "text": "JsBaoClientService",
               "link": "/reference/primitive-app/services/JsBaoClientService"
-            }
-          ]
-        },
-        {
-          "text": "Stores",
-          "items": [
-            {
-              "text": "userStore",
-              "link": "/reference/primitive-app/stores/userStore"
-            }
-          ]
-        },
-        {
-          "text": "Utils",
-          "items": [
-            {
-              "text": "Logger",
-              "link": "/reference/primitive-app/utils/Logger"
             }
           ]
         }
