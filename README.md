@@ -2,10 +2,16 @@
 
 Unified documentation site for Primitive Labs projects, built with **VitePress** and hosted on **GitHub Repo Pages**.
 
+## Prerequisites
+
+- Node.js ≥ 22
+- `pnpm`
+- `git` (with submodules)
+
 ## Structure
 
-- `docs/`: VitePress site (manual guides + generated reference)
-  - `docs/guide/**`: hand-written docs
+- `docs/`: VitePress site (getting-started guides + generated reference)
+  - `docs/getting-started/**`: hand-written docs
   - `docs/reference/**`: generated reference docs (**committed**)
 - `library_repos/**`: git submodules (editable source-of-truth repos)
   - `library_repos/js-bao`
