@@ -424,6 +424,50 @@ For browser automation:
 
 ---
 
+## Browser Console Debugging (for Agents)
+
+When running locally (localhost), primitive-app exposes the js-bao client and registered models on the `window` object for interactive debugging. Agents can use browser automation tools to execute JavaScript in the console and query live data.
+
+**Available globals (localhost only):**
+
+- `window.__primitiveAppClient` - The initialized js-bao client instance
+- `window.__primitiveAppModels` - Object containing all registered model classes, keyed by PascalCase name
+
+**Example console commands:**
+
+```javascript
+// List available models
+Object.keys(window.__primitiveAppModels)
+// → ["Task", "Product", "UserPref"]
+
+// Query all records of a model (returns { data: [...], ... })
+await window.__primitiveAppModels.Task.query({})
+
+// Query with filters
+await window.__primitiveAppModels.Task.query({ completed: false })
+
+// Query with operators
+await window.__primitiveAppModels.Task.query({ priority: { $gte: 3 } })
+
+// Get a single record by ID
+await window.__primitiveAppModels.Task.find('some-id')
+
+// Count records
+await window.__primitiveAppModels.Task.count({ completed: false })
+
+// Create and save a new record (targetDocument required for new records)
+const task = new window.__primitiveAppModels.Task({ title: 'Debug task', priority: 1 })
+await task.save({ targetDocument: 'document-id-here' })
+
+// Access client methods (auth, documents, etc.)
+await window.__primitiveAppClient.auth.getCurrentUser()
+await window.__primitiveAppClient.documents.list()
+```
+
+These globals are only available in debug environments (localhost, 127.0.0.1, *.localhost, *.local) and are not exposed in production builds.
+
+---
+
 ## Browser Automation Best Practices
 
 ### General Tips
