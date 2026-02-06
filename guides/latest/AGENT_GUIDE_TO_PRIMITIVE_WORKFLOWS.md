@@ -14,27 +14,50 @@ Workflows are multi-step automation pipelines that execute sequentially. They su
 
 **Key concepts:**
 
-- **Definition**: The workflow configuration (metadata + steps)
-- **Draft**: Editable version of a workflow (stored in R2)
-- **Revision**: Published, immutable version of a workflow
+- **Definition**: The workflow metadata and settings
+- **Draft**: Editable version of a workflow's steps (stored in R2)
+- **Configuration**: A named, versioned set of steps for a workflow (replaces legacy revisions)
+- **Revision**: Published, immutable version of a workflow (legacy — use configurations instead)
 - **Run**: A single execution instance of a workflow
 
 ## Publishing Workflows
 
-**Important:** Workflows must be **published** and set to `active` status before they can be called from the client.
-
-Unlike prompts which only need `status = "active"`, workflows have a two-step publishing process:
+**Important:** Workflows must be **published** or have an **active configuration** and be set to `active` status before they can be called from the client.
 
 ### Workflow Status Lifecycle
 
-| Status     | Has Revision | Can Run from Client | Can Preview via CLI |
-| ---------- | ------------ | ------------------- | ------------------- |
-| `draft`    | No           | No                  | Yes                 |
-| `draft`    | Yes          | No                  | Yes                 |
-| `active`   | Yes          | Yes                 | Yes                 |
-| `archived` | -            | No                  | No                  |
+| Status     | Has Active Config or Revision | Can Run from Client | Can Preview via CLI |
+| ---------- | ----------------------------- | ------------------- | ------------------- |
+| `draft`    | No                            | No                  | Yes                 |
+| `draft`    | Yes                           | No                  | Yes                 |
+| `active`   | Yes                           | Yes                 | Yes                 |
+| `archived` | -                             | No                  | No                  |
 
-### Publishing Steps
+### Publishing via Configurations (Recommended)
+
+Configurations are the recommended way to manage workflow steps. When you create a workflow, a default configuration is automatically created.
+
+1. **Create the workflow** (creates a draft and a default configuration)
+2. **Set status to active** to allow client execution
+
+```bash
+# Step 1: Create workflow from TOML (auto-creates default config)
+primitive workflows create --from-file workflow.toml
+
+# Step 2: Set to active
+primitive workflows update <workflow-id> --status active
+```
+
+To update steps, update the configuration:
+
+```bash
+# Update the active configuration's steps
+primitive workflows configs update <workflow-id> <config-id> --from-file workflow.toml
+```
+
+### Publishing via Revisions (Legacy)
+
+The legacy publish flow creates immutable revisions:
 
 1. **Create/update the workflow** (creates a draft)
 2. **Publish the draft** to create an immutable revision
@@ -51,7 +74,7 @@ primitive workflows publish <workflow-id>
 primitive workflows update <workflow-id> --status active
 ```
 
-**Via TOML sync:** Setting `status = "active"` in the TOML file will fail with "Cannot activate workflow without a revision" if you haven't published first. Always publish via CLI before setting to active.
+**Via TOML sync:** Setting `status = "active"` in the TOML file will fail with "Cannot activate workflow without a revision or active configuration" if you haven't published or created a configuration first.
 
 ### Common Error
 
@@ -59,8 +82,69 @@ If you see `HTTP 404: Workflow not found` when calling `client.workflows.start()
 
 1. Verify the workflow exists with `primitive workflows list`
 2. Check the workflow has `status = "active"` (not `draft`)
-3. Ensure the workflow has been published (`latestRevision` should not be null)
+3. Ensure the workflow has an active configuration (`activeConfigId`) or has been published (`latestRevision` should not be null)
 4. If using prompts, verify those prompts also have `status = "active"`
+
+## Workflow Configurations
+
+Configurations are named, versioned sets of steps for a workflow. They replace the legacy revision model and provide more flexibility for managing workflow variants.
+
+### Key Concepts
+
+- Each workflow can have **multiple configurations** (e.g., "default", "production", "experiment-v2")
+- One configuration is the **active configuration** (`activeConfigId` on the workflow)
+- When a workflow runs from the client, it uses the **active configuration's steps**
+- When you create a workflow, a **default configuration** is automatically created
+- Configurations can be **duplicated** for A/B testing or experimentation
+
+### Configuration Lifecycle
+
+```
+┌──────────┐     ┌──────────┐     ┌───────────┐     ┌──────────┐
+│  Create  │ ──▶ │  Update  │ ──▶ │ Activate  │ ──▶ │   Run    │
+│  Config  │     │  Steps   │     │  Config   │     │          │
+└──────────┘     └──────────┘     └───────────┘     └──────────┘
+                      │
+                      ▼
+                ┌──────────┐     ┌──────────┐
+                │Duplicate │ ──▶ │  Archive  │
+                │          │     │           │
+                └──────────┘     └──────────┘
+```
+
+### CLI Commands for Configurations
+
+```bash
+# List all configurations for a workflow
+primitive workflows configs list <workflow-id>
+
+# Get a specific configuration (includes steps)
+primitive workflows configs get <workflow-id> <config-id>
+
+# Create a new configuration with steps from a TOML file
+primitive workflows configs create <workflow-id> --name "production" --from-file workflow.toml
+
+# Update a configuration's steps
+primitive workflows configs update <workflow-id> <config-id> --from-file workflow.toml
+
+# Activate a configuration (makes it the one used for client execution)
+primitive workflows configs activate <workflow-id> <config-id>
+
+# Duplicate a configuration
+primitive workflows configs duplicate <workflow-id> <config-id> --name "experiment-v2"
+
+# Archive a configuration (cannot archive the active config)
+primitive workflows configs archive <workflow-id> <config-id>
+```
+
+### Preview with a Specific Configuration
+
+```bash
+# Preview using a specific configuration instead of the draft
+primitive workflows preview <workflow-id> --config <config-id> --input '{"text":"hello"}' --wait
+```
+
+---
 
 ## Workflow Definition Structure
 
@@ -76,12 +160,12 @@ description = "What this workflow does"  # Optional
 status = "draft"                      # draft | active | archived
 
 # Concurrency settings (optional)
-perUserMaxRunning = 5                 # Max concurrent runs per user
-perUserMaxQueued = 10                 # Max queued runs per user
-perAppMaxRunning = 10                 # Max concurrent runs per app
-perAppMaxQueued = 20                  # Max queued runs per app
-queueTtlSeconds = 3600                # Queue TTL in seconds
-dequeueOrder = "fifo"                 # fifo | lifo
+perUserMaxRunning = 4                 # Max concurrent runs per user (default: 4)
+perUserMaxQueued = 100                # Max queued runs per user (default: 100)
+perAppMaxRunning = 25                 # Max concurrent runs per app (default: 25)
+perAppMaxQueued = 10000               # Max queued runs per app (default: 10000)
+queueTtlSeconds = 43200              # Queue TTL in seconds (default: 43200 = 12h)
+dequeueOrder = "fifo"                 # fifo | lifo (default: fifo)
 
 # Schema validation (optional, JSON strings)
 inputSchema = "{\"type\":\"object\",\"properties\":{...}}"
@@ -148,7 +232,20 @@ content = "{{ input.question }}"
 # Optional parameters
 # temperature = 0.7
 # maxTokens = 1000
+# top_p = 0.9
 ```
+
+**Additional parameters:**
+
+| Parameter      | Type     | Description                              |
+| -------------- | -------- | ---------------------------------------- |
+| `temperature`  | number   | Sampling temperature (0-2)               |
+| `maxTokens`    | number   | Maximum tokens in response               |
+| `top_p`        | number   | Nucleus sampling parameter               |
+| `attachments`  | array    | File attachments for multimodal input     |
+| `plugins`      | array    | Plugin configurations                     |
+| `tools`        | object   | Tool/function calling definitions         |
+| `tool_choice`  | object   | Tool selection strategy                   |
 
 ### 4. `gemini.generate` - Google Gemini Generation
 
@@ -235,11 +332,21 @@ kind = "prompt.execute"
 promptKey = "summarizer"        # Must match configured prompt
 saveAs = "summary"
 # modelOverride = "gpt-4"       # Optional: override prompt's default model
+# configId = "config-id"        # Optional: use a specific prompt configuration
 
 [steps.variables]
 text = "{{ input.content }}"
 maxLength = 500
 ```
+
+**Parameters:**
+
+| Parameter       | Type   | Description                                      |
+| --------------- | ------ | ------------------------------------------------ |
+| `promptKey`     | string | Required. Key of the configured prompt            |
+| `variables`     | object | Template variables to pass to the prompt          |
+| `modelOverride` | string | Optional. Override the prompt's default model     |
+| `configId`      | string | Optional. Use a specific prompt configuration ID  |
 
 ### 9. `delay` - Pause Execution
 
@@ -434,16 +541,16 @@ The `primitive workflows` command manages workflows. Most commands require an ap
 ### Workflow Lifecycle
 
 ```
-┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐
-│ Create  │ ──▶ │ Update  │ ──▶ │ Preview │ ──▶ │ Publish │
-│         │     │  Draft  │     │         │     │         │
-└─────────┘     └─────────┘     └─────────┘     └─────────┘
-                     │                               │
-                     ▼                               ▼
-                ┌─────────┐                    ┌─────────┐
-                │  Test   │                    │   Run   │
-                │  Cases  │                    │         │
-                └─────────┘                    └─────────┘
+┌─────────┐     ┌──────────┐     ┌─────────┐     ┌──────────┐
+│ Create  │ ──▶ │  Update  │ ──▶ │ Preview │ ──▶ │ Activate │
+│         │     │  Config  │     │         │     │          │
+└─────────┘     └──────────┘     └─────────┘     └──────────┘
+                     │                                │
+                     ▼                                ▼
+                ┌─────────┐                     ┌─────────┐
+                │  Test   │                     │   Run   │
+                │  Cases  │                     │         │
+                └─────────┘                     └─────────┘
 ```
 
 ### Create Workflow
@@ -462,7 +569,7 @@ primitive workflows create --key my-workflow --name "My Workflow"
 primitive workflows draft update <workflow-id> --from-file workflow.toml
 ```
 
-### Preview Execution (Test Draft)
+### Preview Execution (Test Draft or Configuration)
 
 ```bash
 # Start preview and wait for result
@@ -470,7 +577,17 @@ primitive workflows preview <workflow-id> --input '{"text":"hello"}' --wait
 
 # Start preview (returns instance ID for polling)
 primitive workflows preview <workflow-id> --input '{"text":"hello"}'
+
+# Preview a specific configuration
+primitive workflows preview <workflow-id> --config <config-id> --input '{"text":"hello"}' --wait
 ```
+
+**Preview source priority:**
+
+1. If `--config <config-id>` is provided, uses that configuration's steps
+2. Otherwise if a draft exists, uses the draft steps
+3. Otherwise if an active configuration exists, uses its steps
+4. Otherwise fails with "Workflow has no draft or configuration to preview"
 
 ### Publish Draft
 
@@ -522,6 +639,31 @@ primitive workflows runs list <workflow-id> --status completed
 primitive workflows runs status <workflow-id> <run-id>
 ```
 
+### Manage Configurations
+
+```bash
+# List configurations
+primitive workflows configs list <workflow-id>
+
+# Get a configuration (includes steps)
+primitive workflows configs get <workflow-id> <config-id>
+
+# Create a new configuration
+primitive workflows configs create <workflow-id> --name "production" --from-file workflow.toml
+
+# Update a configuration's steps
+primitive workflows configs update <workflow-id> <config-id> --from-file workflow.toml
+
+# Activate a configuration
+primitive workflows configs activate <workflow-id> <config-id>
+
+# Duplicate a configuration
+primitive workflows configs duplicate <workflow-id> <config-id> --name "experiment-v2"
+
+# Archive a configuration (cannot archive the active config)
+primitive workflows configs archive <workflow-id> <config-id>
+```
+
 ### Test Cases
 
 ```bash
@@ -546,6 +688,157 @@ primitive workflows tests attachments upload <workflow-id> <test-case-id> ./file
 
 ---
 
+## Client Library (JS SDK)
+
+The `JsBaoClient` provides methods for interacting with workflows from application code.
+
+### Start a Workflow
+
+```typescript
+const result = await client.workflows.start({
+  workflowKey: "my-workflow",           // Required: workflow key
+  input: { text: "hello" },            // Optional: root input (default: {})
+  runKey: "unique-run-key",            // Optional: idempotency key (auto-generated if omitted)
+  contextDocId: "doc-id",             // Optional: document scope (default: user's root document)
+  meta: { source: "api" },            // Optional: metadata (max 1KB)
+  forceRerun: false,                   // Optional: terminate existing run with same key and restart
+});
+
+// result: { runId, runKey, instanceId, status, existing? }
+```
+
+**Notes on `runKey` and idempotency:**
+
+- If a run with the same `runKey` already exists in the same `contextDocId` scope, the existing run is returned with `existing: true`
+- Use `forceRerun: true` to terminate the existing run and start a new one
+- The `runKey` is scoped: `${contextDocId}#${runKey}`
+
+### Get Workflow Status
+
+```typescript
+const status = await client.workflows.getStatus({
+  workflowKey: "my-workflow",
+  runKey: "unique-run-key",
+  contextDocId: "doc-id",             // Optional
+});
+
+// status: { status, output?, error?, run? }
+// status.status: "complete" | "failed" | "terminated" | "running"
+```
+
+### Terminate a Workflow
+
+```typescript
+const result = await client.workflows.terminate({
+  workflowKey: "my-workflow",
+  runKey: "unique-run-key",
+  contextDocId: "doc-id",             // Optional
+});
+```
+
+### List Workflow Runs
+
+```typescript
+const runs = await client.workflows.listRuns({
+  workflowKey: "my-workflow",          // Optional: filter by workflow
+  status: "completed",                 // Optional: filter by status
+  contextDocId: "doc-id",             // Optional: filter by document
+  limit: 50,                          // Optional: page size (default: 50, max: 200)
+  cursor: "...",                       // Optional: pagination cursor
+  forward: false,                      // Optional: true = oldest first, false = newest first
+});
+
+// runs: { items: WorkflowRun[], cursor?: string }
+```
+
+### WorkflowRun Object
+
+```typescript
+interface WorkflowRun {
+  runId: string;
+  runKey: string;
+  instanceId: string;
+  workflowId: string;
+  workflowKey: string;
+  revisionId: string;
+  contextDocId?: string;
+  status: string;                      // "running" | "completed" | "failed" | "terminated"
+  errorMessage?: string;
+  startedAt: string;
+  endedAt?: string;
+  meta?: Record<string, any>;
+  createdAt: string;
+}
+```
+
+---
+
+## WebSocket Events
+
+Workflow events are broadcast via WebSocket in real-time. A WebSocket connection must be established (typically by opening a document) to receive events.
+
+### `workflowStarted`
+
+Fired when a workflow run begins execution.
+
+```typescript
+client.on("workflowStarted", (event) => {
+  console.log(`Workflow ${event.workflowKey} started: run ${event.runKey}`);
+});
+```
+
+**Payload:**
+
+```typescript
+{
+  type: "workflowStarted";
+  workflowKey: string;
+  workflowId: string;
+  runKey: string;
+  runId: string;
+  instanceId: string;
+  contextDocId?: string;
+  meta?: Record<string, any>;
+}
+```
+
+### `workflowStatus`
+
+Fired when a workflow run completes, fails, or is terminated.
+
+```typescript
+client.on("workflowStatus", (event) => {
+  if (event.status === "completed") {
+    console.log("Output:", event.output);
+  } else if (event.status === "failed") {
+    console.error("Error:", event.error);
+  }
+});
+```
+
+**Payload:**
+
+```typescript
+{
+  type: "workflowStatus";
+  workflowKey: string;
+  workflowId: string;
+  runKey: string;
+  runId: string;
+  status: "completed" | "failed" | "terminated";
+  output?: any;                        // Present when status is "completed"
+  error?: string;                      // Present when status is "failed"
+  contextDocId?: string;
+}
+```
+
+**Notes:**
+
+- Events are broadcast to all WebSocket connections for the user and for collaborators on the same document
+- Requires an active WebSocket connection (established via `client.documents.open(docId)`)
+
+---
+
 ## Complete Examples
 
 ### Example 1: PDF Summarizer with Haiku
@@ -562,8 +855,8 @@ key = "pdf-haiku"
 name = "PDF Haiku Generator"
 description = "Summarizes a PDF and generates a haiku about its content"
 status = "draft"
-perUserMaxRunning = 5
-perUserMaxQueued = 10
+perUserMaxRunning = 4
+perUserMaxQueued = 100
 dequeueOrder = "fifo"
 
 [[steps]]
@@ -702,7 +995,7 @@ message = "Hello, {{ input.name || 'World' }}!"
 primitive workflows create --from-file my-workflow.toml
 ```
 
-Note the workflow ID returned.
+Note the workflow ID returned. A default configuration is automatically created.
 
 ### Step 3: Preview/test the workflow
 
@@ -710,25 +1003,35 @@ Note the workflow ID returned.
 primitive workflows preview <workflow-id> --input '{"name":"Agent"}' --wait
 ```
 
-### Step 4: Iterate on the draft
+### Step 4: Iterate on the configuration
 
-Edit `my-workflow.toml`, then update:
+Edit `my-workflow.toml`, then update the configuration:
 
 ```bash
-primitive workflows draft update <workflow-id> --from-file my-workflow.toml
+# List configs to get the config ID
+primitive workflows configs list <workflow-id>
+
+# Update the configuration's steps
+primitive workflows configs update <workflow-id> <config-id> --from-file my-workflow.toml
 ```
 
 Preview again to test changes.
 
-### Step 5: Publish when ready
+### Step 5: Set to active
 
 ```bash
-primitive workflows publish <workflow-id>
+primitive workflows update <workflow-id> --status active
 ```
 
-### Step 6: (Optional) Set to active
+### Alternative: Publish via legacy revisions
+
+If using the legacy revision flow:
 
 ```bash
+# Publish the draft (creates immutable revision)
+primitive workflows publish <workflow-id>
+
+# Then set to active
 primitive workflows update <workflow-id> --status active
 ```
 
@@ -811,18 +1114,32 @@ runIf = "input.processDeep"   # Negation not supported, use separate logic
 
 ### "Workflow not found"
 
-- Verify the workflow ID is correct
+- Verify the workflow ID or key is correct
 - Ensure you're using the correct app context
+- Verify the workflow has `status = "active"` (not `draft`)
+- Ensure the workflow has an active configuration or published revision
+
+### "Workflow has no draft or configuration to preview"
+
+- Create a configuration: `primitive workflows configs create <workflow-id> --name "default" --from-file workflow.toml`
+- Or update the draft: `primitive workflows draft update <workflow-id> --from-file workflow.toml`
 
 ### "Draft has no steps"
 
 - Run `primitive workflows draft update` to add steps before preview/publish
+
+### "Cannot activate workflow without a revision or active configuration"
+
+- Create and activate a configuration first, or publish a revision
+- `primitive workflows configs create <workflow-id> --name "default" --from-file workflow.toml`
+- `primitive workflows configs activate <workflow-id> <config-id>`
 
 ### Template not resolving
 
 - Check path exists in context (`input`, `steps`, `outputs`)
 - Use fallback values: `{{ input.field || 'default' }}`
 - Verify step IDs match exactly
+- Check `templateWarnings` in step run results for unresolved variables
 
 ### runIf not working
 
@@ -835,6 +1152,12 @@ runIf = "input.processDeep"   # Negation not supported, use separate logic
 - Check the integration is active
 - Verify request path/method are correct
 
+### Run returns `existing: true`
+
+- A run with the same `runKey` in the same `contextDocId` scope already exists
+- Use `forceRerun: true` to terminate the existing run and start a new one
+- Or use a different `runKey`
+
 ---
 
 ## Limitations
@@ -845,3 +1168,5 @@ runIf = "input.processDeep"   # Negation not supported, use separate logic
 4. **No custom functions**: No string manipulation, date functions, etc.
 5. **No arithmetic**: Cannot do `{{ input.a + input.b }}`
 6. **Sequential only**: Steps cannot run in parallel
+7. **Concurrency limits**: Defined on workflow but not yet enforced by the runtime
+8. **Run TTL**: Workflow runs and step runs are automatically cleaned up after 45 days (7 days for preview runs)
