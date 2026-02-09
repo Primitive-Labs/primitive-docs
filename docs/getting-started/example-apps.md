@@ -18,7 +18,7 @@ Use this app to explore the concepts covered in these docs before building your 
 
 ## Simple Todo
 
-**[simple-todo.primitive.app](https://simple-todo.primitive.app/)**
+**[simpletodo.primitive.app](https://simpletodo.primitive.app/)**
 
 A practical todo list application demonstrating real-world patterns:
 
