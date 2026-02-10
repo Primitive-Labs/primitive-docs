@@ -64,6 +64,7 @@
 - [StartWorkflowOptions](interfaces/StartWorkflowOptions.md)
 - [StartWorkflowResult](interfaces/StartWorkflowResult.md)
 - [StatusChangedEvent](interfaces/StatusChangedEvent.md)
+- [StorageProvider](interfaces/StorageProvider.md)
 - [TerminateWorkflowOptions](interfaces/TerminateWorkflowOptions.md)
 - [UserProfile](interfaces/UserProfile.md)
 - [WorkflowRun](interfaces/WorkflowRun.md)
@@ -71,6 +72,8 @@
 - [WorkflowStartedEvent](interfaces/WorkflowStartedEvent.md)
 - [WorkflowStatusEvent](interfaces/WorkflowStatusEvent.md)
 - [WorkflowStatusResult](interfaces/WorkflowStatusResult.md)
+- [YjsPersistenceContext](interfaces/YjsPersistenceContext.md)
+- [YjsPersistenceProvider](interfaces/YjsPersistenceProvider.md)
 
 ## Type Aliases
 
@@ -79,7 +82,9 @@
 - [GeminiGenerateOptions](type-aliases/GeminiGenerateOptions.md)
 - [GeminiRole](type-aliases/GeminiRole.md)
 - [JsBaoErrorCode](type-aliases/JsBaoErrorCode.md)
+- [StorageConfig](type-aliases/StorageConfig.md)
 - [TypedModelConstructor](type-aliases/TypedModelConstructor.md)
+- [YjsPersistenceFactory](type-aliases/YjsPersistenceFactory.md)
 
 ## Variables
 

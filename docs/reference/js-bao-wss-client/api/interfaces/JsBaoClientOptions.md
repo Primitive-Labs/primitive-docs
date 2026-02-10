@@ -170,6 +170,12 @@
 
 ***
 
+### storageConfig?
+
+> `optional` **storageConfig**: [`StorageConfig`](../type-aliases/StorageConfig.md)
+
+***
+
 ### suppressAutoLoginMs?
 
 > `optional` **suppressAutoLoginMs**: `number`
@@ -205,3 +211,32 @@
 ### wsUrl
 
 > **wsUrl**: `string`
+
+***
+
+### yjsPersistence?
+
+> `optional` **yjsPersistence**: [`YjsPersistenceFactory`](../type-aliases/YjsPersistenceFactory.md)
+
+Custom Yjs persistence factory for document storage.
+
+If not provided:
+- Browser: uses y-indexeddb (built-in)
+- Node.js: no Yjs persistence (documents only synced via server)
+
+For Node.js persistence, use y-sqlite3:
+
+#### Example
+
+```typescript
+import { SqlitePersistence } from 'y-sqlite3';
+
+const client = new JsBaoClient({
+  // ...
+  yjsPersistence: (docId, ydoc, { appId, userId }) => {
+    return new SqlitePersistence(docId, ydoc, {
+      dbPath: `~/.my-app/${appId}/${userId}/yjs.sqlite`
+    });
+  }
+});
+```

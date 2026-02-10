@@ -37,6 +37,326 @@ npm install js-bao-wss-client
 npm install yjs lib0
 ```
 
+## Node.js Environment
+
+The client works in both browser and Node.js environments. Storage behavior differs by environment:
+
+| Environment | Storage Provider | Persistence | Automatic |
+|-------------|-----------------|-------------|-----------|
+| Browser | IndexedDB | ✅ Persistent | ✅ Yes |
+| Node.js + better-sqlite3 | SQLite | ✅ Persistent | ✅ Yes (if installed) |
+| Node.js (no native deps) | Memory | ❌ Volatile | ✅ Fallback |
+
+### Enabling Persistence in Node.js
+
+To enable persistent storage in Node.js, install `better-sqlite3`:
+
+```bash
+npm install better-sqlite3
+```
+
+The client will automatically detect and use it. Data is stored at `~/.js-bao/{appId}/storage.db`.
+
+### How Auto-Detection Works
+
+```
+Browser → Uses IndexedDB (always)
+Node.js → Checks for better-sqlite3
+  ├─ Found → Uses SQLite file storage
+  └─ Not found → Falls back to in-memory with warning
+```
+
+### Explicit Configuration
+
+You can override the auto-detection with `storageConfig`:
+
+```typescript
+import { initializeClient } from "js-bao-wss-client";
+
+// Force SQLite with custom path
+const client = await initializeClient({
+  // ... other options
+  storageConfig: { type: "better-sqlite3", filePath: "./data/my-app.db" },
+});
+
+// Force in-memory (no persistence)
+const client = await initializeClient({
+  // ... other options
+  storageConfig: { type: "memory" },
+});
+```
+
+### What's Stored
+
+The storage provider persists:
+- **KV Cache**: API response caching for offline access
+- **Offline Grants**: Credentials for offline authentication
+- **Auth Tokens**: JWT persistence across restarts (if `auth.persistJwtInStorage` is enabled)
+- **Analytics Queue**: Buffered analytics events
+- **Document Metadata**: Last-opened timestamps and local document state
+
+### Browser Bundling
+
+When bundling for browsers, `better-sqlite3` is automatically excluded:
+- Dynamic imports ensure the SQLite code is never loaded in browsers
+- The browser build uses IndexedDB exclusively
+- No configuration needed—tree-shaking handles it automatically
+
+### Yjs Document Persistence
+
+The storage options above (`storageConfig`) handle general data like auth tokens and cache. **Yjs document persistence** (offline document editing) is configured separately:
+
+| Environment | Default Provider | Persistence |
+|-------------|-----------------|-------------|
+| Browser | y-indexeddb (built-in) | ✅ Automatic |
+| Node.js | None | ❌ Server-only sync |
+
+To enable Yjs document persistence in Node.js, use the `yjsPersistence` option with [y-sqlite3](https://www.npmjs.com/package/y-sqlite3):
+
+```bash
+npm install y-sqlite3
+```
+
+```typescript
+import { initializeClient } from "js-bao-wss-client";
+import { SqlitePersistence } from "y-sqlite3";
+
+const client = await initializeClient({
+  apiUrl: "https://api.example.com",
+  wsUrl: "wss://api.example.com",
+  appId: "my-app",
+  models: [Task, Project],
+
+  // Yjs document persistence for Node.js
+  yjsPersistence: (docId, ydoc, { appId, userId }) => {
+    return new SqlitePersistence(docId, ydoc, {
+      dbPath: `${process.env.HOME}/.my-app/${appId}/${userId}/yjs.sqlite`
+    });
+  },
+});
+
+// Documents now persist locally in SQLite
+const { ydoc } = await client.documents.open("doc-123", {
+  waitForLoad: "localIfAvailableElseNetwork"
+});
+```
+
+**Why two storage systems?**
+
+- `storageConfig` → General key-value data (auth, cache, metadata)
+- `yjsPersistence` → Yjs document updates (binary CRDT data with specialized compaction)
+
+Browser users don't need to configure either—both use IndexedDB automatically.
+
+### Complete Node.js Example
+
+Here's a complete example for a CLI tool or server application:
+
+```typescript
+import { initializeClient } from "js-bao-wss-client";
+import { SqlitePersistence } from "y-sqlite3";
+import * as path from "path";
+import * as os from "os";
+
+// Define your models
+import { Task, Project } from "./models";
+
+async function main() {
+  const appId = "my-app";
+  const dataDir = path.join(os.homedir(), ".my-app", appId);
+
+  const client = await initializeClient({
+    apiUrl: "https://api.example.com",
+    wsUrl: "wss://api.example.com",
+    appId,
+    token: process.env.AUTH_TOKEN, // Or use auth flows below
+    models: [Task, Project],
+
+    // SQLite for general storage (auth, cache, metadata)
+    storageConfig: {
+      type: "better-sqlite3",
+      filePath: path.join(dataDir, "storage.db"),
+    },
+
+    // SQLite for Yjs document persistence
+    yjsPersistence: (docId, ydoc, { userId }) => {
+      return new SqlitePersistence(docId, ydoc, {
+        dbPath: path.join(dataDir, userId, "documents.db"),
+      });
+    },
+
+    // Persist JWT across restarts
+    auth: {
+      persistJwtInStorage: true,
+      storageKeyPrefix: "cli",
+    },
+
+    // Node.js database config
+    databaseConfig: {
+      type: "node-sqlite",
+      options: {},
+    },
+  });
+
+  // Wait for connection
+  await new Promise<void>((resolve) => {
+    if (client.isConnected()) return resolve();
+    client.on("status", (e) => e.status === "connected" && resolve());
+  });
+
+  // Work with documents
+  const { doc: ydoc } = await client.documents.open("doc-123", {
+    waitForLoad: "localIfAvailableElseNetwork",
+    enableNetworkSync: true,
+  });
+
+  // Use your models
+  const tasks = await Task.query();
+  console.log(`Found ${tasks.data.length} tasks`);
+
+  // Clean up
+  await client.destroy();
+}
+
+main().catch(console.error);
+```
+
+### Offline-First in Node.js
+
+The client supports offline-first patterns in Node.js:
+
+```typescript
+// Check network status
+const status = client.getNetworkStatus();
+console.log(`Mode: ${status.mode}, Online: ${status.isOnline}`);
+
+// Force offline mode (for testing or airplane mode)
+await client.setNetworkMode("offline");
+
+// Create documents while offline (queued for sync)
+const { metadata } = await client.documents.create({
+  title: "Offline Draft",
+  localOnly: false, // Will sync when back online
+});
+
+// Work with local data
+const { doc } = await client.documents.open(metadata.documentId, {
+  waitForLoad: "local", // Don't wait for network
+  enableNetworkSync: false,
+});
+
+// Go back online - pending creates auto-sync
+await client.setNetworkMode("online");
+
+// Or manually commit pending creates
+await client.documents.commitOfflineCreate(metadata.documentId);
+```
+
+### JWT Persistence Across Restarts
+
+Enable JWT persistence so CLI tools remember authentication:
+
+```typescript
+const client = await initializeClient({
+  // ... other options
+  storageConfig: {
+    type: "better-sqlite3",
+    filePath: "./data/storage.db",
+  },
+  auth: {
+    persistJwtInStorage: true,
+    storageKeyPrefix: "my-cli", // Namespace for multiple tools
+  },
+});
+
+// First run: provide token
+// Subsequent runs: token is loaded from SQLite automatically
+
+// Check if we have a persisted session
+const userId = await client.waitForUserId({ timeoutMs: 5000 }).catch(() => null);
+if (userId) {
+  console.log(`Restored session for user: ${userId}`);
+} else {
+  console.log("No saved session, please authenticate");
+}
+```
+
+### Local-Only Documents (No Server)
+
+Create documents that never sync to the server:
+
+```typescript
+// Create local-only document
+const { metadata } = await client.documents.create({
+  title: "Local Notes",
+  localOnly: true,
+});
+
+// Open without network
+const { doc } = await client.documents.open(metadata.documentId, {
+  waitForLoad: "local",
+  enableNetworkSync: false,
+});
+
+// Data persists in SQLite but never syncs to server
+const notes = doc.getMap("notes");
+notes.set("idea", "This stays local");
+
+// Clean up local data when done
+await client.documents.evict(metadata.documentId, { force: true });
+```
+
+### Multi-Client Sync Testing
+
+For testing sync behavior between multiple Node.js clients:
+
+```typescript
+import { initializeClient } from "js-bao-wss-client";
+
+async function testSync() {
+  // Create two clients (different storage paths)
+  const client1 = await initializeClient({
+    // ... shared config
+    storageConfig: { type: "better-sqlite3", filePath: "./data/client1.db" },
+  });
+
+  const client2 = await initializeClient({
+    // ... shared config
+    storageConfig: { type: "better-sqlite3", filePath: "./data/client2.db" },
+  });
+
+  // Both open same document
+  const doc1 = await client1.openDocument("shared-doc");
+  const doc2 = await client2.openDocument("shared-doc");
+
+  // Changes sync via WebSocket
+  doc1.getMap("data").set("from", "client1");
+
+  // Wait for sync
+  await new Promise((r) => setTimeout(r, 1000));
+
+  // Verify on client2
+  console.log(doc2.getMap("data").get("from")); // "client1"
+
+  await Promise.all([client1.destroy(), client2.destroy()]);
+}
+```
+
+### Required Packages for Node.js
+
+```bash
+# Core (always required)
+npm install js-bao-wss-client yjs lib0 js-bao
+
+# For SQLite storage (optional, recommended for persistence)
+npm install better-sqlite3
+
+# For Yjs document persistence (optional, for offline document editing)
+npm install y-sqlite3
+```
+
+Note: `better-sqlite3` and `y-sqlite3` are native modules requiring compilation. If you encounter build issues, ensure you have the appropriate build tools installed (Python, C++ compiler).
+
 ## Quick Start
 
 > Migrating from legacy decorators? Follow `src/client/docs/js-bao-v2-migration.md` before continuing—models must now be defined with `defineModelSchema`/`createModelClass`.
@@ -2814,3 +3134,40 @@ pnpm run build:esm    # Build ESM only
 pnpm run build:umd    # Build UMD only
 pnpm pack             # Create publishable package
 ```
+
+## Internal Architecture
+
+### OfflineStore Storage Initialization
+
+The `OfflineStore` class handles all persistent storage operations (metadata, grants, analytics, JWT persistence). It uses a lazy initialization pattern where storage is only created when first needed.
+
+**Key methods:**
+
+- `ensureInitialized(ctx: MetadataContext)` - For user-scoped data (metadata, grants, analytics). Requires `ctx.userId`. Calls `storageProvider.init(userId)` to namespace storage by user.
+- `ensureAuthInitialized(ctx: AuthTokenContext)` - For auth data (JWT persistence). Does NOT require userId since we need to load persisted JWTs before knowing who the user is. Uses namespace like `auth:${appId}:${namespace}`.
+
+Both methods call `ensureStorage()` internally, which invokes the storage initializer provided by JsBaoClient to create the storage provider.
+
+**Rule for writing new OfflineStore methods:**
+
+Every public method that accesses storage must follow this pattern:
+
+```typescript
+async newStorageMethod(ctx: MetadataContext, ...): Promise<...> {
+  // 1. Early exit for missing required context (before async work)
+  if (!ctx.userId) return ...;
+
+  // 2. Ensure storage is initialized for this context
+  await this.ensureInitialized(ctx);  // or ensureAuthInitialized for auth methods
+
+  // 3. Check if storage is actually available (initialization might have failed)
+  if (!this.storageProvider || !this.storageProvider.isReady()) return ...;
+
+  // 4. Do the actual storage operation
+  await this.storageProvider.get/put/delete(...);
+}
+```
+
+**Important:** The `ensure*` call must come BEFORE the `!this.storageProvider` check, otherwise the method will return early without ever initializing storage.
+
+This pattern is internal to OfflineStore. Code outside OfflineStore (like JsBaoClient) doesn't need to think about initialization - just call the public OfflineStore methods and they handle it internally.

@@ -493,6 +493,10 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/StatusChangedEvent"
                 },
                 {
+                  "text": "StorageProvider",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/StorageProvider"
+                },
+                {
                   "text": "TerminateWorkflowOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/TerminateWorkflowOptions"
                 },
@@ -519,6 +523,14 @@
                 {
                   "text": "WorkflowStatusResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/WorkflowStatusResult"
+                },
+                {
+                  "text": "YjsPersistenceContext",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/YjsPersistenceContext"
+                },
+                {
+                  "text": "YjsPersistenceProvider",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/YjsPersistenceProvider"
                 }
               ]
             },
@@ -546,8 +558,16 @@
                   "link": "/reference/js-bao-wss-client/api/type-aliases/JsBaoErrorCode"
                 },
                 {
+                  "text": "StorageConfig",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/StorageConfig"
+                },
+                {
                   "text": "TypedModelConstructor",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/TypedModelConstructor"
+                },
+                {
+                  "text": "YjsPersistenceFactory",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/YjsPersistenceFactory"
                 }
               ]
             },
