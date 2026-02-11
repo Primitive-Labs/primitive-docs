@@ -401,8 +401,8 @@ const { data, initialDataLoaded, reload } = useJsBaoDataLoader<{
   subscribeTo: [Task],  // Auto-reload when Task data changes
   queryParams: computed(() => ({ showCompleted: false })), // Reactive filters
   documentReady,
-  async loadData({ queryParams }) {
-    const query = queryParams.showCompleted ? {} : { completed: false };
+  async loadData(queryParams) {
+    const query = queryParams?.showCompleted ? {} : { completed: false };
     const result = await Task.query(query, { sort: { priority: -1 } });
     return { tasks: result.data as Task[], total: result.data.length };
   },

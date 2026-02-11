@@ -441,7 +441,8 @@ const {
   subscribeTo: [TodoItem],
   queryParams: computed(() => ({ listId: props.listId, showCompleted })),
   documentReady,
-  async loadData({ listId, showCompleted }) {
+  async loadData(queryParams) {
+    const { listId, showCompleted } = queryParams ?? {};
     const query = showCompleted ? { listId } : { listId, completed: false };
     const result = await TodoItem.query(query, { sort: { order: 1 } });
     return { items: result.data, total: result.data.length };

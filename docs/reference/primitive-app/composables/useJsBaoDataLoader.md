@@ -15,7 +15,10 @@ This helper centralizes a common pattern in the app:
 ### UseJsBaoDataLoaderOptions
 
 ```ts
-export interface UseJsBaoDataLoaderOptions<Data, Q = unknown> {
+export interface UseJsBaoDataLoaderOptions<
+  Data,
+  Q extends Record<string, unknown> = Record<string, unknown>,
+> {
   /**
    * Models to subscribe to for automatic reloads after the first successful load.
    * Each model is expected to expose a `subscribe(cb) => unsubscribe` API.
@@ -36,9 +39,9 @@ export interface UseJsBaoDataLoaderOptions<Data, Q = unknown> {
   documentReady: MaybeRefBoolean;
 
   /**
-   * The actual data loading function. Receives the current query params.
+   * The actual data loading function. Receives the current query params directly.
    */
-  loadData: (ctx: { queryParams: Q | null }) => Promise<Data>;
+  loadData: (queryParams: Q | null) => Promise<Data>;
 
   /**
    * Optional per-instance pause flag. While true, no loads or scheduled
