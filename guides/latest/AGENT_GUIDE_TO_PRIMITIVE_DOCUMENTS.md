@@ -62,6 +62,27 @@ const documents = await jsBaoClient.documents.list(); // All documents (owned + 
 const invitations = await jsBaoClient.me.pendingDocumentInvitations(); // Pending share invitations
 ```
 
+**Pagination and filtering options:**
+
+```typescript
+// Filter by tag
+const todoLists = await jsBaoClient.documents.list({ tag: "todolist" });
+
+// Paginated results
+const page = await jsBaoClient.documents.list({
+  limit: 20,
+  cursor: previousCursor,  // From previous page
+  returnPage: true,        // Returns { items, cursor } instead of array
+});
+// page.items = DocumentInfo[], page.cursor = next page cursor
+
+// Include root document (excluded by default)
+const withRoot = await jsBaoClient.documents.list({ includeRoot: true });
+
+// Check if a document has a local copy
+const hasLocal = await jsBaoClient.documents.hasLocalCopy(documentId);
+```
+
 ## Common Document Usage Patterns
 
 **Helper Stores:** This project includes `singleDocumentStore` and `multiDocumentStore` in `/src/stores/` that implement the patterns described below. These stores handle document opening, closing, readiness tracking, and state management. They can be used as-is, customized to fit your needs, or ignored in favor of application-specific approaches.
@@ -225,9 +246,22 @@ const { metadata } = await jsBaoClient.documents.create({
   tags: ["todolist"],
 });
 
-// Filter documents by tag
+// Filter documents by tag using list options
+const todoLists = await jsBaoClient.documents.list({ tag: "todolist" });
+
+// Or filter locally
 const documents = await jsBaoClient.documents.list();
 const todoLists = documents.filter((doc) => doc.tags?.includes("todolist"));
+```
+
+**Programmatic tag management:**
+
+```typescript
+// Add a tag to an existing document
+await jsBaoClient.documents.addTag(documentId, "archived");
+
+// Remove a tag from a document
+await jsBaoClient.documents.removeTag(documentId, "archived");
 ```
 
 ## Defining Models

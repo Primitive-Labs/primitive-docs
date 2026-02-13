@@ -541,3 +541,73 @@ primitive integrations test <integration-id> --method GET --path /v1/test
 # View recent logs
 primitive integrations logs <integration-id> --limit 10
 ```
+
+## Client SDK (JS)
+
+Call integrations from application code using `client.integrations.call()`:
+
+```typescript
+const response = await client.integrations.call({
+  integrationKey: "weather-api",
+  method: "GET",
+  path: "/current",
+  query: { city: "San Francisco" },
+  headers: { "X-Debug": "true" },
+});
+
+console.log(response.status);     // Upstream status code
+console.log(response.body);       // JSON returned by the provider
+console.log(response.traceId);    // Proxy trace id (correlates with admin logs)
+console.log(response.durationMs); // Milliseconds spent in the worker
+```
+
+### Request Options
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `integrationKey` | string | Required. Integration key defined in admin |
+| `method` | string | HTTP method (must be in `allowedMethods`) |
+| `path` | string | Request path (must match `allowedPaths`) |
+| `query` | object | Query parameters |
+| `headers` | object | Request headers |
+| `body` | any | Request body (for POST/PUT/PATCH) |
+
+### Error Handling
+
+`client.integrations.call()` throws `JsBaoError` with specific codes:
+
+| Error Code | Description |
+|------------|-------------|
+| `OFFLINE` | SDK is in offline mode |
+| `ACCESS_DENIED` | Missing/expired JWT |
+| `INTEGRATION_NOT_FOUND` | Integration removed/archived or typo in key |
+| `INTEGRATION_SECRET_MISSING` | Admin hasn't uploaded credentials |
+| `INTEGRATION_REQUEST_INVALID` | Method/path/body violate guardrails |
+| `INTEGRATION_PROXY_FAILED` | Upstream timeout or 5xx error |
+
+```typescript
+import { isJsBaoError } from "js-bao-wss-client";
+
+try {
+  await client.integrations.call({
+    integrationKey: "crm",
+    method: "POST",
+    path: "/contacts",
+    body: { email: "user@example.com" },
+  });
+} catch (error) {
+  if (isJsBaoError(error)) {
+    switch (error.code) {
+      case "INTEGRATION_NOT_FOUND":
+        console.error("Integration not available");
+        break;
+      case "INTEGRATION_SECRET_MISSING":
+        console.error("Configuration incomplete");
+        break;
+      case "INTEGRATION_PROXY_FAILED":
+        console.error("Upstream error:", error.details?.traceId);
+        break;
+    }
+  }
+}
+```

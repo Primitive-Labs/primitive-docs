@@ -1,6 +1,40 @@
 {
   "guides": [
     {
+      "topic": "authentication",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.md",
+      "description": "Implementing user authentication with OAuth, Magic Link, OTP, and Passkeys",
+      "keywords": ["authentication", "auth", "OAuth", "Google", "Magic Link", "OTP", "Passkey", "WebAuthn", "login", "sign-in", "JWT"],
+      "useCases": [
+        "Implementing Google OAuth sign-in",
+        "Adding passwordless Magic Link authentication",
+        "Using OTP email codes for verification",
+        "Adding Passkey/WebAuthn support",
+        "Handling auth state changes and events",
+        "Managing JWT persistence"
+      ],
+      "concepts": ["OAuth", "magicLinkRequest", "magicLinkVerify", "otpRequest", "otpVerify", "passkeyAuthStart", "passkeyAuthFinish", "auth events", "getAuthConfig"],
+      "prerequisites": [],
+      "relatedGuides": ["documents"]
+    },
+    {
+      "topic": "blobs",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_BLOBS.md",
+      "description": "Storing and managing binary files with offline support",
+      "keywords": ["blobs", "files", "upload", "download", "images", "PDFs", "storage", "offline", "cache", "prefetch"],
+      "useCases": [
+        "Uploading files and images",
+        "Downloading and displaying blobs",
+        "Caching blobs for offline access",
+        "Managing upload queues",
+        "Prefetching blobs for offline use",
+        "Using blobs in img/video tags"
+      ],
+      "concepts": ["blobs.upload", "blobs.read", "blobs.list", "blobs.delete", "blobs.prefetch", "downloadUrl", "proxyUrl", "upload queue", "service worker"],
+      "prerequisites": ["documents"],
+      "relatedGuides": ["documents"]
+    },
+    {
       "topic": "documents",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md",
       "description": "Working with documents - the core data architecture in Primitive apps",
@@ -69,7 +103,7 @@
     },
     {
       "topic": "devtools",
-      "file": "AGENT_GUIDE_TO_DEVTOOLS.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_DEVTOOLS.md",
       "description": "Using Document Explorer and Test Harness for debugging and testing",
       "keywords": ["devtools", "debugging", "testing", "Document Explorer", "Test Harness", "browser", "validation", "inspection"],
       "useCases": [

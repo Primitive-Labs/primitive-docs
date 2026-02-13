@@ -23,6 +23,7 @@ A TypeScript/JavaScript client library for js-bao-wss that provides HTTP APIs an
 - **Blob Storage**: Upload/list/get/downloadUrl/delete per document with offline cache
 - **LLM**: Chat API and model listing
 - **Workflows**: Server-side multi-step processes with LLM, delays, and transformations
+- **Workflow Apply**: Single-client claim/confirm flow for applying workflow results to Yjs documents
 - **Offline-first Open**: Non-blocking open with IndexedDB-backed cache
 - **Offline Blob Cache**: Cache API + IndexedDB backed uploads/reads with eviction and retry
 - **Network Controls**: Online/offline modes, reachability, connection control
@@ -2005,6 +2006,7 @@ interface WorkflowStatusEvent {
   output?: any;
   error?: string;
   contextDocId?: string;
+  needsApply?: boolean; // true when workflow requires client-side apply
 }
 ```
 
@@ -2096,6 +2098,61 @@ const result = await client.workflows.terminate({
   runKey,
   contextDocId: "doc-123",
 });
+```
+
+### Applying Workflow Results to Documents
+
+When a workflow completes, its result can be applied to a Yjs document by exactly one connected client. This prevents duplicate writes when multiple tabs or devices are connected to the same document.
+
+Use `workflows.define()` to register an apply handler at initialization. The client automatically claims, applies, and confirms workflow results:
+
+```typescript
+// Define a workflow with its apply handler (call once at startup)
+client.workflows.define("my-workflow-key", {
+  onApply: async ({ output, workflowKey, runKey, contextDocId }) => {
+    // Use models to apply the workflow result to the document
+    const contact = new Contact({
+      name: output.contactName,
+      email: output.contactEmail,
+    });
+    await contact.save({ targetDocument: contextDocId });
+  },
+});
+```
+
+**How it works:**
+
+1. Workflow completes → server sets status to `apply_pending`
+2. All connected clients receive a `workflowStatus` event with `needsApply: true`
+3. The first client to call `claimApply` wins (conditional DynamoDB update)
+4. The claiming client runs the registered `onApply` handler
+5. On success, `confirmApply` marks the run as `completed`
+6. On failure, `releaseApply` releases the claim so another client can retry
+7. A 30-second lease timeout handles crashed clients
+
+The claim/confirm/release cycle is handled automatically when you use `workflows.define()`. For manual control:
+
+```typescript
+// Manual claim/confirm flow
+const claim = await client.workflows.claimApply({
+  workflowKey: "my-workflow-key",
+  runKey: "run-123",
+  contextDocId: "doc-456",
+});
+
+if (claim.claimed) {
+  try {
+    // Apply result to document...
+    await client.workflows.confirmApply({
+      workflowKey: "my-workflow-key",
+      runKey: "run-123",
+      contextDocId: "doc-456",
+    });
+  } catch (err) {
+    // Release so another client can retry
+    // (handled automatically with workflows.define)
+  }
+}
 ```
 
 ### Sending File Attachments (PDFs, Images)

@@ -5,95 +5,29 @@ The fastest way to build an app on Primitive is to start from the official templ
 ## Prerequisites
 
 - **Node.js** ^20.19.0 or >=22.12.0
-- **GitHub account** (to create your own repository from the template)
 
-## 1. Create Your Repository
+## 1. Create Your App
 
-1. Go to [primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template) on GitHub
-2. Click the green **"Use this template"** button in the upper right
-3. Choose a name for your new repository and create it
-
-## 2. Install pnpm
-
-This project uses [pnpm](https://pnpm.io/) as its package manager. The easiest way to install pnpm is through Corepack (included with Node.js 16+):
+Run the following command, replacing `my-app` with your desired app name:
 
 ```bash
-corepack enable
-corepack prepare pnpm@latest --activate
+npx create-primitive-app my-app
 ```
 
-Alternatively, see the [pnpm installation guide](https://pnpm.io/installation) for other methods.
+This will:
+- Prompt you to sign in to your Primitive account (if not already authenticated)
+- Create a new app on the Primitive servers
+- Download and configure the template
+- Install dependencies (prompting to install pnpm if needed)
 
-## 3. Install the Primitive CLI
-
-The `primitive-admin` CLI tool provides command-line access to the Primitive Admin server for managing your app. Install it globally:
-
-```bash
-npm install -g primitive-admin
-```
-
-Once installed, authenticate with your Primitive account:
+## 2. Start Developing!
 
 ```bash
-primitive login
-```
-
-This will open a browser window for you to sign in. After signing in, you can verify your authentication:
-
-```bash
-primitive whoami
-```
-
-## 4. Clone Your Repository
-
-```bash
-git clone https://github.com/your-username/my-app.git
 cd my-app
-```
-
-## 5. Install Dependencies
-
-```bash
-pnpm install
-```
-
-## 6. Create Your App on Primitive
-
-You need to create an app in the Primitive Admin system to get an **App ID** for your project.
-
-**Option A: Using the CLI (Recommended)**
-
-```bash
-primitive apps create "My New App"
-```
-
-This will output your new **App ID**. You can also list your apps at any time:
-
-```bash
-primitive apps list
-```
-
-**Option B: Using the Dashboard**
-
-Go to the [Primitive Admin Console](https://admin.primitiveapi.com/login) and create a new app through the web interface. Make note of your **App ID**.
-
-## 7. Configure Your Environment
-
-Open the `.env` file in your project and update the App ID:
-
-```bash
-VITE_APP_ID=your-app-id-here
-```
-
-## 8. Run Your App
-
-Start the development server:
-
-```bash
 pnpm dev
 ```
 
-Open `http://localhost:5173` in your browser. You should see your app running.
+Visit `http://localhost:5173` to see your app running.
 
 **Congratulations!** You now have a working Primitive app with:
 - Real-time data sync
@@ -101,6 +35,31 @@ Open `http://localhost:5173` in your browser. You should see your app running.
 - A Vue + TypeScript + Tailwind foundation
 - Built-in test harness for browser-based testing
 - Document debugger for inspecting your data
+
+## Set Up Git Repository (Optional)
+
+After creating your app, you may want to track it in Git and push to a remote repository.
+
+### Initialize Git
+
+```bash
+cd my-app
+git init
+git add .
+git commit -m "Initial commit from primitive-app template"
+```
+
+### Push to GitHub
+
+1. Create a new repository on [GitHub](https://github.com/new) (don't initialize with README, .gitignore, or license)
+
+2. Add the remote and push:
+
+```bash
+git remote add origin https://github.com/your-username/my-app.git
+git branch -M main
+git push -u origin main
+```
 
 ## Setting Up Google Sign In (Optional)
 
@@ -122,6 +81,20 @@ When deploying to production, you'll add your production domain to these setting
 :::
 
 ### 2. Enable Google OAuth in Primitive Admin
+
+**Option A: Using the CLI**
+
+```bash
+primitive apps oauth set-google --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
+```
+
+Then add your allowed origins:
+
+```bash
+primitive apps origins add http://localhost:5173
+```
+
+**Option B: Using the Dashboard**
 
 Go to the [Primitive Admin Console](https://admin.primitiveapi.com/login) and navigate to your app's settings:
 

@@ -20,6 +20,12 @@
 
 ***
 
+### needsApply?
+
+> `optional` **needsApply**: `boolean`
+
+***
+
 ### output?
 
 > `optional` **output**: `any`
@@ -35,6 +41,12 @@
 ### runKey
 
 > **runKey**: `string`
+
+***
+
+### startedByUserId?
+
+> `optional` **startedByUserId**: `string`
 
 ***
 

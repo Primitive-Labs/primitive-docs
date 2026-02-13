@@ -829,6 +829,7 @@ client.on("workflowStatus", (event) => {
   output?: any;                        // Present when status is "completed"
   error?: string;                      // Present when status is "failed"
   contextDocId?: string;
+  needsApply?: boolean;                // True if workflow result needs client apply
 }
 ```
 
@@ -836,6 +837,75 @@ client.on("workflowStatus", (event) => {
 
 - Events are broadcast to all WebSocket connections for the user and for collaborators on the same document
 - Requires an active WebSocket connection (established via `client.documents.open(docId)`)
+
+---
+
+## Workflow Apply Pattern
+
+When a workflow completes, its result can be applied to a Yjs document by exactly one connected client. This prevents duplicate writes when multiple tabs or devices are connected to the same document.
+
+### Using `onApply` (Recommended)
+
+Register a handler with `workflows.onApply()` to automatically claim, apply, and confirm workflow results:
+
+```typescript
+client.workflows.onApply("my-workflow-key", async ({ output, workflowKey, runKey, contextDocId }) => {
+  // Apply the workflow result to the Yjs document
+  const { doc } = await client.documents.open(contextDocId);
+  const map = doc.getMap("data");
+  map.set("result", output);
+});
+```
+
+### How It Works
+
+1. Workflow completes → server sets status to `apply_pending`
+2. All connected clients receive a `workflowStatus` event with `needsApply: true`
+3. The first client to call `claimApply` wins (conditional DynamoDB update)
+4. The claiming client runs the registered `onApply` handler
+5. On success, `confirmApply` marks the run as `completed`
+6. On failure, `releaseApply` releases the claim so another client can retry
+7. A 30-second lease timeout handles crashed clients
+
+The claim/confirm/release cycle is handled automatically when you use `workflows.onApply()`.
+
+### Manual Claim/Confirm Flow
+
+For more control, use the claim/confirm/release methods directly:
+
+```typescript
+const claim = await client.workflows.claimApply({
+  workflowKey: "my-workflow-key",
+  runKey: "run-123",
+  contextDocId: "doc-456",
+});
+
+if (claim.claimed) {
+  try {
+    // Apply result to document...
+    await client.workflows.confirmApply({
+      workflowKey: "my-workflow-key",
+      runKey: "run-123",
+      contextDocId: "doc-456",
+    });
+  } catch (err) {
+    await client.workflows.releaseApply({
+      workflowKey: "my-workflow-key",
+      runKey: "run-123",
+      contextDocId: "doc-456",
+    });
+  }
+}
+```
+
+### Apply Methods
+
+| Method | Description |
+| ------ | ----------- |
+| `workflows.onApply(workflowKey, handler)` | Register handler for automatic claim/apply/confirm |
+| `workflows.claimApply(options)` | Manually claim a pending apply |
+| `workflows.confirmApply(options)` | Confirm apply succeeded |
+| `workflows.releaseApply(options)` | Release claim on failure |
 
 ---
 

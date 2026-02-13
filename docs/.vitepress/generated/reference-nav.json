@@ -321,6 +321,22 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/CacheFacade"
                 },
                 {
+                  "text": "ClaimApplyOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ClaimApplyOptions"
+                },
+                {
+                  "text": "ClaimApplyResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ClaimApplyResult"
+                },
+                {
+                  "text": "ConfirmApplyOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ConfirmApplyOptions"
+                },
+                {
+                  "text": "ConfirmApplyResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ConfirmApplyResult"
+                },
+                {
                   "text": "DocumentAccessResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DocumentAccessResult"
                 },
@@ -477,6 +493,14 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/ReasoningOptions"
                 },
                 {
+                  "text": "ReleaseApplyOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ReleaseApplyOptions"
+                },
+                {
+                  "text": "ReleaseApplyResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ReleaseApplyResult"
+                },
+                {
                   "text": "SessionInfo",
                   "link": "/reference/js-bao-wss-client/api/interfaces/SessionInfo"
                 },
@@ -503,6 +527,10 @@
                 {
                   "text": "UserProfile",
                   "link": "/reference/js-bao-wss-client/api/interfaces/UserProfile"
+                },
+                {
+                  "text": "WorkflowDefineOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/WorkflowDefineOptions"
                 },
                 {
                   "text": "WorkflowRun",
