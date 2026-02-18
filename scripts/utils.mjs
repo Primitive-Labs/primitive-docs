@@ -75,15 +75,19 @@ export async function ensureDepsInstalled(repoPath) {
   if (await pathExists(nm)) return
 
   const pm = detectPackageManager(actualRepoRoot)
+  // In CI, lockfiles may be slightly out of sync; use --no-frozen-lockfile
+  const isCI = process.env.CI === 'true'
   if (pm === 'pnpm') {
-    run('pnpm', ['install'], { cwd: actualRepoRoot })
+    const args = isCI ? ['install', '--no-frozen-lockfile'] : ['install']
+    run('pnpm', args, { cwd: actualRepoRoot })
   } else if (pm === 'npm') {
-    // Prefer reproducible installs when possible.
+    // Prefer reproducible installs when possible, but not in CI with potential mismatches
     const hasLock = existsSync(resolve(actualRepoRoot, 'package-lock.json'))
-    run('npm', [hasLock ? 'ci' : 'install'], { cwd: actualRepoRoot })
+    run('npm', [hasLock && !isCI ? 'ci' : 'install'], { cwd: actualRepoRoot })
   } else {
     // Best-effort fallback - use pnpm since this is a pnpm workspace project
-    run('pnpm', ['install'], { cwd: actualRepoRoot })
+    const args = isCI ? ['install', '--no-frozen-lockfile'] : ['install']
+    run('pnpm', args, { cwd: actualRepoRoot })
   }
 }
 

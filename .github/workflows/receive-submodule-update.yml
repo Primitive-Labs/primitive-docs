@@ -97,23 +97,28 @@ jobs:
           echo "$API_CHANGES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-          # Map submodule to relevant guide files
+          # Map submodule to relevant guide files and source paths
           case "$SUBMODULE" in
             "js-bao")
               RELEVANT_GUIDES="docs/getting-started/working-with-data.md"
+              SOURCE_PATHS="library_repos/js-bao/src/"
               ;;
             "js-bao-wss")
               RELEVANT_GUIDES="docs/getting-started/understanding-documents.md docs/getting-started/other-services.md docs/getting-started/local-first-model.md"
+              SOURCE_PATHS="library_repos/js-bao-wss/src/"
               ;;
             "primitive-app-dev")
               RELEVANT_GUIDES="docs/getting-started/template-app.md docs/getting-started/document-debugger.md docs/getting-started/test-harness.md"
+              SOURCE_PATHS="library_repos/primitive-app-dev/primitive-app/src/ library_repos/primitive-app-dev/primitive-app-template/src/"
               ;;
             *)
               RELEVANT_GUIDES="docs/getting-started/"
+              SOURCE_PATHS=""
               ;;
           esac
 
           echo "relevant_guides=$RELEVANT_GUIDES" >> $GITHUB_OUTPUT
+          echo "source_paths=$SOURCE_PATHS" >> $GITHUB_OUTPUT
 
       - name: Update submodule to latest
         if: steps.context.outputs.test_mode != 'true'
@@ -155,6 +160,11 @@ jobs:
             ```diff
             ${{ steps.context.outputs.api_changes }}
             ```
+
+            ### Source Code Location
+
+            The source code for this submodule is located at:
+            ${{ steps.context.outputs.source_paths }}
 
             ### Documentation to Review
 
