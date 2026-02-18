@@ -1,0 +1,90 @@
+# Template workflow for submodule repos (js-bao, js-bao-wss, primitive-app-dev)
+# Copy this file to each submodule repo at .github/workflows/notify-docs-repo.yml
+#
+# Required setup:
+# 1. Create a Personal Access Token (classic) with `repo` scope
+# 2. Add it as a repository secret named DOCS_REPO_PAT in each submodule repo
+# 3. The PAT must belong to a user with write access to primitive-docs
+
+name: Notify Docs Repository
+
+on:
+  push:
+    branches: [main]
+    paths:
+      # Only trigger for source code changes that might affect docs
+      - 'src/**'
+      - 'package.json'
+      - 'README.md'
+      - 'CHANGELOG.md'
+
+jobs:
+  notify-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for git diff
+
+      - name: Get changed files
+        id: changes
+        run: |
+          # Get the list of changed files from this push
+          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            # Initial commit - list all files
+            CHANGED_FILES=$(git ls-files | head -50)
+          else
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | head -50)
+          fi
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Get commit messages
+        id: commits
+        run: |
+          # Get commit messages from this push (up to 10)
+          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            COMMIT_MESSAGES=$(git log --oneline -10)
+          else
+            COMMIT_MESSAGES=$(git log --oneline ${{ github.event.before }}..${{ github.sha }} | head -10)
+          fi
+          echo "messages<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MESSAGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Get relevant source changes
+        id: source_diff
+        run: |
+          # Get a summary of actual code changes (limited to prevent payload overflow)
+          # Focus on exported API changes
+          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            DIFF_SUMMARY="(initial commit)"
+          else
+            DIFF_SUMMARY=$(git diff ${{ github.event.before }} ${{ github.sha }} -- 'src/**/*.ts' 'src/**/*.vue' \
+              | grep -E '^(\+|\-)' \
+              | grep -E '(export|class|interface|function|type |const |defineProps|defineEmits)' \
+              | head -100 || echo "(no API changes detected)")
+          fi
+          echo "diff_summary<<EOF" >> $GITHUB_OUTPUT
+          echo "$DIFF_SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Dispatch to docs repo
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DOCS_REPO_PAT }}
+          repository: Primitive-Labs/primitive-docs
+          event-type: submodule-update
+          client-payload: |
+            {
+              "submodule": "${{ github.event.repository.name }}",
+              "ref": "${{ github.sha }}",
+              "before": "${{ github.event.before }}",
+              "compare_url": "${{ github.event.compare }}",
+              "pusher": "${{ github.actor }}",
+              "changed_files": ${{ toJSON(steps.changes.outputs.changed_files) }},
+              "commit_messages": ${{ toJSON(steps.commits.outputs.messages) }},
+              "api_changes": ${{ toJSON(steps.source_diff.outputs.diff_summary) }}
+            }

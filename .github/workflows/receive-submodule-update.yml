@@ -1,0 +1,269 @@
+# Automated documentation update workflow
+# Triggered by repository_dispatch from submodule repos (js-bao, js-bao-wss, primitive-app-dev)
+# Uses Claude Code Action to analyze changes and update docs, then creates a PR
+
+name: Update Docs from Submodule Changes
+
+on:
+  repository_dispatch:
+    types: [submodule-update]
+
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      submodule:
+        description: 'Submodule name (js-bao, js-bao-wss, or primitive-app-dev)'
+        required: true
+        type: choice
+        options:
+          - js-bao
+          - js-bao-wss
+          - primitive-app-dev
+      test_mode:
+        description: 'Test mode (skip actual submodule update)'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout primitive-docs
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Determine submodule and context
+        id: context
+        run: |
+          # Handle both repository_dispatch and workflow_dispatch
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            SUBMODULE="${{ github.event.client_payload.submodule }}"
+            REF="${{ github.event.client_payload.ref }}"
+            CHANGED_FILES="${{ github.event.client_payload.changed_files }}"
+            COMMIT_MESSAGES="${{ github.event.client_payload.commit_messages }}"
+            API_CHANGES="${{ github.event.client_payload.api_changes }}"
+            COMPARE_URL="${{ github.event.client_payload.compare_url }}"
+            PUSHER="${{ github.event.client_payload.pusher }}"
+            TEST_MODE="false"
+          else
+            SUBMODULE="${{ github.event.inputs.submodule }}"
+            REF="main"
+            CHANGED_FILES="(manual trigger - no specific files)"
+            COMMIT_MESSAGES="(manual trigger)"
+            API_CHANGES="(manual trigger - review all recent changes)"
+            COMPARE_URL=""
+            PUSHER="${{ github.actor }}"
+            TEST_MODE="${{ github.event.inputs.test_mode }}"
+          fi
+
+          echo "submodule=$SUBMODULE" >> $GITHUB_OUTPUT
+          echo "ref=$REF" >> $GITHUB_OUTPUT
+          echo "compare_url=$COMPARE_URL" >> $GITHUB_OUTPUT
+          echo "pusher=$PUSHER" >> $GITHUB_OUTPUT
+          echo "test_mode=$TEST_MODE" >> $GITHUB_OUTPUT
+
+          # Store multiline values
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "commit_messages<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MESSAGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "api_changes<<EOF" >> $GITHUB_OUTPUT
+          echo "$API_CHANGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          # Map submodule to relevant guide files
+          case "$SUBMODULE" in
+            "js-bao")
+              RELEVANT_GUIDES="docs/getting-started/working-with-data.md"
+              ;;
+            "js-bao-wss")
+              RELEVANT_GUIDES="docs/getting-started/understanding-documents.md docs/getting-started/other-services.md docs/getting-started/local-first-model.md"
+              ;;
+            "primitive-app-dev")
+              RELEVANT_GUIDES="docs/getting-started/template-app.md docs/getting-started/document-debugger.md docs/getting-started/test-harness.md"
+              ;;
+            *)
+              RELEVANT_GUIDES="docs/getting-started/"
+              ;;
+          esac
+
+          echo "relevant_guides=$RELEVANT_GUIDES" >> $GITHUB_OUTPUT
+
+      - name: Update submodule to latest
+        if: steps.context.outputs.test_mode != 'true'
+        run: |
+          cd library_repos/${{ steps.context.outputs.submodule }}
+          git fetch origin main
+          git checkout ${{ steps.context.outputs.ref }}
+          cd ../..
+          git add library_repos/${{ steps.context.outputs.submodule }}
+
+      - name: Update documentation with Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          prompt: |
+            ## Task: Update Documentation Based on Submodule Changes
+
+            The **${{ steps.context.outputs.submodule }}** library has been updated with new changes.
+            Your task is to review the changes and update the relevant documentation guides if needed.
+
+            ### What Changed
+
+            **Submodule:** ${{ steps.context.outputs.submodule }}
+            **Commit:** ${{ steps.context.outputs.ref }}
+            **Compare URL:** ${{ steps.context.outputs.compare_url }}
+
+            **Changed Files:**
+            ```
+            ${{ steps.context.outputs.changed_files }}
+            ```
+
+            **Commit Messages:**
+            ```
+            ${{ steps.context.outputs.commit_messages }}
+            ```
+
+            **API Changes (exports, classes, interfaces, functions):**
+            ```diff
+            ${{ steps.context.outputs.api_changes }}
+            ```
+
+            ### Documentation to Review
+
+            The following guide files may need updates based on these changes:
+            ${{ steps.context.outputs.relevant_guides }}
+
+            Also check the guides in:
+            - guides/latest/ (agent guides for the libraries)
+
+            ### Instructions
+
+            1. **Analyze the changes**: Look at the API changes and commit messages to understand what was modified.
+
+            2. **Read the relevant guide files**: Check if any documentation needs to be updated based on:
+               - New exported functions, classes, or types
+               - Changed function signatures or parameters
+               - Renamed or deprecated APIs
+               - New features or capabilities
+               - Bug fixes that affect documented behavior
+
+            3. **Update documentation if needed**:
+               - Update code examples if APIs changed
+               - Add documentation for new features
+               - Update or remove documentation for deprecated features
+               - Fix any outdated information
+
+            4. **Preserve documentation style**: Follow the existing style:
+               - Use VitePress markdown features (:::tip, :::warning, etc.)
+               - Include TypeScript code examples
+               - Keep explanations concise but thorough
+               - Maintain consistent heading structure
+
+            5. **If no documentation changes are needed**:
+               - That's fine! Just note that the changes were reviewed and no doc updates were required.
+
+            ### Important
+
+            - Only modify files in `docs/getting-started/` and `guides/latest/`
+            - Do NOT modify generated API reference files in `docs/reference/` (those are auto-generated)
+            - Focus on the narrative guides that explain concepts and usage patterns
+            - If the changes are purely internal (no public API impact), no doc updates may be needed
+          claude_args: |
+            --allowedTools "Read,Edit,Glob,Grep,Bash(pnpm docs:build),Bash(pnpm gen:reference)"
+
+      - name: Regenerate reference documentation
+        run: pnpm gen:reference
+
+      - name: Build documentation
+        run: pnpm docs:build
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: |
+            docs: Update documentation for ${{ steps.context.outputs.submodule }} changes
+
+            Automated update triggered by changes in ${{ steps.context.outputs.submodule }}.
+
+            Compare: ${{ steps.context.outputs.compare_url }}
+          branch: docs-update/${{ steps.context.outputs.submodule }}-${{ github.run_number }}
+          delete-branch: true
+          title: "docs: Update for ${{ steps.context.outputs.submodule }} changes"
+          body: |
+            ## Automated Documentation Update
+
+            This PR was automatically generated in response to changes in the **${{ steps.context.outputs.submodule }}** submodule.
+
+            ### Trigger
+            - **Submodule:** ${{ steps.context.outputs.submodule }}
+            - **Commit:** `${{ steps.context.outputs.ref }}`
+            - **Pushed by:** @${{ steps.context.outputs.pusher }}
+            - **Compare:** ${{ steps.context.outputs.compare_url }}
+
+            ### Changed Files in Submodule
+            ```
+            ${{ steps.context.outputs.changed_files }}
+            ```
+
+            ### Commit Messages
+            ```
+            ${{ steps.context.outputs.commit_messages }}
+            ```
+
+            ---
+
+            **Please review the documentation changes and merge if appropriate.**
+
+            > Generated by Claude Code Action
+          labels: |
+            documentation
+            automated
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.check_changes.outputs.has_changes }}" = "true" ]; then
+            echo "## Documentation Updated" >> $GITHUB_STEP_SUMMARY
+            echo "A PR has been created with documentation updates for **${{ steps.context.outputs.submodule }}**." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## No Documentation Changes Needed" >> $GITHUB_STEP_SUMMARY
+            echo "The changes in **${{ steps.context.outputs.submodule }}** did not require documentation updates." >> $GITHUB_STEP_SUMMARY
+          fi
