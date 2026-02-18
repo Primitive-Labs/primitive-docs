@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync, lstatSync } from 'node:fs'
 import { mkdir, rm, stat } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { resolve, dirname } from 'node:path'
 
 export function run(cmd, args, opts = {}) {
   const res = spawnSync(cmd, args, { stdio: 'inherit', ...opts })
@@ -29,28 +29,61 @@ export async function pathExists(p) {
   }
 }
 
+/**
+ * Find the repo root by walking up from a path looking for lock files.
+ * Resolves symlinks first to handle packages/* symlinks pointing to subdirectories.
+ */
+export function findRepoRoot(startPath) {
+  // Resolve symlinks to get the real path
+  let currentPath
+  try {
+    currentPath = realpathSync(startPath)
+  } catch {
+    currentPath = startPath
+  }
+
+  // Walk up looking for lock files or .git
+  while (currentPath !== dirname(currentPath)) {
+    if (
+      existsSync(resolve(currentPath, 'pnpm-lock.yaml')) ||
+      existsSync(resolve(currentPath, 'package-lock.json')) ||
+      existsSync(resolve(currentPath, '.git'))
+    ) {
+      return currentPath
+    }
+    currentPath = dirname(currentPath)
+  }
+
+  // Fallback to the original path
+  return startPath
+}
+
 export function detectPackageManager(repoPath) {
   const pnpmLock = resolve(repoPath, 'pnpm-lock.yaml')
   const npmLock = resolve(repoPath, 'package-lock.json')
   if (existsSync(pnpmLock)) return 'pnpm'
   if (existsSync(npmLock)) return 'npm'
-  return 'unknown'
+  // Default to pnpm since this is a pnpm workspace project
+  return 'pnpm'
 }
 
 export async function ensureDepsInstalled(repoPath) {
-  const nm = resolve(repoPath, 'node_modules')
+  // Find the actual repo root (handles symlinks to subdirectories)
+  const actualRepoRoot = findRepoRoot(repoPath)
+
+  const nm = resolve(actualRepoRoot, 'node_modules')
   if (await pathExists(nm)) return
 
-  const pm = detectPackageManager(repoPath)
+  const pm = detectPackageManager(actualRepoRoot)
   if (pm === 'pnpm') {
-    run('pnpm', ['install'], { cwd: repoPath })
+    run('pnpm', ['install'], { cwd: actualRepoRoot })
   } else if (pm === 'npm') {
     // Prefer reproducible installs when possible.
-    const hasLock = existsSync(resolve(repoPath, 'package-lock.json'))
-    run('npm', [hasLock ? 'ci' : 'install'], { cwd: repoPath })
+    const hasLock = existsSync(resolve(actualRepoRoot, 'package-lock.json'))
+    run('npm', [hasLock ? 'ci' : 'install'], { cwd: actualRepoRoot })
   } else {
-    // Best-effort fallback.
-    run('npm', ['install'], { cwd: repoPath })
+    // Best-effort fallback - use pnpm since this is a pnpm workspace project
+    run('pnpm', ['install'], { cwd: actualRepoRoot })
   }
 }
 
