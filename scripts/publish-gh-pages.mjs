@@ -78,7 +78,7 @@ run('git', ['-C', worktreeDir, 'add', '--all'])
 run('git', ['-C', worktreeDir, 'commit', '-m', 'docs: publish', '--allow-empty'])
 
 console.log('[publish] Pushing gh-pages...')
-run('git', ['-C', worktreeDir, 'push', 'origin', 'gh-pages'])
+run('git', ['-C', worktreeDir, 'push', '--force', 'origin', 'gh-pages'])
 
 console.log('[publish] Cleanup...')
 if (tryRun('git', ['worktree', 'remove', '--force', worktreeDir], { stdio: 'ignore' }) !== 0) {
