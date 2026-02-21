@@ -61,21 +61,21 @@ import type { PrimitiveTestGroup } from "primitive-app";
 
 export const myFeatureTestGroup: PrimitiveTestGroup = {
   name: "My Feature",
-  mode: "offline", // or "online" for tests requiring sync
   tests: [
     {
       id: "my-feature-basic",
       name: "basic functionality works",
-      async run(log?: (m: string) => void): Promise<string> {
+      async run(ctx, log?): Promise<string> {
         log?.("Starting test...");
-        
+        // ctx.docId is the automatically-created test document ID
+
         // Your test logic here
         const result = myFunction();
-        
+
         if (result !== expected) {
           throw new Error(`Expected ${expected}, got ${result}`);
         }
-        
+
         log?.("Test passed!");
         return "1/1 (100.0%)"; // Return score in this format
       },
@@ -144,28 +144,7 @@ Each test has three key properties:
 | `name` | Human-readable name shown in the UI |
 | `run` | Async function that executes the test |
 
-The `run` function receives an optional `log` callback for outputting progress messages, and should return a score string in the format `passed/total (percentage%)`.
-
-### Test Modes
-
-Tests can run in two modes:
-
-- **`offline`** — Tests that don't require network sync (faster, more isolated)
-- **`online`** — Tests that need the sync connection to the server
-
-```typescript
-export const offlineTests: PrimitiveTestGroup = {
-  name: "Offline Tests",
-  mode: "offline",
-  tests: [/* ... */],
-};
-
-export const onlineTests: PrimitiveTestGroup = {
-  name: "Sync Tests", 
-  mode: "online",
-  tests: [/* ... */],
-};
-```
+The `run` function receives a `ctx` object (with `ctx.docId` — the auto-created test document ID) and an optional `log` callback for outputting progress messages. It should return a result string: either a plain message for a pass, or a score in the format `passed/total (percentage%)`.
 
 ### Using Stores in Tests
 
@@ -178,7 +157,7 @@ import { useUserStore } from "@/stores/userStore";
 {
   id: "user-pref-read",
   name: "can read user preferences",
-  async run(log?: (m: string) => void): Promise<string> {
+  async run(ctx, log?): Promise<string> {
     const user = useUserStore();
     
     log?.("Reading preferences from userStore...");
@@ -192,57 +171,46 @@ import { useUserStore } from "@/stores/userStore";
 
 ### Testing with Documents
 
-For tests that create data, use the document stores (local files from the template):
+The test harness automatically creates an isolated test document for each test and provides its ID via `ctx.docId`. Use it as the target for saving model data—no manual document creation or cleanup needed.
 
 ```typescript
-// Import from your local stores (included in the template)
-import { useJsBaoDocumentsStore } from "@/stores/jsBaoDocumentsStore";
 import { Product } from "@/models/Product";
 
 {
   id: "product-crud",
   name: "can create and read products",
-  async run(log?: (m: string) => void): Promise<string> {
-    const documentsStore = useJsBaoDocumentsStore();
+  async run(ctx, log?): Promise<string> {
     let passed = 0;
     const total = 3;
-    
-    // Create a test document
-    log?.("Creating test document...");
-    const doc = await documentsStore.createDocument("Test Doc", ["test-tag"]);
-    
-    try {
-      // Create a product
-      const product = new Product({ name: "Test Product", quantity: 10 });
-      await product.save({ targetDocument: doc.documentId });
-      
-      if (product.id) {
-        log?.("✓ Product created with ID");
-        passed++;
-      }
-      
-      // Read it back
-      const retrieved = await Product.find(product.id as string);
-      
-      if (retrieved?.name === "Test Product") {
-        log?.("✓ Product name matches");
-        passed++;
-      }
-      
-      if (retrieved?.quantity === 10) {
-        log?.("✓ Product quantity matches");
-        passed++;
-      }
-    } finally {
-      // Clean up
-      await documentsStore.deleteDocument(doc.documentId);
-      log?.("Cleaned up test document");
+
+    // Use ctx.docId — the auto-created, isolated test document
+    const product = new Product({ name: "Test Product", quantity: 10 });
+    await product.save({ targetDocument: ctx.docId });
+
+    if (product.id) {
+      log?.("✓ Product created with ID");
+      passed++;
     }
-    
+
+    // Read it back
+    const retrieved = await Product.find(product.id as string);
+
+    if (retrieved?.name === "Test Product") {
+      log?.("✓ Product name matches");
+      passed++;
+    }
+
+    if (retrieved?.quantity === 10) {
+      log?.("✓ Product quantity matches");
+      passed++;
+    }
+
     return `${passed}/${total} (${((passed / total) * 100).toFixed(1)}%)`;
   },
 }
 ```
+
+The test document is automatically deleted after each test, even if the test throws. If a test needs additional documents beyond the one in `ctx`, create them manually and clean them up in a `finally` block.
 
 ### Scoring Format
 
@@ -294,18 +262,20 @@ const tag = uniqueTag("test_product");
 Always clean up test documents and data, even if the test fails:
 
 ```typescript
-async run(log?: (m: string) => void): Promise<string> {
-  const createdDocIds: string[] = [];
-  
+async run(ctx, log?): Promise<string> {
+  const extraDocIds: string[] = [];
+
   try {
-    const doc = await documentsStore.createDocument("Test", [tag]);
-    createdDocIds.push(doc.documentId);
-    
+    // ctx.docId is already provided and cleaned up automatically.
+    // Only create additional documents if your test truly needs more than one.
+    const doc = await documentsStore.createDocument("Extra Test Doc", [tag]);
+    extraDocIds.push(doc.documentId);
+
     // ... test logic ...
-    
+
   } finally {
-    // Always runs, even if test throws
-    for (const docId of createdDocIds) {
+    // Clean up any extra documents you created
+    for (const docId of extraDocIds) {
       await documentsStore.deleteDocument(docId).catch(() => {});
     }
   }
