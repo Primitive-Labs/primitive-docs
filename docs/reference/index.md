@@ -171,11 +171,6 @@ Generated reference documentation for each project.
 
 ### Components
 
-- **Components**
-  - **Shared**
-    - [DeleteConfirmationDialog](/reference/primitive-app/components/components/shared/DeleteConfirmationDialog)
-    - [PrimitiveLoadingGate](/reference/primitive-app/components/components/shared/PrimitiveLoadingGate)
-    - [PrimitiveLogoSpinner](/reference/primitive-app/components/components/shared/PrimitiveLogoSpinner)
 - **Dev Tools**
   - **Document Explorer**
     - **Components**

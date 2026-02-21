@@ -659,28 +659,6 @@
           "text": "Components",
           "items": [
             {
-              "text": "Components",
-              "items": [
-                {
-                  "text": "Shared",
-                  "items": [
-                    {
-                      "text": "DeleteConfirmationDialog",
-                      "link": "/reference/primitive-app/components/components/shared/DeleteConfirmationDialog"
-                    },
-                    {
-                      "text": "PrimitiveLoadingGate",
-                      "link": "/reference/primitive-app/components/components/shared/PrimitiveLoadingGate"
-                    },
-                    {
-                      "text": "PrimitiveLogoSpinner",
-                      "link": "/reference/primitive-app/components/components/shared/PrimitiveLogoSpinner"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "text": "Dev Tools",
               "items": [
                 {

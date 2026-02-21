@@ -8,9 +8,15 @@
 
 ## Properties
 
+### acceptedBy?
+
+> `optional` **acceptedBy**: `string`
+
+***
+
 ### action
 
-> **action**: `"created"` \| `"updated"` \| `"cancelled"` \| `"declined"`
+> **action**: `"created"` \| `"updated"` \| `"cancelled"` \| `"declined"` \| `"accepted"`
 
 ***
 
