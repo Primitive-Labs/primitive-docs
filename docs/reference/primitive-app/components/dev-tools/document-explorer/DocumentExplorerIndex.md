@@ -2,8 +2,8 @@
 
 ---
 
-Document Explorer index view.
+Document Explorer - V2 unified three-panel layout.
 
-Provides a high-level overview of models/record counts for the selected document,
-plus entry points into the per-model debugger views and destructive actions
-like mass delete (intended for development/debugging use).
+Left panel: Document list with search, permission badges, pending invitations
+Middle panel: Records table with model selector dropdown, filter chips, pagination
+Right panel: Collapsible document properties (tags, aliases, sharing, metadata)

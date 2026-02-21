@@ -73,7 +73,11 @@ Generated reference documentation for each project.
   - [JsBaoClient](/reference/js-bao-wss-client/api/classes/JsBaoClient)
   - [JsBaoError](/reference/js-bao-wss-client/api/classes/JsBaoError)
 - **Functions**
+  - [createModelClass](/reference/js-bao-wss-client/api/functions/createModelClass)
+  - [defineModelSchema](/reference/js-bao-wss-client/api/functions/defineModelSchema)
+  - [generateULID](/reference/js-bao-wss-client/api/functions/generateULID)
   - [initializeClient](/reference/js-bao-wss-client/api/functions/initializeClient)
+  - [initJsBao](/reference/js-bao-wss-client/api/functions/initJsBao)
   - [isJsBaoError](/reference/js-bao-wss-client/api/functions/isJsBaoError)
 - **Interfaces**
   - [AnalyticsAutoEventsOptions](/reference/js-bao-wss-client/api/interfaces/AnalyticsAutoEventsOptions)
@@ -89,6 +93,7 @@ Generated reference documentation for each project.
   - [ClaimApplyResult](/reference/js-bao-wss-client/api/interfaces/ClaimApplyResult)
   - [ConfirmApplyOptions](/reference/js-bao-wss-client/api/interfaces/ConfirmApplyOptions)
   - [ConfirmApplyResult](/reference/js-bao-wss-client/api/interfaces/ConfirmApplyResult)
+  - [DatabaseConfig](/reference/js-bao-wss-client/api/interfaces/DatabaseConfig)
   - [DocumentAccessResult](/reference/js-bao-wss-client/api/interfaces/DocumentAccessResult)
   - [DocumentCreateCommitFailedEvent](/reference/js-bao-wss-client/api/interfaces/DocumentCreateCommitFailedEvent)
   - [DocumentEvent](/reference/js-bao-wss-client/api/interfaces/DocumentEvent)
@@ -123,6 +128,8 @@ Generated reference documentation for each project.
   - [OfflineAuthFailedEvent](/reference/js-bao-wss-client/api/interfaces/OfflineAuthFailedEvent)
   - [OfflineAuthRenewedEvent](/reference/js-bao-wss-client/api/interfaces/OfflineAuthRenewedEvent)
   - [OfflineAuthUnlockedEvent](/reference/js-bao-wss-client/api/interfaces/OfflineAuthUnlockedEvent)
+  - [PaginatedResult](/reference/js-bao-wss-client/api/interfaces/PaginatedResult)
+  - [PaginationOptions](/reference/js-bao-wss-client/api/interfaces/PaginationOptions)
   - [PendingCreateCommittedEvent](/reference/js-bao-wss-client/api/interfaces/PendingCreateCommittedEvent)
   - [PendingCreateFailedEvent](/reference/js-bao-wss-client/api/interfaces/PendingCreateFailedEvent)
   - [PermissionEvent](/reference/js-bao-wss-client/api/interfaces/PermissionEvent)
@@ -150,13 +157,13 @@ Generated reference documentation for each project.
   - [GeminiContentPart](/reference/js-bao-wss-client/api/type-aliases/GeminiContentPart)
   - [GeminiGenerateOptions](/reference/js-bao-wss-client/api/type-aliases/GeminiGenerateOptions)
   - [GeminiRole](/reference/js-bao-wss-client/api/type-aliases/GeminiRole)
+  - [InferAttrs](/reference/js-bao-wss-client/api/type-aliases/InferAttrs)
   - [JsBaoErrorCode](/reference/js-bao-wss-client/api/type-aliases/JsBaoErrorCode)
   - [StorageConfig](/reference/js-bao-wss-client/api/type-aliases/StorageConfig)
   - [TypedModelConstructor](/reference/js-bao-wss-client/api/type-aliases/TypedModelConstructor)
   - [YjsPersistenceFactory](/reference/js-bao-wss-client/api/type-aliases/YjsPersistenceFactory)
 - **Variables**
   - [AUTH_CODES](/reference/js-bao-wss-client/api/variables/AUTH_CODES)
-  - [initJsBao](/reference/js-bao-wss-client/api/variables/initJsBao)
 - [globals](/reference/js-bao-wss-client/api/globals)
 - [README](/reference/js-bao-wss-client/api/README)
 
@@ -171,12 +178,24 @@ Generated reference documentation for each project.
     - [PrimitiveLogoSpinner](/reference/primitive-app/components/components/shared/PrimitiveLogoSpinner)
 - **Dev Tools**
   - **Document Explorer**
+    - **Components**
+      - [DocumentAliasesSection](/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentAliasesSection)
+      - [DocumentListPanel](/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentListPanel)
+      - [DocumentListSection](/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentListSection)
+      - [DocumentPropertiesPanel](/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentPropertiesPanel)
+      - [DocumentSharingSection](/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentSharingSection)
+      - [DocumentSidebar](/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentSidebar)
+      - [DocumentTagsSection](/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentTagsSection)
+      - [FilterBar](/reference/primitive-app/components/dev-tools/document-explorer/components/FilterBar)
+      - [InvitationPropertiesPanel](/reference/primitive-app/components/dev-tools/document-explorer/components/InvitationPropertiesPanel)
+      - [ModelHeader](/reference/primitive-app/components/dev-tools/document-explorer/components/ModelHeader)
+      - [ModelPaginationBar](/reference/primitive-app/components/dev-tools/document-explorer/components/ModelPaginationBar)
+      - [RecordFormFields](/reference/primitive-app/components/dev-tools/document-explorer/components/RecordFormFields)
+      - [RecordTable](/reference/primitive-app/components/dev-tools/document-explorer/components/RecordTable)
     - **Dialogs**
-      - [MassDeleteDocsDialog](/reference/primitive-app/components/dev-tools/document-explorer/dialogs/MassDeleteDocsDialog)
-      - [MassDeleteRecordsDialog](/reference/primitive-app/components/dev-tools/document-explorer/dialogs/MassDeleteRecordsDialog)
+      - [CreateDocumentDialog](/reference/primitive-app/components/dev-tools/document-explorer/dialogs/CreateDocumentDialog)
     - [DocumentExplorerIndex](/reference/primitive-app/components/dev-tools/document-explorer/DocumentExplorerIndex)
     - [DocumentExplorerModel](/reference/primitive-app/components/dev-tools/document-explorer/DocumentExplorerModel)
-    - [DocumentSidebar](/reference/primitive-app/components/dev-tools/document-explorer/DocumentSidebar)
   - **Test Harness**
     - [TestRunner](/reference/primitive-app/components/dev-tools/test-harness/TestRunner)
   - **Vite Plugin**

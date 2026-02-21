@@ -272,8 +272,24 @@
               "text": "Functions",
               "items": [
                 {
+                  "text": "createModelClass",
+                  "link": "/reference/js-bao-wss-client/api/functions/createModelClass"
+                },
+                {
+                  "text": "defineModelSchema",
+                  "link": "/reference/js-bao-wss-client/api/functions/defineModelSchema"
+                },
+                {
+                  "text": "generateULID",
+                  "link": "/reference/js-bao-wss-client/api/functions/generateULID"
+                },
+                {
                   "text": "initializeClient",
                   "link": "/reference/js-bao-wss-client/api/functions/initializeClient"
+                },
+                {
+                  "text": "initJsBao",
+                  "link": "/reference/js-bao-wss-client/api/functions/initJsBao"
                 },
                 {
                   "text": "isJsBaoError",
@@ -335,6 +351,10 @@
                 {
                   "text": "ConfirmApplyResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/ConfirmApplyResult"
+                },
+                {
+                  "text": "DatabaseConfig",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseConfig"
                 },
                 {
                   "text": "DocumentAccessResult",
@@ -473,6 +493,14 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/OfflineAuthUnlockedEvent"
                 },
                 {
+                  "text": "PaginatedResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PaginatedResult"
+                },
+                {
+                  "text": "PaginationOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PaginationOptions"
+                },
+                {
                   "text": "PendingCreateCommittedEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/PendingCreateCommittedEvent"
                 },
@@ -582,6 +610,10 @@
                   "link": "/reference/js-bao-wss-client/api/type-aliases/GeminiRole"
                 },
                 {
+                  "text": "InferAttrs",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/InferAttrs"
+                },
+                {
                   "text": "JsBaoErrorCode",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/JsBaoErrorCode"
                 },
@@ -605,10 +637,6 @@
                 {
                   "text": "AUTH_CODES",
                   "link": "/reference/js-bao-wss-client/api/variables/AUTH_CODES"
-                },
-                {
-                  "text": "initJsBao",
-                  "link": "/reference/js-bao-wss-client/api/variables/initJsBao"
                 }
               ]
             },
@@ -659,15 +687,68 @@
                   "text": "Document Explorer",
                   "items": [
                     {
+                      "text": "Components",
+                      "items": [
+                        {
+                          "text": "DocumentAliasesSection",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentAliasesSection"
+                        },
+                        {
+                          "text": "DocumentListPanel",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentListPanel"
+                        },
+                        {
+                          "text": "DocumentListSection",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentListSection"
+                        },
+                        {
+                          "text": "DocumentPropertiesPanel",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentPropertiesPanel"
+                        },
+                        {
+                          "text": "DocumentSharingSection",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentSharingSection"
+                        },
+                        {
+                          "text": "DocumentSidebar",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentSidebar"
+                        },
+                        {
+                          "text": "DocumentTagsSection",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentTagsSection"
+                        },
+                        {
+                          "text": "FilterBar",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/FilterBar"
+                        },
+                        {
+                          "text": "InvitationPropertiesPanel",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/InvitationPropertiesPanel"
+                        },
+                        {
+                          "text": "ModelHeader",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/ModelHeader"
+                        },
+                        {
+                          "text": "ModelPaginationBar",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/ModelPaginationBar"
+                        },
+                        {
+                          "text": "RecordFormFields",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/RecordFormFields"
+                        },
+                        {
+                          "text": "RecordTable",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/RecordTable"
+                        }
+                      ]
+                    },
+                    {
                       "text": "Dialogs",
                       "items": [
                         {
-                          "text": "MassDeleteDocsDialog",
-                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/dialogs/MassDeleteDocsDialog"
-                        },
-                        {
-                          "text": "MassDeleteRecordsDialog",
-                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/dialogs/MassDeleteRecordsDialog"
+                          "text": "CreateDocumentDialog",
+                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/dialogs/CreateDocumentDialog"
                         }
                       ]
                     },
@@ -678,10 +759,6 @@
                     {
                       "text": "DocumentExplorerModel",
                       "link": "/reference/primitive-app/components/dev-tools/document-explorer/DocumentExplorerModel"
-                    },
-                    {
-                      "text": "DocumentSidebar",
-                      "link": "/reference/primitive-app/components/dev-tools/document-explorer/DocumentSidebar"
                     }
                   ]
                 },

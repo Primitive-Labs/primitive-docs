@@ -20,7 +20,7 @@ The document ID being opened
 
 ### ydoc
 
-`any`
+`Doc`
 
 The Yjs document instance
 
