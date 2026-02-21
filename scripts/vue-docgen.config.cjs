@@ -15,9 +15,8 @@ module.exports = {
   // Include all components under src (you said all are public)
   components: ['**/*.vue'],
 
-  // Suppress docs for primitive-app/src/components/ui/**
-  // (keep layouts/pages and non-ui components)
-  ignore: ['components/ui/**', 'components/debug-suite/**'],
+  // Suppress docs for internal components not meant for public use
+  ignore: ['components/ui/**', 'components/debug-suite/**', 'components/shared/**'],
 
   // Where to write generated Markdown
   outDir: 'docs/reference/primitive-app/components',

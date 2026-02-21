@@ -52,14 +52,16 @@ for (const p of vueProjects) {
     throw e
   }
 
-  // Suppress docs for primitive-app/src/components/ui/**
-  // (we still allow other components/layouts/pages)
+  // Suppress docs for internal components not meant for public use
   if (p.id === 'primitive-app') {
     const uiDocsDir = resolve(p.outDir, 'components', 'ui')
     await rm(uiDocsDir, { recursive: true, force: true })
 
     const debugSuiteDocsDir = resolve(p.outDir, 'components', 'debug-suite')
     await rm(debugSuiteDocsDir, { recursive: true, force: true })
+
+    const sharedDocsDir = resolve(p.outDir, 'components', 'shared')
+    await rm(sharedDocsDir, { recursive: true, force: true })
   }
 }
 
