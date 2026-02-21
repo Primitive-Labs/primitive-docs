@@ -9,12 +9,14 @@ within the currently selected document, plus dialogs for editing/creating/deleti
 
 ## Props
 
-| Prop name | Description | Type   | Values | Default |
-| --------- | ----------- | ------ | ------ | ------- |
-| modelName |             | string | -      |         |
+| Prop name          | Description                                          | Type   | Values | Default |
+| ------------------ | ---------------------------------------------------- | ------ | ------ | ------- |
+| modelName          |                                                      | string | -      |         |
+| documentPermission | Document permission level — "reader" means view-only | string | -      |         |
 
 ## Events
 
-| Event name | Properties | Description |
-| ---------- | ---------- | ----------- |
-| back       |            |
+| Event name  | Properties | Description |
+| ----------- | ---------- | ----------- |
+| back        |            |
+| switchModel |            |
