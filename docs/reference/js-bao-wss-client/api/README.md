@@ -9,7 +9,7 @@ A TypeScript/JavaScript client library for js-bao-wss that provides HTTP APIs an
 ## Features
 
 - **Document Management**: Create, list, update, delete via HTTP
-- **Permissions**: Get/update/remove document permissions
+- **Permissions**: Get/update/remove document permissions, transfer ownership
 - **Invitations**: Create/list/update/delete; accept/decline (invitee)
 - **Realtime Collaboration**: Y.Doc sync over multi-tenant WebSocket
 - **Awareness**: Presence/cursor broadcast and server-triggered refresh
@@ -1126,7 +1126,7 @@ const { doc } = await client.documents.openAlias({
   aliasKey: "home",
 });
 
-// List aliases for a document (admin-only on the server)
+// List aliases for a document (requires document access)
 const aliases = await client.documents.aliases.listForDocument(documentId);
 
 // Delete an alias (no error if already missing)
@@ -1192,7 +1192,7 @@ permissions.forEach((perm) => {
 // Grant permission to a user
 await client.documents.updatePermissions(documentId, {
   userId: "user-123",
-  permission: "read-write", // 'owner' | 'read-write' | 'reader'
+  permission: "read-write", // 'read-write' | 'reader'
 });
 
 // Batch update permissions
@@ -1205,6 +1205,11 @@ await client.documents.updatePermissions(documentId, {
 
 // Remove permission
 await client.documents.removePermission(documentId, userId);
+
+// Transfer document ownership
+await client.documents.transferOwnership(documentId, newOwnerId);
+// or via DocumentContext:
+await client.document(documentId).transferOwnership(newOwnerId);
 
 // Validate access to a document
 const accessResult = await client.documents.validateAccess(documentId);
@@ -1613,7 +1618,7 @@ The canonical request uses only `origin + pathname`, so all disposition variants
 const invitation = await client.documents.createInvitation(
   documentId,
   "user@example.com",
-  "read-write" // 'owner' | 'read-write' | 'reader'
+  "read-write" // 'read-write' | 'reader'
 );
 console.log("Invitation created:", invitation.invitationId);
 
@@ -1664,14 +1669,19 @@ console.log(user.name, user.email, user.appRole);
 
 The client emits a unified `invitation` event for real-time invitation changes delivered over the WebSocket. Payload:
 
-- `{ type: "invitation"; action: "created" | "updated" | "cancelled" | "declined"; invitationId; documentId; permission; title?; invitedBy?; invitedAt?; expiresAt?; document?: { title?; tags?; createdAt?; lastModified?; createdBy? } }`
+- `{ type: "invitation"; action: "created" | "updated" | "cancelled" | "declined" | "accepted"; invitationId; documentId; permission; title?; invitedBy?; invitedAt?; expiresAt?; acceptedBy?; document?: { title?; tags?; createdAt?; lastModified?; createdBy? } }`
+
+The `accepted` action is sent to the inviter when the invitee accepts the invitation. The `acceptedBy` field contains the userId of the user who accepted.
 
 Example:
 
 ```ts
 client.on("invitation", (evt) => {
-  const { action, documentId, invitationId, permission, title } = evt;
-  console.log("invitation event", action, documentId, invitationId, permission, title);
+  if (evt.action === "accepted") {
+    console.log(`${evt.acceptedBy} accepted invitation to ${evt.documentId}`);
+  } else {
+    console.log("invitation event", evt.action, evt.documentId, evt.invitationId);
+  }
 });
 ```
 
@@ -2007,6 +2017,8 @@ interface WorkflowStatusEvent {
   error?: string;
   contextDocId?: string;
   needsApply?: boolean; // true when workflow requires client-side apply
+  startedByUserId?: string;
+  meta?: Record<string, any>; // custom metadata passed to workflows.start()
 }
 ```
 
@@ -2109,13 +2121,18 @@ Use `workflows.define()` to register an apply handler at initialization. The cli
 ```typescript
 // Define a workflow with its apply handler (call once at startup)
 client.workflows.define("my-workflow-key", {
-  onApply: async ({ output, workflowKey, runKey, contextDocId }) => {
+  onApply: async ({ output, workflowKey, runKey, contextDocId, meta }) => {
     // Use models to apply the workflow result to the document
     const contact = new Contact({
       name: output.contactName,
       email: output.contactEmail,
     });
     await contact.save({ targetDocument: contextDocId });
+
+    // `meta` contains custom metadata passed to workflows.start()
+    if (meta?.notify) {
+      console.log("Apply completed for", meta.source);
+    }
   },
 });
 ```
@@ -2129,6 +2146,7 @@ client.workflows.define("my-workflow-key", {
 5. On success, `confirmApply` marks the run as `completed`
 6. On failure, `releaseApply` releases the claim so another client can retry
 7. A 30-second lease timeout handles crashed clients
+8. On reconnect, the server automatically pushes any pending applies — no client-side polling needed
 
 The claim/confirm/release cycle is handled automatically when you use `workflows.define()`. For manual control:
 

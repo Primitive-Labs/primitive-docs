@@ -20,6 +20,12 @@
 
 ***
 
+### meta?
+
+> `optional` **meta**: `Record`\<`string`, `any`\>
+
+***
+
 ### needsApply?
 
 > `optional` **needsApply**: `boolean`
