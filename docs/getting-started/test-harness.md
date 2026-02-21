@@ -57,9 +57,9 @@ Create your test files in `src/tests/`. Each file exports a `PrimitiveTestGroup`
 
 ```typescript
 // src/tests/myFeatureTests.ts
-import type { PrimitiveTestGroup } from "primitive-app";
+import type { TestGroup } from "primitive-app";
 
-export const myFeatureTestGroup: PrimitiveTestGroup = {
+export const myFeatureTestGroup: TestGroup = {
   name: "My Feature",
   tests: [
     {
@@ -90,11 +90,11 @@ Group your test exports in `src/tests/index.ts`:
 
 ```typescript
 // src/tests/index.ts
-import type { PrimitiveTestGroup } from "primitive-app";
+import type { TestGroup } from "primitive-app";
 import { myFeatureTestGroup } from "./myFeatureTests";
 import { userStoreTestGroup } from "./userStoreTests";
 
-export const appTestGroups: PrimitiveTestGroup[] = [
+export const appTestGroups: TestGroup[] = [
   userStoreTestGroup,
   myFeatureTestGroup,
 ];
