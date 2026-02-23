@@ -66,6 +66,26 @@ Define a workflow with its apply handler. Call once at app initialization so any
 
 ***
 
+### getPendingApplies()
+
+> **getPendingApplies**(`options`): `Promise`\<`any`[]\>
+
+Fetch pending workflow applies for a document.
+
+#### Parameters
+
+##### options
+
+###### contextDocId
+
+`string`
+
+#### Returns
+
+`Promise`\<`any`[]\>
+
+***
+
 ### getStatus()
 
 > **getStatus**(`options`): `Promise`\<[`WorkflowStatusResult`](WorkflowStatusResult.md)\>
