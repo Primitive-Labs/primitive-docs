@@ -56,26 +56,38 @@ jobs:
 
       - name: Determine submodule and context
         id: context
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PAYLOAD_SUBMODULE: ${{ github.event.client_payload.submodule }}
+          PAYLOAD_REF: ${{ github.event.client_payload.ref }}
+          PAYLOAD_CHANGED_FILES: ${{ github.event.client_payload.changed_files }}
+          PAYLOAD_COMMIT_MESSAGES: ${{ github.event.client_payload.commit_messages }}
+          PAYLOAD_API_CHANGES: ${{ github.event.client_payload.api_changes }}
+          PAYLOAD_COMPARE_URL: ${{ github.event.client_payload.compare_url }}
+          PAYLOAD_PUSHER: ${{ github.event.client_payload.pusher }}
+          INPUT_SUBMODULE: ${{ github.event.inputs.submodule }}
+          INPUT_TEST_MODE: ${{ github.event.inputs.test_mode }}
+          ACTOR: ${{ github.actor }}
         run: |
           # Handle both repository_dispatch and workflow_dispatch
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            SUBMODULE="${{ github.event.client_payload.submodule }}"
-            REF="${{ github.event.client_payload.ref }}"
-            CHANGED_FILES="${{ github.event.client_payload.changed_files }}"
-            COMMIT_MESSAGES="${{ github.event.client_payload.commit_messages }}"
-            API_CHANGES="${{ github.event.client_payload.api_changes }}"
-            COMPARE_URL="${{ github.event.client_payload.compare_url }}"
-            PUSHER="${{ github.event.client_payload.pusher }}"
+          if [ "$EVENT_NAME" = "repository_dispatch" ]; then
+            SUBMODULE="$PAYLOAD_SUBMODULE"
+            REF="$PAYLOAD_REF"
+            CHANGED_FILES="$PAYLOAD_CHANGED_FILES"
+            COMMIT_MESSAGES="$PAYLOAD_COMMIT_MESSAGES"
+            API_CHANGES="$PAYLOAD_API_CHANGES"
+            COMPARE_URL="$PAYLOAD_COMPARE_URL"
+            PUSHER="$PAYLOAD_PUSHER"
             TEST_MODE="false"
           else
-            SUBMODULE="${{ github.event.inputs.submodule }}"
+            SUBMODULE="$INPUT_SUBMODULE"
             REF="main"
             CHANGED_FILES="(manual trigger - no specific files)"
             COMMIT_MESSAGES="(manual trigger)"
             API_CHANGES="(manual trigger - review all recent changes)"
             COMPARE_URL=""
-            PUSHER="${{ github.actor }}"
-            TEST_MODE="${{ github.event.inputs.test_mode }}"
+            PUSHER="$ACTOR"
+            TEST_MODE="$INPUT_TEST_MODE"
           fi
 
           echo "submodule=$SUBMODULE" >> $GITHUB_OUTPUT
