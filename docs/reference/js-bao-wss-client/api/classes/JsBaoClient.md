@@ -15,7 +15,7 @@ Provides a hierarchical API for:
 
 ## Extends
 
-- `Observable`\<`any`\>
+- [`initJsBao`](../variables/initJsBao.md)\<`any`\>
 
 ## Constructors
 
@@ -283,10 +283,6 @@ Provides a hierarchical API for:
 
 `Promise`\<`void`\>
 
-#### Overrides
-
-`Observable.destroy`
-
 ***
 
 ### disconnect()
@@ -319,9 +315,6 @@ Provides a hierarchical API for:
 
 > **emit**\<`K`\>(`type`, `args`): `void`
 
-Emit a named event. All registered event listeners that listen to the
-specified name will receive the event.
-
 #### Type Parameters
 
 ##### K
@@ -338,19 +331,9 @@ specified name will receive the event.
 
 \[[`JsBaoEvents`](../interfaces/JsBaoEvents.md)\[`K`\]\]
 
-The arguments that are applied to the event listener.
-
 #### Returns
 
 `void`
-
-#### Todo
-
-This should catch exceptions
-
-#### Overrides
-
-`Observable.emit`
 
 ***
 
@@ -587,7 +570,7 @@ Useful for checking what auth methods are available before showing login UI.
 
 ### getDoc()
 
-> **getDoc**(`documentId`): `Doc` \| `undefined`
+> **getDoc**(`documentId`): `any`
 
 #### Parameters
 
@@ -597,7 +580,7 @@ Useful for checking what auth methods are available before showing login UI.
 
 #### Returns
 
-`Doc` \| `undefined`
+`any`
 
 ***
 
@@ -1317,10 +1300,6 @@ Logout: best-effort server cookie clear, shutdown networking, clear auth state, 
 
 `void`
 
-#### Overrides
-
-`Observable.off`
-
 ***
 
 ### on()
@@ -1346,34 +1325,6 @@ Logout: best-effort server cookie clear, shutdown networking, clear auth state, 
 #### Returns
 
 `void`
-
-#### Overrides
-
-`Observable.on`
-
-***
-
-### once()
-
-> **once**(`name`, `f`): `void`
-
-#### Parameters
-
-##### name
-
-`any`
-
-##### f
-
-`Function`
-
-#### Returns
-
-`void`
-
-#### Inherited from
-
-`Observable.once`
 
 ***
 

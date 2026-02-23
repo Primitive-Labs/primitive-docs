@@ -25,7 +25,6 @@
 - [ClaimApplyResult](interfaces/ClaimApplyResult.md)
 - [ConfirmApplyOptions](interfaces/ConfirmApplyOptions.md)
 - [ConfirmApplyResult](interfaces/ConfirmApplyResult.md)
-- [DatabaseConfig](interfaces/DatabaseConfig.md)
 - [DocumentAccessResult](interfaces/DocumentAccessResult.md)
 - [DocumentCreateCommitFailedEvent](interfaces/DocumentCreateCommitFailedEvent.md)
 - [DocumentEvent](interfaces/DocumentEvent.md)
@@ -60,8 +59,6 @@
 - [OfflineAuthFailedEvent](interfaces/OfflineAuthFailedEvent.md)
 - [OfflineAuthRenewedEvent](interfaces/OfflineAuthRenewedEvent.md)
 - [OfflineAuthUnlockedEvent](interfaces/OfflineAuthUnlockedEvent.md)
-- [PaginatedResult](interfaces/PaginatedResult.md)
-- [PaginationOptions](interfaces/PaginationOptions.md)
 - [PendingCreateCommittedEvent](interfaces/PendingCreateCommittedEvent.md)
 - [PendingCreateFailedEvent](interfaces/PendingCreateFailedEvent.md)
 - [PermissionEvent](interfaces/PermissionEvent.md)
@@ -91,7 +88,6 @@
 - [GeminiContentPart](type-aliases/GeminiContentPart.md)
 - [GeminiGenerateOptions](type-aliases/GeminiGenerateOptions.md)
 - [GeminiRole](type-aliases/GeminiRole.md)
-- [InferAttrs](type-aliases/InferAttrs.md)
 - [JsBaoErrorCode](type-aliases/JsBaoErrorCode.md)
 - [StorageConfig](type-aliases/StorageConfig.md)
 - [TypedModelConstructor](type-aliases/TypedModelConstructor.md)
@@ -100,12 +96,51 @@
 ## Variables
 
 - [AUTH\_CODES](variables/AUTH_CODES.md)
+- [initJsBao](variables/initJsBao.md)
 
 ## Functions
 
-- [~~createModelClass~~](functions/createModelClass.md)
-- [defineModelSchema](functions/defineModelSchema.md)
-- [generateULID](functions/generateULID.md)
 - [initializeClient](functions/initializeClient.md)
-- [initJsBao](functions/initJsBao.md)
 - [isJsBaoError](functions/isJsBaoError.md)
+
+## References
+
+### createModelClass
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
+### DatabaseConfig
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
+### defineModelSchema
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
+### generateULID
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
+### InferAttrs
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
+### PaginatedResult
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
+### PaginationOptions
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)

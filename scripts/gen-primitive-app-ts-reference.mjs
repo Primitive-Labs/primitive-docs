@@ -498,9 +498,10 @@ function mdForTsFile({ title, relFromRepoRoot, description, moduleDescription, e
   return lines.join('\n')
 }
 
-// Files to exclude from documentation generation (internal/debug utilities)
+// Files to exclude from documentation generation (internal/debug utilities or template-only)
 const EXCLUDED_FILES = new Set([
   'documentDebuggerStore.ts',
+  'useJsBaoDataLoader.ts',
 ])
 
 async function generateSection(sectionName, srcSubdir) {
@@ -559,7 +560,6 @@ async function generateSection(sectionName, srcSubdir) {
   }
 }
 
-await generateSection('composables', 'composables')
 await generateSection('types', 'types')
 await generateSection('stores', 'stores')
 await generateSection('services', 'services')
