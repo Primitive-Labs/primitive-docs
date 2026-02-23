@@ -132,6 +132,7 @@ The Document Explorer has a two-panel layout:
 
 **Available filter operators:**
 - equals / not equals
+- is null / is not null
 - contains / not contains
 - starts with / ends with
 - in list / not in list
