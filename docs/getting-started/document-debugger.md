@@ -65,7 +65,7 @@ Each model card displays:
 Clicking a model takes you to a detailed view with a data table showing all records. From here you can:
 
 **Filter records:**
-- Add multiple filters with various operators (equals, contains, starts with, greater than, etc.)
+- Add multiple filters with various operators (equals, contains, starts with, greater than, is null, is not null, etc.)
 - Combine filters for complex queries
 - Clear individual filters or all at once
 
@@ -78,6 +78,7 @@ Clicking a model takes you to a detailed view with a data table showing all reco
 - Toggle "Show hidden fields" to see internal fields (prefixed with `_`)
 - Expand JSON fields in a full-screen editor
 - See field relationships to other models
+- Null field values are shown as `NULL` in muted monospace, making them visually distinct from empty strings
 
 ## CRUD Operations
 
