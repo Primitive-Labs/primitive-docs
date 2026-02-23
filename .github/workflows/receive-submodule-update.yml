@@ -179,12 +179,13 @@ jobs:
             The source code for this submodule is located at:
             ${{ steps.context.outputs.source_paths }}
 
-            ### Files You May Edit
+            ### Documentation to Review
 
-            You may ONLY edit these specific files related to **${{ steps.context.outputs.submodule }}**:
+            The following guide files may need updates based on these changes:
             ${{ steps.context.outputs.relevant_guides }}
 
-            **CRITICAL RESTRICTION**: Do NOT edit any other documentation files. This update is specifically for ${{ steps.context.outputs.submodule }} changes only. Do not update docs for js-bao, js-bao-wss, or primitive-app unless that is the submodule that triggered this workflow.
+            Also check the guides in:
+            - guides/latest/ (agent guides for the libraries)
 
             ### Instructions
 
@@ -220,10 +221,11 @@ jobs:
 
             ### Important
 
-            - **ONLY edit files listed above** - do not modify any other documentation
-            - Do NOT modify generated API reference files in `docs/reference/` (those are auto-generated)
+            - **NEVER edit files in `docs/reference/`** - these are auto-generated from source code and will be overwritten
+            - Only modify files in `docs/getting-started/` and `guides/latest/`
             - Focus on the narrative guides that explain concepts and usage patterns
-            - If the changes are purely internal (no public API impact), no doc updates may be needed
+            - **Only make changes that are directly relevant to the submodule update** - do not make unrelated edits or improvements
+            - **It is perfectly fine to make no changes** - if the code changes don't affect documentation, just write a summary explaining why no updates were needed. Do not invent changes just to have something to commit.
           claude_args: |
             --allowedTools "Read,Edit,Write,Glob,Grep,Bash(pnpm docs:build),Bash(pnpm gen:reference)"
 
