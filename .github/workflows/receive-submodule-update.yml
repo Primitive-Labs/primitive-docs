@@ -142,6 +142,7 @@ jobs:
           git add library_repos/${{ steps.context.outputs.submodule }}
 
       - name: Update documentation with Claude
+        id: claude
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -178,13 +179,12 @@ jobs:
             The source code for this submodule is located at:
             ${{ steps.context.outputs.source_paths }}
 
-            ### Documentation to Review
+            ### Files You May Edit
 
-            The following guide files may need updates based on these changes:
+            You may ONLY edit these specific files related to **${{ steps.context.outputs.submodule }}**:
             ${{ steps.context.outputs.relevant_guides }}
 
-            Also check the guides in:
-            - guides/latest/ (agent guides for the libraries)
+            **CRITICAL RESTRICTION**: Do NOT edit any other documentation files. This update is specifically for ${{ steps.context.outputs.submodule }} changes only. Do not update docs for js-bao, js-bao-wss, or primitive-app unless that is the submodule that triggered this workflow.
 
             ### Instructions
 
@@ -209,17 +209,35 @@ jobs:
                - Keep explanations concise but thorough
                - Maintain consistent heading structure
 
-            5. **If no documentation changes are needed**:
-               - That's fine! Just note that the changes were reviewed and no doc updates were required.
+            5. **Write a summary**: After reviewing and making any changes, write a brief summary to `.claude-summary.md` with:
+               - What changes you reviewed
+               - What documentation updates you made (if any)
+               - Why these changes were or weren't needed
+               This summary will be included in the PR description.
+
+            6. **If no documentation changes are needed**:
+               - That's fine! Still write the summary explaining why no updates were required.
 
             ### Important
 
-            - Only modify files in `docs/getting-started/` and `guides/latest/`
+            - **ONLY edit files listed above** - do not modify any other documentation
             - Do NOT modify generated API reference files in `docs/reference/` (those are auto-generated)
             - Focus on the narrative guides that explain concepts and usage patterns
             - If the changes are purely internal (no public API impact), no doc updates may be needed
           claude_args: |
-            --allowedTools "Read,Edit,Glob,Grep,Bash(pnpm docs:build),Bash(pnpm gen:reference)"
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(pnpm docs:build),Bash(pnpm gen:reference)"
+
+      - name: Read Claude summary
+        id: summary
+        run: |
+          if [ -f ".claude-summary.md" ]; then
+            echo "summary<<EOF" >> $GITHUB_OUTPUT
+            cat .claude-summary.md >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            rm .claude-summary.md
+          else
+            echo "summary=No summary provided." >> $GITHUB_OUTPUT
+          fi
 
       - name: Regenerate reference documentation
         run: pnpm gen:reference
@@ -255,6 +273,10 @@ jobs:
             ## Automated Documentation Update
 
             This PR was automatically generated in response to changes in the **${{ steps.context.outputs.submodule }}** submodule.
+
+            ### Summary of Changes
+
+            ${{ steps.summary.outputs.summary }}
 
             ### Trigger
             - **Submodule:** ${{ steps.context.outputs.submodule }}
