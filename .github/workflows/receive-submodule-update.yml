@@ -304,6 +304,7 @@ jobs:
           labels: |
             documentation
             automated
+          assignees: ${{ steps.context.outputs.pusher }}
 
       - name: Summary
         run: |

@@ -163,6 +163,7 @@ export default defineConfig({
           { text: 'Overview', link: '/' },
           { text: 'Example Apps', link: '/getting-started/example-apps' },
           { text: 'Starting with the Template App', link: '/getting-started/template-app' },
+          { text: 'Primitive CLI', link: '/getting-started/primitive-cli' },
           { text: 'The Local-First Model', link: '/getting-started/local-first-model' },
           { text: 'Understanding Documents', link: '/getting-started/understanding-documents' },
           { text: 'Working with Data', link: '/getting-started/working-with-data' },
