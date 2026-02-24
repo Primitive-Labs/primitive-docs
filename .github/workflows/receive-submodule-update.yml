@@ -216,8 +216,10 @@ jobs:
                - Why these changes were or weren't needed
                This summary will be included in the PR description.
 
-            6. **If no documentation changes are needed**:
-               - That's fine! Still write the summary explaining why no updates were required.
+            6. **Signal whether updates were made**:
+               - If you made documentation changes, create a file `.claude-docs-updated` containing `true`
+               - If no documentation changes were needed, do NOT create this file
+               - This determines whether a PR will be created
 
             ### Important
 
@@ -229,7 +231,7 @@ jobs:
           claude_args: |
             --allowedTools "Read,Edit,Write,Glob,Grep,Bash(pnpm docs:build),Bash(pnpm gen:reference)"
 
-      - name: Read Claude summary
+      - name: Read Claude summary and status
         id: summary
         run: |
           if [ -f ".claude-summary.md" ]; then
@@ -239,6 +241,14 @@ jobs:
             rm .claude-summary.md
           else
             echo "summary=No summary provided." >> $GITHUB_OUTPUT
+          fi
+
+          # Check if Claude indicated docs were updated
+          if [ -f ".claude-docs-updated" ]; then
+            echo "docs_updated=true" >> $GITHUB_OUTPUT
+            rm .claude-docs-updated
+          else
+            echo "docs_updated=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Regenerate reference documentation
@@ -258,7 +268,7 @@ jobs:
           fi
 
       - name: Create Pull Request
-        if: steps.check_changes.outputs.has_changes == 'true'
+        if: steps.check_changes.outputs.has_changes == 'true' && steps.summary.outputs.docs_updated == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.DOCS_REPO_PAT }}
@@ -308,10 +318,13 @@ jobs:
 
       - name: Summary
         run: |
-          if [ "${{ steps.check_changes.outputs.has_changes }}" = "true" ]; then
+          if [ "${{ steps.summary.outputs.docs_updated }}" = "true" ]; then
             echo "## Documentation Updated" >> $GITHUB_STEP_SUMMARY
             echo "A PR has been created with documentation updates for **${{ steps.context.outputs.submodule }}**." >> $GITHUB_STEP_SUMMARY
           else
             echo "## No Documentation Changes Needed" >> $GITHUB_STEP_SUMMARY
-            echo "The changes in **${{ steps.context.outputs.submodule }}** did not require documentation updates." >> $GITHUB_STEP_SUMMARY
+            echo "Claude determined that the changes in **${{ steps.context.outputs.submodule }}** did not require documentation updates." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Summary" >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.summary.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
           fi
