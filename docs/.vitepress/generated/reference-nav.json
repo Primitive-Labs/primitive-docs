@@ -662,6 +662,31 @@
               "text": "Dev Tools",
               "items": [
                 {
+                  "text": "Blob Explorer",
+                  "items": [
+                    {
+                      "text": "BlobDetailPanel",
+                      "link": "/reference/primitive-app/components/dev-tools/blob-explorer/BlobDetailPanel"
+                    },
+                    {
+                      "text": "BlobExplorerDocumentSidebar",
+                      "link": "/reference/primitive-app/components/dev-tools/blob-explorer/BlobExplorerDocumentSidebar"
+                    },
+                    {
+                      "text": "BlobExplorerIndex",
+                      "link": "/reference/primitive-app/components/dev-tools/blob-explorer/BlobExplorerIndex"
+                    },
+                    {
+                      "text": "BlobTablePanel",
+                      "link": "/reference/primitive-app/components/dev-tools/blob-explorer/BlobTablePanel"
+                    },
+                    {
+                      "text": "BlobUploadDialog",
+                      "link": "/reference/primitive-app/components/dev-tools/blob-explorer/BlobUploadDialog"
+                    }
+                  ]
+                },
+                {
                   "text": "Document Explorer",
                   "items": [
                     {

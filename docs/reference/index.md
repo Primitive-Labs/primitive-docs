@@ -172,6 +172,12 @@ Generated reference documentation for each project.
 ### Components
 
 - **Dev Tools**
+  - **Blob Explorer**
+    - [BlobDetailPanel](/reference/primitive-app/components/dev-tools/blob-explorer/BlobDetailPanel)
+    - [BlobExplorerDocumentSidebar](/reference/primitive-app/components/dev-tools/blob-explorer/BlobExplorerDocumentSidebar)
+    - [BlobExplorerIndex](/reference/primitive-app/components/dev-tools/blob-explorer/BlobExplorerIndex)
+    - [BlobTablePanel](/reference/primitive-app/components/dev-tools/blob-explorer/BlobTablePanel)
+    - [BlobUploadDialog](/reference/primitive-app/components/dev-tools/blob-explorer/BlobUploadDialog)
   - **Document Explorer**
     - **Components**
       - [DocumentAliasesSection](/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentAliasesSection)
