@@ -6,6 +6,10 @@ Beyond document storage and sync, Primitive provides additional services that ha
 
 Store files like images, PDFs, and attachments alongside your documents.
 
+::: tip Dev Tools
+Use the **Blob Explorer** in the dev tools overlay to browse, upload, and manage blobs during development. See **[Document Explorer](./document-explorer.md#blob-explorer)** for details.
+:::
+
 ::: info Access Control
 Blobs can only be accessed by signed-in users who have access to the associated document. If a user has `reader`, `read-write`, or `owner` permission on the document, they can access its blobs. Unauthenticated users cannot access blob URLs.
 :::

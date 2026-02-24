@@ -169,5 +169,5 @@ Now that your app is running:
 2. **[Understanding Documents](./understanding-documents.md)** — Learn about documents and sharing
 3. **[Working with Data](./working-with-data.md)** — Create your first data models
 4. **[Test Harness](./test-harness.md)** — Write browser-based tests for your app
-5. **[Document Debugger](./document-debugger.md)** — Inspect and debug your data
+5. **[Document Explorer](./document-explorer.md)** — Inspect and debug your data
 6. **[Deploying to Production](./deploying-to-production.md)** — Deploy your app to Cloudflare Workers

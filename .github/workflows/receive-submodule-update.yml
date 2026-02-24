@@ -120,7 +120,7 @@ jobs:
               SOURCE_PATHS="library_repos/js-bao-wss/src/"
               ;;
             "primitive-app-dev")
-              RELEVANT_GUIDES="docs/getting-started/template-app.md docs/getting-started/document-debugger.md docs/getting-started/test-harness.md"
+              RELEVANT_GUIDES="docs/getting-started/template-app.md docs/getting-started/document-explorer.md docs/getting-started/test-harness.md"
               SOURCE_PATHS="library_repos/primitive-app-dev/primitive-app/src/ library_repos/primitive-app-dev/primitive-app-template/src/"
               ;;
             *)

@@ -168,7 +168,7 @@ export default defineConfig({
           { text: 'Understanding Documents', link: '/getting-started/understanding-documents' },
           { text: 'Working with Data', link: '/getting-started/working-with-data' },
           { text: 'Other Services', link: '/getting-started/other-services' },
-          { text: 'Document Debugger', link: '/getting-started/document-debugger' },
+          { text: 'Document Explorer', link: '/getting-started/document-explorer' },
           { text: 'Browser-Based Test Harness', link: '/getting-started/test-harness' },
           { text: 'Deploying to Production', link: '/getting-started/deploying-to-production' },
           { text: 'Primitive Stack Overview', link: '/getting-started/stack-overview' },

@@ -1,10 +1,10 @@
-# Document Debugger
+# Document Explorer
 
-The Document Debugger is a powerful development tool included with `primitive-app` that lets you inspect and manage documents and data in your application. It's invaluable for debugging data issues, testing model relationships, and understanding how your data is structured.
+The Document Explorer is a powerful development tool included with `primitive-app` that lets you inspect and manage documents and data in your application. It's invaluable for debugging data issues, testing model relationships, and understanding how your data is structured.
 
-## Accessing the Debugger
+## Accessing the Document Explorer
 
-The Document Debugger is provided by the `primitiveDevTools` Vite plugin. In development mode, a floating button appears in the corner of your app that opens the dev tools overlay.
+The Document Explorer is provided by the `primitiveDevTools` Vite plugin. In development mode, a floating button appears in the corner of your app that opens the dev tools overlay.
 
 To enable it, configure the plugin in your `vite.config.ts`:
 
@@ -22,7 +22,7 @@ export default defineConfig({
 });
 ```
 
-Click the floating dev tools button to open the overlay, then select "Document Explorer" to access the debugger.
+Click the floating dev tools button to open the overlay, then select "Document Explorer" to access the tool.
 
 ## Document Management
 
@@ -50,7 +50,7 @@ Shared documents (where you're an Editor or Viewer) cannot be deleted—only the
 
 ## Exploring Data
 
-When you select a document, the main panel shows all your js-bao models with their record counts. The debugger automatically discovers all models registered in your app.
+When you select a document, the main panel shows all your js-bao models with their record counts. The Document Explorer automatically discovers all models registered in your app.
 
 ### Model Overview
 
@@ -82,7 +82,7 @@ Clicking a model takes you to a detailed view with a data table showing all reco
 
 ## CRUD Operations
 
-The Document Debugger provides full Create, Read, Update, Delete capabilities:
+The Document Explorer provides full Create, Read, Update, Delete capabilities:
 
 ### Creating Records
 
@@ -127,13 +127,47 @@ This is helpful for understanding your data model structure and debugging relati
 
 ## Scoped Queries
 
-All queries in the Document Debugger are **scoped to the selected document**. This means:
+All queries in the Document Explorer are **scoped to the selected document**. This means:
 
 - Record counts show only records in that document
 - Filters apply only to data in the current document
 - Creating records saves them to the current document
 
 This matches how documents work in production—data is isolated per document unless you explicitly query across documents.
+
+## Blob Explorer
+
+The dev tools also include a **Blob Explorer** tab for managing files stored with your documents. Click the "Blob Explorer" tab in the dev tools overlay to access it.
+
+### Three-Panel Interface
+
+The Blob Explorer uses a three-panel layout:
+
+- **Left panel** — Document list with search and permission badges (shared with Document Explorer)
+- **Middle panel** — Blob table showing all files in the selected document
+- **Right panel** — Blob detail view with preview, metadata, and actions
+
+### Features
+
+**Browse and search blobs:**
+- View all blobs in a document with filename, size, and type
+- Search blobs by filename
+- Filter by content type (images, PDFs, etc.)
+
+**Upload and manage:**
+- Upload new files directly from the dev tools
+- Delete individual blobs or bulk-delete multiple files
+- Preview images and other supported file types
+
+**Generate URLs:**
+- Copy download URLs for testing
+- Preview how blobs will appear in your app
+
+The Blob Explorer shares document selection state with the Document Explorer, so your selected document persists when switching between tabs.
+
+::: tip
+For details on using blob storage in your application code, see **[Blob Storage](./other-services.md#blob-storage)**.
+:::
 
 ## Production Behavior
 
