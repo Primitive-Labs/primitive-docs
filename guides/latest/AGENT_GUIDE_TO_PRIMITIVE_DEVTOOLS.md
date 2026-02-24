@@ -4,12 +4,13 @@ Guidelines for AI agents using browser automation to validate data state and run
 
 ## Overview
 
-Primitive apps include two browser-based development tools accessible via a floating DevTools button:
+Primitive apps include three browser-based development tools accessible via a floating DevTools button:
 
 1. **Document Explorer** - Inspect and manipulate js-bao documents, models, and records
 2. **Test Harness** - Run browser-based tests that exercise real CRUD operations
+3. **Blob Explorer** - Browse, upload, download, and delete blobs attached to documents
 
-Both tools require authentication. The DevTools button only appears when a user is signed in.
+All tools require authentication. The DevTools button only appears when a user is signed in.
 
 ## Accessing DevTools
 
@@ -18,8 +19,9 @@ Both tools require authentication. The DevTools button only appears when a user 
 1. **Locate the floating DevTools button** - A small button appears in the bottom-right corner of the screen when authenticated
 2. **Click the DevTools button** - Opens a full-screen overlay
 3. **Select a tool** - Use the left sidebar icons:
-   - Database icon → Document Explorer
-   - Flask icon → Test Harness
+   - Document icon → Document Explorer
+   - Checklist icon → Test Harness
+   - Cloud upload icon → Blob Explorer
 4. **Close the overlay** - Click the X button or press Escape
 
 ### Browser Automation Strategy
@@ -188,7 +190,7 @@ For browser automation, look for these UI patterns:
 | Element | Identification Strategy |
 |---------|------------------------|
 | DevTools button | Floating button in bottom-right corner |
-| Document Explorer tab | Database/cylinder icon in left sidebar |
+| Document Explorer tab | Document icon in left sidebar |
 | Document list items | List items with document titles in left panel |
 | Model cards | Cards showing model name and count badge |
 | Data table | Table element with sortable headers |
@@ -410,7 +412,7 @@ For browser automation:
 
 | Element | Identification Strategy |
 |---------|------------------------|
-| Test Harness tab | Flask/beaker icon in DevTools sidebar |
+| Test Harness tab | Checklist icon in DevTools sidebar |
 | Select All button | Button labeled "Select All" |
 | Deselect All button | Button labeled "Deselect All" |
 | Run Selected button | Play icon button |
@@ -422,6 +424,144 @@ For browser automation:
 | Output log | Monospace text area in right panel |
 | Clear Output | Trash icon button above output |
 | Copy Output | Copy icon button above output |
+
+---
+
+## Blob Explorer
+
+The Blob Explorer lets you browse, upload, download, and delete binary files (blobs) stored within documents.
+
+### UI Structure
+
+The Blob Explorer has a three-panel layout:
+
+**Left Panel - Document Sidebar:**
+- Document list showing all accessible documents (shares selection state with Document Explorer)
+- Role badges per document
+
+**Middle Panel - Blob Table:**
+- Toolbar with: document title, blob ID search input, Refresh button, Upload button (write users only)
+- Table columns: Filename, Content Type, Size, Uploaded, Blob ID
+- Row hover actions: Download button, Delete button (write users only)
+- Checkbox column for bulk selection (write users only; hidden for viewers/readers)
+- Bulk action bar (appears when blobs are checked): shows count, Clear, and Delete buttons
+- Server-side cursor-based pagination (10 / 25 / 50 / 100 per page, persisted in localStorage)
+- Search mode: when a blob ID is typed, the table switches to exact server-side lookup; pagination is hidden
+
+**Right Panel - Blob Detail (collapsible):**
+- Only visible on large screens (≥ lg breakpoint) by default; toggle with the collapse button on the panel edge
+- **Preview section** (images, PDFs, text/CSV files up to ~600 chars)
+- **Actions section**: Download, Open in new tab (for browser-renderable types), Delete blob (write users only)
+- **Info section**: Blob ID (click to copy), Filename, Content Type, Size, Uploaded date, SHA-256 hash (click to copy, if available)
+
+### Common Tasks
+
+#### Task 1: Browse Blobs in a Document
+
+```
+1. Open DevTools → Blob Explorer (cloud upload icon)
+2. Select a document from the left sidebar
+3. Blob table populates with the document's blobs (paginated)
+4. Use Previous/Next and page-size selector to navigate
+```
+
+#### Task 2: Find a Blob by ID
+
+```
+1. Open DevTools → Blob Explorer
+2. Select the target document
+3. Type the blob ID into the search field in the toolbar
+4. Table switches to exact-ID lookup — shows the matching blob or "No blob found"
+5. Clear the search field to return to paginated list view
+```
+
+#### Task 3: Upload a Blob
+
+```
+1. Open DevTools → Blob Explorer (requires write access to document)
+2. Select the target document
+3. Click the "Upload" button in the toolbar
+4. Select a file in the upload dialog
+5. A progress bar appears at the bottom while uploading
+6. Table refreshes automatically after upload completes
+```
+
+#### Task 4: Download a Blob
+
+**From the table row (hover actions):**
+```
+1. Hover over any blob row
+2. Click the download icon that appears on the right
+```
+
+**From the detail panel:**
+```
+1. Click a blob row to open the right detail panel
+2. Click "Download" in the Actions section
+```
+
+#### Task 5: Delete a Blob
+
+**Single delete (row action):**
+```
+1. Hover over the blob row
+2. Click the trash icon (write users only)
+3. Confirm in the confirmation dialog
+```
+
+**Single delete (detail panel):**
+```
+1. Click a blob row to open the right detail panel
+2. Click "Delete blob" in the Actions section (write users only)
+3. Confirm in the confirmation dialog
+```
+
+**Bulk delete:**
+```
+1. Check one or more blob rows using the checkboxes (write users only)
+2. A bulk action bar appears in the toolbar showing selected count
+3. Click "Delete" in the bulk action bar
+4. Confirm in the confirmation dialog
+```
+
+#### Task 6: Verify Blob Exists
+
+```
+1. Navigate to Blob Explorer and select the target document
+2. Search for the blob by its ID using the search field
+3. If the blob exists, it appears in the table
+4. If not found, "No blob found with that ID" is shown
+```
+
+#### Task 7: View Blob Details / Metadata
+
+```
+1. Click a blob row — the right detail panel opens
+2. Read Blob ID, Filename, Content Type, Size, Uploaded date, SHA-256
+3. Click the Blob ID or SHA-256 to copy to clipboard
+```
+
+### Blob Explorer Element Identifiers
+
+For browser automation:
+
+| Element | Identification Strategy |
+|---------|------------------------|
+| Blob Explorer tab | Cloud upload icon in DevTools left sidebar |
+| Blob ID search | Text input in middle panel toolbar |
+| Upload button | "Upload" button in toolbar (write users) |
+| Refresh button | Circular arrow icon in toolbar |
+| Blob table rows | Table rows with filename, content type, size, date, blob ID |
+| Row download button | Download arrow icon (appears on row hover) |
+| Row delete button | Trash icon (appears on row hover, write users only) |
+| Checkbox column | Checkboxes on left of rows (write users only) |
+| Bulk action bar | Overlay in toolbar showing "N selected", Clear, Delete |
+| Pagination controls | Previous / Next buttons + page-size selector in table footer |
+| Right detail panel | Panel on right edge of the Blob Explorer |
+| Collapse toggle | Small arrow button on the left edge of the detail panel |
+| Preview area | "Preview" section in detail panel |
+| Actions area | "Actions" section in detail panel |
+| Info area | "Info" section with Blob ID, Filename, Content Type, etc. |
 
 ---
 
