@@ -16,8 +16,8 @@ All tools require authentication. The DevTools button only appears when a user i
 
 ### Opening the DevTools Overlay
 
-1. **Locate the floating DevTools button** - A small button appears in the bottom-right corner of the screen when authenticated
-2. **Click the DevTools button** - Opens a full-screen overlay
+1. **Locate the floating DevTools button** - A small circular button showing the Primitive logo appears on one of the screen edges when authenticated. By default it is in the bottom-right corner, but users can drag it to any edge and its position is saved in localStorage.
+2. **Click the DevTools button** - Opens a full-screen overlay. A short click opens the overlay; dragging repositions the button without opening it.
 3. **Select a tool** - Use the left sidebar icons:
    - Document icon → Document Explorer
    - Checklist icon → Test Harness
@@ -189,7 +189,7 @@ For browser automation, look for these UI patterns:
 
 | Element | Identification Strategy |
 |---------|------------------------|
-| DevTools button | Floating button in bottom-right corner |
+| DevTools button | Circular floating button showing the Primitive logo, fixed to one screen edge (default: bottom-right corner; position is user-configurable and saved in localStorage) |
 | Document Explorer tab | Document icon in left sidebar |
 | Document list items | List items with document titles in left panel |
 | Model cards | Cards showing model name and count badge |

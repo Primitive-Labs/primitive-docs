@@ -4,7 +4,7 @@ The Document Explorer is a powerful development tool included with `primitive-ap
 
 ## Accessing the Document Explorer
 
-The Document Explorer is provided by the `primitiveDevTools` Vite plugin. In development mode, a floating button appears in the corner of your app that opens the dev tools overlay.
+The Document Explorer is provided by the `primitiveDevTools` Vite plugin. In development mode, a floating button showing the Primitive logo appears at the edge of your app that opens the dev tools overlay. The button is draggable—you can reposition it to any screen edge and its position is saved across sessions.
 
 To enable it, configure the plugin in your `vite.config.ts`:
 
