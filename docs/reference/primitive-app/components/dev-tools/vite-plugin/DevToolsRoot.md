@@ -6,7 +6,6 @@
 | ---------------- | ----------- | ------ | ------ | ------- |
 | testGroups       |             | Array  | -      |         |
 | appName          |             | string | -      |         |
-| buttonStyle      |             | Record | -      |         |
 | keyboardShortcut |             | string | -      |         |
 
 ---

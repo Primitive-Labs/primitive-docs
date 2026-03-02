@@ -5,7 +5,6 @@
 | Prop name    | Description | Type    | Values | Default |
 | ------------ | ----------- | ------- | ------ | ------- |
 | isOpen       |             | boolean | -      |         |
-| customStyle  |             | Record  | -      |         |
 | shortcutHint |             | string  | -      |         |
 
 ## Events
