@@ -1,6 +1,6 @@
 # Workflow Agent Guide
 
-This guide explains the workflow syntax and CLI commands for creating and managing workflows in the js-bao platform. It is designed for coding agents to understand and implement workflows.
+This guide explains the workflow syntax and CLI commands for creating and managing workflows in the js-bao platform. It is designed for coding agents to understand and implement workflows. Workflows are configured using TOML config files and the `primitive sync` command to keep configuration version-controlled alongside your code.
 
 ## Overview
 
@@ -20,6 +20,82 @@ Workflows are multi-step automation pipelines that execute sequentially. They su
 - **Revision**: Published, immutable version of a workflow (legacy — use configurations instead)
 - **Run**: A single execution instance of a workflow
 
+## Managing Workflows with Config Files (Recommended)
+
+All workflow configuration is managed through TOML config files and the `primitive sync` command. This keeps configuration version-controlled alongside your code.
+
+```bash
+primitive sync init --dir ./config    # Initialize config directory
+primitive sync pull --dir ./config    # Pull current config from server
+primitive sync diff --dir ./config    # Preview changes
+primitive sync push --dir ./config    # Push local config to server
+primitive sync push --dir ./config --dry-run  # See what would change without applying
+```
+
+The config directory structure:
+
+```
+config/
+  workflows/
+    my-workflow.toml
+    another-workflow.toml
+```
+
+### Creating a Workflow via Sync
+
+1. Create a TOML file in `config/workflows/`:
+
+```toml
+[workflow]
+key = "my-workflow"
+name = "My Workflow"
+description = "Does something useful"
+status = "draft"
+
+[[steps]]
+id = "step-1"
+kind = "transform"
+saveAs = "output"
+
+[steps.output]
+message = "Hello, {{ input.name || 'World' }}!"
+```
+
+2. Push to the server:
+
+```bash
+primitive sync push --dir ./config --dry-run  # Preview changes
+primitive sync push --dir ./config            # Apply
+```
+
+This creates the workflow and a default configuration automatically.
+
+3. Preview/test the workflow:
+
+```bash
+primitive workflows preview <workflow-id> --input '{"name":"Agent"}' --wait
+```
+
+4. When ready, set `status = "active"` in the TOML file and push again:
+
+```bash
+primitive sync push --dir ./config
+```
+
+### Updating a Workflow via Sync
+
+```bash
+# 1. Pull latest configuration
+primitive sync pull --dir ./config
+
+# 2. Edit the TOML file
+vim config/workflows/my-workflow.toml
+
+# 3. Preview and push changes
+primitive sync push --dir ./config --dry-run  # Preview
+primitive sync push --dir ./config            # Apply
+```
+
 ## Publishing Workflows
 
 **Important:** Workflows must be **published** or have an **active configuration** and be set to `active` status before they can be called from the client.
@@ -35,25 +111,12 @@ Workflows are multi-step automation pipelines that execute sequentially. They su
 
 ### Publishing via Configurations (Recommended)
 
-Configurations are the recommended way to manage workflow steps. When you create a workflow, a default configuration is automatically created.
+Configurations are the recommended way to manage workflow steps. When you create a workflow via `primitive sync push`, a default configuration is automatically created.
 
-1. **Create the workflow** (creates a draft and a default configuration)
-2. **Set status to active** to allow client execution
+1. **Create the workflow** by adding a TOML file and running `primitive sync push`
+2. **Set `status = "active"`** in the TOML file and push again
 
-```bash
-# Step 1: Create workflow from TOML (auto-creates default config)
-primitive workflows create --from-file workflow.toml
-
-# Step 2: Set to active
-primitive workflows update <workflow-id> --status active
-```
-
-To update steps, update the configuration:
-
-```bash
-# Update the active configuration's steps
-primitive workflows configs update <workflow-id> <config-id> --from-file workflow.toml
-```
+To update steps, edit the TOML file and run `primitive sync push` again.
 
 ### Publishing via Revisions (Legacy)
 
@@ -74,7 +137,7 @@ primitive workflows publish <workflow-id>
 primitive workflows update <workflow-id> --status active
 ```
 
-**Via TOML sync:** Setting `status = "active"` in the TOML file will fail with "Cannot activate workflow without a revision or active configuration" if you haven't published or created a configuration first.
+**Note:** Setting `status = "active"` in the TOML file will fail with "Cannot activate workflow without a revision or active configuration" if you haven't published or created a configuration first.
 
 ### Common Error
 
@@ -556,7 +619,10 @@ The `primitive workflows` command manages workflows. Most commands require an ap
 ### Create Workflow
 
 ```bash
-# Create from TOML file (recommended)
+# Create via sync (recommended)
+primitive sync push --dir ./config
+
+# Create from TOML file (alternative)
 primitive workflows create --from-file workflow.toml
 
 # Create with inline options
@@ -1039,9 +1105,15 @@ conditions = "{{ outputs.weatherData.description }}"
 
 ## CLI Workflow: Creating a New Workflow
 
-### Step 1: Create the TOML file
+### Step 1: Initialize config directory (if not already done)
 
-Create a file named `my-workflow.toml`:
+```bash
+primitive sync init --dir ./config
+```
+
+### Step 2: Create the TOML file
+
+Create `config/workflows/my-workflow.toml`:
 
 ```toml
 [workflow]
@@ -1059,50 +1131,37 @@ saveAs = "output"
 message = "Hello, {{ input.name || 'World' }}!"
 ```
 
-### Step 2: Create the workflow
+### Step 3: Push to server
 
 ```bash
-primitive workflows create --from-file my-workflow.toml
+primitive sync push --dir ./config --dry-run  # Preview changes
+primitive sync push --dir ./config            # Apply
 ```
 
-Note the workflow ID returned. A default configuration is automatically created.
+A default configuration is automatically created.
 
-### Step 3: Preview/test the workflow
+### Step 4: Preview/test the workflow
 
 ```bash
 primitive workflows preview <workflow-id> --input '{"name":"Agent"}' --wait
 ```
 
-### Step 4: Iterate on the configuration
+### Step 5: Iterate
 
-Edit `my-workflow.toml`, then update the configuration:
+Edit `config/workflows/my-workflow.toml`, then push again:
 
 ```bash
-# List configs to get the config ID
-primitive workflows configs list <workflow-id>
-
-# Update the configuration's steps
-primitive workflows configs update <workflow-id> <config-id> --from-file my-workflow.toml
+primitive sync push --dir ./config
 ```
 
 Preview again to test changes.
 
-### Step 5: Set to active
+### Step 6: Set to active
+
+Update `status = "active"` in the TOML file, then push:
 
 ```bash
-primitive workflows update <workflow-id> --status active
-```
-
-### Alternative: Publish via legacy revisions
-
-If using the legacy revision flow:
-
-```bash
-# Publish the draft (creates immutable revision)
-primitive workflows publish <workflow-id>
-
-# Then set to active
-primitive workflows update <workflow-id> --status active
+primitive sync push --dir ./config
 ```
 
 ---
