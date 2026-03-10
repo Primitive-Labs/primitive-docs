@@ -26,6 +26,12 @@ A **document** is:
 
 **Size Guidelines:** Documents work best around ~10MB each (soft limit). For most apps (thousands of records, years of data), this is sufficient.
 
+## Documents vs. Databases
+
+Primitive also provides **Databases** — server-side storage backed by Cloudflare Durable Objects. Documents are best for personal data, real-time collaboration, and offline access. Databases are best for app-wide shared data, large datasets, and fine-grained access control. Many apps use both.
+
+See the [Data Modeling guide](AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.md) for a full decision framework, comparison table, and example app architectures. See the [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) for database API documentation.
+
 ## Critical Rules
 
 1. **JS-Bao query operates over ALL open documents.** NEVER iterate over documents to query. Filter results by documentId or other fields in the query itself.
@@ -599,6 +605,8 @@ try {
 - `documents.openAlias(params)` - Open document by alias directly
 
 ## Sharing Documents
+
+Documents can be shared with individual users or with groups. For group-based document sharing, see the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md#groups-and-documents).
 
 ### Using PrimitiveShareDocumentDialog
 
