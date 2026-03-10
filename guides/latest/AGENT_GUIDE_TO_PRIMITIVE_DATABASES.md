@@ -468,7 +468,11 @@ const db = await client.databases.create({
 ### Listing and fetching databases
 
 ```typescript
-// List databases the user has access to
+// List databases the current user owns or manages.
+// NOTE: This does NOT return all databases the user has access to —
+// only those where they are an owner or manager. To navigate to a
+// specific database, use group membership or state stored elsewhere
+// rather than relying on this list.
 const databases = await client.databases.list();
 
 // Get a specific database
