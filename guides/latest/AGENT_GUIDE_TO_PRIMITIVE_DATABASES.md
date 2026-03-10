@@ -118,6 +118,21 @@ config/
 
 Each file in `database-types/` defines a database type with its triggers and operations.
 
+**TOML quoting tip:** CEL expressions containing apostrophes (e.g., `isMemberOf('class-teachers', database.id)`) must use triple-quoted strings in TOML, because single-quoted TOML strings don't support escaping. Use `'''...'''` for literal strings or `"""..."""` for basic strings:
+
+```toml
+# WRONG — TOML parse error due to apostrophes in single-quoted string:
+access = 'isMemberOf('team', database.metadata.teamId)'
+
+# CORRECT — triple-quoted literal string:
+access = '''isMemberOf('team', database.metadata.teamId)'''
+
+# ALSO CORRECT — double-quoted string with escaped quotes or no apostrophes:
+access = "isMemberOf('team', database.metadata.teamId)"
+```
+
+Note: Double-quoted strings (`"..."`) also work for CEL with single quotes inside, since TOML only requires escaping the quote character that delimits the string.
+
 **File:** `config/database-types/project.toml`
 
 ```toml
@@ -478,6 +493,16 @@ const result = await client.databases.executeOperation(databaseId, "listTasks", 
 });
 ```
 
+**Response shapes by operation type:**
+
+| Operation Type | Response Shape |
+|----------------|---------------|
+| `query` | `{ data: [...records], hasMore: boolean, nextCursor?: string }` |
+| `mutation` | `{ results: [{ success: boolean, id: string }] }` |
+| `count` | `{ count: number }` |
+| `aggregate` | `{ result: { [groupValue]: { ...computedFields } } }` |
+| `pipeline` | `{ steps: { [stepName]: { type, ...stepResult } } }` — each step's result matches its operation type (query steps have `data`, count steps have `count`, aggregate steps have `result`) |
+
 ### Bulk import
 
 Execute a mutation operation across many items in one call (up to 100,000):
@@ -567,29 +592,35 @@ const result = await db.query("tasks", filter, options);
 
 ### Filter operators
 
+| Operator | Description | Example |
+|----------|-------------|---------|
+| *(exact match)* | Equals a value | `{ status: "active" }` |
+| `$ne` | Not equal | `{ status: { $ne: "archived" } }` |
+| `$gt` | Greater than | `{ price: { $gt: 10 } }` |
+| `$gte` | Greater than or equal | `{ price: { $gte: 10 } }` |
+| `$lt` | Less than | `{ price: { $lt: 50 } }` |
+| `$lte` | Less than or equal | `{ price: { $lte: 50 } }` |
+| `$in` | Matches any value in array | `{ category: { $in: ["books", "music"] } }` |
+| `$startsWith` | String prefix match | `{ name: { $startsWith: "Pro" } }` |
+| `$containsText` | Full-text search | `{ name: { $containsText: "deluxe" } }` |
+| `$exists` | Field exists (true) or is null/missing (false) | `{ avatar: { $exists: true } }` |
+| `$contains` | StringSet contains a value | `{ tags: { $contains: "featured" } }` |
+| `$all` | StringSet contains all values | `{ tags: { $all: ["featured", "sale"] } }` |
+| `$or` | Matches any of the conditions | `{ $or: [{ status: "active" }, { priority: { $gte: 5 } }] }` |
+| `$and` | Matches all conditions (useful when multiple conditions target the same field) | `{ $and: [{ price: { $gte: 10 } }, { price: { $lte: 50 } }] }` |
+
+Multiple filters on different fields are implicitly combined with AND:
+
 ```typescript
-// Exact match
-{ status: "active" }
+// These two are equivalent:
+{ status: "active", priority: { $gte: 5 } }
+{ $and: [{ status: "active" }, { priority: { $gte: 5 } }] }
 
-// Comparisons
-{ price: { $gt: 10 } }
-{ price: { $gte: 10, $lte: 50 } }
-{ status: { $ne: "archived" } }
-{ category: { $in: ["books", "music"] } }
+// Use explicit $and when you need multiple conditions on the same field:
+{ $and: [{ price: { $gte: 10 } }, { price: { $lte: 50 } }] }
 
-// String matching
-{ name: { $startsWith: "Pro" } }
-{ name: { $containsText: "deluxe" } }
-
-// Existence
-{ avatar: { $exists: true } }
-
-// StringSet
-{ tags: { $contains: "featured" } }
-{ tags: { $all: ["featured", "sale"] } }
-
-// Logical operators
-{ $or: [{ status: "active" }, { priority: { $gte: 5 } }] }
+// Combine $or with other filters:
+{ category: "electronics", $or: [{ onSale: true }, { price: { $lt: 20 } }] }
 ```
 
 ### Sort, limit, pagination

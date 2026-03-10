@@ -648,6 +648,52 @@ async function handleInvitationAccepted(documentId: string): Promise<void> {
 }
 ```
 
+### Closing Documents
+
+When your app opens many documents over a session (e.g., viewing individual items that each live in their own document), close documents you're no longer using to avoid accumulating sync connections:
+
+```typescript
+// Close a document and stop syncing
+await jsBaoClient.documents.close(documentId);
+
+// Close and remove the local cached copy
+await jsBaoClient.documents.close(documentId, { evictLocal: true });
+```
+
+### Programmatic Sharing
+
+In addition to the `PrimitiveShareDocumentDialog` UI component, documents can be shared programmatically — useful when sharing should happen in response to application events (e.g., sharing a post's content document with a class when it's approved).
+
+**Group-based permissions:**
+
+```typescript
+// Grant a group access to a document
+await jsBaoClient.documents.grantGroupPermission(documentId, {
+  groupType: "class-students",
+  groupId: classId,
+  permission: "read-write", // "reader" | "read-write" | "owner"
+});
+
+// Revoke a group's access
+await jsBaoClient.documents.revokeGroupPermission(documentId, "class-students", classId);
+
+// List all group permissions on a document
+const permissions = await jsBaoClient.documents.listGroupPermissions(documentId);
+```
+
+**User-based permissions:**
+
+```typescript
+// Grant a specific user access
+await jsBaoClient.documents.grantPermission(documentId, {
+  userId: targetUserId,
+  permission: "read-write",
+});
+
+// Revoke a specific user's access
+await jsBaoClient.documents.revokePermission(documentId, targetUserId);
+```
+
 ### Read-Only Permission Handling
 
 When a user has "reader" permission, disable all edit functionality:
