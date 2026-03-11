@@ -1,0 +1,1 @@
+import{_ as t,c as a,o as i,aj as r}from"./chunks/framework.HLg5PcC2.js";const u=JSON.parse('{"title":"Getting Started","description":"","frontmatter":{},"headers":[],"relativePath":"index.md","filePath":"index.md"}'),o={name:"index.md"};function n(s,e,l,d,p,h){return i(),a("div",null,[...e[0]||(e[0]=[r("",24)])])}const m=t(o,[["render",n]]);export{u as __pageData,m as default};
