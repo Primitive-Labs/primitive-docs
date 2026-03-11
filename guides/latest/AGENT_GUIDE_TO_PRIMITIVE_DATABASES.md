@@ -343,7 +343,7 @@ Use these in operation definitions (filters, data, IDs):
 | `$params.fieldName` | Caller-provided parameter |
 | `$steps.stepName.*` | Pipeline cross-step references (see Pipelines) |
 
-If a filter field's value is `$params.fieldName` and the caller doesn't provide that parameter, the filter key is omitted (not set to null).
+If a filter field's value is `$params.fieldName` and the caller doesn't provide that parameter, the filter key is omitted (not set to null). The same omission behavior applies to `$database.metadata.*` references — if the referenced metadata key is missing or not set, the filter key is omitted rather than matching against null or empty string.
 
 ### Operation types
 
@@ -425,6 +425,8 @@ Aggregate types: `count`, `sum`, `avg`, `min`, `max`.
 **Response:** `{ result: { "open": { total: 15, totalHours: 120 }, ... } }`
 
 #### Pipeline — multi-step read operations
+
+Pipelines are **read-only** — they support `query`, `count`, and `aggregate` steps only. Mutations cannot be included in a pipeline. For "read-then-mutate" flows, execute a pipeline to read the data, then call a separate mutation operation from your app code.
 
 Pipelines execute multiple read-only steps with cross-step references:
 
@@ -524,9 +526,7 @@ const result = await client.databases.importBulk(databaseId, "createTask", [
 Store per-database context (team ID, project ID) that operations can reference via `$database.metadata.*`:
 
 ```typescript
-await client.databases.updateMetadata(databaseId, {
-  metadata: { teamId: "team-alpha", projectId: "proj-1" },
-});
+await client.databases.updateMetadata(databaseId, { teamId: "team-alpha", projectId: "proj-1" });
 ```
 
 ## Direct Record Operations
@@ -863,7 +863,7 @@ const result = await client.databases.importCsv(databaseId, {
 
 - **Create multiple databases for isolation.** Each database is a separate Durable Object. Use separate databases for separate tenants, projects, or data domains to leverage per-database scaling.
 - **Use database types** to share operation definitions and triggers across databases of the same kind.
-- **Use metadata** to store per-database context (team ID, project ID) that operations can reference via `$database.metadata.*`.
+- **Use metadata for identity and routing data** set at creation time — team IDs, tenant IDs, database categories. Metadata is accessible in CEL expressions and filter substitutions via `$database.metadata.*`. It is not designed for frequently-changing application settings. For mutable settings that users toggle at runtime, store them as database records and use pipeline queries with `$steps.*` references to incorporate settings into subsequent query filters.
 - **Use triggers** to enforce server-side invariants (created timestamps, audit fields) — don't trust client-provided values.
 
 ### Operations design
@@ -872,7 +872,13 @@ const result = await client.databases.importCsv(databaseId, {
 - **Use parameterized filters**, not hardcoded values. Let callers pass IDs and filter criteria via `$params.*`.
 - **Set restrictive access by default.** Start with specific CEL expressions and widen as needed.
 - **Use projections** to limit response payloads — only return fields the client needs.
-- **Use pipelines** for dashboard-style views that need data from multiple models in one round-trip.
+- **Use pipelines** for dashboard-style views that need data from multiple models in one round-trip. Pipelines are read-only — for "read-then-mutate" flows, use a pipeline to read, then call a separate mutation operation.
+- **Record IDs are server-assigned.** The `save` operation always generates a new server-assigned ID, even if you pass `"id":"$params.id"` in the save data. To create singleton or well-known records, save the record and then look it up by a unique field value or use `limit: 1` queries rather than relying on a predetermined ID.
+
+### Security
+
+- **Treat `$params.*` as untrusted.** Operation parameters come directly from the calling client and can be set to any value. Never use `$params.*` for sensitive fields like roles, permissions, or status values that control authorization.
+- **Use server-derived values for sensitive fields.** Hardcode literal values in operation definitions (e.g., `"role": "teacher"`) and gate each operation with a CEL `access` expression. For example, instead of a single `createPost` operation with `"authorRole": "$params.authorRole"`, create separate `createTeacherPost` (with `"authorRole": "teacher"` and `access = "isMemberOf('class-teachers', ...)"`) and `createStudentPost` (with `"authorRole": "student"` and `access = "isMemberOf('class-students', ...)"`) operations. The CEL check ensures only the right users can call each operation, and the role is set server-side.
 
 For access control best practices (group-based access, per-parameter access, rule sets), see the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md).
 
@@ -886,6 +892,24 @@ For access control best practices (group-based access, per-parameter access, rul
 ## Common Patterns
 
 For team-based and group-based access patterns, see the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md). For architecture-level patterns (when to use databases vs. documents), see the [Data Modeling guide](AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.md).
+
+### Settings record pattern
+
+For mutable application settings (feature flags, visibility toggles, etc.), store them as a regular database record rather than in `database.metadata`. Use a pipeline to read the settings record and incorporate its values into subsequent query filters via `$steps.*`:
+
+**In `config/database-types/classroom.toml`:**
+
+```toml
+[[operations]]
+name = "listVisiblePosts"
+type = "pipeline"
+modelName = "_pipeline"
+access = "isMemberOf('class-students', database.id)"
+definition = '{"steps":[{"name":"settings","type":"query","modelName":"settings","filter":{"key":"class-settings"},"limit":1},{"name":"posts","type":"query","modelName":"posts","filter":{"$or":[{"authorId":"$user.userId"},{"$and":[{"peerVisible":"$steps.settings.first.peerVisible"},{"status":"approved"}]}]},"sort":{"createdAt":-1},"limit":50}],"return":"posts"}'
+params = '{}'
+```
+
+This pipeline first reads the settings record, then uses `$steps.settings.first.peerVisible` in the posts query filter. When `peerVisible` is `true`, the `$and` branch includes approved posts from all students. When the settings record doesn't have `peerVisible` set, the `$steps` reference is omitted from the filter (same omission behavior as `$params.*`), so students only see their own posts.
 
 ### User-scoped data via operations
 
