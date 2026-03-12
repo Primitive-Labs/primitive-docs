@@ -314,6 +314,38 @@ await client.logout();
 
 ---
 
+## Customizing Email Templates
+
+The emails Primitive sends for Magic Link and OTP authentication can be customized via the CLI:
+
+```bash
+# See available email types and their current status
+primitive email-templates list
+
+# View a template (shows subject, HTML/text body, and available variables)
+primitive email-templates get magic-link
+primitive email-templates get otp
+
+# See what variables are available in a template
+primitive email-templates variables magic-link
+
+# Override a template with custom content
+primitive email-templates set magic-link \
+  --subject "Sign in to MyApp" \
+  --html-file ./emails/magic-link.html \
+  --text-file ./emails/magic-link.txt
+
+# Send a test email to verify your template
+primitive email-templates test magic-link
+
+# Revert to the default template
+primitive email-templates delete magic-link
+```
+
+Email template overrides are also tracked as part of `primitive sync`, stored as TOML files in `email-templates/`. This lets you version-control your email customizations alongside other app configuration.
+
+---
+
 ## Implementation Checklist
 
 When implementing auth in a Primitive app:
@@ -324,3 +356,4 @@ When implementing auth in a Primitive app:
 4. **Listen to auth events** for state changes
 5. **Consider passkeys** for returning users
 6. **Handle errors gracefully** with user-friendly messages
+7. **Customize email templates** if the default magic-link/OTP emails need branding
