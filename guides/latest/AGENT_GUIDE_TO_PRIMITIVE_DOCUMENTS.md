@@ -59,7 +59,9 @@ await jsBaoClient.documents.open(documentId);
 const result = await MyModel.query({}, { documents: documentId });
 ```
 
-Documents are ready to be queried once the .open() call finishes. Applications should wait for all requried documents to be opened and show a loading state until all needed documents have been opened. Often it's handy to track this with an `isReady` ref.
+Documents are ready to be queried once the .open() call finishes. Applications should wait for all required documents to be opened and show a loading state until all needed documents have been opened. Often it's handy to track this with an `isReady` ref.
+
+**Note on `jsBaoDocumentStore.isReady`:** The template app provides `jsBaoDocumentStore` with an `isReady` property. This indicates that the **store itself** has finished initializing — it does NOT indicate that any particular document has been opened. You still need to track document-specific readiness separately (e.g., after calling `documents.open()`) before querying data in those documents.
 
 ### 2. Document List Access
 
@@ -503,7 +505,7 @@ const {
 
 ## Saving Data
 
-### Save to a Specific Document (when creating new obje)
+### Save to a Specific Document (when creating new objects)
 
 ```typescript
 const newItem = new TodoItem();
@@ -518,6 +520,21 @@ await newItem.save({ targetDocument: documentId });
 todo.completed = true;
 await todo.save();
 ```
+
+### Choosing How to Target Documents for Saves
+
+When saving new objects, you need to specify which document they go into. There are three ways to do this:
+
+1. **Pass `targetDocument` explicitly on each save** (preferred for most cases):
+   ```typescript
+   await item.save({ targetDocument: documentId });
+   ```
+
+2. **`setDefaultDocumentId(docId)`** — sets a default document for all subsequent saves that don't specify a `targetDocument`. Good when many consecutive saves go to the same document (e.g., during app initialization or a bulk import).
+
+3. **`addDocumentModelMapping(modelName, docId)`** — routes all saves of a specific model to a specific document. Good when a model *always* goes to the same document for the lifetime of the app session.
+
+**Anti-pattern: Frequently switching defaults.** If your app writes to different documents based on context (e.g., the user switches between workspaces, or items are routed to different documents based on their properties), do NOT repeatedly call `setDefaultDocumentId()` or update model-document mappings to redirect writes. This is fragile and error-prone — it creates implicit state that's easy to get out of sync. Instead, pass `targetDocument` explicitly on each `.save()` call. Reserve `setDefaultDocumentId` and `addDocumentModelMapping` for cases where the target doesn't change, or changes only rarely.
 
 ### Upsert by Unique Constraint
 
