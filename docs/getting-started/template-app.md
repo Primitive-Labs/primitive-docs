@@ -36,20 +36,9 @@ Visit `http://localhost:5173` to see your app running.
 - Built-in test harness for browser-based testing
 - Document debugger for inspecting your data
 
-## Set Up Git Repository (Optional)
+## Push to a Remote Repository (Optional)
 
-After creating your app, you may want to track it in Git and push to a remote repository.
-
-### Initialize Git
-
-```bash
-cd my-app
-git init
-git add .
-git commit -m "Initial commit from primitive-app template"
-```
-
-### Push to GitHub
+`create-primitive-app` automatically initializes a Git repository and creates an initial commit for you. To push to a remote like GitHub:
 
 1. Create a new repository on [GitHub](https://github.com/new) (don't initialize with README, .gitignore, or license)
 
