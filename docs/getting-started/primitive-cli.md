@@ -160,6 +160,7 @@ config/
   integrations/*.toml         # Integration configs
   prompts/*.toml              # Prompt configs
   workflows/*.toml            # Workflow definitions
+  email-templates/*.toml      # Email template overrides
 ```
 
 ## Advanced Features
@@ -193,6 +194,32 @@ primitive workflows list
 primitive workflows publish my-workflow
 primitive workflows runs list
 ```
+
+### Email Templates
+
+Customize the emails Primitive sends for authentication (magic links, OTP codes, etc.):
+
+```bash
+# List all email types and their override status
+primitive email-templates list
+
+# View the current template for an email type
+primitive email-templates get magic-link
+
+# Set a custom template (provide subject and/or body files)
+primitive email-templates set magic-link --subject "Sign in to MyApp" --html-file ./magic-link.html --text-file ./magic-link.txt
+
+# See available template variables for an email type
+primitive email-templates variables magic-link
+
+# Send a test email using the current template
+primitive email-templates test magic-link
+
+# Remove a custom override (revert to default)
+primitive email-templates delete magic-link
+```
+
+Email template types include `magic-link` and `otp`. Each type exposes template variables (e.g. `{{magicLinkUrl}}`, `{{otpCode}}`) that Primitive substitutes at send time. Use `primitive email-templates variables <type>` to see the full list.
 
 ### Analytics
 
