@@ -317,14 +317,18 @@ jobs:
           assignees: ${{ steps.context.outputs.pusher }}
 
       - name: Summary
+        env:
+          DOCS_UPDATED: ${{ steps.summary.outputs.docs_updated }}
+          SUBMODULE: ${{ steps.context.outputs.submodule }}
+          CLAUDE_SUMMARY: ${{ steps.summary.outputs.summary }}
         run: |
-          if [ "${{ steps.summary.outputs.docs_updated }}" = "true" ]; then
+          if [ "$DOCS_UPDATED" = "true" ]; then
             echo "## Documentation Updated" >> $GITHUB_STEP_SUMMARY
-            echo "A PR has been created with documentation updates for **${{ steps.context.outputs.submodule }}**." >> $GITHUB_STEP_SUMMARY
+            echo "A PR has been created with documentation updates for **$SUBMODULE**." >> $GITHUB_STEP_SUMMARY
           else
             echo "## No Documentation Changes Needed" >> $GITHUB_STEP_SUMMARY
-            echo "Claude determined that the changes in **${{ steps.context.outputs.submodule }}** did not require documentation updates." >> $GITHUB_STEP_SUMMARY
+            echo "Claude determined that the changes in **$SUBMODULE** did not require documentation updates." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### Summary" >> $GITHUB_STEP_SUMMARY
-            echo "${{ steps.summary.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
+            printf '%s\n' "$CLAUDE_SUMMARY" >> $GITHUB_STEP_SUMMARY
           fi
