@@ -806,7 +806,9 @@ await client.databases.grantPermission(databaseId, {
 await client.databases.transferOwnership(databaseId, "new-owner-id");
 ```
 
-**Common mistake:** Granting `manager` to users so they can read/write data. Instead, define registered operations with CEL access rules. See the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) for group-based access patterns.
+**Anti-pattern: Adding end users as managers.** It is almost never correct to add individual end users as managers of a database. The `manager` role bypasses CEL access gates entirely and grants administrative control over the database — it is not a way to give users access to data. The proper pattern is that only a small number of privileged accounts (the creator, perhaps one or two co-admins) have direct owner/manager access to a database, and **all other user access goes through registered operations** with CEL access expressions. If you find yourself writing a loop that grants `manager` to each user who needs to interact with a database, stop — define operations with appropriate `access` rules instead.
+
+See the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) for group-based access patterns.
 
 ## Schema Introspection
 
