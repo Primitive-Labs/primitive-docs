@@ -63,6 +63,18 @@ Documents are ready to be queried once the .open() call finishes. Applications s
 
 **Note on `jsBaoDocumentStore.isReady`:** The template app provides `jsBaoDocumentStore` with an `isReady` property. This indicates that the **store itself** has finished initializing — it does NOT indicate that any particular document has been opened. You still need to track document-specific readiness separately (e.g., after calling `documents.open()`) before querying data in those documents.
 
+**Document opening ownership and error handling:**
+
+- **Do not open documents in sub-components.** Open documents in the page/layout/store layer that owns route or session-level lifecycle. Pass readiness/data down to sub-components via props/composables.
+- **Handle open failures explicitly.** If `documents.open()` fails (permissions, missing document, network issues), surface an error state and/or redirect. Do not silently continue.
+- **Calling `open()` on an already open document is safe.** It is okay for higher-level lifecycle code to call `open()` defensively.
+
+**When in the Vue hierarchy to open documents:**
+
+- **Wait for authentication first.** Do not open documents before auth/user initialization completes (typically `userStore` readiness). Sequence: auth ready -> open required documents -> query data.
+- **Session-scoped documents:** Open at app/layout level after login when documents should stay open for most of the session. This is typically a small/medium bounded set (guideline: < 20). Use this when real-time updates are needed across pages, or data must be queried from multiple routes/components.
+- **Route-scoped documents:** Open on route entry when the document is only needed in that context (or document count can grow unbounded), and close on route leave. Show loading until `documents.open()` completes and, when using `useJsBaoDataLoader`, until `initialDataLoaded` is true.
+
 ### 2. Document List Access
 
 ```typescript
