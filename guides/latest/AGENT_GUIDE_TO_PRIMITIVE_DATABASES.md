@@ -63,8 +63,8 @@ name = "createTask"
 type = "mutation"
 modelName = "tasks"
 access = "isMemberOf('team', database.metadata.teamId)"
-definition = '{"operations":[{"op":"save","data":{"id":"$params.id","title":"$params.title","projectId":"$params.projectId","status":"open","createdBy":"$user.userId","createdAt":"$now"}}]}'
-params = '{"id":{"type":"string","required":true},"title":{"type":"string","required":true},"projectId":{"type":"string","required":true}}'
+definition = '{"operations":[{"op":"save","data":{"title":"$params.title","projectId":"$params.projectId","status":"open","createdBy":"$user.userId","createdAt":"$now"}}]}'
+params = '{"title":{"type":"string","required":true},"projectId":{"type":"string","required":true}}'
 ```
 
 Push configuration to the server:
@@ -88,9 +88,10 @@ const result = await client.databases.executeOperation(db.databaseId, "listTasks
   params: { projectId: "proj-1" },
 });
 
-await client.databases.executeOperation(db.databaseId, "createTask", {
-  params: { id: "task-1", title: "Ship v1", projectId: "proj-1" },
+const createResult = await client.databases.executeOperation(db.databaseId, "createTask", {
+  params: { title: "Ship v1", projectId: "proj-1" },
 });
+const taskId = createResult.results[0].id; // server-assigned ULID
 ```
 
 ## Configuring with the CLI
@@ -161,8 +162,8 @@ name = "createTask"
 type = "mutation"
 modelName = "tasks"
 access = "isMemberOf('team', database.metadata.teamId)"
-definition = '{"operations":[{"op":"save","data":{"id":"$params.id","title":"$params.title","projectId":"$params.projectId","status":"open","createdBy":"$user.userId","createdAt":"$now"}}]}'
-params = '{"id":{"type":"string","required":true},"title":{"type":"string","required":true},"projectId":{"type":"string","required":true}}'
+definition = '{"operations":[{"op":"save","data":{"title":"$params.title","projectId":"$params.projectId","status":"open","createdBy":"$user.userId","createdAt":"$now"}}]}'
+params = '{"title":{"type":"string","required":true},"projectId":{"type":"string","required":true}}'
 
 [[operations]]
 name = "countOpenTasks"
@@ -377,8 +378,8 @@ name = "createTask"
 type = "mutation"
 modelName = "tasks"
 access = "isMemberOf('team', database.metadata.teamId)"
-definition = '{"operations":[{"op":"save","data":{"id":"$params.id","title":"$params.title","status":"open","createdBy":"$user.userId","createdAt":"$now"}}]}'
-params = '{"id":{"type":"string","required":true},"title":{"type":"string","required":true}}'
+definition = '{"operations":[{"op":"save","data":{"title":"$params.title","status":"open","createdBy":"$user.userId","createdAt":"$now"}}]}'
+params = '{"title":{"type":"string","required":true}}'
 ```
 
 **Mutation operation types:**
@@ -515,8 +516,8 @@ Execute a mutation operation across many items in one call (up to 100,000):
 
 ```typescript
 const result = await client.databases.importBulk(databaseId, "createTask", [
-  { params: { id: "t-1", title: "Task 1", projectId: "proj-1" } },
-  { params: { id: "t-2", title: "Task 2", projectId: "proj-1" } },
+  { params: { title: "Task 1", projectId: "proj-1" } },
+  { params: { title: "Task 2", projectId: "proj-1" } },
 ]);
 // { imported: 2, failed: 0 }
 ```
@@ -875,7 +876,7 @@ const result = await client.databases.importCsv(databaseId, {
 - **Set restrictive access by default.** Start with specific CEL expressions and widen as needed.
 - **Use projections** to limit response payloads — only return fields the client needs.
 - **Use pipelines** for dashboard-style views that need data from multiple models in one round-trip. Pipelines are read-only — for "read-then-mutate" flows, use a pipeline to read, then call a separate mutation operation.
-- **Record IDs are server-assigned.** The `save` operation always generates a new server-assigned ID, even if you pass `"id":"$params.id"` in the save data. To create singleton or well-known records, save the record and then look it up by a unique field value or use `limit: 1` queries rather than relying on a predetermined ID.
+- **Anti-pattern: Passing explicit IDs in save operations.** The server ignores any `id` field in save data and always assigns a server-generated ULID. Do not include `"id":"$params.id"` in mutation definitions — it will be silently discarded. Instead, read the server-assigned ID from the mutation response (`results[].id`) and use that for subsequent record linking, references, or client-side state. To find specific records later, query by unique field values or use `limit: 1` queries rather than relying on a predetermined ID.
 
 ### Security
 
@@ -932,8 +933,8 @@ name = "createItem"
 type = "mutation"
 modelName = "items"
 access = "true"
-definition = '{"operations":[{"op":"save","data":{"id":"$params.id","title":"$params.title","ownerId":"$user.userId","createdAt":"$now"}}]}'
-params = '{"id":{"type":"string","required":true},"title":{"type":"string","required":true}}'
+definition = '{"operations":[{"op":"save","data":{"title":"$params.title","ownerId":"$user.userId","createdAt":"$now"}}]}'
+params = '{"title":{"type":"string","required":true}}'
 ```
 
 **In app code:**
@@ -942,10 +943,11 @@ params = '{"id":{"type":"string","required":true},"title":{"type":"string","requ
 // Each user only sees their own items
 const result = await client.databases.executeOperation(dbId, "myItems", {});
 
-// Creates an item owned by the calling user (server sets ownerId)
-await client.databases.executeOperation(dbId, "createItem", {
-  params: { id: "item-1", title: "My Item" },
+// Creates an item owned by the calling user (server sets ownerId and assigns ID)
+const createResult = await client.databases.executeOperation(dbId, "createItem", {
+  params: { title: "My Item" },
 });
+const itemId = createResult.results[0].id; // server-assigned ULID
 ```
 
 ## Reserved Field Names
@@ -962,4 +964,5 @@ Any field starting with `_` (underscore) is reserved for internal use. The inter
 | 400 on operation registration | Invalid CEL expression or missing required fields | Validate CEL syntax; ensure `name`, `type`, `modelName`, `access`, `definition` are provided |
 | Empty results from query | Missing index on filtered field | Register indexes on fields used in filters |
 | `$params.x` not substituted | Parameter not declared in `params` | Add the parameter to the operation's `params` schema |
+| Passed `id` in save data ignored | Server always assigns a ULID — explicit IDs in save operations are discarded | Remove `id` from save data; read the server-assigned ID from the mutation response (`results[].id`) |
 | Records not found after save | Querying wrong `modelName` | Model names are case-sensitive collection identifiers |
