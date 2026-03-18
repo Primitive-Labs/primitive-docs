@@ -553,6 +553,94 @@ const thisMonth = await Task.query({
 });
 ```
 
+## Loading Related Data
+
+Use `include` in query options to load related records alongside your results. Related records are attached to each result under `._related`.
+
+### refersTo — Scalar foreign key
+
+Load a single related record via a FK field on the source:
+
+```typescript
+// Schema: Comment has an `authorId` field pointing to a User
+const comments = await Comment.query({}, {
+  include: [{
+    model: "users",
+    type: "refersTo",
+    sourceField: "authorId",  // FK field on Comment
+    as: "author",             // key in _related (optional)
+    projection: { name: 1 }, // only load specific fields (optional)
+  }],
+});
+// comments[0]._related.author = { id, name }
+```
+
+### hasMany — Reverse foreign key
+
+Load multiple related records that reference this record:
+
+```typescript
+// Schema: Comment has a `taskId` field pointing back to Task
+const tasks = await Task.query({}, {
+  include: [{
+    model: "comments",
+    type: "hasMany",
+    foreignKey: "taskId",    // FK field on Comment pointing to Task
+    as: "comments",
+    limit: 10,               // cap per parent (optional)
+    sort: { createdAt: -1 }, // sort order (optional)
+  }],
+});
+// tasks[0]._related.comments = [{ id, text, ... }, ...]
+```
+
+### refersToMany — StringSet of IDs
+
+Load multiple related records referenced by a StringSet field:
+
+```typescript
+// Schema: Article has a `tagIds` StringSet field containing Tag IDs
+const articles = await Article.query({}, {
+  include: [{
+    model: "tags",
+    type: "refersToMany",
+    sourceField: "tagIds",   // StringSet field on Article
+    as: "tags",
+    projection: { name: 1 },
+  }],
+});
+// articles[0]._related.tags = [{ id, name }, ...]
+```
+
+### Combining multiple includes
+
+```typescript
+const posts = await Post.query({}, {
+  include: [
+    {
+      model: "users",
+      type: "refersTo",
+      sourceField: "authorId",
+      as: "author",
+    },
+    {
+      model: "comments",
+      type: "hasMany",
+      foreignKey: "postId",
+      as: "comments",
+      sort: { createdAt: -1 },
+      limit: 5,
+    },
+    {
+      model: "tags",
+      type: "refersToMany",
+      sourceField: "tagIds",
+      as: "tags",
+    },
+  ],
+});
+```
+
 ## Aggregations
 
 Perform calculations across your data:

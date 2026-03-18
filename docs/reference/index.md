@@ -43,6 +43,7 @@ Generated reference documentation for each project.
   - [DumpSummary](/reference/js-bao/api/interfaces/DumpSummary)
   - [DumpSummaryEntry](/reference/js-bao/api/interfaces/DumpSummaryEntry)
   - [FieldOptions](/reference/js-bao/api/interfaces/FieldOptions)
+  - [IncludeSpec](/reference/js-bao/api/interfaces/IncludeSpec)
   - [InitJsBaoOptions](/reference/js-bao/api/interfaces/InitJsBaoOptions)
   - [InitJsBaoResult](/reference/js-bao/api/interfaces/InitJsBaoResult)
   - [ModelOptions](/reference/js-bao/api/interfaces/ModelOptions)

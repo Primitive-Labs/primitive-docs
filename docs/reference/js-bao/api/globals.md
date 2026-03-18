@@ -30,6 +30,7 @@
 - [DumpSummary](interfaces/DumpSummary.md)
 - [DumpSummaryEntry](interfaces/DumpSummaryEntry.md)
 - [FieldOptions](interfaces/FieldOptions.md)
+- [IncludeSpec](interfaces/IncludeSpec.md)
 - [InitJsBaoOptions](interfaces/InitJsBaoOptions.md)
 - [InitJsBaoResult](interfaces/InitJsBaoResult.md)
 - [ModelOptions](interfaces/ModelOptions.md)
