@@ -345,6 +345,26 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/ClaimApplyResult"
                 },
                 {
+                  "text": "CollectionAccessInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CollectionAccessInfo"
+                },
+                {
+                  "text": "CollectionDocumentInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CollectionDocumentInfo"
+                },
+                {
+                  "text": "CollectionGroupPermissionInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CollectionGroupPermissionInfo"
+                },
+                {
+                  "text": "CollectionInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CollectionInfo"
+                },
+                {
+                  "text": "CollectionMemberInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CollectionMemberInfo"
+                },
+                {
                   "text": "ConfirmApplyOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/ConfirmApplyOptions"
                 },
@@ -353,12 +373,44 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/ConfirmApplyResult"
                 },
                 {
+                  "text": "CsvImportOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CsvImportOptions"
+                },
+                {
+                  "text": "CsvImportProgress",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CsvImportProgress"
+                },
+                {
+                  "text": "CsvImportResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CsvImportResult"
+                },
+                {
                   "text": "DatabaseConfig",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseConfig"
                 },
                 {
+                  "text": "DatabaseInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseInfo"
+                },
+                {
+                  "text": "DatabaseOperationInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseOperationInfo"
+                },
+                {
+                  "text": "DatabaseOwnershipTransferResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseOwnershipTransferResult"
+                },
+                {
+                  "text": "DatabasePermissionEntry",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabasePermissionEntry"
+                },
+                {
                   "text": "DocumentAccessResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DocumentAccessResult"
+                },
+                {
+                  "text": "DocumentCollectionInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentCollectionInfo"
                 },
                 {
                   "text": "DocumentCreateCommitFailedEvent",
@@ -367,6 +419,10 @@
                 {
                   "text": "DocumentEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DocumentEvent"
+                },
+                {
+                  "text": "DocumentGroupPermissionEntry",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentGroupPermissionEntry"
                 },
                 {
                   "text": "DocumentInfo",
@@ -425,6 +481,26 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/GetWorkflowStatusOptions"
                 },
                 {
+                  "text": "GroupDocumentInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GroupDocumentInfo"
+                },
+                {
+                  "text": "GroupInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GroupInfo"
+                },
+                {
+                  "text": "GroupMemberInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GroupMemberInfo"
+                },
+                {
+                  "text": "GroupMembershipInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GroupMembershipInfo"
+                },
+                {
+                  "text": "GroupTypeConfigInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GroupTypeConfigInfo"
+                },
+                {
                   "text": "IntegrationCallRequest",
                   "link": "/reference/js-bao-wss-client/api/interfaces/IntegrationCallRequest"
                 },
@@ -467,6 +543,10 @@
                 {
                   "text": "MeUpdateFailedEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/MeUpdateFailedEvent"
+                },
+                {
+                  "text": "ModelRulesInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ModelRulesInfo"
                 },
                 {
                   "text": "NetworkModeEvent",
@@ -529,6 +609,22 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/ReleaseApplyResult"
                 },
                 {
+                  "text": "RuleSetDebugResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/RuleSetDebugResult"
+                },
+                {
+                  "text": "RuleSetInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/RuleSetInfo"
+                },
+                {
+                  "text": "RuleSetSchema",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/RuleSetSchema"
+                },
+                {
+                  "text": "RuleSetTestResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/RuleSetTestResult"
+                },
+                {
                   "text": "SessionInfo",
                   "link": "/reference/js-bao-wss-client/api/interfaces/SessionInfo"
                 },
@@ -551,6 +647,14 @@
                 {
                   "text": "TerminateWorkflowOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/TerminateWorkflowOptions"
+                },
+                {
+                  "text": "TraceEntry",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/TraceEntry"
+                },
+                {
+                  "text": "TriggerDefInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/TriggerDefInfo"
                 },
                 {
                   "text": "UserProfile",
@@ -596,6 +700,10 @@
                 {
                   "text": "AuthCode",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/AuthCode"
+                },
+                {
+                  "text": "DoDb",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/DoDb"
                 },
                 {
                   "text": "GeminiContentPart",

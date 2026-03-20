@@ -132,9 +132,9 @@
 
 ***
 
-### models
+### models?
 
-> **models**: [`TypedModelConstructor`](../type-aliases/TypedModelConstructor.md)\<`any`\>[]
+> `optional` **models**: [`TypedModelConstructor`](../type-aliases/TypedModelConstructor.md)\<`any`\>[]
 
 ***
 
