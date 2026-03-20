@@ -442,6 +442,78 @@ const activeCount = await Task.count({ completed: false });
 const totalCount = await Task.count({});
 ```
 
+### Loading Related Data (Includes)
+
+Use `include` in query options to load related records alongside results. Related records are attached under `._related` on each result object.
+
+**Include types:**
+
+| Type | Relationship | FK location |
+|------|-------------|-------------|
+| `refersTo` | One related record | FK field on source model |
+| `hasMany` | Multiple related records | FK field on target model pointing back |
+| `refersToMany` | Multiple related records | StringSet field on source model |
+
+```typescript
+// refersTo: Post has an authorId pointing to a User
+const posts = await Post.query({}, {
+  include: [{
+    model: "users",
+    type: "refersTo",
+    sourceField: "authorId",  // FK field on Post
+    as: "author",             // key in _related (defaults to model name)
+    projection: { name: 1 }, // optional field subset
+  }],
+});
+// posts[0]._related.author = { id, name }
+
+// hasMany: Comment has a postId field pointing back to Post
+const posts = await Post.query({}, {
+  include: [{
+    model: "comments",
+    type: "hasMany",
+    foreignKey: "postId",    // FK on Comment pointing to Post
+    as: "comments",
+    sort: { createdAt: -1 },
+    limit: 10,               // per-parent cap
+    filter: { status: "approved" }, // optional filter on related records
+  }],
+});
+// posts[0]._related.comments = [{ id, text, ... }]
+
+// refersToMany: Post has a tagIds StringSet field containing Tag IDs
+const posts = await Post.query({}, {
+  include: [{
+    model: "tags",
+    type: "refersToMany",
+    sourceField: "tagIds",   // StringSet field on Post
+    as: "tags",
+  }],
+});
+// posts[0]._related.tags = [{ id, name }, ...]
+```
+
+Includes can be nested (up to 3 levels deep) by adding an `include` array to an include spec:
+
+```typescript
+const articles = await Article.query({}, {
+  include: [{
+    model: "comments",
+    type: "hasMany",
+    foreignKey: "articleId",
+    as: "comments",
+    include: [{
+      model: "users",
+      type: "refersTo",
+      sourceField: "authorId",
+      as: "author",
+      projection: { name: 1 },
+    }],
+  }],
+});
+// articles[0]._related.comments[0]._related.author = { id, name }
+```
+
 ### Aggregations
 
 Group and calculate statistics:

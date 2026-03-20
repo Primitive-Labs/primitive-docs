@@ -158,6 +158,10 @@
                   "link": "/reference/js-bao/api/interfaces/FieldOptions"
                 },
                 {
+                  "text": "IncludeSpec",
+                  "link": "/reference/js-bao/api/interfaces/IncludeSpec"
+                },
+                {
                   "text": "InitJsBaoOptions",
                   "link": "/reference/js-bao/api/interfaces/InitJsBaoOptions"
                 },

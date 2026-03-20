@@ -20,6 +20,12 @@
 
 ***
 
+### include?
+
+> `optional` **include**: [`IncludeSpec`](IncludeSpec.md)[]
+
+***
+
 ### limit?
 
 > `optional` **limit**: `number`

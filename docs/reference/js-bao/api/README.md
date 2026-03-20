@@ -852,6 +852,154 @@ const productSummary = await Product.query(
 // Returns: [{ id: "...", name: "...", price: ... }, ...]
 ```
 
+### Includes (Related Data)
+
+Load related records alongside query results using `include`. Each include spec tells the engine how to resolve a relationship between models.
+
+**Include types:**
+
+| Type | Relationship | Example |
+|------|-------------|---------|
+| `refersTo` | Record has a FK field pointing to one target | Order → Customer |
+| `hasMany` | Target records have a FK field pointing back to this record | Customer → Orders |
+| `refersToMany` | Record has a StringSet field containing multiple target IDs | Post → Tags |
+
+#### refersTo — Scalar foreign key
+
+Load a single related record via a foreign key field on the source.
+
+```typescript
+// Schema: Order has a `customerId` field
+const orders = await Order.query({}, {
+  include: [{
+    model: "customers",
+    type: "refersTo",
+    sourceField: "customerId",  // FK field on Order
+    as: "customer",             // result key (optional, defaults to model name)
+    projection: { name: 1 },   // only load specific fields
+  }],
+});
+// Each order gets: order._related.customer = { id, name }
+```
+
+#### hasMany — Reverse foreign key
+
+Load multiple related records that reference this record.
+
+```typescript
+// Schema: Comment has an `articleId` field pointing to Article
+const articles = await Article.query({}, {
+  include: [{
+    model: "comments",
+    type: "hasMany",
+    foreignKey: "articleId",    // FK field on Comment pointing back
+    as: "comments",
+    limit: 10,                 // cap per parent
+    sort: { createdAt: -1 },   // newest first
+  }],
+});
+// Each article gets: article._related.comments = [{ id, text, ... }, ...]
+```
+
+#### refersToMany — StringSet of IDs
+
+Load multiple related records referenced by a StringSet field.
+
+```typescript
+// Schema: Post has a `tagIds` StringSet field containing Tag IDs
+const posts = await Post.query({}, {
+  include: [{
+    model: "tags",
+    type: "refersToMany",
+    sourceField: "tagIds",     // StringSet field on Post
+    as: "tags",
+    projection: { name: 1 },
+  }],
+});
+// Each post gets: post._related.tags = [{ id, name }, ...]
+```
+
+#### End-to-end example: write and query
+
+```typescript
+// 1. Create tags
+const techTag = await Tag.create({ id: generateULID(), name: "Tech" });
+const newsTag = await Tag.create({ id: generateULID(), name: "News" });
+
+// 2. Create a post with references to tags via StringSet
+const post = await Post.create({ id: generateULID(), title: "Hello World" });
+await Post.addToSet(post.id, { tagIds: [techTag.id, newsTag.id] });
+
+// 3. Create a comment referencing the post
+await Comment.create({
+  id: generateULID(),
+  postId: post.id,
+  text: "Great post!",
+});
+
+// 4. Query posts with all related data in one call
+const results = await Post.query({}, {
+  include: [
+    {
+      model: "tags",
+      type: "refersToMany",
+      sourceField: "tagIds",
+      as: "tags",
+    },
+    {
+      model: "comments",
+      type: "hasMany",
+      foreignKey: "postId",
+      as: "comments",
+      sort: { createdAt: -1 },
+    },
+  ],
+});
+
+// Result:
+// results.data[0]._related.tags = [{ id: "...", name: "Tech" }, { id: "...", name: "News" }]
+// results.data[0]._related.comments = [{ id: "...", postId: "...", text: "Great post!" }]
+```
+
+#### Nested includes
+
+Includes can be nested to load relationships on related records:
+
+```typescript
+const articles = await Article.query({}, {
+  include: [{
+    model: "comments",
+    type: "hasMany",
+    foreignKey: "articleId",
+    as: "comments",
+    include: [{
+      model: "users",
+      type: "refersTo",
+      sourceField: "authorId",
+      as: "author",
+      projection: { name: 1 },
+    }],
+  }],
+});
+// article._related.comments[0]._related.author = { id, name }
+```
+
+#### Filtering included records
+
+Apply filters to narrow which related records are loaded:
+
+```typescript
+const posts = await Post.query({}, {
+  include: [{
+    model: "comments",
+    type: "hasMany",
+    foreignKey: "postId",
+    filter: { status: "approved" },  // only approved comments
+    as: "comments",
+  }],
+});
+```
+
 ### Single Document Queries
 
 ```typescript
@@ -1232,6 +1380,32 @@ await connectDocument("main-doc", doc, "read-write");
 const user = new User({ name: "John Doe", email: "john@example.com" });
 await user.save({ targetDocument: "main-doc" });
 ```
+
+## Client-Only Import (`js-bao/client`)
+
+If you only need the HTTP client engine (e.g., for browser apps, React/Vue frontends, or Node.js clients that talk to a DO backend over HTTP), use `js-bao/client` instead of `js-bao/cloudflare`. This avoids pulling in server-side Durable Object code and its dependencies.
+
+```typescript
+import { connectDoDb } from "js-bao/client";
+
+const db = connectDoDb({
+  endpoint: "https://my-app.workers.dev",
+  id: "my-document",
+});
+
+// Save a record (schemaless)
+await db.engine.saveModel("todos", "todo-1", { title: "Buy milk", done: false });
+
+// Query records
+const result = await db.engine.queryModel("todos", { done: false });
+console.log(result.data);
+```
+
+**When to use `js-bao/client`:** Browser apps, frontend builds, Node.js HTTP clients — any context where you don't need `createDatabaseDO` or `initJsBaoDO` server setup.
+
+**When to use `js-bao/cloudflare`:** When building the Cloudflare Worker that hosts the Durable Object.
+
+Key exports: `connectDoDb`, `DOClientEngine`, and types (`DoDb`, `DocumentFilter`, `QueryOptions`, `PaginatedResult`, `AggregationOptions`, etc.). This import has no dependencies on Cloudflare Workers APIs, better-sqlite3, sql.js, or Yjs — it's pure fetch-based HTTP.
 
 ## Database Configuration
 
