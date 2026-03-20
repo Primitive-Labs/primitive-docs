@@ -51,6 +51,18 @@ Provides a hierarchical API for:
 
 ***
 
+### collections
+
+> **collections**: `CollectionsAPI`
+
+***
+
+### databases
+
+> **databases**: `DatabasesAPI`
+
+***
+
 ### documents
 
 > **documents**: `DocumentsAPI`
@@ -60,6 +72,18 @@ Provides a hierarchical API for:
 ### gemini
 
 > **gemini**: `GeminiAPI`
+
+***
+
+### groups
+
+> **groups**: `GroupsAPI`
+
+***
+
+### groupTypeConfigs
+
+> **groupTypeConfigs**: `GroupTypeConfigsAPI`
 
 ***
 
@@ -84,6 +108,12 @@ Provides a hierarchical API for:
 ### prompts
 
 > **prompts**: [`PromptsAPI`](../interfaces/PromptsAPI.md)
+
+***
+
+### ruleSets
+
+> **ruleSets**: `RuleSetsAPI`
 
 ***
 
@@ -264,6 +294,10 @@ Provides a hierarchical API for:
 ###### localOnly?
 
 `boolean`
+
+###### tags?
+
+`string`[]
 
 ###### title?
 
@@ -1398,6 +1432,10 @@ Logout: best-effort server cookie clear, shutdown networking, clear auth state, 
 `boolean`
 
 ###### enableNetworkSync?
+
+`boolean`
+
+###### requestSyncPerf?
 
 `boolean`
 

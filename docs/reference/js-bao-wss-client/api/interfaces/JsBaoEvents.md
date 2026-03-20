@@ -242,6 +242,28 @@
 
 ***
 
+### syncPerf
+
+> **syncPerf**: `object`
+
+#### clientTimings?
+
+> `optional` **clientTimings**: `Record`\<`string`, `any`\>
+
+#### documentId
+
+> **documentId**: `string`
+
+#### timings
+
+> **timings**: `Record`\<`string`, `any`\>
+
+#### type
+
+> **type**: `"syncPerf"`
+
+***
+
 ### workflowStarted
 
 > **workflowStarted**: [`WorkflowStartedEvent`](WorkflowStartedEvent.md)

@@ -23,12 +23,26 @@
 - [CacheFacade](interfaces/CacheFacade.md)
 - [ClaimApplyOptions](interfaces/ClaimApplyOptions.md)
 - [ClaimApplyResult](interfaces/ClaimApplyResult.md)
+- [CollectionAccessInfo](interfaces/CollectionAccessInfo.md)
+- [CollectionDocumentInfo](interfaces/CollectionDocumentInfo.md)
+- [CollectionGroupPermissionInfo](interfaces/CollectionGroupPermissionInfo.md)
+- [CollectionInfo](interfaces/CollectionInfo.md)
+- [CollectionMemberInfo](interfaces/CollectionMemberInfo.md)
 - [ConfirmApplyOptions](interfaces/ConfirmApplyOptions.md)
 - [ConfirmApplyResult](interfaces/ConfirmApplyResult.md)
+- [CsvImportOptions](interfaces/CsvImportOptions.md)
+- [CsvImportProgress](interfaces/CsvImportProgress.md)
+- [CsvImportResult](interfaces/CsvImportResult.md)
 - [DatabaseConfig](interfaces/DatabaseConfig.md)
+- [DatabaseInfo](interfaces/DatabaseInfo.md)
+- [DatabaseOperationInfo](interfaces/DatabaseOperationInfo.md)
+- [DatabaseOwnershipTransferResult](interfaces/DatabaseOwnershipTransferResult.md)
+- [DatabasePermissionEntry](interfaces/DatabasePermissionEntry.md)
 - [DocumentAccessResult](interfaces/DocumentAccessResult.md)
+- [DocumentCollectionInfo](interfaces/DocumentCollectionInfo.md)
 - [DocumentCreateCommitFailedEvent](interfaces/DocumentCreateCommitFailedEvent.md)
 - [DocumentEvent](interfaces/DocumentEvent.md)
+- [DocumentGroupPermissionEntry](interfaces/DocumentGroupPermissionEntry.md)
 - [DocumentInfo](interfaces/DocumentInfo.md)
 - [DocumentInvitation](interfaces/DocumentInvitation.md)
 - [DocumentInvitationResponse](interfaces/DocumentInvitationResponse.md)
@@ -43,6 +57,11 @@
 - [GeminiPromptOptions](interfaces/GeminiPromptOptions.md)
 - [GeminiStructuredOutput](interfaces/GeminiStructuredOutput.md)
 - [GetWorkflowStatusOptions](interfaces/GetWorkflowStatusOptions.md)
+- [GroupDocumentInfo](interfaces/GroupDocumentInfo.md)
+- [GroupInfo](interfaces/GroupInfo.md)
+- [GroupMemberInfo](interfaces/GroupMemberInfo.md)
+- [GroupMembershipInfo](interfaces/GroupMembershipInfo.md)
+- [GroupTypeConfigInfo](interfaces/GroupTypeConfigInfo.md)
 - [IntegrationCallRequest](interfaces/IntegrationCallRequest.md)
 - [IntegrationCallResponse](interfaces/IntegrationCallResponse.md)
 - [IntegrationsAPI](interfaces/IntegrationsAPI.md)
@@ -54,6 +73,7 @@
 - [LlmChatOptions](interfaces/LlmChatOptions.md)
 - [MeUpdatedEvent](interfaces/MeUpdatedEvent.md)
 - [MeUpdateFailedEvent](interfaces/MeUpdateFailedEvent.md)
+- [ModelRulesInfo](interfaces/ModelRulesInfo.md)
 - [NetworkModeEvent](interfaces/NetworkModeEvent.md)
 - [OfflineAuthEnabledEvent](interfaces/OfflineAuthEnabledEvent.md)
 - [OfflineAuthExpiringSoonEvent](interfaces/OfflineAuthExpiringSoonEvent.md)
@@ -69,12 +89,18 @@
 - [ReasoningOptions](interfaces/ReasoningOptions.md)
 - [ReleaseApplyOptions](interfaces/ReleaseApplyOptions.md)
 - [ReleaseApplyResult](interfaces/ReleaseApplyResult.md)
+- [RuleSetDebugResult](interfaces/RuleSetDebugResult.md)
+- [RuleSetInfo](interfaces/RuleSetInfo.md)
+- [RuleSetSchema](interfaces/RuleSetSchema.md)
+- [RuleSetTestResult](interfaces/RuleSetTestResult.md)
 - [SessionInfo](interfaces/SessionInfo.md)
 - [StartWorkflowOptions](interfaces/StartWorkflowOptions.md)
 - [StartWorkflowResult](interfaces/StartWorkflowResult.md)
 - [StatusChangedEvent](interfaces/StatusChangedEvent.md)
 - [StorageProvider](interfaces/StorageProvider.md)
 - [TerminateWorkflowOptions](interfaces/TerminateWorkflowOptions.md)
+- [TraceEntry](interfaces/TraceEntry.md)
+- [TriggerDefInfo](interfaces/TriggerDefInfo.md)
 - [UserProfile](interfaces/UserProfile.md)
 - [WorkflowDefineOptions](interfaces/WorkflowDefineOptions.md)
 - [WorkflowRun](interfaces/WorkflowRun.md)
@@ -88,6 +114,7 @@
 ## Type Aliases
 
 - [AuthCode](type-aliases/AuthCode.md)
+- [DoDb](type-aliases/DoDb.md)
 - [GeminiContentPart](type-aliases/GeminiContentPart.md)
 - [GeminiGenerateOptions](type-aliases/GeminiGenerateOptions.md)
 - [GeminiRole](type-aliases/GeminiRole.md)
@@ -109,3 +136,21 @@
 - [initializeClient](functions/initializeClient.md)
 - [initJsBao](functions/initJsBao.md)
 - [isJsBaoError](functions/isJsBaoError.md)
+
+## References
+
+### DOClientEngine
+
+Renames and re-exports [DoDb](type-aliases/DoDb.md)
+
+***
+
+### ModelFieldInfo
+
+Renames and re-exports [DoDb](type-aliases/DoDb.md)
+
+***
+
+### ModelIdentifier
+
+Renames and re-exports [DoDb](type-aliases/DoDb.md)

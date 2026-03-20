@@ -121,21 +121,13 @@ Each user gets exactly one document that holds all their data. The document is o
 
 ```typescript
 // On app initialization after user is authenticated
-// Use aliases for atomic get-or-create of a unique default document
-const aliasParams = { scope: "user" as const, aliasKey: "default-doc" };
-
-try {
-  // Try to open by alias (common case - document already exists)
-  await jsBaoClient.documents.openAlias(aliasParams);
-} catch {
-  // Alias doesn't exist - create document with alias atomically
-  // Server prevents duplicates if another client creates simultaneously
-  const result = await jsBaoClient.documents.createWithAlias({
-    title: "My Data",
-    alias: aliasParams,
-  });
-  await jsBaoClient.documents.open(result.documentId);
-}
+// Use getOrCreateWithAlias for idempotent initialization — no try/catch needed
+const result = await jsBaoClient.documents.getOrCreateWithAlias({
+  title: "My Data",
+  alias: { scope: "user", aliasKey: "default-doc" },
+});
+// result.created === true if a new document was just created
+await jsBaoClient.documents.open(result.documentId);
 ```
 
 ### Pattern 2: One Document at a Time (Workspaces)
@@ -603,19 +595,12 @@ For documents that should exist exactly once (default document, settings), use d
 
 ```typescript
 // Atomic get-or-create using aliases
-const aliasParams = { scope: "user" as const, aliasKey: "user-preferences" };
-
-try {
-  // Try to open by alias (common case - document already exists)
-  await jsBaoClient.documents.openAlias(aliasParams);
-} catch {
-  // Alias doesn't exist - create document with alias atomically
-  const result = await jsBaoClient.documents.createWithAlias({
-    title: "My Preferences",
-    alias: aliasParams,
-  });
-  await jsBaoClient.documents.open(result.documentId);
-}
+const result = await jsBaoClient.documents.getOrCreateWithAlias({
+  title: "My Preferences",
+  alias: { scope: "user", aliasKey: "user-preferences" },
+});
+// result.created === true if a new document was just created
+await jsBaoClient.documents.open(result.documentId);
 ```
 
 **Alias scopes:**
@@ -626,12 +611,11 @@ try {
 **Alias API methods:**
 
 - `documents.openAlias(params)` - Open document by alias (throws if not found)
-- `documents.createWithAlias(options)` - Create document with alias atomically
+- `documents.createWithAlias(options)` - Create document with alias atomically (fails if alias already exists)
+- `documents.getOrCreateWithAlias(options)` - Get existing document by alias, or create a new one if not found. Returns `{ documentId, created: boolean, ... }`. Use this for idempotent initialization.
 - `documents.aliases.resolve(params)` - Get alias info (returns null if not found)
 - `documents.aliases.set(params)` - Set an alias for an existing document
 - `documents.aliases.delete(params)` - Remove an alias
-- `documents.createWithAlias(options)` - Create document with alias atomically
-- `documents.openAlias(params)` - Open document by alias directly
 
 ## Sharing Documents
 

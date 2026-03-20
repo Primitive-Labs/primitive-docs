@@ -220,3 +220,32 @@ Put a value into a store.
 #### Returns
 
 `Promise`\<`void`\>
+
+***
+
+### putBatch()?
+
+> `optional` **putBatch**\<`T`\>(`store`, `records`): `Promise`\<`void`\>
+
+Put multiple values into a store in a single transaction.
+Reduces IDB transaction pressure compared to calling put() N times.
+
+#### Type Parameters
+
+##### T
+
+`T` = `unknown`
+
+#### Parameters
+
+##### store
+
+`string`
+
+##### records
+
+`object`[]
+
+#### Returns
+
+`Promise`\<`void`\>

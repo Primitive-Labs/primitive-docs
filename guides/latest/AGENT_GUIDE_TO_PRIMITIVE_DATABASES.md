@@ -239,12 +239,20 @@ primitive database-types operations get project listTasks
 # Database instances
 primitive databases list
 primitive databases create "My DB" --type project
+primitive databases create "My DB" --type project --metadata '{"teamId":"team-1"}'
 primitive databases get <database-id>
 primitive databases delete <database-id>
 
 # Database operations
 primitive databases operations list <database-id>
 primitive databases metadata update <database-id> --metadata '{"teamId":"team-1"}'
+
+# Record introspection and querying (admin only)
+primitive databases records models <database-id>
+primitive databases records describe <database-id> <model-name>
+primitive databases records query <database-id> <model-name> --filter '{"status":"open"}'
+primitive databases records query <database-id> <model-name> --filter-file ./filter.json
+primitive databases records query <database-id> <model-name> --filter-file ./filter.toml
 ```
 
 ## Database Types

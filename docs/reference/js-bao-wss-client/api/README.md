@@ -2381,6 +2381,132 @@ const result = await client.workflows.start({ workflowKey: "my-workflow", input:
 const output = await waitForCompletion(client, "my-workflow", result.runKey);
 ```
 
+## Online Databases
+
+Online databases provide schemaless record storage with user permissions, groups, and group-based access control. All database operations are accessed through `client.databases`.
+
+### Database Management
+
+```typescript
+// Create a database
+const db = await client.databases.create({ title: "My Database" });
+console.log(db.databaseId, db.title);
+
+// List databases accessible to the current user
+const databases = await client.databases.list();
+
+// Get database details
+const info = await client.databases.get(databaseId);
+
+// Delete a database (owner only)
+await client.databases.delete(databaseId);
+```
+
+### Connecting to a Database (Record Engine)
+
+Use `connect()` to get a `DoDb` record engine instance for reading and writing records:
+
+```typescript
+const db = client.databases.connect(databaseId);
+
+// Insert a record
+const record = await db.insert("contacts", { name: "Alice", email: "alice@example.com" });
+
+// Query records
+const contacts = await db.query("contacts");
+
+// Update a record
+await db.update("contacts", record.id, { email: "new@example.com" });
+
+// Delete a record
+await db.delete("contacts", record.id);
+```
+
+### Permissions
+
+Control per-user access to databases. Permission levels: `owner`, `read-write`, `reader`.
+
+```typescript
+// List permissions on a database
+const perms = await client.databases.listPermissions(databaseId);
+
+// Grant a user permission
+await client.databases.grantPermission(databaseId, {
+  userId: "user-123",
+  permission: "read-write",
+});
+
+// Revoke a user's permission
+await client.databases.revokePermission(databaseId, "user-123");
+```
+
+### Groups
+
+Groups allow batch permission grants. A group has a `groupType` and `groupId`.
+
+```typescript
+// Create a group
+const group = await client.groups.create({
+  groupType: "team",
+  groupId: "engineering",
+  name: "Engineering Team",
+  description: "All engineers",
+});
+
+// List groups
+const groups = await client.groups.list();
+const teams = await client.groups.list({ type: "team" });
+
+// Get, update, delete
+const g = await client.groups.get("team", "engineering");
+await client.groups.update("team", "engineering", { name: "Eng Team" });
+await client.groups.delete("team", "engineering");
+```
+
+### Group Members
+
+```typescript
+// Add a member by userId
+await client.groups.addMember("team", "engineering", { userId: "user-123" });
+
+// Add a member by email
+await client.groups.addMember("team", "engineering", { email: "alice@example.com" });
+
+// List members
+const members = await client.groups.listMembers("team", "engineering");
+
+// Update role
+await client.groups.updateMemberRole("team", "engineering", "user-123", { role: "admin" });
+
+// Remove member by userId
+await client.groups.removeMember("team", "engineering", "user-123");
+
+// Remove member by email
+await client.groups.removeMember("team", "engineering", { email: "alice@example.com" });
+
+// List a user's group memberships
+const memberships = await client.groups.listUserMemberships("user-123");
+```
+
+### Group Permissions on Databases
+
+Grant database access to an entire group instead of individual users:
+
+```typescript
+// Grant a group permission on a database
+await client.databases.grantGroupPermission(databaseId, {
+  groupType: "team",
+  groupId: "engineering",
+  permission: "read-write",
+});
+
+// List group permissions
+const gperms = await client.databases.listGroupPermissions(databaseId);
+
+// Revoke group permission
+await client.databases.revokeGroupPermission(databaseId, "team", "engineering");
+```
+
 ## Integrations API
 
 Proxy HTTP calls through the tenant-specific integrations defined in the admin UI:
