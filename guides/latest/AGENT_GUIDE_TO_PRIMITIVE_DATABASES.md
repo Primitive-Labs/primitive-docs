@@ -253,7 +253,13 @@ primitive databases records describe <database-id> <model-name>
 primitive databases records query <database-id> <model-name> --filter '{"status":"open"}'
 primitive databases records query <database-id> <model-name> --filter-file ./filter.json
 primitive databases records query <database-id> <model-name> --filter-file ./filter.toml
+
+# Export / Import (data migration)
+primitive databases export <database-id> --output ./primitive-export    # Export records, indexes, constraints
+primitive databases import <path> --overwrite --dry-run                 # Import from export directory
 ```
+
+Export creates a directory under `<output>/databases/<database-id>/` containing `metadata.json`, `records.jsonl`, `indexes.json`, and `constraints.json`. Import restores records and indexes into a new or existing database. Database type config (operations, triggers, access rules) is not included in the export — run `primitive sync push` on the target app before importing to ensure the type config exists.
 
 ## Database Types
 

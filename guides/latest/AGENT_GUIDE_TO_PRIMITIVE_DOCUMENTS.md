@@ -800,6 +800,27 @@ Pass `isReadOnly` to child components and use it to:
 - Hide share buttons (only owners can share)
 - Prevent inline editing
 
+## Admin CLI: Export / Import
+
+The `primitive` CLI provides export and import commands for migrating or backing up document data. These are admin operations, not used in application code.
+
+```bash
+# Export a single document (Yjs state, blobs, permissions, aliases)
+primitive documents export <document-id> --output ./primitive-export
+
+# Export all documents for a user
+primitive documents export-all --user-id <user-id> --output ./primitive-export
+primitive documents export-all --user-id <user-id> --owned-only  # Only owned documents
+
+# Import from an export directory
+primitive documents import <path>                         # Default: skip existing aliases
+primitive documents import <path> --aliases overwrite     # Overwrite existing user-scoped aliases
+primitive documents import <path> --aliases skip          # Keep existing aliases (default)
+primitive documents import <path> --overwrite --dry-run   # Preview without changes
+```
+
+Export creates a directory per document containing `metadata.json`, `document.yjs` (Yjs state), `permissions.json` (for reference), and `blobs/` (attachments). Permissions are **not** restored on import — the importing admin becomes the new owner and manages sharing in the target app. Document IDs are preserved across import. User-scoped aliases can be restored with `--aliases overwrite` or kept as-is with `--aliases skip`.
+
 ## Common Errors
 
 | Symptom                                         | Cause                                                                    | Fix                                                                                                  |
