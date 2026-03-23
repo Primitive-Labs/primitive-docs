@@ -1,6 +1,20 @@
 # Choosing Your Data Model
 
-Primitive offers two storage systems — **Documents** and **Databases** — each designed for different use cases. Many apps use both. This guide helps you decide which to use where.
+Primitive offers two storage systems — **Documents** and **Databases** — each designed for different use cases. Many apps use both — documents for personal/collaborative data, databases for app-wide shared data. This guide helps you decide which to use where.
+
+## At a Glance
+
+| | Documents | Databases |
+|---|---|---|
+| **Where data lives** | Local-first, in the browser | Server-side |
+| **Connectivity** | Offline access, instant local reads | Requires network connectivity |
+| **Collaboration** | Real-time sync across collaborators | N/A |
+| **Access model** | All-or-nothing sharing per document | Per-operation CEL access rules |
+| **Schema** | Schemaless CRDT structures | Schemaless — save any JSON records |
+| **Size limit** | ~10 MB per document | ~5 GB per instance |
+| **Server logic** | N/A | Server-enforced triggers and computed fields |
+
+**Use documents** when users need offline access, real-time collaboration, or all users with access see the same data. **Use databases** when different users need different views of the data, you need server-enforced rules, or datasets are large.
 
 ## When to Use Documents
 

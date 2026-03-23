@@ -1,14 +1,17 @@
 # Working with Databases
 
-Primitive's server-side databases provide structured storage with registered operations, fine-grained access control, and server-enforced business rules. Unlike documents (which are local-first and collaborative), databases run entirely on the server — ideal for shared data, cross-user queries, and admin-controlled content.
+A database is a server-side data store backed by a Cloudflare Durable Object with SQLite. Each database is an isolated instance with its own storage — strong consistency and zero-config scaling. Unlike documents (which are local-first and collaborative), databases run entirely on the server — ideal for shared data, cross-user queries, and admin-controlled content.
 
-## Core Concepts
+## Key Properties
 
-### Server-Side SQLite
-Each database has its own embedded SQLite instance running on the server. You get the familiarity of SQL with automatic scaling and no infrastructure to manage.
+### Schemaless
+Save any JSON records without upfront schema definition. There's no `CREATE TABLE` step — collections are created implicitly when you first write to them, and you can add new fields at any time without migrations. This means you can iterate fast, ship changes without coordinating schema updates, and let your data model evolve naturally alongside your application.
+
+### Organized by Type
+A **database type** is a named configuration (operations, triggers, access rules) shared across many database instances. Think of it as a template: if you have one database per tenant, project, or team, they all share the same type — update the type once, and every instance inherits the changes. When you create a database with a type that doesn't exist yet, the type is auto-created.
 
 ### Registered Operations
-You don't write raw SQL. Instead, you define **registered operations** — named queries and mutations with specific parameters, access control expressions, and optional triggers. Operations are defined as TOML config files and synced via the CLI.
+End-user data access goes through **registered operations** — named, parameterized queries and mutations with per-operation access control. You don't write raw SQL in your app. Instead, you define operations as TOML config files and sync them via the CLI.
 
 ### CEL Access Expressions
 Every operation has an access control expression written in [CEL (Common Expression Language)](https://github.com/google/cel-spec). These expressions determine who can execute each operation based on the authenticated user, their group memberships, and operation parameters.
