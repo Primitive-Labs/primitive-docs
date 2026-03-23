@@ -64,7 +64,7 @@ const { blobId, numBytes } = await client
 const page1 = await client.document(documentId).blobs().list({ limit: 10 });
 
 page1.items.forEach((blob) => {
-  console.log(blob.blobId, blob.filename, blob.size);
+  console.log(blob.blobId, blob.filename, blob.numBytes, blob.sha256);
 });
 
 // Get next page
