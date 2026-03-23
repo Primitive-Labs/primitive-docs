@@ -163,6 +163,27 @@ config/
   email-templates/*.toml      # Email template overrides
 ```
 
+## Claude Code Skill
+
+The CLI includes a built-in skill for Claude Code that gives it expert knowledge of the Primitive platform. When installed, Claude Code automatically follows Primitive patterns and best practices as you build.
+
+```bash
+# Install or update the skill
+primitive skill install
+
+# Check installation status
+primitive skill status
+
+# Remove the skill
+primitive skill uninstall
+```
+
+The skill is installed to `~/.claude/skills/primitive-platform/SKILL.md`. If the skill is already installed, the CLI will automatically update it to the latest bundled version after each command run.
+
+:::tip During Init
+When you run `primitive init`, you'll be prompted to install the skill as part of project setup. If you skip it, you can always install it later with `primitive skill install`.
+:::
+
 ## Advanced Features
 
 ### Integrations
