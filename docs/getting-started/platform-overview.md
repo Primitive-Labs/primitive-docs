@@ -1,33 +1,8 @@
-# Primitive
+# Platform Overview
 
-Primitive is a platform designed to work with LLM coding tools — making going from idea to production app as fast and easy as possible. Not demo apps or toys, but real, production-ready applications.
+Primitive is a backend platform for app developers. You focus on your UI and business logic; Primitive provides the backend services — authentication, data storage, real-time sync, file storage, server-side workflows, LLM integration, and more. No APIs to build. No servers to manage.
 
-Modern apps need authentication, data storage, real-time sync, file storage, access control, LLM integration, workflow automation, and more. Building each from scratch — or signing up for and configuring a dozen separate services — is weeks of work before you write a line of app logic. Primitive provides an integrated set of well-tested, production-ready services so you can focus on what makes your app unique.
-
-## Why Primitive?
-
-**AI coding tools work best with a solid foundation.** Tools like Claude, Cursor, and Copilot excel at UI and business logic, but struggle with distributed systems, infrastructure plumbing, and service integration. Primitive gives you a complete platform underneath, so your AI assistant can focus on what it's good at — your app.
-
-**One platform, not ten services.** Auth, data sync, file storage, LLM proxying, workflows, analytics — all integrated, all configured through code and CLI. No dashboard hopping, no credential juggling, no glue code between providers.
-
-**Production-ready from day one.** Every service is built for real workloads: offline support, real-time collaboration, fine-grained access control, server-side workflows. You're not building on top of a prototype — you're building on infrastructure that scales.
-
-## Quick Start
-
-The fastest way to get started is the template app:
-
-```bash
-npx create-primitive-app my-app
-cd my-app
-pnpm dev
-```
-
-In minutes you'll have a running app with authentication, real-time data sync, file storage, dev tools, and a Vue + TypeScript + Tailwind foundation.
-
-- **[Starting with the Template App](./getting-started/template-app.md)** — Full setup guide and walkthrough
-- **[Example Apps](./getting-started/example-apps.md)** — See Primitive in action
-
-## What Primitive Provides
+## Core Services
 
 ### Authentication
 Multiple sign-in methods out of the box — Google OAuth, Magic Link (passwordless email), OTP (email codes), and Passkeys (biometric/WebAuthn). Token management, session handling, and refresh are all handled for you.
@@ -40,7 +15,7 @@ Primitive offers two complementary storage systems:
 
 - **Databases** — Server-side structured storage. Define operations (queries, mutations) with fine-grained access control. Great for shared records, cross-user data, admin-controlled content, and server-enforced business rules.
 
-Most apps use one or both — see [Choosing Your Data Model](./getting-started/choosing-your-data-model.md) for guidance.
+Most apps use one or both — see [Choosing Your Data Model](./choosing-your-data-model.md) for guidance.
 
 ### Users and Groups
 Every user gets a built-in profile (name, email, avatar) managed by the platform. Groups let you organize users into teams, roles, or any relationship — with flexible, expression-based access control that works across both documents and databases.
@@ -148,6 +123,6 @@ A command-line tool for managing your app's backend configuration. Configure aut
 
 ## Next Steps
 
-- **[Choosing Your Data Model](./getting-started/choosing-your-data-model.md)** — Decide between documents, databases, or both
-- **[Working with Documents](./getting-started/working-with-documents.md)** — Deep dive into local-first collaborative data
-- **[Working with Databases](./getting-started/working-with-databases.md)** — Deep dive into server-side structured storage
+- **[Choosing Your Data Model](./choosing-your-data-model.md)** — Decide between documents, databases, or both
+- **[Working with Documents](./working-with-documents.md)** — Deep dive into local-first collaborative data
+- **[Working with Databases](./working-with-databases.md)** — Deep dive into server-side structured storage

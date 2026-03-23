@@ -15,7 +15,701 @@ Provides a hierarchical API for:
 
 ## Extends
 
-- `Observable`\<`any`\>
+- [`initJsBao`](../variables/initJsBao.md)\<`any`\>
+
+## Documents
+
+### addDocumentModelMapping()
+
+> **addDocumentModelMapping**(`modelName`, `documentId`): `void`
+
+Map a js-bao model name to a specific document ID.
+
+#### Parameters
+
+##### modelName
+
+`string`
+
+The model class name to map
+
+##### documentId
+
+`string`
+
+The document that should store instances of this model
+
+#### Returns
+
+`void`
+
+***
+
+### cancelPendingCreate()
+
+> **cancelPendingCreate**(`documentId`, `opts?`): `Promise`\<`void`\>
+
+Cancel a pending offline document creation.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The pending document to cancel
+
+##### opts?
+
+Optional cleanup behavior
+
+###### evictLocal?
+
+`boolean`
+
+If true, also removes the document's local data from storage
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### clearDefaultDocumentId()
+
+> **clearDefaultDocumentId**(): `void`
+
+Clear the default document ID.
+
+#### Returns
+
+`void`
+
+***
+
+### clearDocumentModelMapping()
+
+> **clearDocumentModelMapping**(`modelName`): `void`
+
+Remove a model-to-document mapping.
+
+#### Parameters
+
+##### modelName
+
+`string`
+
+The model class name to unmap
+
+#### Returns
+
+`void`
+
+***
+
+### clearSelfRemovalPending()
+
+> **clearSelfRemovalPending**(`documentId`): `void`
+
+Clear the self-removal pending flag for a document.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to clear the pending self-removal flag for
+
+#### Returns
+
+`void`
+
+***
+
+### closeDocument()
+
+> **closeDocument**(`documentId`, `options?`): `Promise`\<`void`\>
+
+Close an open document and stop syncing.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to close
+
+##### options?
+
+Optional close behavior
+
+###### evictLocal?
+
+`boolean`
+
+If true, removes the document's local data from storage on close
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### commitOfflineCreate()
+
+> **commitOfflineCreate**(`documentId`, `opts?`): `Promise`\<\{ `created`: `boolean`; `linked?`: `boolean`; `reason?`: `string`; \}\>
+
+Commit a locally created document to the server.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The locally created document to commit
+
+##### opts?
+
+Optional commit behavior
+
+###### onExists?
+
+`"link"` \| `"fail"`
+
+What to do if the document already exists on the server: "link" adopts the existing document, "fail" throws an error
+
+#### Returns
+
+`Promise`\<\{ `created`: `boolean`; `linked?`: `boolean`; `reason?`: `string`; \}\>
+
+***
+
+### createDocument()
+
+> **createDocument**(`options`): `Promise`\<\{ `metadata`: `any`; \}\>
+
+Create a new document, optionally local-only for offline-first creation.
+
+#### Parameters
+
+##### options
+
+[`CreateDocumentOptions`](../interfaces/CreateDocumentOptions.md)
+
+Document creation options
+
+#### Returns
+
+`Promise`\<\{ `metadata`: `any`; \}\>
+
+***
+
+### document()
+
+> **document**(`documentId`): [`DocumentContext`](../interfaces/DocumentContext.md)
+
+Get a scoped API for a specific document
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to scope operations to
+
+#### Returns
+
+[`DocumentContext`](../interfaces/DocumentContext.md)
+
+***
+
+### getDefaultDocumentId()
+
+> **getDefaultDocumentId**(): `string` \| `null`
+
+Get the current default document ID.
+
+#### Returns
+
+`string` \| `null`
+
+***
+
+### getDoc()
+
+> **getDoc**(`documentId`): `any`
+
+Get the raw Yjs Doc instance for a document.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to retrieve
+
+#### Returns
+
+`any`
+
+***
+
+### getDocDebug()
+
+> **getDocDebug**(`documentId`): `DocumentDebugSnapshot`
+
+Get debug information about a document's internal state.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to inspect
+
+#### Returns
+
+`DocumentDebugSnapshot`
+
+***
+
+### getDocHash()
+
+> **getDocHash**(`documentId`): `Promise`\<`string`\>
+
+Compute a hash of the document's current state.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to hash
+
+#### Returns
+
+`Promise`\<`string`\>
+
+***
+
+### getDocumentModelMapping()
+
+> **getDocumentModelMapping**(`modelName`): `string` \| `null`
+
+Get the document ID mapped to a model name.
+
+#### Parameters
+
+##### modelName
+
+`string`
+
+The model class name to look up
+
+#### Returns
+
+`string` \| `null`
+
+***
+
+### getDocumentPermission()
+
+> **getDocumentPermission**(`documentId`): `DocumentPermission` \| `null`
+
+Get the current user's permission level for a document.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to check permissions for
+
+#### Returns
+
+`DocumentPermission` \| `null`
+
+***
+
+### isDocOpen()
+
+> **isDocOpen**(`documentId`): `boolean`
+
+Check if a document is currently open.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to check
+
+#### Returns
+
+`boolean`
+
+***
+
+### isDocumentReadOnly()
+
+> **isDocumentReadOnly**(`documentId`): `boolean`
+
+Check if the current user has read-only access to a document.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to check
+
+#### Returns
+
+`boolean`
+
+***
+
+### isMetadataDeleted()
+
+> **isMetadataDeleted**(`documentId`): `boolean`
+
+Check if a document's metadata has been marked as deleted.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to check
+
+#### Returns
+
+`boolean`
+
+***
+
+### isPendingCreate()
+
+> **isPendingCreate**(`documentId`): `boolean`
+
+Check if a document is pending server creation.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to check
+
+#### Returns
+
+`boolean`
+
+***
+
+### isRootDocument()
+
+> **isRootDocument**(`documentId`): `boolean`
+
+Check if a document is the user's root document.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to check
+
+#### Returns
+
+`boolean`
+
+***
+
+### listOpenDocuments()
+
+> **listOpenDocuments**(): `string`[]
+
+List IDs of all currently open documents.
+
+#### Returns
+
+`string`[]
+
+***
+
+### listPendingCreates()
+
+> **listPendingCreates**(): `Promise`\<`object`[]\>
+
+List all documents pending server creation.
+
+#### Returns
+
+`Promise`\<`object`[]\>
+
+***
+
+### markMetadataDeleted()
+
+> **markMetadataDeleted**(`documentId`): `number` \| `undefined`
+
+Mark a document's metadata as deleted locally.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to mark as deleted
+
+#### Returns
+
+`number` \| `undefined`
+
+***
+
+### markSelfRemovalPending()
+
+> **markSelfRemovalPending**(`documentId`): `void`
+
+Mark a document as pending self-removal to suppress duplicate server delete events.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document being removed by the current user
+
+#### Returns
+
+`void`
+
+***
+
+### openDocument()
+
+> **openDocument**(`documentId`, `options?`): `Promise`\<`Doc`\>
+
+Open a document for real-time collaboration and sync.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to open
+
+##### options?
+
+Controls how the document is loaded and synced
+
+###### availabilityWaitMs?
+
+`number`
+
+How long to wait for initial data before resolving with an empty doc (ms, default 30000)
+
+###### deferNetworkSync?
+
+`boolean`
+
+If true, opens locally without starting server sync until startNetworkSync() is called
+
+###### enableNetworkSync?
+
+`boolean`
+
+If false, opens the document without subscribing to server updates (default true)
+
+###### requestSyncPerf?
+
+`boolean`
+
+If true, requests sync performance timings from the server
+
+###### retainLocal?
+
+`boolean`
+
+If true, persists the document data locally for offline access (default true)
+
+###### waitForLoad?
+
+`"local"` \| `"network"` \| `"localIfAvailableElseNetwork"`
+
+Controls when the returned promise resolves: "local" for local data only, "network" to wait for server sync, "localIfAvailableElseNetwork" to prefer local but fall back to network
+
+#### Returns
+
+`Promise`\<`Doc`\>
+
+***
+
+### openDocumentByAlias()
+
+> **openDocumentByAlias**(`alias`, `options?`): `Promise`\<\{ `doc`: `Doc`; `metadata`: `LocalMetadataEntry` \| `null`; \}\>
+
+Resolve a document alias and open the document.
+
+#### Parameters
+
+##### alias
+
+`ResolveAliasParams`
+
+Alias parameters identifying the document (scope, aliasKey, optional userId)
+
+##### options?
+
+Controls how the resolved document is loaded and synced
+
+###### availabilityWaitMs?
+
+`number`
+
+How long to wait for initial data before resolving with an empty doc (ms)
+
+###### enableNetworkSync?
+
+`boolean`
+
+If false, opens the document without subscribing to server updates
+
+###### retainLocal?
+
+`boolean`
+
+If true, persists the document data locally for offline access
+
+###### waitForLoad?
+
+`"local"` \| `"network"` \| `"localIfAvailableElseNetwork"`
+
+Controls when the returned promise resolves: "local", "network", or "localIfAvailableElseNetwork"
+
+#### Returns
+
+`Promise`\<\{ `doc`: `Doc`; `metadata`: `LocalMetadataEntry` \| `null`; \}\>
+
+***
+
+### retryCommit()
+
+> **retryCommit**(`documentId`): `Promise`\<\{ `created`: `boolean`; \} \| `null`\>
+
+Retry committing a pending offline-created document to the server.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The pending document to retry committing
+
+#### Returns
+
+`Promise`\<\{ `created`: `boolean`; \} \| `null`\>
+
+***
+
+### runLocalTransaction()
+
+> **runLocalTransaction**(`documentId`, `fn`): `void`
+
+Run a function as a local Yjs transaction (batches updates).
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to transact against
+
+##### fn
+
+() => `void`
+
+Function to execute within the transaction; all Yjs mutations inside are batched into a single update
+
+#### Returns
+
+`void`
+
+***
+
+### setDefaultDocumentId()
+
+> **setDefaultDocumentId**(`documentId`): `void`
+
+Set the default document ID used by js-bao models when no explicit mapping exists.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to use as the default for all unmapped models
+
+#### Returns
+
+`void`
+
+***
+
+### updateLocalMetadata()
+
+> **updateLocalMetadata**(`documentId`, `updates`): `Promise`\<`void`\>
+
+Update a document's locally stored metadata (title, tags).
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to update metadata for
+
+##### updates
+
+Fields to update in the local metadata cache
+
+###### tags?
+
+`string`[]
+
+New document tags
+
+###### title?
+
+`string`
+
+New document title
+
+#### Returns
+
+`Promise`\<`void`\>
 
 ## Constructors
 
@@ -37,456 +731,17 @@ Provides a hierarchical API for:
 
 `Observable<any>.constructor`
 
-## Properties
-
-### analytics
-
-> `readonly` **analytics**: [`AnalyticsClient`](../interfaces/AnalyticsClient.md)
-
-***
-
-### cache
-
-> **cache**: [`CacheFacade`](../interfaces/CacheFacade.md)
-
-***
-
-### collections
-
-> **collections**: `CollectionsAPI`
-
-***
-
-### databases
-
-> **databases**: `DatabasesAPI`
-
-***
-
-### documents
-
-> **documents**: `DocumentsAPI`
-
-***
-
-### gemini
-
-> **gemini**: `GeminiAPI`
-
-***
-
-### groups
-
-> **groups**: `GroupsAPI`
-
-***
-
-### groupTypeConfigs
-
-> **groupTypeConfigs**: `GroupTypeConfigsAPI`
-
-***
-
-### integrations
-
-> **integrations**: [`IntegrationsAPI`](../interfaces/IntegrationsAPI.md)
-
-***
-
-### llm
-
-> **llm**: `LlmAPI`
-
-***
-
-### me
-
-> **me**: `MeAPI`
-
-***
-
-### prompts
-
-> **prompts**: [`PromptsAPI`](../interfaces/PromptsAPI.md)
-
-***
-
-### ruleSets
-
-> **ruleSets**: `RuleSetsAPI`
-
-***
-
-### session
-
-> **session**: `SessionAPI`
-
-***
-
-### users
-
-> **users**: `UsersAPI`
-
-***
-
-### workflows
-
-> **workflows**: [`WorkflowsAPI`](../interfaces/WorkflowsAPI.md)
-
-## Methods
-
-### addDocumentModelMapping()
-
-> **addDocumentModelMapping**(`modelName`, `documentId`): `void`
-
-#### Parameters
-
-##### modelName
-
-`string`
-
-##### documentId
-
-`string`
-
-#### Returns
-
-`void`
-
-***
-
-### cancelPendingCreate()
-
-> **cancelPendingCreate**(`documentId`, `opts?`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-##### opts?
-
-###### evictLocal?
-
-`boolean`
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
+## Authentication
 
 ### checkOAuthAvailable()
 
 > **checkOAuthAvailable**(): `Promise`\<`boolean`\>
 
+Check if OAuth authentication is available for this app.
+
 #### Returns
 
 `Promise`\<`boolean`\>
-
-***
-
-### clearDefaultDocumentId()
-
-> **clearDefaultDocumentId**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
-### clearDocumentModelMapping()
-
-> **clearDocumentModelMapping**(`modelName`): `void`
-
-#### Parameters
-
-##### modelName
-
-`string`
-
-#### Returns
-
-`void`
-
-***
-
-### clearSelfRemovalPending()
-
-> **clearSelfRemovalPending**(`documentId`): `void`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-#### Returns
-
-`void`
-
-***
-
-### closeDocument()
-
-> **closeDocument**(`documentId`, `options?`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-##### options?
-
-###### evictLocal?
-
-`boolean`
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
-### commitOfflineCreate()
-
-> **commitOfflineCreate**(`documentId`, `opts?`): `Promise`\<\{ `created`: `boolean`; `linked?`: `boolean`; `reason?`: `string`; \}\>
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-##### opts?
-
-###### onExists?
-
-`"link"` \| `"fail"`
-
-#### Returns
-
-`Promise`\<\{ `created`: `boolean`; `linked?`: `boolean`; `reason?`: `string`; \}\>
-
-***
-
-### connect()
-
-> **connect**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
-### createDocument()
-
-> **createDocument**(`options`): `Promise`\<\{ `metadata`: `any`; \}\>
-
-#### Parameters
-
-##### options
-
-###### localOnly?
-
-`boolean`
-
-###### tags?
-
-`string`[]
-
-###### title?
-
-`string`
-
-#### Returns
-
-`Promise`\<\{ `metadata`: `any`; \}\>
-
-***
-
-### destroy()
-
-> **destroy**(): `Promise`\<`void`\>
-
-#### Returns
-
-`Promise`\<`void`\>
-
-#### Overrides
-
-`Observable.destroy`
-
-***
-
-### disconnect()
-
-> **disconnect**(): `Promise`\<`void`\>
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
-### document()
-
-> **document**(`documentId`): `DocumentContext`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-#### Returns
-
-`DocumentContext`
-
-***
-
-### emit()
-
-> **emit**\<`K`\>(`type`, `args`): `void`
-
-Emit a named event. All registered event listeners that listen to the
-specified name will receive the event.
-
-#### Type Parameters
-
-##### K
-
-`K` *extends* keyof [`JsBaoEvents`](../interfaces/JsBaoEvents.md)
-
-#### Parameters
-
-##### type
-
-`K`
-
-##### args
-
-\[[`JsBaoEvents`](../interfaces/JsBaoEvents.md)\[`K`\]\]
-
-The arguments that are applied to the event listener.
-
-#### Returns
-
-`void`
-
-#### Todo
-
-This should catch exceptions
-
-#### Overrides
-
-`Observable.emit`
-
-***
-
-### enableOfflineAccess()
-
-> **enableOfflineAccess**(`options?`): `Promise`\<\{ `enabled`: `boolean`; `method?`: `"largeBlob"` \| `"pin"` \| `"signed"`; `reason?`: `string`; \}\>
-
-#### Parameters
-
-##### options?
-
-###### allowPinFallback?
-
-`boolean`
-
-###### pinProvider?
-
-() => `Promise`\<`string`\>
-
-###### preferBiometric?
-
-`boolean`
-
-###### retention?
-
-\{ `preserveOnSignOut?`: `boolean`; \}
-
-###### retention.preserveOnSignOut?
-
-`boolean`
-
-###### ttlDays?
-
-`number`
-
-#### Returns
-
-`Promise`\<\{ `enabled`: `boolean`; `method?`: `"largeBlob"` \| `"pin"` \| `"signed"`; `reason?`: `string`; \}\>
-
-***
-
-### evictAllLocal()
-
-> **evictAllLocal**(`opts?`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### opts?
-
-###### onlySynced?
-
-`boolean`
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
-### evictLocalDocument()
-
-> **evictLocalDocument**(`documentId`, `opts?`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-##### opts?
-
-###### force?
-
-`boolean`
-
-###### suppressMetadataEvent?
-
-`boolean`
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
-### forceReconnect()
-
-> **forceReconnect**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
-### getApiUrl()
-
-> **getApiUrl**(): `string`
-
-#### Returns
-
-`string`
 
 ***
 
@@ -503,19 +758,11 @@ Useful for checking what auth methods are available before showing login UI.
 
 ***
 
-### getAppId()
-
-> **getAppId**(): `string`
-
-#### Returns
-
-`string`
-
-***
-
 ### getAuthConfig()
 
 > **getAuthConfig**(): `Promise`\<\{ `appId`: `string`; `googleClientId`: `string` \| `null`; `googleOAuthEnabled`: `boolean`; `hasOAuth`: `boolean`; `hasPasskey`: `boolean`; `magicLinkEnabled`: `boolean`; `mode`: `string`; `name`: `string`; `otpEnabled`: `boolean`; `passkeyEnabled`: `boolean`; `passkeyRpId`: `string` \| `null`; `passkeyRpName`: `string` \| `null`; `redirectUris`: `string`[] \| `null`; `waitlistEnabled`: `boolean`; \}\>
+
+Get detailed authentication configuration including enabled providers and passkey settings.
 
 #### Returns
 
@@ -526,6 +773,8 @@ Useful for checking what auth methods are available before showing login UI.
 ### getAuthPersistenceInfo()
 
 > **getAuthPersistenceInfo**(): `object`
+
+Get info about how auth tokens are persisted (memory vs storage).
 
 #### Returns
 
@@ -545,6 +794,8 @@ Useful for checking what auth methods are available before showing login UI.
 
 > **getAuthState**(): `object`
 
+Get the current authentication state including mode (online/offline/none) and user ID.
+
 #### Returns
 
 `object`
@@ -563,9 +814,523 @@ Useful for checking what auth methods are available before showing login UI.
 
 ***
 
+### getRootDocId()
+
+> **getRootDocId**(): `string` \| `null`
+
+Get the root document ID for the authenticated user.
+
+#### Returns
+
+`string` \| `null`
+
+***
+
+### getToken()
+
+> **getToken**(): `string` \| `null`
+
+Get the current JWT auth token.
+
+#### Returns
+
+`string` \| `null`
+
+***
+
+### getUserId()
+
+> **getUserId**(): `string` \| `null`
+
+Get the current authenticated user's ID.
+
+#### Returns
+
+`string` \| `null`
+
+***
+
+### handleOAuthCallback()
+
+> **handleOAuthCallback**(`code`, `state`): `Promise`\<`void`\>
+
+Handle the OAuth callback after the user completes the OAuth flow.
+
+#### Parameters
+
+##### code
+
+`string`
+
+The authorization code from the OAuth provider
+
+##### state
+
+`string`
+
+The state parameter for CSRF verification
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### isAuthenticated()
+
+> **isAuthenticated**(): `boolean`
+
+Check if the client is currently authenticated.
+
+#### Returns
+
+`boolean`
+
+***
+
+### logout()
+
+> **logout**(`options?`): `Promise`\<`void`\>
+
+Logout: best-effort server cookie clear, shutdown networking, clear auth state, and optional local eviction.
+- Preserves stored offline grant by default (does not delete it)
+- Clears in-memory offline identity so the client is not considered authenticated
+
+#### Parameters
+
+##### options?
+
+[`LogoutOptions`](../interfaces/LogoutOptions.md)
+
+Controls logout behavior
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### magicLinkRequest()
+
+> **magicLinkRequest**(`email`, `options?`): `Promise`\<\{ `success`: `boolean`; \}\>
+
+Request a magic link email for passwordless authentication.
+
+#### Parameters
+
+##### email
+
+`string`
+
+The email address to send the magic link to
+
+##### options?
+
+Optional configuration
+
+###### redirectUri?
+
+`string`
+
+Override the default OAuth redirect URI for the magic link callback
+
+#### Returns
+
+`Promise`\<\{ `success`: `boolean`; \}\>
+
+***
+
+### magicLinkVerify()
+
+> **magicLinkVerify**(`token`): `Promise`\<\{ `isNewUser?`: `boolean`; `promptAddPasskey?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
+
+Verify a magic link token and authenticate the user.
+
+#### Parameters
+
+##### token
+
+`string`
+
+The magic link token from the email URL
+
+#### Returns
+
+`Promise`\<\{ `isNewUser?`: `boolean`; `promptAddPasskey?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
+
+***
+
+### otpRequest()
+
+> **otpRequest**(`email`): `Promise`\<\{ `success`: `boolean`; \}\>
+
+Request a one-time password (OTP) code to be sent to the specified email.
+The code can be verified using `otpVerify()`.
+
+#### Parameters
+
+##### email
+
+`string`
+
+The email address to send the OTP code to
+
+#### Returns
+
+`Promise`\<\{ `success`: `boolean`; \}\>
+
+***
+
+### otpVerify()
+
+> **otpVerify**(`email`, `code`): `Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
+
+Verify a one-time password (OTP) code and authenticate the user.
+On success, the client will be authenticated and connected.
+
+#### Parameters
+
+##### email
+
+`string`
+
+The email address the OTP was sent to
+
+##### code
+
+`string`
+
+The OTP code entered by the user
+
+#### Returns
+
+`Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
+
+***
+
+### passkeyAuthFinish()
+
+> **passkeyAuthFinish**(`credential`, `challengeToken`): `Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
+
+Complete passkey authentication with the browser's credential response.
+
+#### Parameters
+
+##### credential
+
+`any`
+
+The credential response from the browser's WebAuthn API
+
+##### challengeToken
+
+`string`
+
+The challenge token returned by passkeyAuthStart()
+
+#### Returns
+
+`Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
+
+***
+
+### passkeyAuthStart()
+
+> **passkeyAuthStart**(): `Promise`\<\{ `challengeToken`: `string`; `options`: `any`; \}\>
+
+Start the passkey authentication flow, returns challenge options for the browser.
+
+#### Returns
+
+`Promise`\<\{ `challengeToken`: `string`; `options`: `any`; \}\>
+
+***
+
+### passkeyDelete()
+
+> **passkeyDelete**(`passkeyId`): `Promise`\<\{ `success`: `boolean`; \}\>
+
+Delete a registered passkey by ID.
+
+#### Parameters
+
+##### passkeyId
+
+`string`
+
+The ID of the passkey to delete
+
+#### Returns
+
+`Promise`\<\{ `success`: `boolean`; \}\>
+
+***
+
+### passkeyList()
+
+> **passkeyList**(): `Promise`\<\{ `passkeys`: `object`[]; \}\>
+
+List all passkeys registered for the current user.
+
+#### Returns
+
+`Promise`\<\{ `passkeys`: `object`[]; \}\>
+
+***
+
+### passkeyRegisterFinish()
+
+> **passkeyRegisterFinish**(`credential`, `challengeToken`, `deviceName?`): `Promise`\<\{ `success`: `boolean`; \}\>
+
+Complete passkey registration with the browser's credential response.
+
+#### Parameters
+
+##### credential
+
+`any`
+
+The credential response from the browser's WebAuthn API
+
+##### challengeToken
+
+`string`
+
+The challenge token returned by passkeyRegisterStart()
+
+##### deviceName?
+
+`string`
+
+Optional human-readable name for this passkey (e.g. "MacBook Pro")
+
+#### Returns
+
+`Promise`\<\{ `success`: `boolean`; \}\>
+
+***
+
+### passkeyRegisterStart()
+
+> **passkeyRegisterStart**(): `Promise`\<\{ `challengeToken`: `string`; `options`: `any`; \}\>
+
+Start registering a new passkey for the current user.
+
+#### Returns
+
+`Promise`\<\{ `challengeToken`: `string`; `options`: `any`; \}\>
+
+***
+
+### passkeyUpdate()
+
+> **passkeyUpdate**(`passkeyId`, `params`): `Promise`\<\{ `passkey`: \{ `createdAt`: `string`; `deviceName`: `string`; `lastUsedAt?`: `string`; `passkeyId`: `string`; \}; \}\>
+
+Update a passkey's metadata such as its device name.
+
+#### Parameters
+
+##### passkeyId
+
+`string`
+
+The ID of the passkey to update
+
+##### params
+
+Fields to update
+
+###### deviceName
+
+`string`
+
+New human-readable name for the passkey
+
+#### Returns
+
+`Promise`\<\{ `passkey`: \{ `createdAt`: `string`; `deviceName`: `string`; `lastUsedAt?`: `string`; `passkeyId`: `string`; \}; \}\>
+
+***
+
+### setToken()
+
+> **setToken**(`token`, `options?`): `void`
+
+Manually set the JWT auth token.
+
+#### Parameters
+
+##### token
+
+The JWT token to use for authentication, or null to clear
+
+`string` | `null`
+
+##### options?
+
+Optional metadata
+
+###### cause?
+
+`string`
+
+Reason for the token change (used in event payloads and logging)
+
+#### Returns
+
+`void`
+
+***
+
+### startOAuthFlow()
+
+> **startOAuthFlow**(`continueUrl?`, `options?`): `Promise`\<`void`\>
+
+Start the OAuth authentication flow by redirecting to the OAuth provider.
+
+#### Parameters
+
+##### continueUrl?
+
+`string`
+
+URL to return to after the OAuth flow completes
+
+##### options?
+
+Additional flow options
+
+###### waitlist?
+
+\{ `note?`: `string` \| `null`; `source?`: `string` \| `null`; \}
+
+If provided, enrolls the user in the app's waitlist with optional source and note
+
+###### waitlist.note?
+
+`string` \| `null`
+
+###### waitlist.source?
+
+`string` \| `null`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### waitForAuthBootstrap()
+
+> **waitForAuthBootstrap**(): `Promise`\<`void`\>
+
+Wait for the initial authentication bootstrap to complete (token refresh, offline unlock, etc.).
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### waitForAuthReady()
+
+> **waitForAuthReady**(`options?`): `Promise`\<\{ `mode`: `"online"` \| `"offline"`; `userId`: `string`; \}\>
+
+Wait until the client is authenticated and return the auth mode and user ID.
+
+#### Parameters
+
+##### options?
+
+[`WaitForAuthReadyOptions`](../interfaces/WaitForAuthReadyOptions.md)
+
+Optional configuration
+
+#### Returns
+
+`Promise`\<\{ `mode`: `"online"` \| `"offline"`; `userId`: `string`; \}\>
+
+***
+
+### waitForUserId()
+
+> **waitForUserId**(`options?`): `Promise`\<`string`\>
+
+Wait until a user ID is available (authenticated).
+
+#### Parameters
+
+##### options?
+
+[`WaitForUserIdOptions`](../interfaces/WaitForUserIdOptions.md)
+
+Optional configuration
+
+#### Returns
+
+`Promise`\<`string`\>
+
+***
+
+### exchangeOAuthCode()
+
+> `static` **exchangeOAuthCode**(`params`): `Promise`\<`string`\>
+
+Exchange an OAuth authorization code for an access token without constructing a client instance.
+
+#### Parameters
+
+##### params
+
+OAuth exchange parameters
+
+###### apiUrl
+
+`string`
+
+The API server base URL
+
+###### appId
+
+`string`
+
+The application ID
+
+###### code
+
+`string`
+
+The authorization code received from the OAuth provider
+
+###### refreshProxyBaseUrl?
+
+`string` \| `null`
+
+Optional proxy URL for refresh token cookie handling
+
+###### refreshProxyCookieMaxAgeSeconds?
+
+`number`
+
+Max age in seconds for the refresh proxy cookie
+
+###### state
+
+`string`
+
+The state parameter for CSRF verification
+
+#### Returns
+
+`Promise`\<`string`\>
+
+## Awareness
+
 ### getAwarenessStates()
 
 > **getAwarenessStates**(`documentId`): `Map`\<`string`, `any`\>
+
+Get all users' awareness states for a document.
 
 #### Parameters
 
@@ -573,15 +1338,155 @@ Useful for checking what auth methods are available before showing login UI.
 
 `string`
 
+The document to get awareness states for
+
 #### Returns
 
 `Map`\<`string`, `any`\>
 
 ***
 
+### getLocalAwarenessState()
+
+> **getLocalAwarenessState**(`documentId`): `any`
+
+Get the local user's current awareness state for a document.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to get local awareness for
+
+#### Returns
+
+`any`
+
+***
+
+### removeAwareness()
+
+> **removeAwareness**(`documentId`, `clientIds`, `_reason?`): `void`
+
+Remove awareness states for specific clients.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to remove awareness from
+
+##### clientIds
+
+`string`[]
+
+Array of client IDs whose awareness states should be removed
+
+##### \_reason?
+
+`string`
+
+Optional reason for removal (used for logging)
+
+#### Returns
+
+`void`
+
+***
+
+### removeAwarenessStates()
+
+> **removeAwarenessStates**(`documentId`, `clientIds`, `_reason?`): `void`
+
+Remove awareness states for specific clients.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to remove awareness from
+
+##### clientIds
+
+`string`[]
+
+Array of client IDs whose awareness states should be removed
+
+##### \_reason?
+
+`string`
+
+Optional reason for removal (used for logging)
+
+#### Returns
+
+`void`
+
+***
+
+### setAwareness()
+
+> **setAwareness**(`documentId`, `state`): `void`
+
+Set the local user's awareness state for a document (e.g., cursor position, selection).
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to set awareness for
+
+##### state
+
+`any`
+
+Arbitrary awareness data (cursor, selection, user info) to broadcast to collaborators
+
+#### Returns
+
+`void`
+
+***
+
+### setLocalAwarenessState()
+
+> **setLocalAwarenessState**(`documentId`, `state`): `void`
+
+Set the local awareness state for a document.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to set awareness for
+
+##### state
+
+`any`
+
+Arbitrary awareness data (cursor, selection, user info) to broadcast to collaborators
+
+#### Returns
+
+`void`
+
+## Blobs
+
 ### getBlobManager()
 
 > **getBlobManager**(): `BlobManager`
+
+Get the blob manager for direct blob operations.
 
 #### Returns
 
@@ -593,115 +1498,63 @@ Useful for checking what auth methods are available before showing login UI.
 
 > **getBlobUploadConcurrency**(): `number`
 
+Get the current blob upload concurrency limit.
+
 #### Returns
 
 `number`
 
 ***
 
-### getConnectionId()
+### setBlobUploadConcurrency()
 
-> **getConnectionId**(): `string`
+> **setBlobUploadConcurrency**(`value`): `void`
 
-#### Returns
-
-`string`
-
-***
-
-### getDefaultDocumentId()
-
-> **getDefaultDocumentId**(): `string` \| `null`
-
-#### Returns
-
-`string` \| `null`
-
-***
-
-### getDoc()
-
-> **getDoc**(`documentId`): `Doc` \| `undefined`
+Set the maximum number of concurrent blob uploads.
 
 #### Parameters
 
-##### documentId
+##### value
 
-`string`
+`number`
+
+Maximum number of blob uploads that can run in parallel
 
 #### Returns
 
-`Doc` \| `undefined`
+`void`
+
+## Configuration
+
+### getApiUrl()
+
+> **getApiUrl**(): `string`
+
+Get the API base URL.
+
+#### Returns
+
+`string`
 
 ***
 
-### getDocDebug()
+### getAppId()
 
-> **getDocDebug**(`documentId`): `DocumentDebugSnapshot`
+> **getAppId**(): `string`
 
-#### Parameters
-
-##### documentId
-
-`string`
+Get the app ID.
 
 #### Returns
 
-`DocumentDebugSnapshot`
-
-***
-
-### getDocHash()
-
-> **getDocHash**(`documentId`): `Promise`\<`string`\>
-
-#### Parameters
-
-##### documentId
-
 `string`
-
-#### Returns
-
-`Promise`\<`string`\>
-
-***
-
-### getDocumentModelMapping()
-
-> **getDocumentModelMapping**(`modelName`): `string` \| `null`
-
-#### Parameters
-
-##### modelName
-
-`string`
-
-#### Returns
-
-`string` \| `null`
-
-***
-
-### getDocumentPermission()
-
-> **getDocumentPermission**(`documentId`): `DocumentPermission` \| `null`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-#### Returns
-
-`DocumentPermission` \| `null`
 
 ***
 
 ### getGeminiAnalyticsContext()
 
 > **getGeminiAnalyticsContext**(): \{ `isEnabled`: (`phase?`) => `boolean`; `logEvent`: (`event`) => `void`; \} \| `null`
+
+Get the analytics context for Gemini operations.
 
 #### Returns
 
@@ -713,6 +1566,8 @@ Useful for checking what auth methods are available before showing login UI.
 
 > **getGlobalAdminAppId**(): `string`
 
+Get the global admin app ID.
+
 #### Returns
 
 `string`
@@ -723,47 +1578,265 @@ Useful for checking what auth methods are available before showing login UI.
 
 > **getLlmAnalyticsContext**(): \{ `isEnabled`: (`phase?`) => `boolean`; `logEvent`: (`event`) => `void`; \} \| `null`
 
+Get the analytics context for LLM operations.
+
 #### Returns
 
 \{ `isEnabled`: (`phase?`) => `boolean`; `logEvent`: (`event`) => `void`; \} \| `null`
 
 ***
 
-### getLocalAwarenessState()
+### setLogLevel()
 
-> **getLocalAwarenessState**(`documentId`): `any`
+> **setLogLevel**(`level`): `void`
+
+Set the client's log verbosity level.
 
 #### Parameters
 
-##### documentId
+##### level
+
+`LogLevel`
+
+The minimum log level to output (e.g. "debug", "warn", "error")
+
+#### Returns
+
+`void`
+
+## Connection
+
+### connect()
+
+> **connect**(): `void`
+
+Connect to the WebSocket server.
+
+#### Returns
+
+`void`
+
+***
+
+### destroy()
+
+> **destroy**(): `Promise`\<`void`\>
+
+Destroy the client, disconnecting and cleaning up all resources.
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### disconnect()
+
+> **disconnect**(): `Promise`\<`void`\>
+
+Disconnect from the WebSocket server.
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### forceReconnect()
+
+> **forceReconnect**(): `void`
+
+Force a WebSocket reconnection.
+
+#### Returns
+
+`void`
+
+***
+
+### getConnectionId()
+
+> **getConnectionId**(): `string`
+
+Get the unique ID for this client connection.
+
+#### Returns
 
 `string`
 
+***
+
+### isConnected()
+
+> **isConnected**(): `boolean`
+
+Check if the WebSocket is currently connected.
+
 #### Returns
+
+`boolean`
+
+***
+
+### makeRequest()
+
+> **makeRequest**(`method`, `path`, `data?`, `options?`): `Promise`\<`any`\>
+
+Make an authenticated HTTP request to the API server.
+
+#### Parameters
+
+##### method
+
+`string`
+
+HTTP method (GET, POST, PUT, DELETE, etc.)
+
+##### path
+
+`string`
+
+API endpoint path relative to the app base URL
+
+##### data?
 
 `any`
 
-***
+Request body payload (sent as JSON)
 
-### getLocalMetadata()
+##### options?
 
-> **getLocalMetadata**(`documentId`): `Promise`\<`LocalMetadataEntry` \| `null`\>
+`RequestOptions`
 
-#### Parameters
-
-##### documentId
-
-`string`
+Additional request options (headers, timeout, etc.)
 
 #### Returns
 
-`Promise`\<`LocalMetadataEntry` \| `null`\>
+`Promise`\<`any`\>
 
 ***
+
+### setShouldConnect()
+
+> **setShouldConnect**(`shouldConnect`): `Promise`\<`void`\>
+
+Set whether the client should maintain a WebSocket connection.
+
+#### Parameters
+
+##### shouldConnect
+
+`boolean`
+
+If true, the client will connect and auto-reconnect; if false, it disconnects and stays disconnected
+
+#### Returns
+
+`Promise`\<`void`\>
+
+## Events
+
+### emit()
+
+> **emit**\<`K`\>(`type`, `args`): `void`
+
+Emit a client event.
+
+#### Type Parameters
+
+##### K
+
+`K` *extends* keyof [`JsBaoEvents`](../interfaces/JsBaoEvents.md)
+
+#### Parameters
+
+##### type
+
+`K`
+
+The event name to emit
+
+##### args
+
+\[[`JsBaoEvents`](../interfaces/JsBaoEvents.md)\[`K`\]\]
+
+The event payload wrapped in an array
+
+#### Returns
+
+`void`
+
+***
+
+### off()
+
+> **off**\<`K`\>(`type`, `f`): `void`
+
+Unsubscribe from a client event.
+
+#### Type Parameters
+
+##### K
+
+`K` *extends* keyof [`JsBaoEvents`](../interfaces/JsBaoEvents.md)
+
+#### Parameters
+
+##### type
+
+`K`
+
+The event name to stop listening for
+
+##### f
+
+(`payload`) => `void`
+
+The callback to remove
+
+#### Returns
+
+`void`
+
+***
+
+### on()
+
+> **on**\<`K`\>(`type`, `f`): `void`
+
+Subscribe to a client event.
+
+#### Type Parameters
+
+##### K
+
+`K` *extends* keyof [`JsBaoEvents`](../interfaces/JsBaoEvents.md)
+
+#### Parameters
+
+##### type
+
+`K`
+
+The event name to listen for
+
+##### f
+
+(`payload`) => `void`
+
+Callback invoked when the event fires
+
+#### Returns
+
+`void`
+
+## Network
 
 ### getNetworkStatus()
 
 > **getNetworkStatus**(): `object`
+
+Get the current network status including connectivity and transport state.
 
 #### Returns
 
@@ -795,9 +1868,171 @@ Useful for checking what auth methods are available before showing login UI.
 
 ***
 
+### goOffline()
+
+> **goOffline**(`opts?`): `Promise`\<`void`\>
+
+Switch the client to offline mode.
+
+#### Parameters
+
+##### opts?
+
+[`GoOfflineOptions`](../interfaces/GoOfflineOptions.md)
+
+Optional configuration
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### goOnline()
+
+> **goOnline**(): `Promise`\<`void`\>
+
+Switch the client back to online mode.
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### isOnline()
+
+> **isOnline**(): `boolean`
+
+Check if the client is currently online.
+
+#### Returns
+
+`boolean`
+
+***
+
+### setNetworkMode()
+
+> **setNetworkMode**(`mode`): `Promise`\<`void`\>
+
+Set the network mode (auto, online, or offline).
+
+#### Parameters
+
+##### mode
+
+"auto" to connect/disconnect based on connectivity, "online" to force connection, "offline" to force disconnection
+
+`"auto"` | `"online"` | `"offline"`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+## Offline & Sync
+
+### enableOfflineAccess()
+
+> **enableOfflineAccess**(`options?`): `Promise`\<\{ `enabled`: `boolean`; `method?`: `"largeBlob"` \| `"pin"` \| `"signed"`; `reason?`: `string`; \}\>
+
+Enable offline access using passkey or PIN authentication.
+
+#### Parameters
+
+##### options?
+
+[`EnableOfflineAccessOptions`](../interfaces/EnableOfflineAccessOptions.md)
+
+Controls how offline credentials are created and stored
+
+#### Returns
+
+`Promise`\<\{ `enabled`: `boolean`; `method?`: `"largeBlob"` \| `"pin"` \| `"signed"`; `reason?`: `string`; \}\>
+
+***
+
+### evictAllLocal()
+
+> **evictAllLocal**(`opts?`): `Promise`\<`void`\>
+
+Remove all locally stored document data.
+
+#### Parameters
+
+##### opts?
+
+[`EvictAllLocalOptions`](../interfaces/EvictAllLocalOptions.md)
+
+Optional eviction behavior
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### evictLocalDocument()
+
+> **evictLocalDocument**(`documentId`, `opts?`): `Promise`\<`void`\>
+
+Remove a document's local data from storage.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to evict
+
+##### opts?
+
+Optional eviction behavior
+
+###### force?
+
+`boolean`
+
+If true, evicts even if the document has unsynced local changes
+
+###### suppressMetadataEvent?
+
+`boolean`
+
+If true, does not emit a documentMetadataChanged event
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### getLocalMetadata()
+
+> **getLocalMetadata**(`documentId`): `Promise`\<`LocalMetadataEntry` \| `null`\>
+
+Get locally stored metadata for a document.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to get metadata for
+
+#### Returns
+
+`Promise`\<`LocalMetadataEntry` \| `null`\>
+
+***
+
 ### getOfflineGrantStatus()
 
 > **getOfflineGrantStatus**(): `object`
+
+Get detailed status of the offline access grant.
 
 #### Returns
 
@@ -825,6 +2060,8 @@ Useful for checking what auth methods are available before showing login UI.
 
 > **getOfflineIdentity**(): \{ `appId`: `string`; `email?`: `string`; `name?`: `string`; `rootDocId`: `string`; `userId`: `string`; \} \| `null`
 
+Get the offline identity (user info available when offline).
+
 #### Returns
 
 \{ `appId`: `string`; `email?`: `string`; `name?`: `string`; `rootDocId`: `string`; `userId`: `string`; \} \| `null`
@@ -835,11 +2072,15 @@ Useful for checking what auth methods are available before showing login UI.
 
 > **getOfflineInfo**(`documentId`): `object`
 
+Get offline status information for a document.
+
 #### Parameters
 
 ##### documentId
 
 `string`
+
+The document to get offline info for
 
 #### Returns
 
@@ -867,93 +2108,19 @@ Useful for checking what auth methods are available before showing login UI.
 
 ***
 
-### getRootDocId()
-
-> **getRootDocId**(): `string` \| `null`
-
-#### Returns
-
-`string` \| `null`
-
-***
-
-### getToken()
-
-> **getToken**(): `string` \| `null`
-
-#### Returns
-
-`string` \| `null`
-
-***
-
-### getUserId()
-
-> **getUserId**(): `string` \| `null`
-
-#### Returns
-
-`string` \| `null`
-
-***
-
-### goOffline()
-
-> **goOffline**(`opts?`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### opts?
-
-###### reason?
-
-`string`
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
-### goOnline()
-
-> **goOnline**(): `Promise`\<`void`\>
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
-### handleOAuthCallback()
-
-> **handleOAuthCallback**(`code`, `state`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### code
-
-`string`
-
-##### state
-
-`string`
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
 ### hasIndexedDbPersistence()
 
 > **hasIndexedDbPersistence**(`documentId`): `Promise`\<`boolean`\>
+
+Check if a document has IndexedDB persistence.
 
 #### Parameters
 
 ##### documentId
 
 `string`
+
+The document to check for local persistence
 
 #### Returns
 
@@ -965,11 +2132,15 @@ Useful for checking what auth methods are available before showing login UI.
 
 > **hasLocalCopy**(`documentId`): `boolean`
 
+Check if a document has local data available.
+
 #### Parameters
 
 ##### documentId
 
 `string`
+
+The document to check for local data
 
 #### Returns
 
@@ -981,61 +2152,11 @@ Useful for checking what auth methods are available before showing login UI.
 
 > **hasOfflineGrantStored**(): `Promise`\<`boolean`\>
 
+Check if an offline grant is stored locally.
+
 #### Returns
 
 `Promise`\<`boolean`\>
-
-***
-
-### isAuthenticated()
-
-> **isAuthenticated**(): `boolean`
-
-#### Returns
-
-`boolean`
-
-***
-
-### isConnected()
-
-> **isConnected**(): `boolean`
-
-#### Returns
-
-`boolean`
-
-***
-
-### isDocOpen()
-
-> **isDocOpen**(`documentId`): `boolean`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-#### Returns
-
-`boolean`
-
-***
-
-### isDocumentReadOnly()
-
-> **isDocumentReadOnly**(`documentId`): `boolean`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-#### Returns
-
-`boolean`
 
 ***
 
@@ -1043,27 +2164,15 @@ Useful for checking what auth methods are available before showing login UI.
 
 > **isDocumentSynced**(`documentId`): `boolean`
 
-#### Parameters
-
-##### documentId
-
-`string`
-
-#### Returns
-
-`boolean`
-
-***
-
-### isMetadataDeleted()
-
-> **isMetadataDeleted**(`documentId`): `boolean`
+Check if a document's data is synced with the server.
 
 #### Parameters
 
 ##### documentId
 
 `string`
+
+The document to check sync status for
 
 #### Returns
 
@@ -1075,47 +2184,7 @@ Useful for checking what auth methods are available before showing login UI.
 
 > **isOfflineGrantAvailable**(): `boolean`
 
-#### Returns
-
-`boolean`
-
-***
-
-### isOnline()
-
-> **isOnline**(): `boolean`
-
-#### Returns
-
-`boolean`
-
-***
-
-### isPendingCreate()
-
-> **isPendingCreate**(`documentId`): `boolean`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-#### Returns
-
-`boolean`
-
-***
-
-### isRootDocument()
-
-> **isRootDocument**(`documentId`): `boolean`
-
-#### Parameters
-
-##### documentId
-
-`string`
+Check if an offline access grant is currently active.
 
 #### Returns
 
@@ -1127,11 +2196,15 @@ Useful for checking what auth methods are available before showing login UI.
 
 > **isSynced**(`documentId`): `boolean`
 
+Check if a document is synced with the server.
+
 #### Parameters
 
 ##### documentId
 
 `string`
+
+The document to check sync status for
 
 #### Returns
 
@@ -1143,6 +2216,8 @@ Useful for checking what auth methods are available before showing login UI.
 
 > **listLocalDocuments**(): `Promise`\<`LocalDocumentEntry`[]\>
 
+List all documents stored locally.
+
 #### Returns
 
 `Promise`\<`LocalDocumentEntry`[]\>
@@ -1153,17 +2228,15 @@ Useful for checking what auth methods are available before showing login UI.
 
 > **listLocalDocumentsUnified**(`options?`): `Promise`\<[`DocumentInfo`](../interfaces/DocumentInfo.md)[]\>
 
+List documents with merged local and server metadata.
+
 #### Parameters
 
 ##### options?
 
-###### includeRoot?
+[`ListLocalDocumentsOptions`](../interfaces/ListLocalDocumentsOptions.md)
 
-`boolean`
-
-###### onlyWithLocalData?
-
-`boolean`
+Optional filters
 
 #### Returns
 
@@ -1171,527 +2244,11 @@ Useful for checking what auth methods are available before showing login UI.
 
 ***
 
-### listOpenDocuments()
-
-> **listOpenDocuments**(): `string`[]
-
-#### Returns
-
-`string`[]
-
-***
-
-### listPendingCreates()
-
-> **listPendingCreates**(): `Promise`\<`object`[]\>
-
-#### Returns
-
-`Promise`\<`object`[]\>
-
-***
-
-### logout()
-
-> **logout**(`options?`): `Promise`\<`void`\>
-
-Logout: best-effort server cookie clear, shutdown networking, clear auth state, and optional local eviction.
-- Preserves stored offline grant by default (does not delete it)
-- Clears in-memory offline identity so the client is not considered authenticated
-
-#### Parameters
-
-##### options?
-
-###### clearOfflineIdentity?
-
-`boolean`
-
-###### redirectTo?
-
-`string`
-
-###### revokeOffline?
-
-`boolean`
-
-###### waitForDisconnect?
-
-`boolean`
-
-###### wipeLocal?
-
-`boolean`
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
-### magicLinkRequest()
-
-> **magicLinkRequest**(`email`, `options?`): `Promise`\<\{ `success`: `boolean`; \}\>
-
-#### Parameters
-
-##### email
-
-`string`
-
-##### options?
-
-###### redirectUri?
-
-`string`
-
-#### Returns
-
-`Promise`\<\{ `success`: `boolean`; \}\>
-
-***
-
-### magicLinkVerify()
-
-> **magicLinkVerify**(`token`): `Promise`\<\{ `isNewUser?`: `boolean`; `promptAddPasskey?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
-
-#### Parameters
-
-##### token
-
-`string`
-
-#### Returns
-
-`Promise`\<\{ `isNewUser?`: `boolean`; `promptAddPasskey?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
-
-***
-
-### makeRequest()
-
-> **makeRequest**(`method`, `path`, `data?`, `options?`): `Promise`\<`any`\>
-
-#### Parameters
-
-##### method
-
-`string`
-
-##### path
-
-`string`
-
-##### data?
-
-`any`
-
-##### options?
-
-`RequestOptions`
-
-#### Returns
-
-`Promise`\<`any`\>
-
-***
-
-### markMetadataDeleted()
-
-> **markMetadataDeleted**(`documentId`): `number` \| `undefined`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-#### Returns
-
-`number` \| `undefined`
-
-***
-
-### markSelfRemovalPending()
-
-> **markSelfRemovalPending**(`documentId`): `void`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-#### Returns
-
-`void`
-
-***
-
-### off()
-
-> **off**\<`K`\>(`type`, `f`): `void`
-
-#### Type Parameters
-
-##### K
-
-`K` *extends* keyof [`JsBaoEvents`](../interfaces/JsBaoEvents.md)
-
-#### Parameters
-
-##### type
-
-`K`
-
-##### f
-
-(`payload`) => `void`
-
-#### Returns
-
-`void`
-
-#### Overrides
-
-`Observable.off`
-
-***
-
-### on()
-
-> **on**\<`K`\>(`type`, `f`): `void`
-
-#### Type Parameters
-
-##### K
-
-`K` *extends* keyof [`JsBaoEvents`](../interfaces/JsBaoEvents.md)
-
-#### Parameters
-
-##### type
-
-`K`
-
-##### f
-
-(`payload`) => `void`
-
-#### Returns
-
-`void`
-
-#### Overrides
-
-`Observable.on`
-
-***
-
-### once()
-
-> **once**(`name`, `f`): `void`
-
-#### Parameters
-
-##### name
-
-`any`
-
-##### f
-
-`Function`
-
-#### Returns
-
-`void`
-
-#### Inherited from
-
-`Observable.once`
-
-***
-
-### openDocument()
-
-> **openDocument**(`documentId`, `options?`): `Promise`\<`Doc`\>
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-##### options?
-
-###### availabilityWaitMs?
-
-`number`
-
-###### deferNetworkSync?
-
-`boolean`
-
-###### enableNetworkSync?
-
-`boolean`
-
-###### requestSyncPerf?
-
-`boolean`
-
-###### retainLocal?
-
-`boolean`
-
-###### waitForLoad?
-
-`"local"` \| `"network"` \| `"localIfAvailableElseNetwork"`
-
-#### Returns
-
-`Promise`\<`Doc`\>
-
-***
-
-### openDocumentByAlias()
-
-> **openDocumentByAlias**(`alias`, `options?`): `Promise`\<\{ `doc`: `Doc`; `metadata`: `LocalMetadataEntry` \| `null`; \}\>
-
-#### Parameters
-
-##### alias
-
-`ResolveAliasParams`
-
-##### options?
-
-###### availabilityWaitMs?
-
-`number`
-
-###### enableNetworkSync?
-
-`boolean`
-
-###### retainLocal?
-
-`boolean`
-
-###### waitForLoad?
-
-`"local"` \| `"network"` \| `"localIfAvailableElseNetwork"`
-
-#### Returns
-
-`Promise`\<\{ `doc`: `Doc`; `metadata`: `LocalMetadataEntry` \| `null`; \}\>
-
-***
-
-### otpRequest()
-
-> **otpRequest**(`email`): `Promise`\<\{ `success`: `boolean`; \}\>
-
-Request a one-time password (OTP) code to be sent to the specified email.
-The code can be verified using `otpVerify()`.
-
-#### Parameters
-
-##### email
-
-`string`
-
-#### Returns
-
-`Promise`\<\{ `success`: `boolean`; \}\>
-
-***
-
-### otpVerify()
-
-> **otpVerify**(`email`, `code`): `Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
-
-Verify a one-time password (OTP) code and authenticate the user.
-On success, the client will be authenticated and connected.
-
-#### Parameters
-
-##### email
-
-`string`
-
-##### code
-
-`string`
-
-#### Returns
-
-`Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
-
-***
-
-### passkeyAuthFinish()
-
-> **passkeyAuthFinish**(`credential`, `challengeToken`): `Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
-
-#### Parameters
-
-##### credential
-
-`any`
-
-##### challengeToken
-
-`string`
-
-#### Returns
-
-`Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
-
-***
-
-### passkeyAuthStart()
-
-> **passkeyAuthStart**(): `Promise`\<\{ `challengeToken`: `string`; `options`: `any`; \}\>
-
-#### Returns
-
-`Promise`\<\{ `challengeToken`: `string`; `options`: `any`; \}\>
-
-***
-
-### passkeyDelete()
-
-> **passkeyDelete**(`passkeyId`): `Promise`\<\{ `success`: `boolean`; \}\>
-
-#### Parameters
-
-##### passkeyId
-
-`string`
-
-#### Returns
-
-`Promise`\<\{ `success`: `boolean`; \}\>
-
-***
-
-### passkeyList()
-
-> **passkeyList**(): `Promise`\<\{ `passkeys`: `object`[]; \}\>
-
-#### Returns
-
-`Promise`\<\{ `passkeys`: `object`[]; \}\>
-
-***
-
-### passkeyRegisterFinish()
-
-> **passkeyRegisterFinish**(`credential`, `challengeToken`, `deviceName?`): `Promise`\<\{ `success`: `boolean`; \}\>
-
-#### Parameters
-
-##### credential
-
-`any`
-
-##### challengeToken
-
-`string`
-
-##### deviceName?
-
-`string`
-
-#### Returns
-
-`Promise`\<\{ `success`: `boolean`; \}\>
-
-***
-
-### passkeyRegisterStart()
-
-> **passkeyRegisterStart**(): `Promise`\<\{ `challengeToken`: `string`; `options`: `any`; \}\>
-
-#### Returns
-
-`Promise`\<\{ `challengeToken`: `string`; `options`: `any`; \}\>
-
-***
-
-### passkeyUpdate()
-
-> **passkeyUpdate**(`passkeyId`, `params`): `Promise`\<\{ `passkey`: \{ `createdAt`: `string`; `deviceName`: `string`; `lastUsedAt?`: `string`; `passkeyId`: `string`; \}; \}\>
-
-#### Parameters
-
-##### passkeyId
-
-`string`
-
-##### params
-
-###### deviceName
-
-`string`
-
-#### Returns
-
-`Promise`\<\{ `passkey`: \{ `createdAt`: `string`; `deviceName`: `string`; `lastUsedAt?`: `string`; `passkeyId`: `string`; \}; \}\>
-
-***
-
-### removeAwareness()
-
-> **removeAwareness**(`documentId`, `clientIds`, `_reason?`): `void`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-##### clientIds
-
-`string`[]
-
-##### \_reason?
-
-`string`
-
-#### Returns
-
-`void`
-
-***
-
-### removeAwarenessStates()
-
-> **removeAwarenessStates**(`documentId`, `clientIds`, `_reason?`): `void`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-##### clientIds
-
-`string`[]
-
-##### \_reason?
-
-`string`
-
-#### Returns
-
-`void`
-
-***
-
 ### renewOfflineGrantOnline()
 
 > **renewOfflineGrantOnline**(`pinProvider?`): `Promise`\<`boolean`\>
+
+Renew the offline access grant while online.
 
 #### Parameters
 
@@ -1699,25 +2256,11 @@ On success, the client will be authenticated and connected.
 
 () => `Promise`\<`string`\>
 
+Async function that prompts for a PIN; required for PIN-based grants
+
 #### Returns
 
 `Promise`\<`boolean`\>
-
-***
-
-### retryCommit()
-
-> **retryCommit**(`documentId`): `Promise`\<\{ `created`: `boolean`; \} \| `null`\>
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-#### Returns
-
-`Promise`\<\{ `created`: `boolean`; \} \| `null`\>
 
 ***
 
@@ -1725,137 +2268,15 @@ On success, the client will be authenticated and connected.
 
 > **revokeOfflineGrant**(`opts?`): `Promise`\<`void`\>
 
+Revoke the offline access grant.
+
 #### Parameters
 
 ##### opts?
 
-###### wipeLocal?
+[`RevokeOfflineGrantOptions`](../interfaces/RevokeOfflineGrantOptions.md)
 
-`boolean`
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
-### runLocalTransaction()
-
-> **runLocalTransaction**(`documentId`, `fn`): `void`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-##### fn
-
-() => `void`
-
-#### Returns
-
-`void`
-
-***
-
-### setAwareness()
-
-> **setAwareness**(`documentId`, `state`): `void`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-##### state
-
-`any`
-
-#### Returns
-
-`void`
-
-***
-
-### setBlobUploadConcurrency()
-
-> **setBlobUploadConcurrency**(`value`): `void`
-
-#### Parameters
-
-##### value
-
-`number`
-
-#### Returns
-
-`void`
-
-***
-
-### setDefaultDocumentId()
-
-> **setDefaultDocumentId**(`documentId`): `void`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-#### Returns
-
-`void`
-
-***
-
-### setLocalAwarenessState()
-
-> **setLocalAwarenessState**(`documentId`, `state`): `void`
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-##### state
-
-`any`
-
-#### Returns
-
-`void`
-
-***
-
-### setLogLevel()
-
-> **setLogLevel**(`level`): `void`
-
-#### Parameters
-
-##### level
-
-`LogLevel`
-
-#### Returns
-
-`void`
-
-***
-
-### setNetworkMode()
-
-> **setNetworkMode**(`mode`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### mode
-
-`"auto"` | `"online"` | `"offline"`
+Optional revocation behavior
 
 #### Returns
 
@@ -1867,67 +2288,43 @@ On success, the client will be authenticated and connected.
 
 > **setRetentionPolicy**(`opts`): `void`
 
+Configure the local document retention policy.
+
 #### Parameters
 
 ##### opts
+
+Retention policy settings
 
 ###### default
 
 `"persist"` \| `"session"`
 
+Default retention mode: "persist" keeps documents across sessions, "session" evicts on sign-out
+
 ###### maxBytes?
 
 `number`
+
+Maximum total bytes of local document data; oldest documents evicted when exceeded
 
 ###### maxDocs?
 
 `number`
 
+Maximum number of documents to keep locally; oldest are evicted first
+
 ###### preserveOnSignOut?
 
 `boolean`
+
+If true, retains local data even when the user signs out
 
 ###### ttlMs?
 
 `number`
 
-#### Returns
-
-`void`
-
-***
-
-### setShouldConnect()
-
-> **setShouldConnect**(`shouldConnect`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### shouldConnect
-
-`boolean`
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
-### setToken()
-
-> **setToken**(`token`, `options?`): `void`
-
-#### Parameters
-
-##### token
-
-`string` | `null`
-
-##### options?
-
-###### cause?
-
-`string`
+Time-to-live in milliseconds; documents older than this are evicted
 
 #### Returns
 
@@ -1939,41 +2336,15 @@ On success, the client will be authenticated and connected.
 
 > **startNetworkSync**(`documentId`): `Promise`\<`void`\>
 
+Start network syncing for a document that was opened with deferred sync.
+
 #### Parameters
 
 ##### documentId
 
 `string`
 
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
-### startOAuthFlow()
-
-> **startOAuthFlow**(`continueUrl?`, `options?`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### continueUrl?
-
-`string`
-
-##### options?
-
-###### waitlist?
-
-\{ `note?`: `string` \| `null`; `source?`: `string` \| `null`; \}
-
-###### waitlist.note?
-
-`string` \| `null`
-
-###### waitlist.source?
-
-`string` \| `null`
+The document to begin syncing with the server
 
 #### Returns
 
@@ -1985,11 +2356,15 @@ On success, the client will be authenticated and connected.
 
 > **syncMetadata**(`options?`): `Promise`\<`void`\>
 
+Sync document metadata with the server.
+
 #### Parameters
 
 ##### options?
 
 `SyncMetadataOptions`
+
+Controls the scope and behavior of the metadata sync
 
 #### Returns
 
@@ -2001,29 +2376,43 @@ On success, the client will be authenticated and connected.
 
 > **syncMetadataForDocument**(`documentId`, `options?`): `Promise`\<`void`\>
 
+Sync metadata for a specific document.
+
 #### Parameters
 
 ##### documentId
 
 `string`
 
+The document whose metadata to sync
+
 ##### options?
+
+Optional sync behavior controls
 
 ###### background?
 
 `boolean`
 
+If true, silently swallows errors instead of throwing
+
 ###### payload?
 
 `any`
+
+Pre-fetched metadata payload to merge instead of fetching from server
 
 ###### payloadType?
 
 `"full"` \| `"ids"`
 
+Whether the payload contains full metadata objects or just IDs
+
 ###### shouldRetain?
 
 (`docId`) => `boolean`
+
+Predicate controlling which documents are kept in the local cache
 
 #### Returns
 
@@ -2035,11 +2424,15 @@ On success, the client will be authenticated and connected.
 
 > **unlockOffline**(`pinProvider?`): `Promise`\<`boolean`\>
 
+Unlock offline access using stored credentials.
+
 #### Parameters
 
 ##### pinProvider?
 
 () => `Promise`\<`string`\>
+
+Async function that prompts the user for a PIN; required when the offline grant uses PIN-based storage
 
 #### Returns
 
@@ -2047,45 +2440,25 @@ On success, the client will be authenticated and connected.
 
 ***
 
-### updateLocalMetadata()
-
-> **updateLocalMetadata**(`documentId`, `updates`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### documentId
-
-`string`
-
-##### updates
-
-###### tags?
-
-`string`[]
-
-###### title?
-
-`string`
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
 ### updateLocalSnapshotFlag()
 
 > **updateLocalSnapshotFlag**(`documentId`, `hasSnapshot`): `Promise`\<`void`\>
 
+Update the local snapshot flag for a document.
+
 #### Parameters
 
 ##### documentId
 
 `string`
 
+The document to update the snapshot flag for
+
 ##### hasSnapshot
 
 `boolean`
+
+Whether the document has a local IndexedDB snapshot
 
 #### Returns
 
@@ -2097,37 +2470,55 @@ On success, the client will be authenticated and connected.
 
 > **upsertServerDocuments**(`items`, `options?`): `void`
 
+Update local metadata cache with server document data.
+
 #### Parameters
 
 ##### items
+
+Array of server document records to merge into the local cache
 
 `object`[] | `undefined`
 
 ##### options?
 
+Controls how the merge is performed
+
 ###### authoritative?
 
 `boolean`
+
+If true, evicts local entries not present in the server list
 
 ###### payloadType?
 
 `"full"` \| `"ids"`
 
+Whether items contain full metadata or just document IDs
+
 ###### retainIds?
 
 `Iterable`\<`string`, `any`, `any`\>
+
+Document IDs to keep locally even if missing from the server list
 
 ###### scope?
 
 `"all"` \| `"single"`
 
+Whether to replace all metadata or merge a single document
+
 ###### shouldRetain?
 
 (`documentId`) => `boolean`
 
+Predicate controlling which documents are kept during eviction
+
 ###### targetDocumentId?
 
 `string`
+
+Specific document ID to update when scope is "single"
 
 #### Returns
 
@@ -2135,37 +2526,11 @@ On success, the client will be authenticated and connected.
 
 ***
 
-### waitForAuthBootstrap()
-
-> **waitForAuthBootstrap**(): `Promise`\<`void`\>
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
-### waitForAuthReady()
-
-> **waitForAuthReady**(`options?`): `Promise`\<\{ `mode`: `"online"` \| `"offline"`; `userId`: `string`; \}\>
-
-#### Parameters
-
-##### options?
-
-###### timeoutMs?
-
-`number`
-
-#### Returns
-
-`Promise`\<\{ `mode`: `"online"` \| `"offline"`; `userId`: `string`; \}\>
-
-***
-
 ### waitForSync()
 
 > **waitForSync**(`documentId`, `timeoutMs`): `Promise`\<`void`\>
+
+Wait until a document is synced with the server.
 
 #### Parameters
 
@@ -2173,68 +2538,142 @@ On success, the client will be authenticated and connected.
 
 `string`
 
+The document to wait for
+
 ##### timeoutMs
 
 `number` = `30000`
+
+Maximum time to wait before rejecting (ms, default 30000)
 
 #### Returns
 
 `Promise`\<`void`\>
 
-***
+## Sub-APIs
 
-### waitForUserId()
+### analytics
 
-> **waitForUserId**(`options?`): `Promise`\<`string`\>
+> `readonly` **analytics**: [`AnalyticsClient`](../interfaces/AnalyticsClient.md)
 
-#### Parameters
-
-##### options?
-
-###### timeoutMs?
-
-`number`
-
-#### Returns
-
-`Promise`\<`string`\>
+Analytics client for tracking events and metrics.
 
 ***
 
-### exchangeOAuthCode()
+### cache
 
-> `static` **exchangeOAuthCode**(`params`): `Promise`\<`string`\>
+> **cache**: [`CacheFacade`](../interfaces/CacheFacade.md)
 
-Exchange an OAuth authorization code for an access token without constructing a client instance.
+Key-value cache facade backed by IndexedDB.
 
-#### Parameters
+***
 
-##### params
+### collections
 
-###### apiUrl
+> **collections**: [`CollectionsAPI`](../interfaces/CollectionsAPI.md)
 
-`string`
+Sub-API for managing document collections.
 
-###### appId
+***
 
-`string`
+### databases
 
-###### code
+> **databases**: [`DatabasesAPI`](../interfaces/DatabasesAPI.md)
 
-`string`
+Sub-API for managing databases.
 
-###### refreshProxyBaseUrl?
+***
 
-`string` \| `null`
+### documents
 
-###### refreshProxyCookieMaxAgeSeconds?
+> **documents**: [`DocumentsAPI`](../interfaces/DocumentsAPI.md)
 
-`number`
+Sub-API for managing documents (list, create, get, delete, share).
 
-###### state
+***
 
-`string`
+### gemini
 
-#### Returns
+> **gemini**: [`GeminiAPI`](../interfaces/GeminiAPI.md)
 
-`Promise`\<`string`\>
+Sub-API for Gemini model operations.
+
+***
+
+### groups
+
+> **groups**: [`GroupsAPI`](../interfaces/GroupsAPI.md)
+
+Sub-API for managing groups and memberships.
+
+***
+
+### groupTypeConfigs
+
+> **groupTypeConfigs**: [`GroupTypeConfigsAPI`](../interfaces/GroupTypeConfigsAPI.md)
+
+Sub-API for managing group type configurations.
+
+***
+
+### integrations
+
+> **integrations**: [`IntegrationsAPI`](../interfaces/IntegrationsAPI.md)
+
+Sub-API for managing third-party integrations.
+
+***
+
+### llm
+
+> **llm**: [`LlmAPI`](../interfaces/LlmAPI.md)
+
+Sub-API for LLM (large language model) operations.
+
+***
+
+### me
+
+> **me**: [`MeAPI`](../interfaces/MeAPI.md)
+
+Sub-API for the current authenticated user's profile and preferences.
+
+***
+
+### prompts
+
+> **prompts**: [`PromptsAPI`](../interfaces/PromptsAPI.md)
+
+Sub-API for managing and executing prompts.
+
+***
+
+### ruleSets
+
+> **ruleSets**: [`RuleSetsAPI`](../interfaces/RuleSetsAPI.md)
+
+Sub-API for managing rule sets.
+
+***
+
+### session
+
+> **session**: [`SessionAPI`](../interfaces/SessionAPI.md)
+
+Sub-API for session management (sign in, sign out, token refresh).
+
+***
+
+### users
+
+> **users**: [`UsersAPI`](../interfaces/UsersAPI.md)
+
+Sub-API for managing app users.
+
+***
+
+### workflows
+
+> **workflows**: [`WorkflowsAPI`](../interfaces/WorkflowsAPI.md)
+
+Sub-API for managing and executing workflows.

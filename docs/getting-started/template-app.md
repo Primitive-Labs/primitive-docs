@@ -1,10 +1,6 @@
 # Starting with the Template App
 
-The fastest way to build an app on Primitive is to start from the official template. This guide walks you through creating a new project and running your first app.
-
-## Prerequisites
-
-- **Node.js** ^20.19.0 or >=22.12.0
+The fastest way to build on Primitive is to start from the official template. In minutes you'll have a working app with authentication, data storage, real-time sync, dev tools, and a production-ready Vue + TypeScript + Tailwind foundation.
 
 ## 1. Create Your App
 
@@ -30,11 +26,13 @@ pnpm dev
 Visit `http://localhost:5173` to see your app running.
 
 **Congratulations!** You now have a working Primitive app with:
-- Real-time data sync
-- Local-first data persistence
+- Authentication (OAuth, Magic Link, OTP, Passkeys)
+- Local-first data storage with real-time sync
+- Server-side databases with access control
+- Blob storage for files and images
 - A Vue + TypeScript + Tailwind foundation
-- Built-in test harness for browser-based testing
-- Document debugger for inspecting your data
+- Built-in dev tools (Document Explorer, Test Harness, Blob Explorer)
+- CLI for managing workflows, prompts, integrations, and more
 
 ## Push to a Remote Repository (Optional)
 
@@ -92,14 +90,6 @@ Go to the [Primitive Admin Console](https://admin.primitiveapi.com/login) and na
 3. Add your **Google Client ID** and **Client Secret** from step 1
 4. Add matching origin/callback URLs to match what you configured with Google
 
-## Why Vue?
-
-The template uses Vue 3 because it produces cleaner, more maintainable code—especially when working with AI coding assistants. Vue's straightforward reactivity model avoids the complexity of patterns like React's `useEffect` chains.
-
-::: tip Using Other Frameworks
-The core libraries—**js-bao** and **js-bao-wss-client**—are plain JavaScript and work with any framework. If you prefer React, Svelte, Solid, or vanilla JS, you can use these libraries directly. You'll just need to handle the framework integration yourself rather than using our Vue-specific `primitive-app` helpers.
-:::
-
 ## What's in the Template?
 
 The template gives you a production-ready starting point:
@@ -121,7 +111,7 @@ my-app/
 ├── docs/               # Agent guides for AI coding assistants
 ├── .env                # Development environment variables
 ├── .env.production     # Production environment variables
-└── wrangler.toml       # Cloudflare deployment config
+└── wrangler.toml       # Deployment config
 ```
 
 Key configuration files:
@@ -130,33 +120,13 @@ Key configuration files:
 - **`src/models/`** — Your data models (start here!)
 - **`docs/`** — Guides for AI coding assistants working on your project
 
-## Development Workflow
-
-### Code Generation
-
-After creating or modifying js-bao models, run the codegen script to generate TypeScript types and field accessors:
-
-```bash
-pnpm codegen
-```
-
-This is automatically run when you start the dev server (`pnpm dev`) but should also be run after any model changes.
-
-### Type Checking
-
-Run type checking to catch errors:
-
-```bash
-pnpm type-check
-```
-
 ## Next Steps
 
 Now that your app is running:
 
-1. **[The Local-First Model](./local-first-model.md)** — Understand how Primitive apps work
-2. **[Understanding Documents](./understanding-documents.md)** — Learn about documents and sharing
-3. **[Working with Data](./working-with-data.md)** — Create your first data models
-4. **[Test Harness](./test-harness.md)** — Write browser-based tests for your app
-5. **[Document Explorer](./document-explorer.md)** — Inspect and debug your data
-6. **[Deploying to Production](./deploying-to-production.md)** — Deploy your app to Cloudflare Workers
+1. **[Choosing Your Data Model](./choosing-your-data-model.md)** — Decide between documents, databases, or both
+2. **[Working with Documents](./working-with-documents.md)** — Local-first collaborative data
+3. **[Working with Databases](./working-with-databases.md)** — Server-side structured storage
+4. **[Authentication](./authentication.md)** — Set up sign-in methods
+5. **[Dev Tools](./devtools.md)** — Inspect data, manage files, run tests
+6. **[Deploying to Production](./deploying-to-production.md)** — Deploy your app to production

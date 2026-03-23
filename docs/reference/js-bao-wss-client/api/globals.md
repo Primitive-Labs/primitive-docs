@@ -17,9 +17,16 @@
 - [AnalyticsEventInput](interfaces/AnalyticsEventInput.md)
 - [AuthStateEvent](interfaces/AuthStateEvent.md)
 - [BasicUserInfo](interfaces/BasicUserInfo.md)
+- [BlobListResult](interfaces/BlobListResult.md)
+- [BlobPrefetchOptions](interfaces/BlobPrefetchOptions.md)
+- [BlobProxyUrlOptions](interfaces/BlobProxyUrlOptions.md)
+- [BlobReadOptions](interfaces/BlobReadOptions.md)
 - [BlobUploadCompletedEvent](interfaces/BlobUploadCompletedEvent.md)
 - [BlobUploadFailedEvent](interfaces/BlobUploadFailedEvent.md)
 - [BlobUploadProgressEvent](interfaces/BlobUploadProgressEvent.md)
+- [BlobUploadResult](interfaces/BlobUploadResult.md)
+- [BlobUploadSourceOptions](interfaces/BlobUploadSourceOptions.md)
+- [BlobUploadStatus](interfaces/BlobUploadStatus.md)
 - [CacheFacade](interfaces/CacheFacade.md)
 - [ClaimApplyOptions](interfaces/ClaimApplyOptions.md)
 - [ClaimApplyResult](interfaces/ClaimApplyResult.md)
@@ -28,18 +35,24 @@
 - [CollectionGroupPermissionInfo](interfaces/CollectionGroupPermissionInfo.md)
 - [CollectionInfo](interfaces/CollectionInfo.md)
 - [CollectionMemberInfo](interfaces/CollectionMemberInfo.md)
+- [CollectionsAPI](interfaces/CollectionsAPI.md)
 - [ConfirmApplyOptions](interfaces/ConfirmApplyOptions.md)
 - [ConfirmApplyResult](interfaces/ConfirmApplyResult.md)
+- [CreateDocumentOptions](interfaces/CreateDocumentOptions.md)
 - [CsvImportOptions](interfaces/CsvImportOptions.md)
 - [CsvImportProgress](interfaces/CsvImportProgress.md)
 - [CsvImportResult](interfaces/CsvImportResult.md)
-- [DatabaseConfig](interfaces/DatabaseConfig.md)
 - [DatabaseInfo](interfaces/DatabaseInfo.md)
 - [DatabaseOperationInfo](interfaces/DatabaseOperationInfo.md)
 - [DatabaseOwnershipTransferResult](interfaces/DatabaseOwnershipTransferResult.md)
 - [DatabasePermissionEntry](interfaces/DatabasePermissionEntry.md)
+- [DatabasesAPI](interfaces/DatabasesAPI.md)
 - [DocumentAccessResult](interfaces/DocumentAccessResult.md)
+- [DocumentAliasesAPI](interfaces/DocumentAliasesAPI.md)
+- [DocumentAliasInfo](interfaces/DocumentAliasInfo.md)
+- [DocumentBlobContext](interfaces/DocumentBlobContext.md)
 - [DocumentCollectionInfo](interfaces/DocumentCollectionInfo.md)
+- [DocumentContext](interfaces/DocumentContext.md)
 - [DocumentCreateCommitFailedEvent](interfaces/DocumentCreateCommitFailedEvent.md)
 - [DocumentEvent](interfaces/DocumentEvent.md)
 - [DocumentGroupPermissionEntry](interfaces/DocumentGroupPermissionEntry.md)
@@ -48,8 +61,12 @@
 - [DocumentInvitationResponse](interfaces/DocumentInvitationResponse.md)
 - [DocumentMetadataChangedEvent](interfaces/DocumentMetadataChangedEvent.md)
 - [DocumentPermissionEntry](interfaces/DocumentPermissionEntry.md)
+- [DocumentsAPI](interfaces/DocumentsAPI.md)
+- [EnableOfflineAccessOptions](interfaces/EnableOfflineAccessOptions.md)
+- [EvictAllLocalOptions](interfaces/EvictAllLocalOptions.md)
 - [ExecutePromptOptions](interfaces/ExecutePromptOptions.md)
 - [ExecutePromptResult](interfaces/ExecutePromptResult.md)
+- [GeminiAPI](interfaces/GeminiAPI.md)
 - [GeminiGenerateRawOptions](interfaces/GeminiGenerateRawOptions.md)
 - [GeminiGenerateResult](interfaces/GeminiGenerateResult.md)
 - [GeminiMessage](interfaces/GeminiMessage.md)
@@ -57,20 +74,27 @@
 - [GeminiPromptOptions](interfaces/GeminiPromptOptions.md)
 - [GeminiStructuredOutput](interfaces/GeminiStructuredOutput.md)
 - [GetWorkflowStatusOptions](interfaces/GetWorkflowStatusOptions.md)
+- [GoOfflineOptions](interfaces/GoOfflineOptions.md)
 - [GroupDocumentInfo](interfaces/GroupDocumentInfo.md)
 - [GroupInfo](interfaces/GroupInfo.md)
 - [GroupMemberInfo](interfaces/GroupMemberInfo.md)
 - [GroupMembershipInfo](interfaces/GroupMembershipInfo.md)
+- [GroupsAPI](interfaces/GroupsAPI.md)
 - [GroupTypeConfigInfo](interfaces/GroupTypeConfigInfo.md)
+- [GroupTypeConfigsAPI](interfaces/GroupTypeConfigsAPI.md)
 - [IntegrationCallRequest](interfaces/IntegrationCallRequest.md)
 - [IntegrationCallResponse](interfaces/IntegrationCallResponse.md)
 - [IntegrationsAPI](interfaces/IntegrationsAPI.md)
 - [InvitationEvent](interfaces/InvitationEvent.md)
 - [JsBaoClientOptions](interfaces/JsBaoClientOptions.md)
 - [JsBaoEvents](interfaces/JsBaoEvents.md)
+- [ListLocalDocumentsOptions](interfaces/ListLocalDocumentsOptions.md)
 - [ListWorkflowRunsOptions](interfaces/ListWorkflowRunsOptions.md)
 - [ListWorkflowRunsResult](interfaces/ListWorkflowRunsResult.md)
+- [LlmAPI](interfaces/LlmAPI.md)
 - [LlmChatOptions](interfaces/LlmChatOptions.md)
+- [LogoutOptions](interfaces/LogoutOptions.md)
+- [MeAPI](interfaces/MeAPI.md)
 - [MeUpdatedEvent](interfaces/MeUpdatedEvent.md)
 - [MeUpdateFailedEvent](interfaces/MeUpdateFailedEvent.md)
 - [ModelRulesInfo](interfaces/ModelRulesInfo.md)
@@ -80,8 +104,6 @@
 - [OfflineAuthFailedEvent](interfaces/OfflineAuthFailedEvent.md)
 - [OfflineAuthRenewedEvent](interfaces/OfflineAuthRenewedEvent.md)
 - [OfflineAuthUnlockedEvent](interfaces/OfflineAuthUnlockedEvent.md)
-- [PaginatedResult](interfaces/PaginatedResult.md)
-- [PaginationOptions](interfaces/PaginationOptions.md)
 - [PendingCreateCommittedEvent](interfaces/PendingCreateCommittedEvent.md)
 - [PendingCreateFailedEvent](interfaces/PendingCreateFailedEvent.md)
 - [PermissionEvent](interfaces/PermissionEvent.md)
@@ -89,10 +111,13 @@
 - [ReasoningOptions](interfaces/ReasoningOptions.md)
 - [ReleaseApplyOptions](interfaces/ReleaseApplyOptions.md)
 - [ReleaseApplyResult](interfaces/ReleaseApplyResult.md)
+- [RevokeOfflineGrantOptions](interfaces/RevokeOfflineGrantOptions.md)
 - [RuleSetDebugResult](interfaces/RuleSetDebugResult.md)
 - [RuleSetInfo](interfaces/RuleSetInfo.md)
+- [RuleSetsAPI](interfaces/RuleSetsAPI.md)
 - [RuleSetSchema](interfaces/RuleSetSchema.md)
 - [RuleSetTestResult](interfaces/RuleSetTestResult.md)
+- [SessionAPI](interfaces/SessionAPI.md)
 - [SessionInfo](interfaces/SessionInfo.md)
 - [StartWorkflowOptions](interfaces/StartWorkflowOptions.md)
 - [StartWorkflowResult](interfaces/StartWorkflowResult.md)
@@ -102,6 +127,9 @@
 - [TraceEntry](interfaces/TraceEntry.md)
 - [TriggerDefInfo](interfaces/TriggerDefInfo.md)
 - [UserProfile](interfaces/UserProfile.md)
+- [UsersAPI](interfaces/UsersAPI.md)
+- [WaitForAuthReadyOptions](interfaces/WaitForAuthReadyOptions.md)
+- [WaitForUserIdOptions](interfaces/WaitForUserIdOptions.md)
 - [WorkflowDefineOptions](interfaces/WorkflowDefineOptions.md)
 - [WorkflowRun](interfaces/WorkflowRun.md)
 - [WorkflowsAPI](interfaces/WorkflowsAPI.md)
@@ -114,11 +142,11 @@
 ## Type Aliases
 
 - [AuthCode](type-aliases/AuthCode.md)
-- [DoDb](type-aliases/DoDb.md)
+- [BlobDisposition](type-aliases/BlobDisposition.md)
+- [DocumentAliasScope](type-aliases/DocumentAliasScope.md)
 - [GeminiContentPart](type-aliases/GeminiContentPart.md)
 - [GeminiGenerateOptions](type-aliases/GeminiGenerateOptions.md)
 - [GeminiRole](type-aliases/GeminiRole.md)
-- [InferAttrs](type-aliases/InferAttrs.md)
 - [JsBaoErrorCode](type-aliases/JsBaoErrorCode.md)
 - [StorageConfig](type-aliases/StorageConfig.md)
 - [TypedModelConstructor](type-aliases/TypedModelConstructor.md)
@@ -127,30 +155,75 @@
 ## Variables
 
 - [AUTH\_CODES](variables/AUTH_CODES.md)
+- [initJsBao](variables/initJsBao.md)
 
 ## Functions
 
-- [~~createModelClass~~](functions/createModelClass.md)
-- [defineModelSchema](functions/defineModelSchema.md)
-- [generateULID](functions/generateULID.md)
 - [initializeClient](functions/initializeClient.md)
-- [initJsBao](functions/initJsBao.md)
 - [isJsBaoError](functions/isJsBaoError.md)
 
 ## References
 
+### createModelClass
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
+### DatabaseConfig
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
+### defineModelSchema
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
 ### DOClientEngine
 
-Renames and re-exports [DoDb](type-aliases/DoDb.md)
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
+### DoDb
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
+### generateULID
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
+### InferAttrs
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
 
 ***
 
 ### ModelFieldInfo
 
-Renames and re-exports [DoDb](type-aliases/DoDb.md)
+Renames and re-exports [initJsBao](variables/initJsBao.md)
 
 ***
 
 ### ModelIdentifier
 
-Renames and re-exports [DoDb](type-aliases/DoDb.md)
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
+### PaginatedResult
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
+
+***
+
+### PaginationOptions
+
+Renames and re-exports [initJsBao](variables/initJsBao.md)
