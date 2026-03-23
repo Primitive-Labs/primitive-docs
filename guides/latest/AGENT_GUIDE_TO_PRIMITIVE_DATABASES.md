@@ -311,6 +311,8 @@ Each operation has an `access` field — a CEL expression evaluated at call time
 
 **CEL context variables:** `user.userId`, `user.role`, `database.id`, `database.metadata`, `params.*`
 
+Only `database.id` and `database.metadata` are available in CEL — other database fields like `createdBy` are not exposed. To check ownership, store the creator's ID in metadata at creation time or use group membership.
+
 **CEL functions:** `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`, `hasRole(role)`
 
 For group-based access patterns, per-parameter access, and detailed CEL examples, see the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md).
@@ -352,7 +354,10 @@ Use these in operation definitions (filters, data, IDs):
 | `$params.fieldName` | Caller-provided parameter |
 | `$steps.stepName.*` | Pipeline cross-step references (see Pipelines) |
 
-If a filter field's value is `$params.fieldName` and the caller doesn't provide that parameter, the filter key is omitted (not set to null). The same omission behavior applies to `$database.metadata.*` references — if the referenced metadata key is missing or not set, the filter key is omitted rather than matching against null or empty string.
+If a substitution variable (`$params.fieldName`, `$database.metadata.*`, or `$steps.*`) references a value that is missing, the field is **omitted** — not set to null or empty string. This applies everywhere substitution variables are used:
+
+- **In filters:** The filter key is removed, so the query matches all values for that field.
+- **In mutation data (save/patch):** The field is excluded from the written record entirely. An optional `$params.fieldName` in save data that the caller doesn't provide results in that field not being set on the record — it is not set to null or empty string.
 
 ### Operation types
 
@@ -874,7 +879,7 @@ const result = await client.databases.importCsv(databaseId, {
 
 - **Create multiple databases for isolation.** Each database is a separate Durable Object. Use separate databases for separate tenants, projects, or data domains to leverage per-database scaling.
 - **Use database types** to share operation definitions and triggers across databases of the same kind.
-- **Use metadata for identity and routing data** set at creation time — team IDs, tenant IDs, database categories. Metadata is accessible in CEL expressions and filter substitutions via `$database.metadata.*`. It is not designed for frequently-changing application settings. For mutable settings that users toggle at runtime, store them as database records and use pipeline queries with `$steps.*` references to incorporate settings into subsequent query filters.
+- **Keep metadata minimal — use groups for access control.** Metadata has a 1KB limit and is meant for a few identifying fields: the creator's user ID, a related object ID (e.g., a team or project ID), or a category label. Its primary purpose is to connect a database to a group for CEL access checks — e.g., store a `teamId` so operations can use `isMemberOf('team', database.metadata.teamId)`. The group membership is what controls access; metadata just provides the lookup key. Do not replicate data into metadata to check field-by-field in CEL — if you need complex access rules, model them with groups instead. Metadata can be updated, but changing it affects access rule evaluation for all operations on that database, so treat it as mostly-static. For mutable settings that users toggle at runtime, store them as database records and use pipeline queries with `$steps.*` references to incorporate settings into subsequent query filters (see the [settings record pattern](#settings-record-pattern) below).
 - **Use triggers** to enforce server-side invariants (created timestamps, audit fields) — don't trust client-provided values.
 
 ### Operations design
