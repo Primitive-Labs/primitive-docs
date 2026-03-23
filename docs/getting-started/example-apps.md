@@ -13,6 +13,8 @@ An interactive walkthrough of Primitive's core features. This demo app showcases
 - **Authentication** — Google OAuth and passkey-based login
 - **Offline support** — Continue working without an internet connection
 - **Data models** — Examples of defining and querying data
+- **Databases** — Server-side storage with registered operations, pipelines, and CEL-based access control
+- **Groups & Access Control** — Organize users into groups and control access with CEL rule sets
 
 Use this app to explore the concepts covered in these docs before building your own.
 

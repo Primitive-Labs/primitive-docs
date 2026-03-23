@@ -15,7 +15,7 @@ Provides a hierarchical API for:
 
 ## Extends
 
-- [`initJsBao`](../variables/initJsBao.md)\<`any`\>
+- `Observable`\<`any`\>
 
 ## Documents
 
@@ -241,7 +241,7 @@ Get the current default document ID.
 
 ### getDoc()
 
-> **getDoc**(`documentId`): `any`
+> **getDoc**(`documentId`): `Doc` \| `undefined`
 
 Get the raw Yjs Doc instance for a document.
 
@@ -255,7 +255,7 @@ The document to retrieve
 
 #### Returns
 
-`any`
+`Doc` \| `undefined`
 
 ***
 
@@ -730,6 +730,30 @@ New document title
 #### Overrides
 
 `Observable<any>.constructor`
+
+## Methods
+
+### once()
+
+> **once**(`name`, `f`): `void`
+
+#### Parameters
+
+##### name
+
+`any`
+
+##### f
+
+`Function`
+
+#### Returns
+
+`void`
+
+#### Inherited from
+
+`Observable.once`
 
 ## Authentication
 
@@ -1628,6 +1652,10 @@ Destroy the client, disconnecting and cleaning up all resources.
 
 `Promise`\<`void`\>
 
+#### Overrides
+
+`Observable.destroy`
+
 ***
 
 ### disconnect()
@@ -1766,6 +1794,10 @@ The event payload wrapped in an array
 
 `void`
 
+#### Overrides
+
+`Observable.emit`
+
 ***
 
 ### off()
@@ -1798,6 +1830,10 @@ The callback to remove
 
 `void`
 
+#### Overrides
+
+`Observable.off`
+
 ***
 
 ### on()
@@ -1829,6 +1865,10 @@ Callback invoked when the event fires
 #### Returns
 
 `void`
+
+#### Overrides
+
+`Observable.on`
 
 ## Network
 

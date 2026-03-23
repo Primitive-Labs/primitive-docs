@@ -830,7 +830,7 @@ List all documents that were created locally but not yet committed to the server
 
 ### open()
 
-> **open**(`documentId`, `options?`): `Promise`\<\{ `doc`: `any`; `metadata`: `any`; \}\>
+> **open**(`documentId`, `options?`): `Promise`\<\{ `doc`: `Doc` \| `null`; `metadata`: `any`; \}\>
 
 Open a document for editing with configurable loading and sync behavior.
 
@@ -878,7 +878,7 @@ Controls when the returned promise resolves: "local" resolves once local data is
 
 #### Returns
 
-`Promise`\<\{ `doc`: `any`; `metadata`: `any`; \}\>
+`Promise`\<\{ `doc`: `Doc` \| `null`; `metadata`: `any`; \}\>
 
 ***
 
