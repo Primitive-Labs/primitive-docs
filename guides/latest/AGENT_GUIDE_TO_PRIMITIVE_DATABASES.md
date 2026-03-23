@@ -479,8 +479,10 @@ const db = await client.databases.create({
 ### Listing and fetching databases
 
 ```typescript
-// List databases the current user owns or manages.
-// NOTE: This does NOT return all databases the user has access to —
+// List databases visible to the current user.
+// App admins (users with admin role) see ALL databases in the app with owner-level access.
+// Non-admins only see databases where they are an owner or manager.
+// NOTE: For non-admins, this does NOT return all databases the user has access to —
 // only those where they are an owner or manager. To navigate to a
 // specific database, use group membership or state stored elsewhere
 // rather than relying on this list.
@@ -802,7 +804,7 @@ Owner and manager permissions control **who can manage the database itself** —
 | `owner` | Yes | Yes | Yes | Yes | Yes |
 | `manager` | No (list only) | Yes | Yes | No | Yes |
 
-The database creator is automatically the `owner`. Console admins bypass all checks.
+The database creator is automatically the `owner`. App admins (users with admin role) and console/super admins both bypass direct permission checks and have implicit owner-level access to all databases in their app — including listing all databases and updating metadata.
 
 ```typescript
 // These are for administrative access — not for end-user data access
