@@ -243,6 +243,97 @@ client.on("auth:state", ({ authenticated }) => {
 
 ---
 
+## Auth State Model
+
+The [primitive-app-template](https://github.com/AnchorPal/primitive-app-template) provides a `userStore` (Pinia store) and `AppLayout` component that implement the patterns described in this section. If you're not using the template, the same concepts apply — you'll need to implement equivalent auth state tracking in your own store/component layer.
+
+The `userStore` exposes two key flags. Understanding their semantics is important for writing correct application code.
+
+### `isInitialized` — one-way gate
+
+Once `true`, it stays `true` for the lifetime of the app. It means the store has completed setup: event listeners are registered, auth config is loaded, and the store's reactive state is meaningful. It does **not** imply the user is authenticated.
+
+Used by the router guard to catch developer errors (navigating to protected routes before the store is ready). Most application code does not need to check this directly.
+
+### `isAuthenticated` — live reactive signal
+
+Indicates whether the user has a valid session **right now**. Unlike `isInitialized`, this can change in both directions at any time:
+
+- `false → true`: returning user (JWT in storage) during `initialize()`, or OAuth/magic link/passkey completing later
+- `true → false`: server-side session invalidation (`auth-failed` event), explicit logout
+
+This is a reactive ref, not a promise that resolves once. Treat it as ongoing state, not a one-time gate.
+
+### `currentUser`
+
+Populated **before** `isAuthenticated` becomes `true`. Safe to read whenever `isAuthenticated` is `true`.
+
+### Auth-Dependent Code Patterns
+
+#### AppLayout auth gate (recommended default)
+
+The template's `AppLayout` (provided by primitive-app-template) gates all child content on `isAuthenticated`. If you're not using the template, implement an equivalent gate in your own layout. This means any component rendered inside the layout can assume:
+
+- `currentUser` is available and non-null
+- If auth is lost mid-session (token expiry, server-side invalidation), the component unmounts automatically
+
+```vue
+<!-- AppLayout.vue template structure -->
+<template v-if="!userStore.isAuthenticated">
+  <LoadingSpinner />
+</template>
+<div v-else>
+  <!-- All app content here — currentUser guaranteed available -->
+  <router-view />
+</div>
+```
+
+This is the primary mechanism for preventing auth timing bugs. Components inside the layout **do not** need to check `isAuthenticated` or guard against `currentUser` being null.
+
+#### Downstream stores — react to `isAuthenticated`
+
+Stores that depend on auth state (e.g., opening documents, loading user-specific data) should watch `isAuthenticated` reactively rather than checking it once:
+
+```typescript
+// In a layout or app-level component
+watch(
+  () => userStore.isAuthenticated,
+  async (isAuth, wasAuth) => {
+    if (isAuth && !wasAuth) {
+      // Auth gained — initialize auth-dependent resources
+      await myStore.initialize();
+    } else if (!isAuth && wasAuth) {
+      // Auth lost — clean up
+      myStore.reset();
+    }
+  },
+  { immediate: true }
+);
+```
+
+This handles both directions: initialization when auth arrives, and cleanup when auth is lost.
+
+#### Sequencing: auth → documents → data
+
+The correct initialization sequence for auth-dependent data loading is:
+
+1. **Auth ready** (`isAuthenticated` becomes `true`)
+2. **Open required documents** (call `documents.open()`)
+3. **Query data** (via `useJsBaoDataLoader` with `documentReady`)
+
+Do not open documents or query data before authentication is complete. The template's AppLayout auth gate ensures this structurally for components inside the layout; if you're not using the template, ensure your own layout provides an equivalent gate.
+
+### How the Router Guard and Layout Gate Work Together
+
+These serve complementary purposes:
+
+- **Router guard** (`beforeEach`): prevents **navigation** to protected routes when `isAuthenticated` is `false`. Runs on route transitions only.
+- **Layout auth gate** (`v-if`): prevents **rendering** of protected content. Handles the case where `isAuthenticated` transitions from `true → false` while the user is already on a protected route (e.g., session expiry).
+
+The router guard is navigation-scoped; the layout gate is render-scoped. Together they ensure protected content is never visible to unauthenticated users, regardless of how the auth state changes.
+
+---
+
 ## JWT Persistence
 
 Persist JWT across page reloads (optional):
@@ -357,3 +448,6 @@ When implementing auth in a Primitive app:
 5. **Consider passkeys** for returning users
 6. **Handle errors gracefully** with user-friendly messages
 7. **Customize email templates** if the default magic-link/OTP emails need branding
+8. **Gate your app layout on `isAuthenticated`** so child components can assume `currentUser` is always available
+9. **Watch `isAuthenticated` reactively** in downstream stores — it can change in both directions at any time
+10. **Sequence initialization correctly**: auth ready → open documents → query data

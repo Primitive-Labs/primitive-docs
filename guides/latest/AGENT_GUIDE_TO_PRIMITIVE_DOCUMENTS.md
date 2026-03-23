@@ -71,7 +71,7 @@ Documents are ready to be queried once the .open() call finishes. Applications s
 
 **When in the Vue hierarchy to open documents:**
 
-- **Wait for authentication first.** Do not open documents before auth/user initialization completes (typically `userStore` readiness). Sequence: auth ready -> open required documents -> query data.
+- **Wait for authentication first.** Do not open documents before authentication completes. The `userStore.isAuthenticated` ref is the correct signal — not `isInitialized`, which only means the store is set up but does not guarantee the user has a session. The template's `AppLayout` gates content rendering on `isAuthenticated`, so components inside the layout can safely open documents on mount. For stores that initialize outside the layout, watch `isAuthenticated` reactively (see the [Authentication guide's Auth State Model section](AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.md#auth-state-model)).
 - **Session-scoped documents:** Open at app/layout level after login when documents should stay open for most of the session. This is typically a small/medium bounded set (guideline: < 20). Use this when real-time updates are needed across pages, or data must be queried from multiple routes/components.
 - **Route-scoped documents:** Open on route entry when the document is only needed in that context (or document count can grow unbounded), and close on route leave. Show loading until `documents.open()` completes and, when using `useJsBaoDataLoader`, until `initialDataLoaded` is true.
 
