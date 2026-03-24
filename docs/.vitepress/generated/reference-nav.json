@@ -276,8 +276,24 @@
               "text": "Functions",
               "items": [
                 {
+                  "text": "createModelClass",
+                  "link": "/reference/js-bao-wss-client/api/functions/createModelClass"
+                },
+                {
+                  "text": "defineModelSchema",
+                  "link": "/reference/js-bao-wss-client/api/functions/defineModelSchema"
+                },
+                {
+                  "text": "generateULID",
+                  "link": "/reference/js-bao-wss-client/api/functions/generateULID"
+                },
+                {
                   "text": "initializeClient",
                   "link": "/reference/js-bao-wss-client/api/functions/initializeClient"
+                },
+                {
+                  "text": "initJsBao",
+                  "link": "/reference/js-bao-wss-client/api/functions/initJsBao"
                 },
                 {
                   "text": "isJsBaoError",
@@ -309,22 +325,6 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/BasicUserInfo"
                 },
                 {
-                  "text": "BlobListResult",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobListResult"
-                },
-                {
-                  "text": "BlobPrefetchOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobPrefetchOptions"
-                },
-                {
-                  "text": "BlobProxyUrlOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobProxyUrlOptions"
-                },
-                {
-                  "text": "BlobReadOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobReadOptions"
-                },
-                {
                   "text": "BlobUploadCompletedEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/BlobUploadCompletedEvent"
                 },
@@ -335,18 +335,6 @@
                 {
                   "text": "BlobUploadProgressEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/BlobUploadProgressEvent"
-                },
-                {
-                  "text": "BlobUploadResult",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobUploadResult"
-                },
-                {
-                  "text": "BlobUploadSourceOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobUploadSourceOptions"
-                },
-                {
-                  "text": "BlobUploadStatus",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobUploadStatus"
                 },
                 {
                   "text": "CacheFacade",
@@ -381,20 +369,12 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/CollectionMemberInfo"
                 },
                 {
-                  "text": "CollectionsAPI",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/CollectionsAPI"
-                },
-                {
                   "text": "ConfirmApplyOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/ConfirmApplyOptions"
                 },
                 {
                   "text": "ConfirmApplyResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/ConfirmApplyResult"
-                },
-                {
-                  "text": "CreateDocumentOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/CreateDocumentOptions"
                 },
                 {
                   "text": "CsvImportOptions",
@@ -407,6 +387,10 @@
                 {
                   "text": "CsvImportResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/CsvImportResult"
+                },
+                {
+                  "text": "DatabaseConfig",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseConfig"
                 },
                 {
                   "text": "DatabaseInfo",
@@ -425,32 +409,12 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/DatabasePermissionEntry"
                 },
                 {
-                  "text": "DatabasesAPI",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabasesAPI"
-                },
-                {
                   "text": "DocumentAccessResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DocumentAccessResult"
                 },
                 {
-                  "text": "DocumentAliasesAPI",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentAliasesAPI"
-                },
-                {
-                  "text": "DocumentAliasInfo",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentAliasInfo"
-                },
-                {
-                  "text": "DocumentBlobContext",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentBlobContext"
-                },
-                {
                   "text": "DocumentCollectionInfo",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DocumentCollectionInfo"
-                },
-                {
-                  "text": "DocumentContext",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentContext"
                 },
                 {
                   "text": "DocumentCreateCommitFailedEvent",
@@ -485,28 +449,12 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/DocumentPermissionEntry"
                 },
                 {
-                  "text": "DocumentsAPI",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/DocumentsAPI"
-                },
-                {
-                  "text": "EnableOfflineAccessOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/EnableOfflineAccessOptions"
-                },
-                {
-                  "text": "EvictAllLocalOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/EvictAllLocalOptions"
-                },
-                {
                   "text": "ExecutePromptOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/ExecutePromptOptions"
                 },
                 {
                   "text": "ExecutePromptResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/ExecutePromptResult"
-                },
-                {
-                  "text": "GeminiAPI",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/GeminiAPI"
                 },
                 {
                   "text": "GeminiGenerateRawOptions",
@@ -537,10 +485,6 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/GetWorkflowStatusOptions"
                 },
                 {
-                  "text": "GoOfflineOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/GoOfflineOptions"
-                },
-                {
                   "text": "GroupDocumentInfo",
                   "link": "/reference/js-bao-wss-client/api/interfaces/GroupDocumentInfo"
                 },
@@ -557,16 +501,8 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/GroupMembershipInfo"
                 },
                 {
-                  "text": "GroupsAPI",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/GroupsAPI"
-                },
-                {
                   "text": "GroupTypeConfigInfo",
                   "link": "/reference/js-bao-wss-client/api/interfaces/GroupTypeConfigInfo"
-                },
-                {
-                  "text": "GroupTypeConfigsAPI",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/GroupTypeConfigsAPI"
                 },
                 {
                   "text": "IntegrationCallRequest",
@@ -593,10 +529,6 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/JsBaoEvents"
                 },
                 {
-                  "text": "ListLocalDocumentsOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/ListLocalDocumentsOptions"
-                },
-                {
                   "text": "ListWorkflowRunsOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/ListWorkflowRunsOptions"
                 },
@@ -605,20 +537,8 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/ListWorkflowRunsResult"
                 },
                 {
-                  "text": "LlmAPI",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/LlmAPI"
-                },
-                {
                   "text": "LlmChatOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/LlmChatOptions"
-                },
-                {
-                  "text": "LogoutOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/LogoutOptions"
-                },
-                {
-                  "text": "MeAPI",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/MeAPI"
                 },
                 {
                   "text": "MeUpdatedEvent",
@@ -657,6 +577,14 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/OfflineAuthUnlockedEvent"
                 },
                 {
+                  "text": "PaginatedResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PaginatedResult"
+                },
+                {
+                  "text": "PaginationOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PaginationOptions"
+                },
+                {
                   "text": "PendingCreateCommittedEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/PendingCreateCommittedEvent"
                 },
@@ -685,10 +613,6 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/ReleaseApplyResult"
                 },
                 {
-                  "text": "RevokeOfflineGrantOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/RevokeOfflineGrantOptions"
-                },
-                {
                   "text": "RuleSetDebugResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/RuleSetDebugResult"
                 },
@@ -697,20 +621,12 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/RuleSetInfo"
                 },
                 {
-                  "text": "RuleSetsAPI",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/RuleSetsAPI"
-                },
-                {
                   "text": "RuleSetSchema",
                   "link": "/reference/js-bao-wss-client/api/interfaces/RuleSetSchema"
                 },
                 {
                   "text": "RuleSetTestResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/RuleSetTestResult"
-                },
-                {
-                  "text": "SessionAPI",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/SessionAPI"
                 },
                 {
                   "text": "SessionInfo",
@@ -747,18 +663,6 @@
                 {
                   "text": "UserProfile",
                   "link": "/reference/js-bao-wss-client/api/interfaces/UserProfile"
-                },
-                {
-                  "text": "UsersAPI",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/UsersAPI"
-                },
-                {
-                  "text": "WaitForAuthReadyOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/WaitForAuthReadyOptions"
-                },
-                {
-                  "text": "WaitForUserIdOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/WaitForUserIdOptions"
                 },
                 {
                   "text": "WorkflowDefineOptions",
@@ -802,12 +706,8 @@
                   "link": "/reference/js-bao-wss-client/api/type-aliases/AuthCode"
                 },
                 {
-                  "text": "BlobDisposition",
-                  "link": "/reference/js-bao-wss-client/api/type-aliases/BlobDisposition"
-                },
-                {
-                  "text": "DocumentAliasScope",
-                  "link": "/reference/js-bao-wss-client/api/type-aliases/DocumentAliasScope"
+                  "text": "DoDb",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/DoDb"
                 },
                 {
                   "text": "GeminiContentPart",
@@ -820,6 +720,10 @@
                 {
                   "text": "GeminiRole",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/GeminiRole"
+                },
+                {
+                  "text": "InferAttrs",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/InferAttrs"
                 },
                 {
                   "text": "JsBaoErrorCode",
@@ -845,10 +749,6 @@
                 {
                   "text": "AUTH_CODES",
                   "link": "/reference/js-bao-wss-client/api/variables/AUTH_CODES"
-                },
-                {
-                  "text": "initJsBao",
-                  "link": "/reference/js-bao-wss-client/api/variables/initJsBao"
                 }
               ]
             },

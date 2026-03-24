@@ -110,7 +110,7 @@
 
 ### databaseConfig?
 
-> `optional` **databaseConfig**: `any`
+> `optional` **databaseConfig**: [`DatabaseConfig`](DatabaseConfig.md)
 
 ***
 
@@ -134,7 +134,7 @@
 
 ### models?
 
-> `optional` **models**: `any`[]
+> `optional` **models**: [`TypedModelConstructor`](../type-aliases/TypedModelConstructor.md)\<`any`\>[]
 
 ***
 
