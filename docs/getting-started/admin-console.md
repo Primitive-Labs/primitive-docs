@@ -10,11 +10,11 @@ The Primitive Admin Console is a web-based dashboard for managing your apps, use
 - Manage email templates for authentication flows
 - Set invite-only mode for controlled access
 
-### User Management
+### Users & Groups
 - View all users in your app
-- Invite new users
+- Invite new users and manage pending invitations
+- Manage console admins (who can access the admin console) and admin invitations
 - Manage waitlist (when in invite-only mode)
-- View user activity and sessions
 
 ### Databases
 - Browse databases and their types

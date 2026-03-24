@@ -99,6 +99,33 @@ primitive users invite user@example.com
 
 # Remove a user
 primitive users remove user@example.com
+
+# List pending invitations
+primitive users invitations
+
+# Change a user's role
+primitive users set-role <user-id> admin
+```
+
+### Managing Console Admins
+
+Console admins have access to the admin console for your app. Manage them separately from regular app users:
+
+```bash
+# List console admins
+primitive users admins list
+
+# Add a console admin (sends invitation if they don't have an account)
+primitive users admins add admin@example.com
+
+# Remove a console admin
+primitive users admins remove <admin-id>
+
+# List pending console admin invitations
+primitive users admin-invitations list
+
+# Delete a pending admin invitation
+primitive users admin-invitations delete <invitation-id>
 ```
 
 ### OAuth Configuration
