@@ -62,7 +62,7 @@ const blob = await blobs.read(blobId, { as: "blob" });
 const { items, cursor } = await blobs.list({ limit: 50 });
 
 items.forEach(blob => {
-  console.log(blob.blobId, blob.filename, blob.size);
+  console.log(blob.blobId, blob.filename, blob.numBytes, blob.sha256);
 });
 
 // Get metadata
