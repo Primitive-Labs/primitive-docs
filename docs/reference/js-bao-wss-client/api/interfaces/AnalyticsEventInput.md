@@ -86,6 +86,6 @@
 
 ***
 
-### user\_ulid?
+### user\_ulid
 
-> `optional` **user\_ulid**: `string`
+> **user\_ulid**: `string`

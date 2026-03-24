@@ -34,6 +34,22 @@
 
 ***
 
+### logSnapshot()
+
+> **logSnapshot**(`context?`): `void`
+
+#### Parameters
+
+##### context?
+
+`Record`\<`string`, `any`\>
+
+#### Returns
+
+`void`
+
+***
+
 ### setAppVersionOverride()
 
 > **setAppVersionOverride**(`version`): `void`
