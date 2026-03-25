@@ -143,12 +143,20 @@ If the group type has `autoAddCreator: true` (default), the creator is automatic
 
 ### List
 
+`groups.list()` returns a paginated result with `{ items, cursor }`.
+
 ```typescript
 // All groups
-const groups = await client.groups.list();
+const { items: groups } = await client.groups.list();
 
 // Filter by type
-const teams = await client.groups.list({ type: "team" });
+const { items: teams } = await client.groups.list({ type: "team" });
+
+// With pagination
+const { items, cursor } = await client.groups.list({ limit: 20 });
+if (cursor) {
+  const { items: nextItems } = await client.groups.list({ limit: 20, cursor });
+}
 ```
 
 ### Get / Update / Delete

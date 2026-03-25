@@ -114,7 +114,7 @@ The unique identifier of the group within its type
 
 ### list()
 
-> **list**(`options?`): `Promise`\<[`GroupInfo`](GroupInfo.md)[]\>
+> **list**(`options?`): `Promise`\<`PaginatedResult`\<[`GroupInfo`](GroupInfo.md)\>\>
 
 Lists groups, optionally filtered by group type.
 
@@ -124,11 +124,11 @@ Lists groups, optionally filtered by group type.
 
 `ListGroupsOptions`
 
-Filtering options
+Filtering and pagination options
 
 #### Returns
 
-`Promise`\<[`GroupInfo`](GroupInfo.md)[]\>
+`Promise`\<`PaginatedResult`\<[`GroupInfo`](GroupInfo.md)\>\>
 
 ***
 
