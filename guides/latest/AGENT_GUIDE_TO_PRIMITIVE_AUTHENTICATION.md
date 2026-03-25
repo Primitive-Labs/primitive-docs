@@ -35,13 +35,30 @@ if (config.hasPasskey) console.log("Passkeys available");
 ```typescript
 const hasOAuth = await client.checkOAuthAvailable();
 if (hasOAuth) {
-  await client.startOAuthFlow(); // Redirects to Google
+  // continueUrl (optional): where to redirect after OAuth completes
+  await client.startOAuthFlow(continueUrl); // Redirects to Google
 }
 ```
 
+**Note:** `startOAuthFlow` requires `oauthRedirectUri` to be set in the client options (passed to `initializeClient`). It throws if not configured.
+
 ### Handle OAuth Callback
 
-In your callback page (e.g., `/oauth/callback`):
+In your callback page (e.g., `/oauth/callback`), use the instance method when you already have a client:
+
+```typescript
+const params = new URLSearchParams(window.location.search);
+const code = params.get("code");
+const state = params.get("state");
+
+if (code && state) {
+  await client.handleOAuthCallback(code, state);
+  // Client is now authenticated and WebSocket is connected
+  window.location.href = "/";
+}
+```
+
+Alternatively, use the static method when you don't have a client instance yet (e.g., a standalone callback page):
 
 ```typescript
 import { JsBaoClient } from "js-bao-wss-client";
@@ -58,7 +75,7 @@ if (code && state) {
     state,
   });
 
-  // Store token and redirect to app
+  // Store token and initialize client
   localStorage.setItem("jwt", token);
   window.location.href = "/";
 }
@@ -143,7 +160,7 @@ try {
 
 ## Passkey Authentication
 
-Passkeys require an existing account (created via OAuth or Magic Link).
+Passkeys require an existing account (created via OAuth, Magic Link, or OTP).
 
 ### Sign In with Passkey
 
@@ -205,8 +222,8 @@ client.on("auth-failed", ({ message }) => {
 });
 
 // Auth succeeded
-client.on("auth-success", () => {
-  console.log("Authenticated");
+client.on("auth-success", ({ token, previousToken, cause }) => {
+  console.log("Authenticated, cause:", cause);
 });
 
 // Online auth required (went online without token)
@@ -215,8 +232,9 @@ client.on("auth:onlineAuthRequired", () => {
 });
 
 // Auth state changes
-client.on("auth:state", ({ authenticated, mode }) => {
-  console.log("Auth state:", authenticated, mode);
+client.on("auth:state", ({ authenticated, mode, userId }) => {
+  // mode is "online" | "offline" | "none" | "auto"
+  console.log("Auth state:", authenticated, mode, userId);
 });
 
 // Logout lifecycle
@@ -336,9 +354,11 @@ The router guard is navigation-scoped; the layout gate is render-scoped. Togethe
 
 ## JWT Persistence
 
-Persist JWT across page reloads (optional):
+Persist JWT across page reloads (optional). Import from `js-bao-wss-client`:
 
 ```typescript
+import { initializeClient } from "js-bao-wss-client";
+
 const client = await initializeClient({
   // ... other options
   auth: {
@@ -370,6 +390,7 @@ const client = await initializeClient({
     refreshProxy: {
       baseUrl: `${window.location.origin}/proxy`,
       cookieMaxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
+      enabled: true, // optional, defaults to true when refreshProxy is provided
     },
   },
 });

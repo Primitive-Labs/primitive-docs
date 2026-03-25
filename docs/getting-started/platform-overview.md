@@ -33,7 +33,7 @@ Securely proxy requests to external APIs. Primitive stores your API keys server-
 Upload, download, and manage files (images, PDFs, attachments) scoped to documents. Includes offline caching, upload queues, and prefetching.
 
 ### Analytics
-Automatic lifecycle event tracking (daily active users, session start/end, first edit) plus custom event logging. View metrics in the admin console.
+Automatic lifecycle event tracking (daily active users, session end, network recovery) plus custom event logging. Query metrics via the CLI or REST API.
 
 ## Architecture at a Glance
 

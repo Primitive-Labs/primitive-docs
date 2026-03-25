@@ -10,7 +10,7 @@ Primitive apps include three browser-based development tools accessible via a fl
 2. **Test Harness** - Run browser-based tests that exercise real CRUD operations
 3. **Blob Explorer** - Browse, upload, download, and delete blobs attached to documents
 
-All tools require authentication. The DevTools button only appears when a user is signed in.
+DevTools are provided by the `primitiveDevTools` Vite plugin and only appear in development mode (`import.meta.env.DEV`). They are automatically excluded from production builds. Within development mode, the floating button only appears when a user is authenticated.
 
 ## Accessing DevTools
 
@@ -20,9 +20,32 @@ All tools require authentication. The DevTools button only appears when a user i
 2. **Click the DevTools button** - Opens a full-screen overlay. A short click opens the overlay; dragging repositions the button without opening it.
 3. **Select a tool** - Use the left sidebar icons:
    - Document icon → Document Explorer
-   - Checklist icon → Test Harness
+   - Clipboard/checklist icon → Test Harness
    - Cloud upload icon → Blob Explorer
 4. **Close the overlay** - Click the X button or press Escape
+5. **URL hash** - Opening the overlay pushes `#devtools` to the URL hash, so browser back/forward can close/reopen it. Refreshing with `#devtools` in the URL re-opens the overlay automatically.
+6. **Keyboard shortcut** - If the app's `vite.config.ts` sets the `keyboardShortcut` option (e.g., `"cmd+shift+b"`), the overlay can be toggled with that shortcut. The floating button tooltip shows the shortcut hint.
+
+### Vite Plugin Configuration
+
+DevTools are enabled by the `primitiveDevTools` Vite plugin in `vite.config.ts`:
+
+```typescript
+import { primitiveDevTools } from "primitive-app/vite";
+
+export default defineConfig({
+  plugins: [
+    vue(),
+    primitiveDevTools({
+      appName: "My App",           // Shown in the UI
+      testsDir: "src/tests",       // Directory for test files (default: "src/tests")
+      testPattern: "**/*.primitive-test.ts",  // Glob for test files (default)
+      enabled: true,               // Whether to enable (default: true in dev)
+      keyboardShortcut: "cmd+shift+b",  // Optional shortcut to toggle overlay
+    }),
+  ],
+});
+```
 
 ### Browser Automation Strategy
 
@@ -34,7 +57,7 @@ All tools require authentication. The DevTools button only appears when a user i
 5. Click the appropriate tab icon in the left sidebar
 ```
 
-**Note:** The DevTools overlay is not accessed via a URL route. It's a DOM overlay that appears on top of the current page.
+**Note:** The DevTools overlay is not a separate page or route. It's a DOM overlay teleported to `<body>` that appears on top of the current page. The `#devtools` hash fragment is used only for history navigation integration.
 
 ---
 
@@ -50,7 +73,7 @@ The Document Explorer has a two-panel layout:
 - Search input for filtering documents
 - "Add Document" button for creating new documents
 - Document list showing all accessible documents
-- Each document shows: title, badges (Root, Active, Owner, Editor, Viewer)
+- Each document shows: title, badges (Root, Owner, Editor, Viewer, Admin)
 - Pagination controls for large document lists
 - Per-document actions: rename (pencil icon), delete (trash icon)
 
@@ -210,43 +233,49 @@ The Test Harness runs browser-based tests that exercise real js-bao operations w
 ### Key Concepts
 
 1. **Tests run in the browser** - Uses the same authenticated session as the app
-2. **Document isolation** - Each test gets its own ephemeral document (prefixed with `===TEST===`)
-3. **Automatic cleanup** - Test documents are deleted after each test
-4. **Host app protection** - App documents are closed during test runs and restored afterward
+2. **Document isolation** - Each test gets its own ephemeral local-only document (prefixed with `===TEST===`), set as the default document for all model operations
+3. **Automatic cleanup** - Test documents are evicted (local-only removal, no server round-trip) after each test, even on failure
+4. **Host app protection** - All host app documents are closed before the test run begins (`beginTestRun()`) and restored after all tests complete (`endTestRun()`)
+5. **Leftover cleanup** - Any leftover test documents from a previous interrupted run are automatically cleaned up when a new run starts or when the overlay opens
 
 ### UI Structure
 
 **Left Panel - Test Selection:**
-- "Select All" / "Deselect All" buttons
-- "Run Selected" button (play icon)
+- Master checkbox at the top (selects/deselects all tests)
+- Bulk action bar appears when tests are selected, showing: selected count, "Clear" button, "Run" button (play icon)
+- All tests are selected by default
 - Test groups with:
-  - Group-level checkbox (selects all tests in group)
+  - Group-level checkbox (selects all tests in group) with selected/total count
   - Individual test checkboxes
   - Status indicators:
     - Clock (spinning) = running
     - Green checkmark = passed
-    - Red alert = failed
+    - Red X circle = failed
     - Blue percentage badge = scored test
   - Result badges: "Passed", "Failed", or score (e.g., "5/10 (50%)")
+  - Clicking a test name focuses/filters the output log to that test's entries
+- Summary footer showing total tests, group count, and pass/fail counts
 
 **Right Panel - Test Output:**
-- "Clear Output" button
-- "Copy Output" button
+- "Copy" button (copies all output)
+- "Copy Failing Tests" button (copies only output from failed tests)
+- "Clear" button (clears output and resets results)
 - Monospace log area with timestamped entries
-- Each log line shows: `[HH:MM:SS.mmm] [test-id] message`
+- Each log line shows: `HH:MM:SS AM/PM - message` (with `[test-id]` prefix for per-test log calls)
+- Progress bar at the bottom during test runs showing current test name and completion count
 
 ### Running Tests
 
 #### Basic Test Run
 
 ```
-1. Open DevTools → Test Harness (flask icon)
-2. Select tests:
-   - Check individual test checkboxes, OR
-   - Check group checkbox to select all tests in a group, OR
-   - Click "Select All" for all tests
-3. Click "Run Selected" (play button)
-4. Watch status indicators update as tests run
+1. Open DevTools → Test Harness (clipboard/checklist icon)
+2. All tests are selected by default. Adjust selection if needed:
+   - Uncheck individual test checkboxes, OR
+   - Uncheck group checkbox to deselect all tests in a group, OR
+   - Uncheck the master checkbox at the top to deselect all
+3. Click "Run" in the bulk action bar (appears when tests are selected)
+4. Watch status indicators and progress bar update as tests run
 5. Review output log for details
 6. Check final status badges (Passed/Failed/Score)
 ```
@@ -266,7 +295,7 @@ The Test Harness runs browser-based tests that exercise real js-bao operations w
 1. Check the output log panel
 2. Failed tests show error messages
 3. Log entries are prefixed with test ID for filtering
-4. Use "Copy Output" to capture full log
+4. Use "Copy" to capture full log, or "Copy Failing Tests" for only failed test output
 ```
 
 **Verify specific assertions:**
@@ -274,6 +303,8 @@ The Test Harness runs browser-based tests that exercise real js-bao operations w
 1. Tests use log?.() calls to output progress
 2. Read log to see intermediate values and checks
 3. Error messages indicate which assertion failed
+4. Click a test name in the left panel to focus/filter the output log to that test's entries
+5. Click again to unfocus and see all output
 ```
 
 ### Writing Tests
@@ -283,6 +314,7 @@ Tests are TypeScript files in `src/tests/` with `.primitive-test.ts` extension.
 #### Test File Structure
 
 ```typescript
+// src/tests/myFeature.primitive-test.ts
 import type { TestGroup } from "primitive-app";
 import { MyModel } from "@/models/MyModel";
 
@@ -294,12 +326,12 @@ const myTests: TestGroup = {
       name: "Human-readable name",     // Shown in UI
       run: async (ctx, log) => {
         // Test logic here
-        // ctx.docId = ephemeral test document ID
+        // ctx.docId = ephemeral test document ID (set as default for model operations)
         // log?.("message") = output to test log
-        
+
         // PASS: return a success message string
         return "Test passed successfully";
-        
+
         // FAIL: throw an Error
         // throw new Error("Expected X but got Y");
       },
@@ -307,13 +339,16 @@ const myTests: TestGroup = {
   ],
 };
 
+// Both default exports and named exports are supported
 export default myTests;
 ```
+
+The Vite plugin discovers test files matching `**/*.primitive-test.ts` in the configured `testsDir` (default: `src/tests`). It handles both default exports and array exports.
 
 #### Test Context
 
 Each test receives:
-- `ctx.docId` - The ephemeral document ID created for this test
+- `ctx.docId` - The ephemeral local-only document ID created for this test. This document is automatically set as the default document via `client.setDefaultDocumentId(docId)`, so model operations like `save()` use it by default. You can also pass it explicitly with `save({ targetDocument: ctx.docId })`.
 - `log` - Optional logging function (use `log?.("message")`)
 
 #### Test Results
@@ -330,28 +365,29 @@ Each test receives:
 {
   id: "task-create-and-query",
   name: "Create task and query it back",
-  run: async (_ctx, log) => {
+  run: async (ctx, log) => {
     log?.("Creating a new task...");
-    
+
     const task = new Task({
       title: "Test task",
       priority: 1,
     });
-    await task.save();
-    
+    // ctx.docId is already set as the default document, but you can be explicit:
+    await task.save({ targetDocument: ctx.docId });
+
     log?.(`Created task with ID: ${task.id}`);
-    
+
     // Query it back
-    const found = await Task.find(task.id);
-    
+    const found = await Task.find(task.id as string);
+
     if (!found) {
       throw new Error("Task not found after save");
     }
-    
+
     if (found.title !== "Test task") {
       throw new Error(`Expected title "Test task", got "${found.title}"`);
     }
-    
+
     log?.("Task retrieved successfully");
     return "CRUD operations work correctly";
   },
@@ -412,18 +448,22 @@ For browser automation:
 
 | Element | Identification Strategy |
 |---------|------------------------|
-| Test Harness tab | Checklist icon in DevTools sidebar |
-| Select All button | Button labeled "Select All" |
-| Deselect All button | Button labeled "Deselect All" |
-| Run Selected button | Play icon button |
-| Test group | Container with group name and checkbox |
-| Individual test | List item with checkbox, name, status icon |
-| Running indicator | Spinning clock icon |
-| Passed indicator | Green checkmark icon |
-| Failed indicator | Red alert/X icon |
+| Test Harness tab | Clipboard/checklist icon in DevTools sidebar |
+| Master checkbox | Checkbox at top of left panel (selects/deselects all) |
+| Bulk action bar | Overlay showing "N selected", "Clear" button, "Run" button (appears when tests are selected) |
+| Run button | Play icon button in the bulk action bar |
+| Test group | Container with group name, checkbox, and selected/total count |
+| Individual test | List item with checkbox, name, status icon; clickable to focus output |
+| Running indicator | Spinning clock icon (blue) |
+| Passed indicator | Green checkmark circle icon |
+| Failed indicator | Red X circle icon |
+| Scored indicator | Blue circle with "%" |
 | Output log | Monospace text area in right panel |
-| Clear Output | Trash icon button above output |
-| Copy Output | Copy icon button above output |
+| Copy button | "Copy" text button above output (copies all output) |
+| Copy Failing Tests button | "Copy Failing Tests" text button above output |
+| Clear button | "Clear" text button with trash icon above output |
+| Progress bar | Bar at bottom of right panel during test run, showing current test and completion count |
+| Summary footer | Bottom of left panel showing total tests, group count, and pass/fail counts |
 
 ---
 
@@ -605,7 +645,7 @@ await window.__primitiveAppClient.auth.getCurrentUser()
 await window.__primitiveAppClient.documents.list()
 ```
 
-These globals are only available in debug environments (localhost, 127.0.0.1, *.localhost, *.local) and are not exposed in production builds.
+These globals are only available in debug environments (localhost, 127.0.0.1, [::1], *.localhost, *.local) and are not exposed in production builds.
 
 ---
 
@@ -634,11 +674,11 @@ These globals are only available in debug environments (localhost, 127.0.0.1, *.
 ```
 1. Navigate to authenticated page
 2. Open DevTools → Test Harness
-3. Select target tests (group or individual)
-4. Click Run Selected
-5. Wait for all status indicators to show final state (not spinning)
-6. Read final status badges
-7. If failures, capture output log for debugging
+3. All tests are selected by default; deselect any you don't want to run
+4. Click "Run" in the bulk action bar
+5. Wait for progress bar to complete and all status indicators to show final state (not spinning)
+6. Read final status badges and summary footer
+7. If failures, click a failed test name to focus its output, or use "Copy Failing Tests"
 8. Close DevTools overlay
 ```
 
@@ -651,7 +691,8 @@ These globals are only available in debug environments (localhost, 127.0.0.1, *.
 
 ### Error Recovery
 
-- If DevTools overlay doesn't open, ensure user is authenticated
+- If DevTools overlay doesn't open, ensure user is authenticated and the app is running in development mode
 - If Document Explorer shows no documents, wait for document list to load
-- If tests fail to run, ensure at least one test is selected
+- If tests fail to run, ensure at least one test is selected (the "Run" button only appears in the bulk action bar when tests are selected)
 - If test hangs, check for infinite loops in test code; tests run with no timeout by default
+- If the overlay shows "Initialization Failed", click "Retry" -- this usually means leftover test document cleanup failed

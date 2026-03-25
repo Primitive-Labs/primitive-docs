@@ -89,14 +89,13 @@ Storage: Both
 │
 └── Databases (type: "classroom")
     ├── Per-class database → assignments, grades, roster, submission metadata
-    │   ├── metadata: { classId, teacherId, schoolId }
     │   ├── Operations:
     │   │   ├── "listAssignments" → access: "true" (all class members)
-    │   │   ├── "submitWork" → access: "true", data.studentId: "$user.userId"
-    │   │   ├── "gradeSubmission" → access: "isMemberOf('teacher', database.metadata.classId)"
-    │   │   └── "myGrades" → access: "true", filter: { studentId: "$user.userId" }
+    │   │   ├── "submitWork" → access: "params.studentId == userId"
+    │   │   ├── "gradeSubmission" → access: "isMemberOf('teacher')"
+    │   │   └── "myGrades" → access: "params.studentId == userId"
     │   └── Triggers: createdAt, modifiedAt on all models
-    └── Groups: teacher, student, parent-of (for per-parameter access)
+    └── Groups: teacher, student, parent-of (for group-based access)
 ```
 
 **Why both:**
@@ -117,17 +116,16 @@ Storage: Both
     │   ├── Products, categories, reviews
     │   ├── Operations:
     │   │   ├── "searchProducts" → access: "true"
-    │   │   ├── "addProduct" → access: "hasRole('admin') || isMemberOf('seller', 'verified')"
+    │   │   ├── "addProduct" → access: "isMemberOf('admin') || isMemberOf('verified-seller')"
     │   │   └── "productStats" → pipeline with aggregates (admin only)
     │   └── Triggers: createdAt, modifiedAt, searchIndex fields
     │
     └── Per-seller database (type: "seller_store")
         ├── Orders, inventory, analytics
         ├── Operations:
-        │   ├── "myOrders" → access: "true", filter: { buyerId: "$user.userId" }
-        │   ├── "sellerOrders" → access: "isMemberOf('seller', database.metadata.sellerId)"
+        │   ├── "myOrders" → access: "params.buyerId == userId"
+        │   ├── "sellerOrders" → access: "isMemberOf('seller')"
         │   └── "salesDashboard" → pipeline, seller access only
-        └── metadata: { sellerId }
 ```
 
 **Why both:**
@@ -147,17 +145,15 @@ Storage: Both
 └── Databases
     ├── Per-organization database (type: "org")
     │   ├── Teams, members, settings
-    │   ├── metadata: { orgId }
     │   └── Operations gated by org membership
     │
     └── Per-project database (type: "project")
         ├── Tasks, milestones, comments, files
-        ├── metadata: { orgId, projectId, teamId }
         ├── Operations:
-        │   ├── "listTasks" → access: "isMemberOf('team', database.metadata.teamId)"
-        │   ├── "createTask" → access: "isMemberOf('team', database.metadata.teamId)"
+        │   ├── "listTasks" → access: "isMemberOf('team')"
+        │   ├── "createTask" → access: "isMemberOf('team')"
         │   ├── "projectDashboard" → pipeline with task stats, milestone progress
-        │   └── "adminReport" → access: "hasRole('admin')"
+        │   └── "adminReport" → access: "isMemberOf('admin')"
         └── Triggers: audit timestamps, status transition tracking
 ```
 
@@ -179,7 +175,7 @@ Storage: Both
     ├── App-wide database → channel directory, user profiles, settings
     ├── Operations:
     │   ├── "listChannels" → access: "true"
-    │   ├── "createChannel" → access: "hasRole('admin')"
+    │   ├── "createChannel" → access: "isMemberOf('admin')"
     │   └── "searchUsers" → access: "true"
     └── Triggers: createdAt on channels
 ```
@@ -204,12 +200,12 @@ Don't put everything in one giant database. Multiple smaller databases scale bet
 Registered operations are the interface between your app and its data. Design them like API endpoints:
 - **Name them clearly**: `listTasks`, `createTask`, `tasksByStatus`
 - **Keep access rules tight**: Start restrictive, widen as needed
-- **Use substitution variables**: `$user.userId` and `$database.metadata.*` for dynamic scoping
+- **Use CEL variables**: `userId` for the authenticated user, `params.*` for operation parameters, `isMemberOf()` and `hasGroupRole()` for group-based access
 - **Declare parameters explicitly**: Type and require them properly
 
-### 3. Use metadata for database-level context
+### 3. Partition databases by context
 
-Store contextual identifiers (team ID, project ID, org ID) in database metadata. Operations can reference these via `$database.metadata.*` for access control and filtering without the caller needing to know the underlying IDs.
+Create separate databases per tenant, project, or team rather than storing everything in one database. Each database is an isolated Durable Object. Use groups and `isMemberOf()` in CEL access expressions to control who can execute operations on each database.
 
 ### 4. Use triggers for server-enforced invariants
 
@@ -217,12 +213,12 @@ If a field should always be set by the server (timestamps, creator ID, computed 
 
 ### 5. Use groups for flexible access control
 
-Groups (`isMemberOf`, `memberGroups`) enable access patterns like:
+CEL functions (`isMemberOf(groupId)`, `hasGroupRole(groupId, role)`, `memberGroups(groupTypeId)`) enable access patterns like:
 - Team membership → can view/edit team data
-- Parent-of → can view child's grades (per-parameter access)
+- Role-based access → managers vs. members within a group
 - Seller → can manage their own store
 
-Groups are more flexible than roles for multi-tenant patterns where users have different access in different contexts. See the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) for full group management API and CEL patterns.
+Groups are more flexible than hardcoded user ID checks for multi-tenant patterns where users have different access in different contexts. See the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) for full group management API and CEL patterns.
 
 ### 6. Documents for collaboration, databases for control
 
@@ -238,11 +234,11 @@ If you're torn:
 | Putting all app data in one database | Split by tenant/domain for isolation and scaling |
 | Using direct record access for end users | Use registered operations with CEL access control |
 | Granting database permissions to end users | `grantPermission` is for administrative control — use operations with CEL for end-user access |
-| Hardcoding values in operation definitions | Use `$params.*`, `$user.*`, `$database.metadata.*` |
+| Hardcoding values in operation definitions | Use `params.*` for operation parameters and `userId` for the authenticated user in CEL expressions |
 | Using documents for large shared datasets | Use databases with server-side filtering |
 | Using databases when you need real-time collaboration | Use documents — they handle sync and conflict resolution |
 | Trusting client-provided timestamps/IDs | Use triggers to set server-side values |
-| Making all operations `access: "true"` | Start restrictive — use groups and roles |
+| Making all operations `access: "true"` | Start restrictive — use `isMemberOf()` and `hasGroupRole()` for group-based access |
 
 ## Further Reading
 

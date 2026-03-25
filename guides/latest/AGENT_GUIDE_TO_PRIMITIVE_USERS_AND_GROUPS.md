@@ -67,17 +67,19 @@ user.id = generateNewId();        // Use platform userId instead
 | **User's document** | App-specific profile data that follows document sharing rules |
 | **Database** | User metadata visible to other users (e.g., public profile, reputation score) accessed via operations with `$user.userId` |
 
-### Listing and looking up users
+### Looking up users
 
 ```typescript
-// List all app users (paginated)
-const users = await client.users.list({ limit: 50 });
-
-// Look up by email
-const user = await client.users.list({ email: "alice@example.com" });
-
-// Get a specific user's basic info
+// Get a specific user's basic info (cached with 5-minute default TTL)
 const info = await client.users.getBasic(userId);
+// { userId, email, name, avatarUrl, appRole, appId, addedAt }
+```
+
+The `UsersAPI` only exposes `getBasic(userId)`. There is no `list()`, `get()`, or `me()` method on the client. To list users or look up by email, use the CLI:
+
+```bash
+primitive users list
+primitive users get --user-id <userId>
 ```
 
 ### App roles (legacy)
@@ -146,17 +148,16 @@ If the group type has `autoAddCreator: true` (default), the creator is automatic
 `groups.list()` returns a paginated result with `{ items, cursor }`.
 
 ```typescript
-// All groups
-const { items: groups } = await client.groups.list();
+// All groups (paginated)
+const result = await client.groups.list();
+// result: { items: GroupInfo[], cursor?: string }
 
 // Filter by type
-const { items: teams } = await client.groups.list({ type: "team" });
+const teamResult = await client.groups.list({ type: "team" });
 
-// With pagination
-const { items, cursor } = await client.groups.list({ limit: 20 });
-if (cursor) {
-  const { items: nextItems } = await client.groups.list({ limit: 20, cursor });
-}
+// Paginate through results
+const page1 = await client.groups.list({ type: "team", limit: 10 });
+const page2 = await client.groups.list({ type: "team", limit: 10, cursor: page1.cursor });
 ```
 
 ### Get / Update / Delete
@@ -190,15 +191,7 @@ Provide either `userId` or `email`, not both. Returns `404` if the email doesn't
 
 ```typescript
 const members = await client.groups.listMembers("team", "engineering");
-// [{ userId, role, userName, userEmail, addedAt, addedBy }]
-```
-
-### Update member role
-
-```typescript
-await client.groups.updateMemberRole("team", "engineering", "user-456", {
-  role: "admin",
-});
+// [{ userId, userName, userEmail, addedAt, addedBy }]
 ```
 
 ### Remove members
@@ -215,7 +208,7 @@ await client.groups.removeMember("team", "engineering", { email: "alice@example.
 
 ```typescript
 const memberships = await client.groups.listUserMemberships("user-456");
-// [{ groupType, groupId, role, addedAt, addedBy }]
+// [{ groupType, groupId, addedAt, addedBy }]
 ```
 
 ## Group Type Configuration
@@ -273,6 +266,7 @@ Databases don't have group permission grants. Instead, group memberships are che
 |----------|---------|-------------|
 | `isMemberOf(groupType, groupId)` | bool | Whether the caller belongs to the group |
 | `memberGroups(groupType)` | string[] | All group IDs the caller belongs to for the type |
+| `hasRole(role)` | bool | Whether the caller's app role matches (e.g., `"owner"`, `"admin"`, `"member"`) |
 
 **Common CEL patterns for database operations:**
 
@@ -365,8 +359,21 @@ You can test a rule set's evaluation at runtime:
 const result = await client.ruleSets.test(ruleSetId, {
   category: "group",
   operation: "create",
+  user: { userId: "user-123", role: "member" },
+  memberships: [{ groupType: "team", groupId: "engineering" }], // optional
+  group: { groupType: "team", groupId: "engineering", name: "Eng", createdBy: "user-456" }, // optional
+});
+```
+
+You can also debug rule evaluation for a real user (returning the full evaluation trace):
+
+```typescript
+const debugResult = await client.ruleSets.debug({
   userId: "user-123",
-  // ... context
+  groupType: "team",
+  groupId: "engineering",
+  category: "member",
+  operation: "create",
 });
 ```
 
@@ -519,7 +526,7 @@ await client.groups.addMember("team", "backend", { userId });
 - **App owners and admins bypass all group rules.** Design CEL expressions for regular members — don't try to restrict owners/admins via rules.
 - **Use per-parameter access** for sensitive relationships (parent-child, manager-report).
 - **Keep rule sets simple.** Complex nested CEL expressions are hard to debug. Prefer multiple focused operations over one operation with complex access logic.
-- **Test rules** with `client.ruleSets.test()` before deploying.
+- **Test rules** with `client.ruleSets.test()` before deploying, and use `client.ruleSets.debug()` to trace evaluation for real users.
 
 ## Common Errors
 

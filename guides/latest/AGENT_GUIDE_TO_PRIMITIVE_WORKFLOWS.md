@@ -275,7 +275,7 @@ timestamp = "{{ meta.startedAt }}"
 
 ### 3. `llm.chat` - OpenAI Chat Completion
 
-Calls the internal LLM service.
+Calls the internal LLM service (via OpenRouter).
 
 ```toml
 [[steps]]
@@ -294,7 +294,6 @@ content = "{{ input.question }}"
 
 # Optional parameters
 # temperature = 0.7
-# maxTokens = 1000
 # top_p = 0.9
 ```
 
@@ -303,12 +302,13 @@ content = "{{ input.question }}"
 | Parameter      | Type     | Description                              |
 | -------------- | -------- | ---------------------------------------- |
 | `temperature`  | number   | Sampling temperature (0-2)               |
-| `maxTokens`    | number   | Maximum tokens in response               |
 | `top_p`        | number   | Nucleus sampling parameter               |
 | `attachments`  | array    | File attachments for multimodal input     |
 | `plugins`      | array    | Plugin configurations                     |
 | `tools`        | object   | Tool/function calling definitions         |
 | `tool_choice`  | object   | Tool selection strategy                   |
+
+**Note:** `maxTokens` is not supported on `llm.chat` steps. To control max tokens, use a managed prompt (`prompt.execute`) with a prompt configuration that sets `maxTokens`.
 
 ### 4. `gemini.generate` - Google Gemini Generation
 
@@ -340,6 +340,7 @@ Direct Gemini API payload (advanced use).
 id = "raw-gemini"
 kind = "gemini.generateRaw"
 model = "models/gemini-2.5-flash"
+thinkingLevel = "minimal"   # Optional: minimal | low | medium | high (Gemini 3 only)
 
 [steps.prompt]
 # Raw Gemini API payload structure
@@ -369,6 +370,7 @@ id = "fetch-data"
 kind = "integration.call"
 integrationKey = "weather-api"   # Must match configured integration
 saveAs = "weather"
+# bodyMode = "json"              # Optional: json | raw | multipart (default: json)
 
 [steps.request]
 method = "GET"
@@ -383,6 +385,16 @@ X-Custom = "value"
 # [steps.request.body]
 # For POST/PUT requests
 ```
+
+**Additional parameters:**
+
+| Parameter         | Type   | Description                                          |
+| ----------------- | ------ | ---------------------------------------------------- |
+| `integrationKey`  | string | Required. Key of the configured integration          |
+| `request`         | object | Request configuration (method, path, headers, query, body) |
+| `attachments`     | array  | File attachments: `[{ name, type, data }]`           |
+| `bodyMode`        | string | Body encoding: `json` (default), `raw`, `multipart`  |
+| `multipartFields` | array  | Multipart field definitions (for `bodyMode = "multipart"`) |
 
 ### 8. `prompt.execute` - Execute Managed Prompt
 
@@ -492,6 +504,53 @@ text = "{{ input.text || '' }}"
 # Chained fallback
 value = "{{ input.primary || input.fallback || 'default' }}"
 ```
+
+### Filters
+
+Use `|` (single pipe) to apply a filter to a value. Filters transform the resolved value before output. Do not confuse with `||` (double pipe) which is the fallback operator.
+
+```toml
+# Format as JSON
+debug = "{{ input.data | json }}"
+
+# String transformations
+upper = "{{ input.name | upper }}"
+lower = "{{ input.name | lower }}"
+trimmed = "{{ input.text | trim }}"
+
+# Collection operations
+count = "{{ input.items | length }}"
+first = "{{ input.items | first }}"
+last = "{{ input.items | last }}"
+allKeys = "{{ input.data | keys }}"
+allValues = "{{ input.data | values }}"
+joined = "{{ input.tags | join: ', ' }}"
+
+# Type conversion
+asString = "{{ input.count | string }}"
+asNumber = "{{ input.amount | number }}"
+
+# Default value (works on null, undefined, or empty string)
+name = "{{ input.name | default: 'Anonymous' }}"
+```
+
+**Available filters:**
+
+| Filter      | Description                                       |
+| ----------- | ------------------------------------------------- |
+| `json`      | JSON-stringify the value (pretty-printed)          |
+| `upper`     | Convert string to uppercase (alias: `uppercase`)   |
+| `lower`     | Convert string to lowercase (alias: `lowercase`)   |
+| `trim`      | Trim whitespace from string                        |
+| `length`    | Length of string/array, or key count of object (alias: `size`) |
+| `first`     | First element of array/string                      |
+| `last`      | Last element of array/string                       |
+| `keys`      | Object keys as array                               |
+| `values`    | Object values as array                             |
+| `string`    | Convert to string                                  |
+| `number`    | Convert to number                                  |
+| `default`   | Use fallback if value is null/undefined/empty: `\| default: 'fallback'` |
+| `join`      | Join array with separator: `\| join: ','`          |
 
 ### Single Expression Mode
 
@@ -758,6 +817,8 @@ primitive workflows tests attachments upload <workflow-id> <test-case-id> ./file
 
 The `JsBaoClient` provides methods for interacting with workflows from application code.
 
+**Note:** The getting-started guide shows a simplified call signature (e.g., `client.workflows.start("key", { input })`). The actual SDK uses an options object as shown below. Always prefer the signatures documented here, which match the source code.
+
 ### Start a Workflow
 
 ```typescript
@@ -789,7 +850,7 @@ const status = await client.workflows.getStatus({
 });
 
 // status: { status, output?, error?, run? }
-// status.status: "complete" | "failed" | "terminated" | "running"
+// status.status: "running" | "complete" | "failed" | "terminated" | "apply_pending" | "apply_claimed"
 ```
 
 ### Terminate a Workflow
@@ -829,11 +890,9 @@ interface WorkflowRun {
   revisionId: string;
   contextDocId?: string;
   status: string;                      // "running" | "completed" | "failed" | "terminated"
-  errorMessage?: string;
-  startedAt: string;
-  endedAt?: string;
-  meta?: Record<string, any>;
   createdAt: string;
+  endedAt?: string;
+  meta?: Record<string, any>;          // User-defined metadata (max 1KB)
 }
 ```
 
@@ -896,6 +955,8 @@ client.on("workflowStatus", (event) => {
   error?: string;                      // Present when status is "failed"
   contextDocId?: string;
   needsApply?: boolean;                // True if workflow result needs client apply
+  startedByUserId?: string;            // User ID that started the workflow
+  meta?: Record<string, any>;          // User-defined metadata
 }
 ```
 
@@ -910,16 +971,18 @@ client.on("workflowStatus", (event) => {
 
 When a workflow completes, its result can be applied to a Yjs document by exactly one connected client. This prevents duplicate writes when multiple tabs or devices are connected to the same document.
 
-### Using `onApply` (Recommended)
+### Using `workflows.define()` (Recommended)
 
-Register a handler with `workflows.onApply()` to automatically claim, apply, and confirm workflow results:
+Register a handler with `workflows.define()` to automatically claim, apply, and confirm workflow results:
 
 ```typescript
-client.workflows.onApply("my-workflow-key", async ({ output, workflowKey, runKey, contextDocId }) => {
-  // Apply the workflow result to the Yjs document
-  const { doc } = await client.documents.open(contextDocId);
-  const map = doc.getMap("data");
-  map.set("result", output);
+client.workflows.define("my-workflow-key", {
+  onApply: async ({ output, workflowKey, runKey, runId, contextDocId, startedByUserId, meta }) => {
+    // Apply the workflow result to the Yjs document
+    const { doc } = await client.documents.open(contextDocId);
+    const map = doc.getMap("data");
+    map.set("result", output);
+  },
 });
 ```
 
@@ -933,7 +996,7 @@ client.workflows.onApply("my-workflow-key", async ({ output, workflowKey, runKey
 6. On failure, `releaseApply` releases the claim so another client can retry
 7. A 30-second lease timeout handles crashed clients
 
-The claim/confirm/release cycle is handled automatically when you use `workflows.onApply()`.
+The claim/confirm/release cycle is handled automatically when you use `workflows.define()`.
 
 ### Manual Claim/Confirm Flow
 
@@ -968,10 +1031,11 @@ if (claim.claimed) {
 
 | Method | Description |
 | ------ | ----------- |
-| `workflows.onApply(workflowKey, handler)` | Register handler for automatic claim/apply/confirm |
+| `workflows.define(workflowKey, { onApply })` | Register handler for automatic claim/apply/confirm |
 | `workflows.claimApply(options)` | Manually claim a pending apply |
 | `workflows.confirmApply(options)` | Confirm apply succeeded |
 | `workflows.releaseApply(options)` | Release claim on failure |
+| `workflows.getPendingApplies({ contextDocId })` | Fetch pending applies for a document |
 
 ---
 

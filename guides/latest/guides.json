@@ -157,6 +157,25 @@
       "relatedGuides": ["workflows"]
     },
     {
+      "topic": "analytics",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.md",
+      "description": "Tracking user behavior with automatic lifecycle events and custom event logging",
+      "keywords": ["analytics", "events", "tracking", "metrics", "DAU", "WAU", "MAU", "logEvent", "auto events", "usage", "user activity", "session", "offline"],
+      "useCases": [
+        "Logging custom analytics events",
+        "Configuring automatic lifecycle event tracking",
+        "Querying app-wide analytics (DAU, WAU, MAU)",
+        "Viewing top users and user timelines",
+        "Tracking integration and workflow metrics",
+        "Overriding plan or app version for analytics",
+        "Handling pre-auth event logging",
+        "Flushing events before navigation"
+      ],
+      "concepts": ["client.analytics.logEvent", "client.analytics.flush", "client.analytics.logSnapshot", "analyticsAutoEvents", "ANALYTICS_UNAUTHENTICATED_USER", "auto events", "offline persistence", "rate limiting"],
+      "prerequisites": ["authentication"],
+      "relatedGuides": ["workflows", "integrations", "blobs"]
+    },
+    {
       "topic": "devtools",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DEVTOOLS.md",
       "description": "Using Document Explorer and Test Harness for debugging and testing",

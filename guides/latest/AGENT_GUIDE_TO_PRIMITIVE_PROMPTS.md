@@ -97,7 +97,8 @@ When templates are rendered, they have access to this context structure:
   selected: any,                  // Alias for input
   steps: Record<string, any>,     // Workflow step outputs (when used in workflows)
   outputs: Record<string, any>,   // Workflow outputs
-  meta: Record<string, any>       // Metadata
+  meta: Record<string, any>,      // Metadata
+  output?: any,                   // The generated output (available in evaluator prompts)
 }
 ```
 
@@ -107,6 +108,28 @@ Most prompts access variables via `input.*`:
 User request: {{ input.userMessage }}
 Document content: {{ input.documentText }}
 ```
+
+### Filters
+
+Template expressions support filters using the `|` (pipe) syntax. Filters transform values inline:
+
+```
+{{ input.data | json }}             // Pretty-print as JSON
+{{ input.name | upper }}            // Convert to uppercase (alias: uppercase)
+{{ input.name | lower }}            // Convert to lowercase (alias: lowercase)
+{{ input.text | trim }}             // Trim whitespace
+{{ input.items | length }}          // Array/string length or object key count (alias: size)
+{{ input.items | first }}           // First element of array or string
+{{ input.items | last }}            // Last element of array or string
+{{ input.obj | keys }}              // Object keys as array
+{{ input.obj | values }}            // Object values as array
+{{ input.val | string }}            // Convert to string
+{{ input.val | number }}            // Convert to number
+{{ input.items | join:", " }}       // Join array with separator (default: ",")
+{{ input.name | default:"Anonymous" }}  // Fallback if null/undefined/empty
+```
+
+**Note:** The `||` fallback syntax and the `| default:` filter both provide fallback values, but work differently. Use `||` for chaining multiple variable paths; use `| default:` for providing a literal default.
 
 ### Raw Value Preservation
 
@@ -144,7 +167,7 @@ name = "default"
 description = "Default configuration"
 provider = "gemini"  # gemini | openrouter
 model = "models/gemini-3-flash-preview"
-temperature = "0.7"
+temperature = 0.7
 systemPrompt = "You are a helpful assistant."
 userPromptTemplate = "Respond to: {{ input.text }}"
 ```
@@ -158,7 +181,7 @@ userPromptTemplate = "Respond to: {{ input.text }}"
 | `description`  | No       | Description of what the prompt does               |
 | `status`       | No       | `draft` (default), `active`, or `archived`        |
 | `inputSchema`  | No       | JSON Schema string for input validation           |
-| `outputSchema` | No       | JSON Schema string for structured output          |
+| `outputSchema` | No       | JSON Schema string for structured output (supported via CLI `--output-schema` but not included in `sync pull` output) |
 
 ### Config Section Fields
 
@@ -170,8 +193,7 @@ userPromptTemplate = "Respond to: {{ input.text }}"
 | `model`              | Yes      | Model identifier                         |
 | `userPromptTemplate` | Yes      | User prompt with `{{ }}` variables       |
 | `systemPrompt`       | No       | System prompt                            |
-| `temperature`        | No       | Temperature as string (e.g., `"0.7"`)    |
-| `topP`               | No       | Top-p sampling as string (e.g., `"0.9"`) |
+| `temperature`        | No       | Temperature (e.g., `0.7`)                |
 | `maxTokens`          | No       | Max output tokens (integer)              |
 | `outputFormat`       | No       | `text` (default) or `json`               |
 
@@ -186,21 +208,21 @@ displayName = "Document Summarizer"
 name = "default"
 provider = "gemini"
 model = "models/gemini-3-flash-preview"
-temperature = "0.3"
+temperature = 0.3
 userPromptTemplate = "Summarize: {{ input.text }}"
 
 [[configs]]
 name = "creative"
 provider = "gemini"
 model = "models/gemini-3-pro-preview"
-temperature = "0.8"
+temperature = 0.8
 userPromptTemplate = "Write an engaging summary of: {{ input.text }}"
 
 [[configs]]
 name = "openrouter-claude"
 provider = "openrouter"
 model = "anthropic/claude-3-5-sonnet"
-temperature = "0.5"
+temperature = 0.5
 userPromptTemplate = "Provide a concise summary: {{ input.text }}"
 ```
 
@@ -217,7 +239,7 @@ displayName = "Output Evaluator"
 name = "default"
 provider = "gemini"
 model = "models/gemini-3-flash-preview"
-temperature = "1"
+temperature = 1
 systemPrompt = "You are an evaluator that judges the quality of LLM outputs."
 userPromptTemplate = """
 **Output to Evaluate:**
@@ -443,6 +465,24 @@ primitive prompts tests run-all <prompt-id> \
 primitive prompts tests runs <prompt-id> [--limit 20] [--group <comparison-group>] [--json]
 ```
 
+### Batch Test Execution
+
+Run tests in parallel using workflow-based execution:
+
+```bash
+# Start batch test execution
+primitive prompts tests batch start <prompt-id> \
+  [--config <config-id>] \
+  [--test-cases "id1,id2,id3"] \
+  [--json]
+
+# Check batch status (optionally wait for completion)
+primitive prompts tests batch status <prompt-id> <batch-id> [--wait] [--json]
+
+# Cancel a running batch
+primitive prompts tests batch cancel <prompt-id> <batch-id> [-y] [--json]
+```
+
 ### Test Case Attachments
 
 For prompts that process files (e.g., PDF summarizer):
@@ -550,7 +590,7 @@ description = "Generates personalized greetings"
 name = "default"
 provider = "gemini"
 model = "models/gemini-3-flash-preview"
-temperature = "0.7"
+temperature = 0.7
 userPromptTemplate = "Generate a friendly greeting for {{ input.name }} who works as a {{ input.occupation }}."
 EOF
 
@@ -633,6 +673,30 @@ model = "anthropic/claude-3-5-sonnet"
 model = "openai/gpt-4o"
 model = "google/gemini-2.0-flash-001"
 ```
+
+---
+
+## Client SDK API
+
+The `JsBaoClient` exposes a `prompts` sub-API for executing prompts from application code:
+
+```typescript
+const result = await client.prompts.execute("my-prompt-key", {
+  variables: { text: "Hello world" },  // Maps to template {{ input.text }}
+  configId: "01ABC...",                 // Optional: specific config ID
+  modelOverride: "other-model",        // Optional: override the config's model
+});
+
+// Result shape:
+result.success;        // boolean
+result.output;         // string - the generated text
+result.configId;       // string - which config was used
+result.error;          // string | undefined
+result.rawResponse;    // any - raw provider response
+result.metrics;        // { durationMs, inputTokens?, outputTokens?, totalTokens? }
+```
+
+**Note:** The `variables` property maps to the `input` namespace in templates. So `variables: { text: "Hello" }` is accessed as `{{ input.text }}` in the prompt template.
 
 ---
 

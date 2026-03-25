@@ -274,8 +274,10 @@ Email template types include `magic-link` and `otp`. Each type exposes template 
 View usage metrics:
 
 ```bash
-primitive analytics summary
-primitive analytics users
+primitive analytics overview
+primitive analytics top-users
+primitive analytics user <user-ulid>
+primitive analytics integrations
 ```
 
 ## Scripting

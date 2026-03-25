@@ -16,6 +16,8 @@ const blobs = client.document(documentId).blobs();
 
 ## Uploading Blobs
 
+The `upload` method accepts `File | Blob | Uint8Array | ArrayBuffer` as the source.
+
 ### Basic Upload
 
 ```typescript
@@ -33,17 +35,16 @@ const { blobId, numBytes, contentType } = await blobs.upload(data, {
 const fileInput = document.querySelector('input[type="file"]');
 const file = fileInput.files[0];
 
-const arrayBuffer = await file.arrayBuffer();
-const { blobId } = await client.document(documentId).blobs().upload(
-  new Uint8Array(arrayBuffer),
-  {
-    filename: file.name,
-    contentType: file.type,
-  }
-);
+// File objects can be passed directly — no need to convert to ArrayBuffer
+const { blobId } = await client.document(documentId).blobs().upload(file, {
+  filename: file.name,
+  contentType: file.type,
+});
 ```
 
 ### Convenience Helper
+
+`uploadFile` queues the upload for background transfer when the upload queue is active.
 
 ```typescript
 const { blobId, numBytes } = await client
@@ -79,7 +80,7 @@ if (page1.cursor) {
 
 ```typescript
 const meta = await client.document(documentId).blobs().get(blobId);
-console.log(meta.filename, meta.contentType, meta.size);
+console.log(meta.filename, meta.contentType, meta.numBytes);
 ```
 
 ---
@@ -177,7 +178,7 @@ const uploads = client.document(documentId).blobs().uploads();
 
 uploads.forEach((task) => {
   console.log(task.blobId, task.status);
-  // status: "pending" | "uploading" | "completed" | "failed"
+  // status: "pending" | "uploading" | "uploaded" | "paused"
 });
 ```
 
@@ -199,25 +200,30 @@ blobs.resumeAll();
 
 ```typescript
 // Adjust how many uploads run in parallel (minimum 1)
-client.documents.setUploadConcurrency(5);
-console.log("Current:", client.documents.getUploadConcurrency());
+client.setBlobUploadConcurrency(5);
+console.log("Current:", client.getBlobUploadConcurrency());
 ```
 
 ---
 
 ## Blob Events
 
-Listen for upload progress and completion:
+Listen for upload progress, completion, and failure:
 
 ```typescript
-// Upload progress
-client.on("blobs:upload-progress", ([event]) => {
-  console.log(event.queueId, event.status, event.bytesTransferred);
+// Upload progress (status: "queued" | "uploading" | "pending" | "paused")
+client.on("blobs:upload-progress", (event) => {
+  console.log(event.queueId, event.status, event.numBytes, event.attempts);
 });
 
 // Upload completed
-client.on("blobs:upload-completed", ([event]) => {
-  console.log("Upload done:", event.queueId);
+client.on("blobs:upload-completed", (event) => {
+  console.log("Upload done:", event.queueId, event.blobId);
+});
+
+// Upload failed
+client.on("blobs:upload-failed", (event) => {
+  console.log("Upload failed:", event.queueId, event.lastError, event.willRetry);
 });
 
 // All uploads complete
@@ -233,7 +239,7 @@ client.on("blobs:queue-drained", () => {
 For using blobs in `<img>` and `<video>` tags without authentication issues:
 
 ```typescript
-const blobs = client.documents.blobs(documentId);
+const blobs = client.document(documentId).blobs();
 
 // Check if service worker is ready
 if (blobs.hasServiceWorkerControl()) {
@@ -276,20 +282,16 @@ async function uploadImage(documentId: string, file: File) {
   const blobs = client.document(documentId).blobs();
 
   // Set up progress listener
-  const progressHandler = ([event]) => {
+  const progressHandler = (event) => {
     if (event.filename === file.name) {
-      const percent = Math.round((event.bytesTransferred / file.size) * 100);
-      console.log(`Upload progress: ${percent}%`);
+      console.log(`Upload status: ${event.status}, attempts: ${event.attempts}`);
     }
   };
   client.on("blobs:upload-progress", progressHandler);
 
   try {
-    // Read file
-    const arrayBuffer = await file.arrayBuffer();
-
-    // Upload
-    const { blobId } = await blobs.upload(new Uint8Array(arrayBuffer), {
+    // File objects can be passed directly
+    const { blobId } = await blobs.upload(file, {
       filename: file.name,
       contentType: file.type,
     });

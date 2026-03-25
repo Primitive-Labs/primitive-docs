@@ -30,8 +30,9 @@ allowedMethods = ["GET", "POST"]     # Required: Allowed HTTP methods (default: 
 allowedPaths = ["/v1/*", "/status"]  # Required: Allowed paths with wildcard support (default: ["/*"])
 defaultMethod = "GET"                # Optional: Default HTTP method (default: first allowedMethod)
 responsePassthrough = true           # Optional: Pass through response (default: true)
-forwardHeaders = ["x-trace-id"]      # Optional: Client headers to forward (lowercased)
-forwardQueryParams = ["q", "limit"]  # Optional: Client query params to forward (lowercased)
+forwardHeaders = ["x-trace-id"]      # Optional: Client headers to forward (lowercased; use ["*"] to forward all)
+forwardQueryParams = ["q", "limit"]  # Optional: Client query params to forward (lowercased; use ["*"] to forward all)
+bodyMode = "json"                    # Optional: "json" (default), "raw", or "multipart"
 
 [requestConfig.defaultHeaders]       # Optional: Headers always sent
 Content-Type = "application/json"
@@ -47,6 +48,16 @@ q = "search term"
 [requestConfig.exampleBody]          # Optional: Example request body (for testing/documentation)
 model = "gpt-4"
 input = "Hello"
+
+[[requestConfig.multipartFieldMapping]]  # Optional: Field mapping for multipart body mode
+fieldName = "file"
+type = "attachment"                  # "attachment" or "value"
+attachmentIndex = 0                  # Index into attachments array
+
+[[requestConfig.multipartFieldMapping]]
+fieldName = "purpose"
+type = "value"
+value = "fine-tune"
 ```
 
 ### Field Reference Table
@@ -63,10 +74,12 @@ input = "Hello"
 | `requestConfig.allowedPaths` | string[] | No | `["/*"]` | Array of path patterns |
 | `requestConfig.defaultMethod` | string | No | First allowed | Default HTTP method |
 | `requestConfig.defaultHeaders` | object | No | `{}` | Headers always sent |
-| `requestConfig.forwardHeaders` | string[] | No | `[]` | Client headers to forward |
+| `requestConfig.forwardHeaders` | string[] | No | `[]` | Client headers to forward (`["*"]` for all) |
 | `requestConfig.staticQuery` | object | No | `{}` | Query params always included |
-| `requestConfig.forwardQueryParams` | string[] | No | `[]` | Client query params to forward |
+| `requestConfig.forwardQueryParams` | string[] | No | `[]` | Client query params to forward (`["*"]` for all) |
 | `requestConfig.responsePassthrough` | boolean | No | `true` | Pass through response |
+| `requestConfig.bodyMode` | string | No | `"json"` | `"json"`, `"raw"`, or `"multipart"` |
+| `requestConfig.multipartFieldMapping` | array | No | `[]` | Field definitions for multipart mode |
 | `requestConfig.exampleQuery` | object | No | - | Example query params |
 | `requestConfig.exampleBody` | any | No | - | Example request body |
 
@@ -154,7 +167,7 @@ responsePassthrough = true
 
 ### Prerequisites
 
-1. Install the CLI: `npm install -g @anthropic/primitive-cli` (or use local installation)
+1. Install the CLI: `npm install -g primitive-admin` (or use local installation)
 2. Authenticate: `primitive login`
 3. Select an app: `primitive use <app-id>` (or use `--app` flag with each command)
 
@@ -312,7 +325,11 @@ config/
 ├── .primitive-sync.json    # Sync state tracking
 ├── integrations/           # Integration TOML files
 ├── prompts/                # Prompt TOML files
-└── workflows/              # Workflow TOML files
+├── workflows/              # Workflow TOML files
+├── database-types/         # Database type configs
+├── rule-sets/              # Rule set configs
+├── group-type-configs/     # Group type configs
+└── email-templates/        # Email template configs
 ```
 
 #### Pull Configuration from Server
@@ -461,27 +478,53 @@ primitive sync push --force
 - `active`: Can be called by clients via proxy endpoint
 - `archived`: Disabled, cannot be called
 
+### Body Mode
+- `"json"` (default): Body is JSON-serialized; `Content-Type: application/json` set automatically
+- `"raw"`: First attachment is sent as the raw request body
+- `"multipart"`: Body is sent as `multipart/form-data` using `multipartFieldMapping` definitions
+
+### Max Request Body Size
+- Configurable per integration via `maxRequestBodyBytes` (default: 1,048,576 = 1 MB)
+- Requests exceeding the limit receive `REQUEST_BODY_TOO_LARGE` error (HTTP 413)
+
 ### Secrets
 - Stored separately from integration configuration
 - Latest active secret (by version) is used automatically
 - Secrets can be rotated by adding new secret and archiving old one
+- Secret data is a JSON object; fields are injected as headers and/or query parameters (see "How Secrets Are Injected" above)
 
 ## Common Patterns
 
-### API Key in Header
+### How Secrets Are Injected
 
-```toml
-[requestConfig.defaultHeaders]
-Authorization = "Bearer {{secret.apiKey}}"  # Placeholder - actual key from secrets
+Secrets are stored as JSON objects via `primitive integrations secrets add`. The server automatically injects secret fields into requests:
+
+- If the secret JSON has a `headers` key (object), those key-value pairs are added as request headers.
+- If the secret JSON has a `query` key (object), those key-value pairs are added as query parameters.
+- If the secret JSON has no `headers`/`query` keys, all top-level string/number/boolean fields are added as both headers and query parameters (excluding `body`).
+
+For example, to inject an `Authorization` header:
+
+```bash
+primitive integrations secrets add <integration-id> \
+  --data '{"headers": {"Authorization": "Bearer sk-your-key"}}' \
+  --summary "API key with header placement"
 ```
 
-Note: The actual API key is stored in secrets and injected server-side.
+Or for a query parameter API key:
 
-### API Key in Query Parameter
+```bash
+primitive integrations secrets add <integration-id> \
+  --data '{"query": {"api_key": "your-key"}}' \
+  --summary "API key as query param"
+```
 
-```toml
-[requestConfig.staticQuery]
-api_key = "{{secret.apiKey}}"  # Placeholder - actual key from secrets
+Simple flat format (legacy, fields injected as both headers and query):
+
+```bash
+primitive integrations secrets add <integration-id> \
+  --data '{"apiKey": "sk-your-key"}' \
+  --summary "API key"
 ```
 
 ### Forward Client Authentication
@@ -555,22 +598,35 @@ const response = await client.integrations.call({
   headers: { "X-Debug": "true" },
 });
 
-console.log(response.status);     // Upstream status code
-console.log(response.body);       // JSON returned by the provider
-console.log(response.traceId);    // Proxy trace id (correlates with admin logs)
-console.log(response.durationMs); // Milliseconds spent in the worker
+console.log(response.status);      // Upstream status code
+console.log(response.headers);     // Response headers (Record<string, string>)
+console.log(response.body);        // JSON returned by the provider
+console.log(response.traceId);     // Proxy trace id (optional, correlates with admin logs)
+console.log(response.durationMs);  // Milliseconds spent in the worker (optional)
+console.log(response.errorCode);   // Error code string if upstream returned an error (optional)
 ```
 
-### Request Options
+### Request Options (`IntegrationCallRequest`)
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `integrationKey` | string | Required. Integration key defined in admin |
-| `method` | string | HTTP method (must be in `allowedMethods`) |
-| `path` | string | Request path (must match `allowedPaths`) |
-| `query` | object | Query parameters |
-| `headers` | object | Request headers |
-| `body` | any | Request body (for POST/PUT/PATCH) |
+| `method` | string | Optional. HTTP method (must be in `allowedMethods`, defaults to `defaultMethod`) |
+| `path` | string | Optional. Request path (must match `allowedPaths`) |
+| `query` | `Record<string, any>` | Optional. Query parameters |
+| `headers` | `Record<string, string>` | Optional. Request headers |
+| `body` | any | Optional. Request body (for POST/PUT/PATCH) |
+
+### Response Shape (`IntegrationCallResponse<T>`)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | number | Upstream HTTP status code |
+| `headers` | `Record<string, string>` | Response headers |
+| `body` | `T` | Response body (generic type, defaults to `any`) |
+| `traceId` | string? | Optional. Proxy trace ID for log correlation |
+| `durationMs` | number? | Optional. Milliseconds spent in the proxy worker |
+| `errorCode` | string? | Optional. Error code if the upstream returned an error |
 
 ### Error Handling
 
@@ -578,12 +634,13 @@ console.log(response.durationMs); // Milliseconds spent in the worker
 
 | Error Code | Description |
 |------------|-------------|
-| `OFFLINE` | SDK is in offline mode |
-| `ACCESS_DENIED` | Missing/expired JWT |
-| `INTEGRATION_NOT_FOUND` | Integration removed/archived or typo in key |
-| `INTEGRATION_SECRET_MISSING` | Admin hasn't uploaded credentials |
-| `INTEGRATION_REQUEST_INVALID` | Method/path/body violate guardrails |
-| `INTEGRATION_PROXY_FAILED` | Upstream timeout or 5xx error |
+| `OFFLINE` | SDK is in offline mode (`networkMode=offline`) |
+| `INVALID_ARGUMENT` | Missing or invalid `integrationKey` parameter |
+| `ACCESS_DENIED` | Missing/expired JWT (HTTP 401/403) |
+| `INTEGRATION_NOT_FOUND` | Integration removed, archived, inactive, or typo in key (HTTP 404) |
+| `INTEGRATION_SECRET_MISSING` | Admin hasn't uploaded credentials (HTTP 409) |
+| `INTEGRATION_REQUEST_INVALID` | Method/path/body violate guardrails (HTTP 400/413/422) |
+| `INTEGRATION_PROXY_FAILED` | Upstream timeout, network error, or malformed response |
 
 ```typescript
 import { isJsBaoError } from "js-bao-wss-client";

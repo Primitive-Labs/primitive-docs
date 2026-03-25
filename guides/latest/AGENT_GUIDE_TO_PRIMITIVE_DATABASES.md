@@ -515,7 +515,7 @@ const result = await client.databases.executeOperation(databaseId, "listTasks", 
   params: { projectId: "proj-1" },
   limit: 10,
   cursor: previousCursor,
-  direction: "forward",
+  direction: 1, // 1 for forward, -1 for backward
 });
 ```
 
@@ -529,9 +529,9 @@ const result = await client.databases.executeOperation(databaseId, "listTasks", 
 | `aggregate` | `{ result: { [groupValue]: { ...computedFields } } }` |
 | `pipeline` | `{ steps: { [stepName]: { type, ...stepResult } } }` — each step's result matches its operation type (query steps have `data`, count steps have `count`, aggregate steps have `result`) |
 
-### Bulk import
+### Bulk operations
 
-Execute a mutation operation across many items in one call (up to 100,000):
+Execute any operation across many items in one call (up to 100,000). Useful for bulk inserts, deletes, updates, or any other mutation:
 
 ```typescript
 const result = await client.databases.importBulk(databaseId, "createTask", [
@@ -580,12 +580,18 @@ await db.save("products", data, { ifNotExists: true });
 
 // Conditional write
 await db.save("products", data, { condition: { status: "draft" } });
+
+// With StringSet fields
+await db.save("products", data, { stringSets: { tags: ["featured", "sale"] } });
 ```
 
 ### Patch (partial update)
 
 ```typescript
 await db.patch("products", "prod-1", { price: 7.99 });
+
+// Conditional patch
+await db.patch("products", "prod-1", { price: 7.99 }, { condition: { status: "draft" } });
 ```
 
 ### Find
@@ -791,6 +797,17 @@ await db.registerIndex("users", "email", "string", true);
 
 // Composite unique constraint
 await db.registerUniqueConstraint("tasks", "unique_title_per_project", ["projectId", "title"]);
+
+// List and drop indexes
+const indexes = await db.listIndexes("tasks"); // or listIndexes() for all models
+await db.dropIndex("tasks", "status");
+
+// List and drop unique constraints
+const constraints = await db.listUniqueConstraints("tasks");
+await db.dropUniqueConstraint("tasks", "unique_title_per_project");
+
+// Sync indexes for all models passed in the models array at init
+await db.syncAllIndexes();
 ```
 
 ## Permissions
@@ -821,6 +838,13 @@ await client.databases.grantPermission(databaseId, {
   userId: "co-admin-user-id",
   permission: "manager",
 });
+
+// List current permissions
+const permissions = await client.databases.listPermissions(databaseId);
+// [{ databaseId, userId, permission, grantedAt, grantedBy, userName?, userEmail? }]
+
+// Revoke a user's permission
+await client.databases.revokePermission(databaseId, "co-admin-user-id");
 
 // Transfer ownership
 await client.databases.transferOwnership(databaseId, "new-owner-id");
@@ -862,9 +886,10 @@ const result = await client.databases.importCsv(databaseId, {
   columnMap: { "Product Name": "name", "Unit Price": "price" },
 });
 
-// Without model class
+// Without model class (csv string or pre-parsed data array)
 const result = await client.databases.importCsv(databaseId, {
-  csv: csvString,
+  csv: csvString,       // provide csv or data, not both
+  // data: parsedRows,  // alternative: pre-parsed array of objects
   modelName: "products",
   types: { price: "number", stock: "number" },
   idColumn: "sku",
@@ -877,6 +902,7 @@ const result = await client.databases.importCsv(databaseId, {
     console.log(`${processed}/${total} processed`);
   },
 });
+// result: { imported: number, failed: number, errors: [...], indexesCreated: number, durationMs: number }
 ```
 
 ## Best Practices

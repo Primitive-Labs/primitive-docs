@@ -99,8 +99,8 @@ const page = await jsBaoClient.documents.list({
 // Include root document (excluded by default)
 const withRoot = await jsBaoClient.documents.list({ includeRoot: true });
 
-// Check if a document has a local copy
-const hasLocal = await jsBaoClient.documents.hasLocalCopy(documentId);
+// Check if a document has a local copy (synchronous)
+const hasLocal = jsBaoClient.documents.hasLocalCopy(documentId);
 ```
 
 ## Common Document Usage Patterns
@@ -395,15 +395,31 @@ const result = await MyModel.query(
 
 ### Query Operators
 
-| Operator        | Description           | Example                                      |
-| --------------- | --------------------- | -------------------------------------------- |
-| `$eq`           | Equals (default)      | `{ status: "active" }`                       |
-| `$gt`, `$lt`    | Greater/less than     | `{ priority: { $gt: 5 } }`                   |
-| `$gte`, `$lte`  | Greater/less or equal | `{ dueDate: { $lte: today } }`               |
-| `$in`           | Matches any in array  | `{ status: { $in: ["active", "pending"] } }` |
-| `$startsWith`   | String prefix match   | `{ title: { $startsWith: "Bug:" } }`         |
-| `$containsText` | Full-text search      | `{ title: { $containsText: "urgent" } }`     |
-| `$exists`       | Field exists/not null | `{ dueDate: { $exists: true } }`             |
+| Operator        | Description                    | Example                                              |
+| --------------- | ------------------------------ | ---------------------------------------------------- |
+| `$eq`           | Equals (default)               | `{ status: "active" }`                               |
+| `$ne`           | Not equals                     | `{ status: { $ne: "deleted" } }`                     |
+| `$gt`, `$lt`    | Greater/less than              | `{ priority: { $gt: 5 } }`                           |
+| `$gte`, `$lte`  | Greater/less or equal          | `{ dueDate: { $lte: today } }`                       |
+| `$in`           | Matches any in array           | `{ status: { $in: ["active", "pending"] } }`         |
+| `$nin`          | Not in array                   | `{ status: { $nin: ["deleted", "archived"] } }`      |
+| `$startsWith`   | String prefix match            | `{ title: { $startsWith: "Bug:" } }`                 |
+| `$containsText` | Case-insensitive contains      | `{ title: { $containsText: "urgent" } }`             |
+| `$exists`       | Field exists/not null          | `{ dueDate: { $exists: true } }`                     |
+| `$contains`     | StringSet contains value       | `{ tags: { $contains: "tutorial" } }`                |
+| `$containsAny`  | StringSet contains any         | `{ tags: { $containsAny: ["js", "ts"] } }`           |
+| `$containsAll`  | StringSet contains all         | `{ tags: { $containsAll: ["tutorial", "advanced"] } }`|
+
+**Logical operators:**
+
+```typescript
+const result = await Task.query({
+  $or: [
+    { priority: 3 },
+    { dueDate: { $lt: new Date().toISOString() } },
+  ],
+});
+```
 
 ```typescript
 const result = await Task.query({
@@ -428,7 +444,7 @@ const page1 = await Task.query(
 );
 
 // Next page using cursor
-cursor = page1.uniqueStartKey;
+cursor = page1.nextCursor;
 const page2 = await Task.query(
   { completed: false },
   { limit: pageSize, sort: { createdAt: -1 }, uniqueStartKey: cursor }
@@ -606,11 +622,20 @@ When saving new objects, you need to specify which document they go into. There 
    await item.save({ targetDocument: documentId });
    ```
 
-2. **`setDefaultDocumentId(docId)`** — sets a default document for all subsequent saves that don't specify a `targetDocument`. Good when many consecutive saves go to the same document (e.g., during app initialization or a bulk import).
+2. **`jsBaoClient.setDefaultDocumentId(docId)`** — sets a default document for all subsequent saves that don't specify a `targetDocument`. Good when many consecutive saves go to the same document (e.g., during app initialization or a bulk import).
 
-3. **`addDocumentModelMapping(modelName, docId)`** — routes all saves of a specific model to a specific document. Good when a model *always* goes to the same document for the lifetime of the app session.
+3. **`jsBaoClient.addDocumentModelMapping(modelName, docId)`** — routes all saves of a specific model to a specific document. Good when a model *always* goes to the same document for the lifetime of the app session.
 
 **Anti-pattern: Frequently switching defaults.** If your app writes to different documents based on context (e.g., the user switches between workspaces, or items are routed to different documents based on their properties), do NOT repeatedly call `setDefaultDocumentId()` or update model-document mappings to redirect writes. This is fragile and error-prone — it creates implicit state that's easy to get out of sync. Instead, pass `targetDocument` explicitly on each `.save()` call. Reserve `setDefaultDocumentId` and `addDocumentModelMapping` for cases where the target doesn't change, or changes only rarely.
+
+### Deleting Records
+
+```typescript
+const task = await Task.find("task-id");
+if (task) {
+  await task.delete();
+}
+```
 
 ### Upsert by Unique Constraint
 
@@ -688,6 +713,7 @@ await jsBaoClient.documents.open(result.documentId);
 - `documents.aliases.resolve(params)` - Get alias info (returns null if not found)
 - `documents.aliases.set(params)` - Set an alias for an existing document
 - `documents.aliases.delete(params)` - Remove an alias
+- `documents.aliases.listForDocument(documentId)` - List all aliases for a document
 
 ## Sharing Documents
 
@@ -745,9 +771,39 @@ await jsBaoClient.documents.close(documentId);
 await jsBaoClient.documents.close(documentId, { evictLocal: true });
 ```
 
+### Updating Document Metadata
+
+```typescript
+// Update a document's title
+await jsBaoClient.documents.update(documentId, { title: "New Title" });
+
+// Check if a document is currently open
+const open = jsBaoClient.documents.isOpen(documentId);
+```
+
+### Deleting Documents
+
+```typescript
+// Delete a document (must be closed first)
+await jsBaoClient.documents.delete(documentId);
+
+// Force-close before deleting
+await jsBaoClient.documents.delete(documentId, { forceCloseIfOpen: true });
+```
+
+Note: Root documents cannot be deleted.
+
 ### Programmatic Sharing
 
 In addition to the `PrimitiveShareDocumentDialog` UI component, documents can be shared programmatically — useful when sharing should happen in response to application events (e.g., sharing a post's content document with a class when it's approved).
+
+**Listing permissions:**
+
+```typescript
+// Get all user permissions on a document
+const permissions = await jsBaoClient.documents.getPermissions(documentId);
+// Returns: [{ userId, email, name, permission, grantedAt }, ...]
+```
 
 **Group-based permissions:**
 
@@ -769,14 +825,131 @@ const permissions = await jsBaoClient.documents.listGroupPermissions(documentId)
 **User-based permissions:**
 
 ```typescript
-// Grant a specific user access
-await jsBaoClient.documents.grantPermission(documentId, {
+// Grant or update a specific user's access
+await jsBaoClient.documents.updatePermissions(documentId, {
   userId: targetUserId,
   permission: "read-write",
 });
 
-// Revoke a specific user's access
-await jsBaoClient.documents.revokePermission(documentId, targetUserId);
+// Batch update multiple users' permissions
+await jsBaoClient.documents.updatePermissions(documentId, {
+  permissions: [
+    { userId: user1Id, permission: "read-write" },
+    { userId: user2Id, permission: "reader" },
+  ],
+});
+
+// Remove a specific user's access
+await jsBaoClient.documents.removePermission(documentId, targetUserId);
+
+// Transfer ownership to another user
+await jsBaoClient.documents.transferOwnership(documentId, newOwnerId);
+
+// Invite a user by email
+await jsBaoClient.documents.createInvitation(documentId, "user@example.com", "read-write", {
+  sendEmail: true,
+  documentUrl: `${window.location.origin}/lists`,
+  note: "Check out this list!",
+});
+```
+
+### Collections
+
+When sharing multiple documents as a unit, group them into a **collection** and manage permissions on the collection rather than on each document individually. Permissions granted to a collection are automatically materialized onto all its documents (current and future). When sharing the same document with many individual users, consider sharing it with a **group** instead (see the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md)).
+
+**Key properties:**
+- Permissions are **additive, max-wins** — collections can only add access, never restrict it
+- A document can belong to multiple collections; permissions from all sources combine
+- Deleting a collection revokes the permissions it granted but **never deletes the documents** and preserves any direct grants
+- Individual member access is O(1) regardless of collection size (uses system-managed groups internally)
+
+**Creating and managing collections:**
+
+```typescript
+// Create a collection
+const collection = await client.collections.create({
+  name: "Q1 Reports",
+  description: "All quarterly report documents",
+});
+
+// Add documents to a collection
+await client.collections.addDocument(collection.collectionId, documentId);
+
+// Remove a document (revokes only collection-sourced permissions)
+await client.collections.removeDocument(collection.collectionId, documentId);
+
+// List documents in a collection
+const docs = await client.collections.listDocuments(collection.collectionId);
+// Returns: { items: CollectionDocumentInfo[], cursor?: string }
+
+// List which collections a document belongs to
+const collections = await client.collections.listCollectionsForDocument(documentId);
+```
+
+**Sharing a collection with a group (fans out to all documents):**
+
+```typescript
+// Grant a group access — materializes permissions on all documents in the collection
+await client.collections.grantGroupPermission(collection.collectionId, {
+  groupType: "team",
+  groupId: "engineering",
+  permission: "read-write", // "reader" | "read-write"
+});
+
+// Revoke group access — cleans up materialized permissions, preserves direct grants
+await client.collections.revokeGroupPermission(collection.collectionId, "team", "engineering");
+```
+
+**Sharing a collection with individual users:**
+
+```typescript
+// Add a user (O(1) — no per-document writes)
+await client.collections.addMember(collection.collectionId, {
+  userId: targetUserId,
+  permission: "reader",
+});
+
+// Change permission level — call addMember again with new permission
+await client.collections.addMember(collection.collectionId, {
+  userId: targetUserId,
+  permission: "read-write",
+});
+
+// Remove a user
+await client.collections.removeMember(collection.collectionId, targetUserId);
+```
+
+**Viewing all access on a collection:**
+
+```typescript
+const access = await client.collections.getAccess(collection.collectionId);
+// access.groups: [{ groupType, groupId, permission, grantedAt, grantedBy }, ...]
+// access.members: [{ userId, permission, addedAt, addedBy }, ...]
+```
+
+**CLI commands:**
+
+```bash
+# Create and manage collections
+primitive collections create "Q1 Reports" --description "Quarterly reports"
+primitive collections list
+primitive collections delete <collection-id>
+
+# Manage documents in a collection
+primitive collections docs add <collection-id> <document-id>
+primitive collections docs remove <collection-id> <document-id>
+primitive collections docs list <collection-id>
+
+# Share with groups
+primitive collections share <collection-id> --group team/engineering --permission read-write
+primitive collections unshare <collection-id> --group team/engineering
+
+# Manage individual members
+primitive collections members add <collection-id> <user-id> --permission reader
+primitive collections members remove <collection-id> <user-id>
+
+# View all access
+primitive collections access <collection-id>
 ```
 
 ### Read-Only Permission Handling
