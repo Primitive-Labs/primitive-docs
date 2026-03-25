@@ -13,6 +13,17 @@ Most apps use one or both depending on the data. This guide helps you make the r
 
 ## Decision Framework
 
+### When to ask clarifying questions
+
+If the user's requirements clearly match one storage system based on the decision table below, proceed without asking. But if any of the following are ambiguous, **ask the user before choosing**:
+
+- **Sharing model unclear**: Will data be private, shared with specific people, or visible to different roles with different access? If the user hasn't mentioned sharing or collaboration, ask: *"Will this data be private to each user, or do you need to share it — and if shared, does everyone see the same thing or do different users need different access?"*
+- **Data size unclear**: Could the dataset grow beyond ~10MB per logical unit? If you can't estimate from context, ask: *"How much data do you expect per user/workspace/tenant? A rough order of magnitude helps — hundreds of records, thousands, millions?"*
+- **Access control unclear**: Are there distinct roles that need different visibility into the same data? If the user describes multiple user types but hasn't specified access patterns, ask: *"Do all users see the same data, or do different roles (e.g., admin vs. member) need to see or edit different subsets?"*
+- **Offline / real-time unclear**: If the app context doesn't make it obvious whether offline support or real-time collaboration matters, ask rather than assume.
+
+The goal is to avoid choosing the wrong storage system and having to migrate later. A quick clarifying question is much cheaper than a redesign.
+
 ### Quick decision table
 
 | Question | Documents | Databases |
