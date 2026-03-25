@@ -34,18 +34,12 @@ Each user gets one document that holds all their data. No document management UI
 **Best for:** Personal task managers, habit trackers, journal apps, budgeting tools.
 
 ```typescript
-// Use aliases for atomic get-or-create
-const aliasParams = { scope: "user" as const, aliasKey: "default-doc" };
-
-try {
-  await jsBaoClient.documents.openAlias(aliasParams);
-} catch {
-  const result = await jsBaoClient.documents.createWithAlias({
-    title: "My Data",
-    alias: aliasParams,
-  });
-  await jsBaoClient.documents.open(result.documentId);
-}
+// Use getOrCreateWithAlias for atomic get-or-create
+const result = await jsBaoClient.documents.getOrCreateWithAlias({
+  title: "My Data",
+  alias: { scope: "user", aliasKey: "default-doc" },
+});
+await jsBaoClient.documents.open(result.documentId);
 ```
 
 ### One Document at a Time (Workspaces)
