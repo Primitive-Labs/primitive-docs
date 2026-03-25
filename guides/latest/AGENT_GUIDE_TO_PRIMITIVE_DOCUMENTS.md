@@ -700,8 +700,6 @@ const result = await jsBaoClient.documents.getOrCreateWithAlias({
 await jsBaoClient.documents.open(result.documentId);
 ```
 
-**Always prefer `getOrCreateWithAlias` over manual alias resolution.** An older pattern involved manually resolving an alias, creating a document if not found, resolving again to check for race conditions, and cleaning up duplicates. `getOrCreateWithAlias` replaces that entire flow with a single atomic call. The manual approach still works but is unnecessary complexity — use it only if you need custom logic between the resolve and create steps.
-
 **Alias scopes:**
 
 - `"user"` - Unique per user (each user can have their own document with this alias)
