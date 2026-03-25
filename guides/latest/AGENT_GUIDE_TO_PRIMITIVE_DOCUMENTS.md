@@ -688,10 +688,10 @@ const todoItemSchema = defineModelSchema({
 
 ### Singleton Documents with Aliases
 
-For documents that should exist exactly once (default document, settings), use document aliases. Aliases provide atomic get-or-create semantics that prevent race conditions when multiple clients initialize simultaneously.
+For documents that should exist exactly once (default document, settings), use `getOrCreateWithAlias`. This single call atomically resolves an existing alias or creates a new document with that alias, eliminating race conditions when multiple clients initialize simultaneously.
 
 ```typescript
-// Atomic get-or-create using aliases
+// Atomic get-or-create — handles everything in one call
 const result = await jsBaoClient.documents.getOrCreateWithAlias({
   title: "My Preferences",
   alias: { scope: "user", aliasKey: "user-preferences" },
@@ -699,6 +699,8 @@ const result = await jsBaoClient.documents.getOrCreateWithAlias({
 // result.created === true if a new document was just created
 await jsBaoClient.documents.open(result.documentId);
 ```
+
+**Always prefer `getOrCreateWithAlias` over manual alias resolution.** An older pattern involved manually resolving an alias, creating a document if not found, resolving again to check for race conditions, and cleaning up duplicates. `getOrCreateWithAlias` replaces that entire flow with a single atomic call. The manual approach still works but is unnecessary complexity — use it only if you need custom logic between the resolve and create steps.
 
 **Alias scopes:**
 
