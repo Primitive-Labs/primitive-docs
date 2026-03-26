@@ -969,16 +969,17 @@ client.on("workflowStatus", (event) => {
 
 ## Workflow Apply Pattern
 
-When a workflow completes, its result can be applied to a Yjs document by exactly one connected client. This prevents duplicate writes when multiple tabs or devices are connected to the same document.
+When a workflow completes, you may need to run client-side follow-up logic exactly once — such as updating a document or syncing local state. The apply pattern guarantees that exactly one connected client executes this logic, even when multiple tabs or devices are connected simultaneously.
 
 ### Using `workflows.define()` (Recommended)
 
-Register a handler with `workflows.define()` to automatically claim, apply, and confirm workflow results:
+Register a client-side handler with `workflows.define()` to automatically claim, apply, and confirm workflow results:
 
 ```typescript
 client.workflows.define("my-workflow-key", {
   onApply: async ({ output, workflowKey, runKey, runId, contextDocId, startedByUserId, meta }) => {
-    // Apply the workflow result to the Yjs document
+    // Run any client-side logic that should happen exactly once after the workflow completes.
+    // For example: update a document, refresh local state, notify the UI, etc.
     const { doc } = await client.documents.open(contextDocId);
     const map = doc.getMap("data");
     map.set("result", output);
@@ -990,7 +991,7 @@ client.workflows.define("my-workflow-key", {
 
 1. Workflow completes → server sets status to `apply_pending`
 2. All connected clients receive a `workflowStatus` event with `needsApply: true`
-3. The first client to call `claimApply` wins (conditional DynamoDB update)
+3. The first client to call `claimApply` wins — only one client gets the claim
 4. The claiming client runs the registered `onApply` handler
 5. On success, `confirmApply` marks the run as `completed`
 6. On failure, `releaseApply` releases the claim so another client can retry
@@ -1011,7 +1012,7 @@ const claim = await client.workflows.claimApply({
 
 if (claim.claimed) {
   try {
-    // Apply result to document...
+    // Run your apply logic here...
     await client.workflows.confirmApply({
       workflowKey: "my-workflow-key",
       runKey: "run-123",
