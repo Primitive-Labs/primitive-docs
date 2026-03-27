@@ -60,6 +60,20 @@ primitive workflows publish welcome-email
 | `delay` | Pause execution for a specified duration |
 | `event.wait` | Wait for an external event/webhook |
 | `noop` | No operation (useful for conditional branching) |
+| `database.query` | Run a registered database query operation |
+| `database.mutate` | Run a registered database mutation operation |
+| `database.count` | Run a registered database count operation |
+| `database.aggregate` | Run a registered database aggregation |
+| `database.pipeline` | Run a registered database pipeline |
+| `group.addMember` | Add a user to a group |
+| `group.removeMember` | Remove a user from a group |
+| `group.checkMembership` | Check if a user belongs to a group |
+| `group.listMembers` | List members of a group |
+| `group.listUserMemberships` | List groups a user belongs to |
+| `collect` | Auto-paginate a data source and merge all pages |
+| `workflow.call` | Run another workflow inline (synchronously) |
+| `workflow.start` | Start child workflow instances in parallel |
+| `workflow.await` | Wait for child workflow instances to complete |
 
 ### Template Syntax
 
@@ -119,6 +133,47 @@ client.on("workflowStatus", (event) => {
     console.log("Result:", event.outputs);
   }
 });
+```
+
+## Inbound Webhooks
+
+Inbound webhooks let external services (Stripe, GitHub, Slack, etc.) trigger workflows automatically. Each webhook has a public URL, signature verification, and automatic workflow triggering.
+
+```bash
+# Create a webhook that triggers a workflow when Stripe sends events
+POST /app/{appId}/api/webhooks
+{
+  "webhookKey": "stripe-payments",
+  "displayName": "Stripe Payments",
+  "workflowKey": "handle-payment",
+  "verificationScheme": "stripe",
+  "signingSecret": "whsec_your_stripe_secret"
+}
+```
+
+The receive endpoint is:
+```
+POST /app/{appId}/webhook/{webhookKey}
+```
+
+When an event is received, the webhook verifies the signature and starts the configured workflow with the event payload as `rootInput`. Supported verification schemes are `stripe`, `github`, `slack`, `custom`, and `none`.
+
+Use `inputMapping` to extract a nested path from the payload before passing it to the workflow:
+```json
+{ "inputMapping": "data.object" }
+```
+
+Each event (accepted, rejected, duplicate) is logged and viewable via the API. Manage webhooks via the CLI:
+
+```bash
+# Create/update webhook definitions
+primitive webhooks push --dir ./config
+
+# List webhooks
+primitive webhooks list
+
+# View recent events
+primitive webhooks events <webhook-id>
 ```
 
 ## Managed Prompts
