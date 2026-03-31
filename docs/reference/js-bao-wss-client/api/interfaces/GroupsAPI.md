@@ -160,9 +160,9 @@ The unique identifier of the group within its type
 
 ### listMembers()
 
-> **listMembers**(`groupType`, `groupId`): `Promise`\<[`GroupMemberInfo`](GroupMemberInfo.md)[]\>
+> **listMembers**(`groupType`, `groupId`, `options?`): `Promise`\<\{ `cursor?`: `string`; `items`: [`GroupMemberInfo`](GroupMemberInfo.md)[]; \}\>
 
-Lists all members of a group.
+Lists members of a group with optional pagination.
 
 #### Parameters
 
@@ -178,9 +178,21 @@ The type category of the group
 
 The unique identifier of the group within its type
 
+##### options?
+
+Pagination options (limit, cursor)
+
+###### cursor?
+
+`string`
+
+###### limit?
+
+`number`
+
 #### Returns
 
-`Promise`\<[`GroupMemberInfo`](GroupMemberInfo.md)[]\>
+`Promise`\<\{ `cursor?`: `string`; `items`: [`GroupMemberInfo`](GroupMemberInfo.md)[]; \}\>
 
 ***
 

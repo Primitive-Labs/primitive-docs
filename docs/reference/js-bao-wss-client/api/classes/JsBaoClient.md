@@ -129,7 +129,7 @@ The document to clear the pending self-removal flag for
 
 ### closeDocument()
 
-> **closeDocument**(`documentId`, `options?`): `Promise`\<`void`\>
+> **closeDocument**(`documentId`, `options?`): `Promise`\<\{ `evicted`: `boolean`; \}\>
 
 Close an open document and stop syncing.
 
@@ -153,7 +153,7 @@ If true, removes the document's local data from storage on close
 
 #### Returns
 
-`Promise`\<`void`\>
+`Promise`\<\{ `evicted`: `boolean`; \}\>
 
 ***
 
@@ -733,6 +733,29 @@ New document title
 
 ## Methods
 
+### checkStateVector()
+
+> **checkStateVector**(`documentId`, `timeoutMs`): `Promise`\<\{ `includesWrites`: `boolean`; `inSync`: `boolean`; \}\>
+
+Ask the server to compare its state vector with the client's for a document.
+Returns { includesWrites, inSync } or safe defaults on failure/timeout.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+##### timeoutMs
+
+`number` = `5000`
+
+#### Returns
+
+`Promise`\<\{ `includesWrites`: `boolean`; `inSync`: `boolean`; \}\>
+
+***
+
 ### once()
 
 > **once**(`name`, `f`): `void`
@@ -754,6 +777,30 @@ New document title
 #### Inherited from
 
 `Observable.once`
+
+***
+
+### ~~waitForSync()~~
+
+> **waitForSync**(`documentId`, `timeoutMs`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+##### timeoutMs
+
+`number` = `30000`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+#### Deprecated
+
+Use [waitForInitialSync](#waitforinitialsync) instead.
 
 ## Authentication
 
@@ -2582,11 +2629,13 @@ Specific document ID to update when scope is "single"
 
 ***
 
-### waitForSync()
+### waitForInitialSync()
 
-> **waitForSync**(`documentId`, `timeoutMs`): `Promise`\<`void`\>
+> **waitForInitialSync**(`documentId`, `timeoutMs`): `Promise`\<`void`\>
 
-Wait until a document is synced with the server.
+Wait until a document's initial sync with the server completes and
+the local update queue is drained. This does NOT confirm the server
+received the writes — use [waitForWriteConfirmation](#waitforwriteconfirmation) for that.
 
 #### Parameters
 
@@ -2601,6 +2650,72 @@ The document to wait for
 `number` = `30000`
 
 Maximum time to wait before rejecting (ms, default 30000)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### waitForInSync()
+
+> **waitForInSync**(`documentId`, `timeoutMs`, `pollMs`): `Promise`\<`void`\>
+
+Wait until the client and server have identical document state.
+Polls [checkStateVector](#checkstatevector) until `inSync` is true.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to check
+
+##### timeoutMs
+
+`number` = `5000`
+
+Maximum time to wait (ms, default 5000)
+
+##### pollMs
+
+`number` = `50`
+
+Polling interval (ms, default 50)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### waitForWriteConfirmation()
+
+> **waitForWriteConfirmation**(`documentId`, `timeoutMs`, `pollMs`): `Promise`\<`void`\>
+
+Wait until the server confirms it has all of this client's writes.
+Polls [checkStateVector](#checkstatevector) until `includesWrites` is true.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to check
+
+##### timeoutMs
+
+`number` = `5000`
+
+Maximum time to wait (ms, default 5000)
+
+##### pollMs
+
+`number` = `50`
+
+Polling interval (ms, default 50)
 
 #### Returns
 

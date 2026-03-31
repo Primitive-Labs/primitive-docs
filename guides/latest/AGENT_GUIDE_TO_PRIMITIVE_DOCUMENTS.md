@@ -768,7 +768,37 @@ When your app opens many documents over a session (e.g., viewing individual item
 await jsBaoClient.documents.close(documentId);
 
 // Close and remove the local cached copy
-await jsBaoClient.documents.close(documentId, { evictLocal: true });
+// Safe: eviction is skipped if the server doesn't yet have all local writes
+const { evicted } = await jsBaoClient.documents.close(documentId, { evictLocal: true });
+if (!evicted) {
+  // Server was not fully in sync — local copy was retained
+}
+```
+
+When `evictLocal: true` is passed, the client performs a state vector check against the server before removing local data. If the server hasn't received all local writes (e.g. due to a brief network interruption), eviction is skipped and `evicted: false` is returned. This prevents data loss during WebSocket instability.
+
+### Sync Verification
+
+Use these methods to confirm the server has received your writes before taking irreversible actions (e.g., logging out, clearing local storage):
+
+```typescript
+// Check if the server has received all of this client's writes
+const hasAllWrites = await jsBaoClient.documents.includesWrites(documentId);
+
+// Check if client and server have completely identical document state
+const fullyInSync = await jsBaoClient.documents.inSync(documentId);
+```
+
+Both return `false` if the client is disconnected or the check times out. An optional `timeoutMs` parameter controls how long to wait (default: 3000ms).
+
+For cases where you need to wait until the server is confirmed to have all writes, use the polling helpers on the client directly:
+
+```typescript
+// Wait until server has all writes (throws if timeout exceeded)
+await jsBaoClient.waitForWriteConfirmation(documentId);
+
+// Wait until fully in sync
+await jsBaoClient.waitForInSync(documentId);
 ```
 
 ### Updating Document Metadata
