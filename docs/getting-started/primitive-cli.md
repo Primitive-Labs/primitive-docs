@@ -276,7 +276,13 @@ View usage metrics:
 ```bash
 primitive analytics overview
 primitive analytics top-users
-primitive analytics user <user-ulid>
+primitive analytics user-detail <user-ulid>
+primitive analytics user-search --query user@example.com
+primitive analytics events --window-days 7
+primitive analytics events-grouped --group-by feature
+primitive analytics cohort-retention
+primitive analytics workflows
+primitive analytics prompts
 primitive analytics integrations
 ```
 

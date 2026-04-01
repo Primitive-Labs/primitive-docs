@@ -504,16 +504,14 @@ All automatic emitters are on by default; pass `analyticsAutoEvents` when constr
 
 - `user_active_daily` (`feature: "session"`, toggle: `analyticsAutoEvents.dailyAuth`): first successful auth per calendar day.
 - `user_returned` (`"session"`, respects `analyticsAutoEvents.minResumeMs`): fired when the tab becomes visible after being hidden long enough. `context_json.trigger` indicates `"visibility"` or `"manual"`.
-- `client_boot` (`"session"`, toggle: `analyticsAutoEvents.boot`): exactly once per client instance.
-- `first_doc_open` / `first_doc_edit` (`"documents"`, toggles: `analyticsAutoEvents.firstDocOpen`, `analyticsAutoEvents.firstDocEdit`): include the triggering `documentId`.
-- `offline_recovery` (`"network"`, toggle: `analyticsAutoEvents.offlineRecovery.enabled`, throttled by `minIntervalMs`): logged when moving from offline back to online.
 - `sync_error` (`"sync"`, toggle: `analyticsAutoEvents.syncErrors.enabled`): records the `documentId` and `reason` when flush/send attempts fail (with interval throttling).
 - `blob_upload_started` / `blob_upload_succeeded` / `blob_upload_failed` (`"blobs"`, toggles: `analyticsAutoEvents.blobUploads.{start|success|failure}`): include blob/document identifiers, attempt counts, byte size, and retry details (with truncated error text on failure).
-- `service_worker_control` / `service_worker_token_update` (`"service_worker"`, toggles: `analyticsAutoEvents.serviceWorker.{control|tokenUpdate}`): cover the bridge taking control and forwarding refreshed tokens (`context_json.cause` when available).
 - `session_end` (`"session"`, toggle: `analyticsAutoEvents.sessionEnd`): emitted on `beforeunload` and `client.destroy()`, including `duration_ms` and exit reason.
-- `gemini_request_started` / `gemini_request_succeeded` / `gemini_request_failed` (`"gemini"`, toggles: `analyticsAutoEvents.gemini.{start|success|failure}` or boolean): emitted for `client.gemini.generate()` and `client.gemini.countTokens()` lifecycles with model/context metadata.
+- `prompt_started` / `prompt_succeeded` / `prompt_failed` (`"llm"` or `"gemini"`, toggles: `analyticsAutoEvents.llm.{start|success|failure}` and `analyticsAutoEvents.gemini.{start|success|failure}`): unified prompt lifecycle events emitted by `client.llm.chat()` and `client.gemini.generate()`/`client.gemini.countTokens()`. The `feature` field distinguishes the provider.
 
 When `analyticsAutoEvents.llm` enables any of `start`, `success`, or `failure`, `client.getLlmAnalyticsContext()` becomes non-null so LLM helpers can emit structured events without guessing configuration. `analyticsAutoEvents.gemini` controls `client.getGeminiAnalyticsContext()`, which powers automatic logging inside the Gemini namespace.
+
+**Removed events** (no longer emitted): `client_boot`, `first_doc_open`, `first_doc_edit`, `offline_recovery`, `service_worker_control`, `service_worker_token_update`, `llm_request_*`, `gemini_request_*`.
 
 Example configuration:
 
