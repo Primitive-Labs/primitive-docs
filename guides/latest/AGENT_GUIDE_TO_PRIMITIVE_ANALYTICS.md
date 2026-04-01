@@ -193,10 +193,30 @@ The `primitive` CLI provides commands for querying analytics data:
 ### App Overview
 
 ```bash
-# DAU, WAU, MAU, and activity series
+# DAU, WAU, MAU, and growth accounting
 primitive analytics overview
-primitive analytics overview --window-days 7
+primitive analytics overview --window-days 28
 primitive analytics overview --json
+```
+
+### Active Users Time Series
+
+```bash
+# Daily active users for a time window
+primitive analytics daily-active
+primitive analytics daily-active --window-days 14
+
+# Rolling active users (28 data points)
+primitive analytics rolling-active
+primitive analytics rolling-active --window-days 7
+```
+
+### Cohort Retention
+
+```bash
+# Weekly cohort retention matrix
+primitive analytics cohort-retention
+primitive analytics cohort-retention --json
 ```
 
 ### Top Users
@@ -207,12 +227,30 @@ primitive analytics top-users
 primitive analytics top-users --window-days 7 --limit 20
 ```
 
-### User Timeline
+### User Search & Detail
 
 ```bash
-# Activity breakdown and timeline for a specific user
-primitive analytics user <user-ulid>
-primitive analytics user <user-ulid> --window-days 14
+# Search users by email or ULID
+primitive analytics user-search --query user@example.com
+
+# Detailed activity breakdown for a specific user
+primitive analytics user-detail <user-ulid>
+primitive analytics user-detail <user-ulid> --json
+
+# Latest context snapshot for a user
+primitive analytics user-snapshot <user-ulid>
+```
+
+### Event Feed
+
+```bash
+# Paginated raw event feed
+primitive analytics events
+primitive analytics events --window-days 7 --page 1
+
+# Events grouped by a dimension (action, feature, route, country, deviceType, plan, day)
+primitive analytics events-grouped
+primitive analytics events-grouped --group-by feature --window-days 14
 ```
 
 ### Integration Metrics
@@ -221,6 +259,18 @@ primitive analytics user <user-ulid> --window-days 14
 # Invocation counts, error rates, and latency per integration
 primitive analytics integrations
 primitive analytics integrations --window-days 7 --json
+```
+
+### Workflow & Prompt Analytics
+
+```bash
+# Top workflows by run count
+primitive analytics workflows
+primitive analytics workflows --limit 5 --window-days 14
+
+# Top prompts by execution count
+primitive analytics prompts
+primitive analytics prompts --limit 5 --window-days 14
 ```
 
 All commands accept `--json` for machine-readable output and default to a 30-day window.
