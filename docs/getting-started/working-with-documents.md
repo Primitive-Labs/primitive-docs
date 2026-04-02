@@ -210,6 +210,18 @@ await Category.upsertByUnique(
 );
 ```
 
+### Upsert by Natural Key
+
+Use the `upsertOn` option to save-or-update by a natural unique field (such as `email` or `slug`) without needing to know the existing record's ID. The field must have a single-field unique constraint.
+
+```typescript
+const user = new User({ email: "alice@example.com", name: "Alice" });
+// Creates a new record, or merges into the existing one with that email
+await user.save({ upsertOn: "email" });
+```
+
+When a match is found, the save returns the existing record's ID. Only the fields you provided are updated — all other existing fields are preserved.
+
 ## Query Operators
 
 | Operator | Description | Example |
