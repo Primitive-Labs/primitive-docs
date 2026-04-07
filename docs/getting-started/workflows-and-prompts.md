@@ -168,7 +168,7 @@ status = "active"
 accessRule = "hasRole('owner')"  # Only webhook triggers can start this — clients are blocked
 ```
 
-The `accessRule` is a CEL expression evaluated on `client.workflows.start()` calls but **not** on webhook triggers (which have their own signature verification). Setting it to `hasRole('owner')` effectively restricts direct starts to app owners while allowing webhooks to trigger normally. See the [Workflows Agent Guide](/guides/latest/AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md#access-control) for the full `accessRule` reference.
+The `accessRule` is a CEL expression evaluated on `client.workflows.start()` calls but **not** on webhook triggers (which have their own signature verification). Setting it to `hasRole('owner')` effectively restricts direct starts to app owners while allowing webhooks to trigger normally. See the Workflows Agent Guide for the full `accessRule` reference.
 
 Use `inputMapping` to extract a nested path from the payload before passing it to the workflow:
 ```json
