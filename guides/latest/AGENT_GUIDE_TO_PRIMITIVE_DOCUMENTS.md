@@ -650,6 +650,29 @@ await Category.upsertByUnique(
 );
 ```
 
+### Upsert by Natural Key (`upsertOn`)
+
+Use the `upsertOn` option in `save()` to upsert by a natural unique field (e.g., `email`, `slug`) without knowing the existing record's ID. The field must have a single-field `uniqueConstraints` entry on the model.
+
+```typescript
+const user = new User({ email: "alice@example.com", name: "Alice", role: "admin" });
+// Creates a new record if none exists with that email, or merges into the existing one
+const result = await user.save({ upsertOn: "email" });
+```
+
+Behavior:
+- **No existing record**: creates a new record with an auto-generated ID (or the caller-provided ID)
+- **Existing record found**: merges the provided fields into the existing record; unprovided fields are preserved; returns the existing record's ID
+- **Caller provides an ID that mismatches the found record**: throws an error (conflict)
+
+`upsertOn` validates that the field has a registered unique index. It throws if the field is missing from the data or has a null/empty value.
+
+### Save Merge Semantics
+
+`save()` uses **merge semantics**: only the fields you set on the instance are written; existing fields not included in the change set are preserved. Setting a field to `null` removes it from the stored record.
+
+This applies both to new saves and updates, and is consistent across single saves and batch operations.
+
 ## Design Patterns
 
 ### Singleton Model per Document (Avoiding ID Confusion)
@@ -768,7 +791,37 @@ When your app opens many documents over a session (e.g., viewing individual item
 await jsBaoClient.documents.close(documentId);
 
 // Close and remove the local cached copy
-await jsBaoClient.documents.close(documentId, { evictLocal: true });
+// Safe: eviction is skipped if the server doesn't yet have all local writes
+const { evicted } = await jsBaoClient.documents.close(documentId, { evictLocal: true });
+if (!evicted) {
+  // Server was not fully in sync — local copy was retained
+}
+```
+
+When `evictLocal: true` is passed, the client performs a state vector check against the server before removing local data. If the server hasn't received all local writes (e.g. due to a brief network interruption), eviction is skipped and `evicted: false` is returned. This prevents data loss during WebSocket instability.
+
+### Sync Verification
+
+Use these methods to confirm the server has received your writes before taking irreversible actions (e.g., logging out, clearing local storage):
+
+```typescript
+// Check if the server has received all of this client's writes
+const hasAllWrites = await jsBaoClient.documents.includesWrites(documentId);
+
+// Check if client and server have completely identical document state
+const fullyInSync = await jsBaoClient.documents.inSync(documentId);
+```
+
+Both return `false` if the client is disconnected or the check times out. An optional `timeoutMs` parameter controls how long to wait (default: 3000ms).
+
+For cases where you need to wait until the server is confirmed to have all writes, use the polling helpers on the client directly:
+
+```typescript
+// Wait until server has all writes (throws if timeout exceeded)
+await jsBaoClient.waitForWriteConfirmation(documentId);
+
+// Wait until fully in sync
+await jsBaoClient.waitForInSync(documentId);
 ```
 
 ### Updating Document Metadata

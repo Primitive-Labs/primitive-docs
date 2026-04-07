@@ -8,6 +8,32 @@
 
 ## Methods
 
+### addManager()
+
+> **addManager**(`databaseId`, `params`): `Promise`\<[`DatabasePermissionEntry`](DatabasePermissionEntry.md)\>
+
+Add a user as a manager of a database.
+
+#### Parameters
+
+##### databaseId
+
+`string`
+
+The unique identifier of the database
+
+##### params
+
+[`AddManagerParams`](AddManagerParams.md)
+
+Manager details (userId)
+
+#### Returns
+
+`Promise`\<[`DatabasePermissionEntry`](DatabasePermissionEntry.md)\>
+
+***
+
 ### connect()
 
 > **connect**(`databaseId`): `DoDb`
@@ -198,6 +224,28 @@ The unique identifier of the database to retrieve
 
 ***
 
+### getMetadata()
+
+> **getMetadata**(`databaseId`): `Promise`\<\{ `databaseId`: `string`; `metadata`: `Record`\<`string`, `any`\> \| `null`; \}\>
+
+Read a database's custom metadata.
+Owners and managers always have access. Non-owner/manager users
+need a `metadataAccess` CEL rule on the database type config.
+
+#### Parameters
+
+##### databaseId
+
+`string`
+
+The unique identifier of the database to read metadata from
+
+#### Returns
+
+`Promise`\<\{ `databaseId`: `string`; `metadata`: `Record`\<`string`, `any`\> \| `null`; \}\>
+
+***
+
 ### getOperation()
 
 > **getOperation**(`databaseId`, `name`): `Promise`\<[`DatabaseOperationInfo`](DatabaseOperationInfo.md)\>
@@ -224,7 +272,7 @@ The name of the operation to retrieve
 
 ***
 
-### grantPermission()
+### ~~grantPermission()~~
 
 > **grantPermission**(`databaseId`, `params`): `Promise`\<[`DatabasePermissionEntry`](DatabasePermissionEntry.md)\>
 
@@ -240,13 +288,17 @@ The unique identifier of the database to grant access to
 
 ##### params
 
-`GrantPermissionParams`
+[`GrantPermissionParams`](GrantPermissionParams.md)
 
 Permission grant details
 
 #### Returns
 
 `Promise`\<[`DatabasePermissionEntry`](DatabasePermissionEntry.md)\>
+
+#### Deprecated
+
+Use [addManager](#addmanager) instead.
 
 ***
 
@@ -362,7 +414,33 @@ The unique identifier of the database whose permissions to list
 
 ***
 
-### revokePermission()
+### removeManager()
+
+> **removeManager**(`databaseId`, `userId`): `Promise`\<\{ `success`: `boolean`; \}\>
+
+Remove a manager from a database.
+
+#### Parameters
+
+##### databaseId
+
+`string`
+
+The unique identifier of the database
+
+##### userId
+
+`string`
+
+The user ID of the manager to remove
+
+#### Returns
+
+`Promise`\<\{ `success`: `boolean`; \}\>
+
+***
+
+### ~~revokePermission()~~
 
 > **revokePermission**(`databaseId`, `userId`): `Promise`\<\{ `success`: `boolean`; \}\>
 
@@ -385,6 +463,10 @@ The user whose permission should be removed
 #### Returns
 
 `Promise`\<\{ `success`: `boolean`; \}\>
+
+#### Deprecated
+
+Use [removeManager](#removemanager) instead.
 
 ***
 

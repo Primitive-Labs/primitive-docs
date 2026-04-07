@@ -17,3 +17,9 @@
 ### targetDocument?
 
 > `optional` **targetDocument**: `string`
+
+***
+
+### upsertOn?
+
+> `optional` **upsertOn**: `string`

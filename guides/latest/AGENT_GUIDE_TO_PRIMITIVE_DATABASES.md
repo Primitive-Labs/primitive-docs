@@ -814,7 +814,7 @@ await db.syncAllIndexes();
 
 ### How end users access databases
 
-**Use registered operations with CEL access expressions** to control what end users can do. Do not use `grantPermission` to give application users access to a database — that grants administrative control over the database itself, not scoped data access.
+**Use registered operations with CEL access expressions** to control what end users can do. Do not use `addManager` to give application users access to a database — that grants administrative control over the database itself, not scoped data access.
 
 The correct pattern:
 1. Define operations with appropriate `access` CEL expressions (e.g., `isMemberOf('team', database.metadata.teamId)`)
@@ -834,17 +834,16 @@ The database creator is automatically the `owner`. Console admins bypass all che
 
 ```typescript
 // These are for administrative access — not for end-user data access
-await client.databases.grantPermission(databaseId, {
+await client.databases.addManager(databaseId, {
   userId: "co-admin-user-id",
-  permission: "manager",
 });
 
 // List current permissions
 const permissions = await client.databases.listPermissions(databaseId);
 // [{ databaseId, userId, permission, grantedAt, grantedBy, userName?, userEmail? }]
 
-// Revoke a user's permission
-await client.databases.revokePermission(databaseId, "co-admin-user-id");
+// Remove a manager
+await client.databases.removeManager(databaseId, "co-admin-user-id");
 
 // Transfer ownership
 await client.databases.transferOwnership(databaseId, "new-owner-id");
@@ -1005,7 +1004,7 @@ Any field starting with `_` (underscore) is reserved for internal use. The inter
 |---------|-------|-----|
 | 403 on operation execute | CEL `access` expression returned false | Check user's groups/roles match the access expression |
 | 403 on direct record access | User is not owner/manager | Use registered operations for non-privileged users |
-| Using `grantPermission` for end-user access | Granting manager/owner gives administrative control, not scoped data access | Define registered operations with CEL access expressions instead |
+| Using `addManager` for end-user access | Granting manager/owner gives administrative control, not scoped data access | Define registered operations with CEL access expressions instead |
 | 400 on operation registration | Invalid CEL expression or missing required fields | Validate CEL syntax; ensure `name`, `type`, `modelName`, `access`, `definition` are provided |
 | Empty results from query | Missing index on filtered field | Register indexes on fields used in filters |
 | `$params.x` not substituted | Parameter not declared in `params` | Add the parameter to the operation's `params` schema |

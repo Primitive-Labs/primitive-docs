@@ -31,3 +31,25 @@ Controls caching and loading behavior
 #### Returns
 
 `Promise`\<[`BasicUserInfo`](BasicUserInfo.md)\>
+
+***
+
+### getProfiles()
+
+> **getProfiles**(`userIds`): `Promise`\<[`BatchUserProfile`](BatchUserProfile.md)[]\>
+
+Retrieves profiles for multiple users in a single batch request.
+
+#### Parameters
+
+##### userIds
+
+`string`[]
+
+Array of user IDs to look up (max 100)
+
+#### Returns
+
+`Promise`\<[`BatchUserProfile`](BatchUserProfile.md)[]\>
+
+Array of user profiles (only users that exist and belong to the app)

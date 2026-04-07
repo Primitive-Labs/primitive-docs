@@ -447,6 +447,203 @@ type = "user-approval"
 timeout = "24 hours"            # Optional timeout
 ```
 
+### 11. `database.query` - Query Database
+
+Runs a registered database query operation.
+
+```toml
+[[steps]]
+id = "fetch-users"
+kind = "database.query"
+databaseId = "{{ input.dbId }}"
+operationName = "listActiveUsers"
+limit = 50
+saveAs = "users"
+
+[steps.params]
+status = "active"
+```
+
+**Output:** `{ data: [...], hasMore: boolean, nextCursor?: string }`
+
+### 12. `database.mutate` - Mutate Database
+
+Runs a registered database mutation operation.
+
+```toml
+[[steps]]
+id = "save-record"
+kind = "database.mutate"
+databaseId = "{{ input.dbId }}"
+operationName = "createTask"
+
+[steps.params]
+title = "{{ input.title }}"
+assignee = "{{ steps.lookup.userId }}"
+```
+
+**Output:** `{ results: [{ success: boolean, id: string }] }`
+
+### 13. `database.count` / `database.aggregate` / `database.pipeline`
+
+Other registered database operations:
+
+```toml
+[[steps]]
+id = "count-active"
+kind = "database.count"
+databaseId = "{{ input.dbId }}"
+operationName = "countByStatus"
+
+[steps.params]
+status = "active"
+# Output: { count: 42 }
+```
+
+### 14. `group.addMember` / `group.removeMember`
+
+Manage group membership. Idempotent — add is a no-op if already a member, remove is a no-op if not.
+
+```toml
+[[steps]]
+id = "add-to-team"
+kind = "group.addMember"
+groupType = "team"
+groupId = "{{ input.teamId }}"
+userId = "{{ input.userId }}"
+```
+
+**Output:** `{ userId, groupType, groupId, addedBy }` or `{ ..., alreadyMember: true }`
+
+Group operations evaluate CEL rules on the group type. Workflows can be granted access via `fromWorkflow("workflowKey")` in CEL rules.
+
+### 15. `group.checkMembership`
+
+Check if a user belongs to a group. Useful for conditional branching with `runIf`.
+
+```toml
+[[steps]]
+id = "is-reviewer"
+kind = "group.checkMembership"
+groupType = "reviewers"
+groupId = "senior"
+userId = "{{ input.userId }}"
+
+[[steps]]
+id = "approve"
+kind = "database.mutate"
+runIf = "steps.is-reviewer.isMember"
+# ...
+```
+
+**Output:** `{ isMember: boolean, userId, groupType, groupId }`
+
+### 16. `group.listMembers`
+
+Paginated list of group members.
+
+```toml
+[[steps]]
+id = "team-members"
+kind = "group.listMembers"
+groupType = "team"
+groupId = "engineering"
+limit = 100
+includeUserDetails = true
+```
+
+**Output:** `{ items: [{ userId, addedAt, addedBy, userName?, userEmail? }], cursor? }`
+
+### 17. `group.listUserMemberships`
+
+List all groups a user belongs to.
+
+```toml
+[[steps]]
+id = "user-groups"
+kind = "group.listUserMemberships"
+userId = "{{ input.userId }}"
+groupType = "team"              # Optional filter
+```
+
+**Output:** `{ memberships: [{ groupType, groupId, addedAt, addedBy }] }`
+
+### 18. `collect` - Auto-paginate
+
+Auto-paginates a data source and merges all pages.
+
+```toml
+[[steps]]
+id = "all-users"
+kind = "collect"
+itemsField = "data"             # Field containing items in each page (default: "items")
+cursorField = "nextCursor"      # Field containing the cursor (default: "cursor")
+maxPages = 20                   # Max pages to fetch (default: 10)
+maxItems = 10000                # Max total items (default: 10000)
+
+[steps.step]
+kind = "database.query"
+databaseId = "{{ input.dbId }}"
+operationName = "listUsers"
+limit = 100
+```
+
+**Output:** `{ items: [...all pages merged...], totalPages: number }`
+
+### 19. `workflow.call` - Call Child Workflow (Sequential)
+
+Run another workflow inline (synchronously). The child workflow gets its own isolated `input` — it cannot access the parent's `steps` or `outputs`.
+
+```toml
+[[steps]]
+id = "onboard-user"
+kind = "workflow.call"
+workflowKey = "onboard-user"
+
+[steps.input]
+userId = "{{ item.userId }}"
+department = "{{ input.department }}"
+```
+
+**Output:** `{ output: <child workflow output>, childStepResults: [...] }`
+
+Works with `forEach` for sequential per-item processing.
+
+### 20. `workflow.start` - Start Child Workflows (Parallel)
+
+Start child workflow instances in parallel. Each creates an independent workflow instance.
+
+```toml
+[[steps]]
+id = "start-all"
+kind = "workflow.start"
+forEach = "steps.get-users.data"
+as = "user"
+workflowKey = "process-item"
+
+[steps.input]
+userId = "{{ user.id }}"
+```
+
+**Output** (per instance): `{ runId, instanceId, workflowKey, status: "running" }`
+
+With `forEach`, returns `{ items: [...], errors: [], totalSucceeded, totalFailed }`.
+
+### 21. `workflow.await` - Wait for Child Workflows
+
+Wait for child workflow instances to complete.
+
+```toml
+[[steps]]
+id = "results"
+kind = "workflow.await"
+runs = "steps.start-all"        # Path to array from workflow.start
+timeout = 300000                # 5 minutes (default: 600000)
+onPartialFailure = "continue"   # or "fail" (default)
+```
+
+**Output:** `{ completed: [{ runId, instanceId, output }], failed: [{ runId, instanceId, error }], allSucceeded: boolean }`
+
 ## Templating Syntax
 
 Workflows use Mustache-style `{{ }}` templates with path resolution.
@@ -536,21 +733,61 @@ name = "{{ input.name | default: 'Anonymous' }}"
 
 **Available filters:**
 
+**Array:**
+
+| Filter      | Description                                       |
+| ----------- | ------------------------------------------------- |
+| `pluck`     | Extract a field from each object: `\| pluck: 'name'` |
+| `where`     | Filter by field value: `\| where: 'status', 'active'` |
+| `sort`      | Sort ascending by field: `\| sort: 'name'`        |
+| `reverse`   | Reverse order                                     |
+| `flatten`   | Flatten one level                                 |
+| `uniq`      | Remove duplicates                                 |
+| `compact`   | Remove null/undefined/empty/false values          |
+| `slice`     | Slice: `\| slice: '0', '3'`                       |
+| `first`     | First element                                     |
+| `last`      | Last element                                      |
+| `length`    | Count items (alias: `size`)                       |
+| `join`      | Join into string: `\| join: ', '`                 |
+| `keys`      | Object keys as array                              |
+| `values`    | Object values as array                            |
+
+**String:**
+
+| Filter      | Description                                       |
+| ----------- | ------------------------------------------------- |
+| `upper`     | Uppercase (alias: `uppercase`)                    |
+| `lower`     | Lowercase (alias: `lowercase`)                    |
+| `trim`      | Trim whitespace                                   |
+| `split`     | Split into array: `\| split: ','`                 |
+| `replace`   | Replace all: `\| replace: 'old', 'new'`           |
+| `truncate`  | Truncate with `...`: `\| truncate: '100'`         |
+| `startsWith`| Returns boolean: `\| startsWith: 'prefix'`       |
+| `endsWith`  | Returns boolean: `\| endsWith: 'suffix'`          |
+| `contains`  | Returns boolean: `\| contains: 'substring'`      |
+
+**Number:**
+
+| Filter      | Description                                       |
+| ----------- | ------------------------------------------------- |
+| `round`     | Round to nearest integer                          |
+| `floor`     | Round down                                        |
+| `ceil`      | Round up                                          |
+| `abs`       | Absolute value                                    |
+| `toFixed`   | Format decimal places: `\| toFixed: '2'`          |
+
+**Type / misc:**
+
 | Filter      | Description                                       |
 | ----------- | ------------------------------------------------- |
 | `json`      | JSON-stringify the value (pretty-printed)          |
-| `upper`     | Convert string to uppercase (alias: `uppercase`)   |
-| `lower`     | Convert string to lowercase (alias: `lowercase`)   |
-| `trim`      | Trim whitespace from string                        |
-| `length`    | Length of string/array, or key count of object (alias: `size`) |
-| `first`     | First element of array/string                      |
-| `last`      | Last element of array/string                       |
-| `keys`      | Object keys as array                               |
-| `values`    | Object values as array                             |
 | `string`    | Convert to string                                  |
 | `number`    | Convert to number                                  |
-| `default`   | Use fallback if value is null/undefined/empty: `\| default: 'fallback'` |
-| `join`      | Join array with separator: `\| join: ','`          |
+| `boolean`   | Convert to boolean                                |
+| `default`   | Use fallback if null/undefined/empty: `\| default: 'fallback'` |
+| `expect`    | Validate type, throw if mismatch: `\| expect: 'number'` (types: `string`, `number`, `boolean`, `array`, `object`) |
+| `now`       | Current ISO timestamp                             |
+| `toISOString` | Convert to ISO date string                      |
 
 ### Single Expression Mode
 
@@ -563,47 +800,172 @@ items = "{{ input.itemsList }}"
 
 ## Conditional Execution (`runIf`)
 
-Each step can include a `runIf` condition to control execution.
-
-### Truthy Check
+Each step can include a `runIf` CEL expression to control execution.
 
 ```toml
 [[steps]]
 id = "optional-step"
 kind = "transform"
-runIf = "input.shouldRun"       # Runs if input.shouldRun is truthy
-```
+runIf = "input.shouldRun"               # Truthy check
 
-### Numeric Comparison
-
-```toml
 [[steps]]
 id = "short-content-step"
 kind = "transform"
-runIf = "outputs.text.length < 1000"   # Runs if text length < 1000
+runIf = "outputs.text.length < 1000"   # Comparison
+
+[[steps]]
+id = "approve"
+kind = "database.mutate"
+runIf = 'steps.check.isMember == true && input.amount > 0'  # Full CEL
 ```
 
-### Fallback Logic
+CEL context includes: `input`, `selected`, `steps`, `outputs`, `meta`.
+
+## `forEach` — Iteration
+
+Any step can use `forEach` to run once per item in a list:
 
 ```toml
 [[steps]]
-id = "has-content"
-kind = "transform"
-runIf = "input.primary || input.fallback"   # Runs if either is truthy
+id = "notify-each"
+kind = "integration.call"
+forEach = "steps.get-team.items"
+as = "member"
+integrationKey = "email"
+
+[steps.request.body]
+to = "{{ member.userEmail }}"
+subject = "Update: {{ input.title }}"
 ```
 
-**Supported operators:**
+**Output shape** — forEach always returns a consistent object:
 
-- `< number` - Less than comparison
-- `||` - Fallback/OR logic
-- Truthy evaluation (any path resolves to truthy value)
+```json
+{
+  "items": [result1, result2, ...],
+  "errors": [],
+  "totalSucceeded": 3,
+  "totalFailed": 0
+}
+```
 
-**Not supported:**
+Access the results with `steps.notify-each.items`.
 
-- Arithmetic (`+`, `-`, `*`, `/`)
-- Equality comparisons (`==`, `!=`)
-- Greater than (`>`, `>=`, `<=`)
-- Custom functions
+**Loop context variables** (in templates):
+
+| Variable | Description |
+|----------|-------------|
+| `{{ member }}` | Current item (name from `as`) |
+| `{{ loop.index }}` | Zero-based index |
+| `{{ loop.count }}` | Total items |
+| `{{ loop.first }}` | True on first iteration |
+| `{{ loop.last }}` | True on last iteration |
+
+**CEL runIf per iteration** — use `iteration` (not `loop`, which is reserved in CEL):
+
+```toml
+[[steps]]
+id = "process-active"
+kind = "transform"
+forEach = "steps.data"
+as = "item"
+runIf = "item.active && iteration.index < 100"
+output = "{{ item.name }}"
+```
+
+**Limits:** Default 200 items max. Override with `maxItems = 1000`.
+
+## Error Handling
+
+### `continueOnError`
+
+By default, a step failure stops the workflow. Set `continueOnError = true` to capture the error and continue:
+
+```toml
+[[steps]]
+id = "risky-call"
+kind = "integration.call"
+continueOnError = true
+# ...
+
+[[steps]]
+id = "handle-result"
+kind = "transform"
+saveAs = "output"
+
+[steps.output]
+success = "{{ steps.risky-call.error == null }}"
+data = "{{ steps.risky-call.data || 'fallback' }}"
+```
+
+When a step fails with `continueOnError`:
+- `steps[id]` contains `{ error: "message", errorDetails: "stack trace" }`
+- Workflow continues to the next step
+
+### `compensate` block
+
+The `compensate` block runs when any step fails (without `continueOnError`). Use it to undo side effects:
+
+```toml
+[[steps]]
+id = "deduct-token"
+kind = "database.mutate"
+# ...
+
+[[steps]]
+id = "call-api"
+kind = "integration.call"
+# if this fails, compensate runs
+
+[[compensate]]
+id = "restore-token"
+kind = "database.mutate"
+runIf = "steps.deduct-token != null"
+# ...
+```
+
+Compensate steps have access to `steps._error.message` and `steps._error.stepId`.
+
+### `strict` mode
+
+Add `strict = true` to a step to turn unresolved template expressions into hard errors:
+
+```toml
+[[steps]]
+id = "send-email"
+kind = "integration.call"
+strict = true
+
+[steps.request.body]
+to = "{{ input.recipientEmail }}"
+subject = "{{ input.titl }}"     # Typo → throws with clear message
+```
+
+### `expect` filter (type validation)
+
+Validate that a template expression resolves to a specific type:
+
+```toml
+[[steps]]
+id = "process-order"
+kind = "transform"
+
+[steps.output]
+orderId = "{{ input.orderId | expect: 'string' }}"
+amount = "{{ input.amount | expect: 'number' }}"
+items = "{{ input.lineItems | expect: 'array' }}"
+```
+
+Supported types: `string`, `number`, `boolean`, `array`, `object`. Throws immediately if the type doesn't match.
+
+### Step input validation
+
+Required fields are automatically validated after template rendering. If a required field resolves to an empty string (e.g., from a missing template path), the step throws:
+
+```
+Step "query": required field "databaseId" is empty (resolved to "").
+Check that the template expression "{{ input.dbId }}" resolves correctly.
+```
 
 ## Input Selectors
 
@@ -762,7 +1124,31 @@ primitive workflows runs list <workflow-id> --status completed
 
 # Get run status
 primitive workflows runs status <workflow-id> <run-id>
+
+# View step-level details for a run
+primitive workflows runs steps <workflow-id> <run-id>
+
+# Full detail for one step (config, input, output, error, context)
+primitive workflows runs step-detail <workflow-id> <run-id> <step-id>
+
+# Quick error summary for a failed run
+primitive workflows runs error <workflow-id> <run-id>
+
+# List recent failures
+primitive workflows runs failures <workflow-id>
 ```
+
+### Analytics
+
+```bash
+# Performance analytics overview
+primitive workflows analytics overview --days 7
+
+# Top workflows by usage
+primitive workflows analytics top --days 7
+```
+
+All debugging commands support `--json` for machine-readable output.
 
 ### Manage Configurations
 
@@ -1337,8 +1723,9 @@ runIf = "input.processDeep"   # Negation not supported, use separate logic
 
 ### runIf not working
 
-- Only supports: truthy checks, `< number`, `||` fallback
-- Does not support: `>`, `>=`, `<=`, `==`, `!=`, arithmetic
+- Uses CEL expressions: supports truthy checks, comparisons (`<`, `>`, `==`, `!=`), `&&`, `||`
+- Template expressions (`{{ }}`) are NOT supported inside `runIf` — use CEL path syntax directly (e.g., `steps.check.isMember` not `{{ steps.check.isMember }}`)
+- Arithmetic (e.g., `+`, `-`) is not supported in templates, but comparisons work in CEL runIf
 
 ### Integration call failing
 
@@ -1356,11 +1743,8 @@ runIf = "input.processDeep"   # Negation not supported, use separate logic
 
 ## Limitations
 
-1. **No loops**: Workflows execute steps sequentially only
-2. **No branching**: Use `runIf` for conditional execution (no goto/jump)
-3. **Limited expressions**: Only path access, fallbacks, and `< number` comparisons
-4. **No custom functions**: No string manipulation, date functions, etc.
-5. **No arithmetic**: Cannot do `{{ input.a + input.b }}`
-6. **Sequential only**: Steps cannot run in parallel
-7. **Concurrency limits**: Defined on workflow but not yet enforced by the runtime
-8. **Run TTL**: Workflow runs and step runs are automatically cleaned up after 45 days (7 days for preview runs)
+1. **No branching**: Use `runIf` for conditional execution (no goto/jump)
+2. **No arithmetic in templates**: Cannot do `{{ input.a + input.b }}` (use `transform` step to reshape data first)
+3. **forEach is sequential**: Each iteration runs one at a time (use `workflow.start` + `workflow.await` for true parallelism)
+4. **Run TTL**: Workflow runs and step runs are automatically cleaned up after 45 days (7 days for preview runs)
+5. **forEach maxItems**: Default 200 iterations per step; increase with `maxItems`

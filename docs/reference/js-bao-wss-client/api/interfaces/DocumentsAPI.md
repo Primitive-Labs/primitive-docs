@@ -112,9 +112,12 @@ If true, also removes the document's local data from storage after cancellation
 
 ### close()
 
-> **close**(`documentId`, `options?`): `Promise`\<`void`\>
+> **close**(`documentId`, `options?`): `Promise`\<\{ `evicted`: `boolean`; \}\>
 
 Close an open document and optionally evict its local data.
+When evictLocal is true, the server is first checked to confirm it has all
+the client's writes. If it doesn't, eviction is skipped and { evicted: false }
+is returned.
 
 #### Parameters
 
@@ -136,7 +139,9 @@ If true, also removes the document's local data from storage after closing
 
 #### Returns
 
-`Promise`\<`void`\>
+`Promise`\<\{ `evicted`: `boolean`; \}\>
+
+- Whether local data was actually evicted
 
 ***
 
@@ -650,6 +655,61 @@ The unique identifier of the document to check
 #### Returns
 
 `boolean`
+
+***
+
+### includesWrites()
+
+> **includesWrites**(`documentId`, `timeoutMs?`): `Promise`\<`boolean`\>
+
+Check whether the server has all of this client's writes for a document.
+Performs a state vector comparison via WebSocket.
+Returns false if the WebSocket is disconnected or the check times out.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to check
+
+##### timeoutMs?
+
+`number`
+
+Timeout in milliseconds (default 5000)
+
+#### Returns
+
+`Promise`\<`boolean`\>
+
+***
+
+### inSync()
+
+> **inSync**(`documentId`, `timeoutMs?`): `Promise`\<`boolean`\>
+
+Check whether the client and server have identical document state.
+Returns false if the WebSocket is disconnected or the check times out.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to check
+
+##### timeoutMs?
+
+`number`
+
+Timeout in milliseconds (default 5000)
+
+#### Returns
+
+`Promise`\<`boolean`\>
 
 ***
 
@@ -1436,3 +1496,67 @@ The unique identifier of the document to validate access for
 #### Returns
 
 `Promise`\<[`DocumentAccessResult`](DocumentAccessResult.md)\>
+
+***
+
+### waitForInSync()
+
+> **waitForInSync**(`documentId`, `timeoutMs?`, `pollMs?`): `Promise`\<`void`\>
+
+Wait until the client and server have identical document state.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to check
+
+##### timeoutMs?
+
+`number`
+
+Maximum time to wait (ms, default 5000)
+
+##### pollMs?
+
+`number`
+
+Polling interval (ms, default 50)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### waitForWriteConfirmation()
+
+> **waitForWriteConfirmation**(`documentId`, `timeoutMs?`, `pollMs?`): `Promise`\<`boolean`\>
+
+Wait until the server confirms it has all of this client's writes.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to check
+
+##### timeoutMs?
+
+`number`
+
+Maximum time to wait (ms, default 5000)
+
+##### pollMs?
+
+`number`
+
+Polling interval (ms, default 50)
+
+#### Returns
+
+`Promise`\<`boolean`\>
