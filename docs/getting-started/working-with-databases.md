@@ -288,7 +288,7 @@ const db = await client.databases.get(databaseId);
 
 ### Discovering Databases via Group Memberships
 
-For apps where databases are shared with teams through registered operations (not direct permissions), use group memberships to discover accessible databases. A common pattern is to store the database ID in group metadata, then look up the user's groups to find their databases.
+For apps where databases are shared with teams through registered operations (not direct permissions), use group memberships to discover accessible databases. The common pattern is to use the database ID as the group ID, so the user's group memberships directly give you the database IDs.
 
 ```typescript
 import { jsBaoClientService } from "primitive-app";
@@ -301,20 +301,27 @@ const memberships = await client.groups.listUserMemberships(currentUser.userId);
 // 2. Filter to the group type that represents your workspaces/projects
 const workspaceGroups = memberships.filter(m => m.groupType === "workspace");
 
-// 3. Load each database using the group's metadata
+// 3. Each group ID is also the database ID — load them directly
 const databases = await Promise.all(
-  workspaceGroups.map(async (group) => {
-    // Assumes the database ID is stored in group metadata
-    const groupDetails = await client.groups.get(group.groupType, group.groupId);
-    const databaseId = groupDetails.metadata?.databaseId;
-    if (databaseId) {
-      return client.databases.get(databaseId);
-    }
-    return null;
-  })
+  workspaceGroups.map(group => client.databases.get(group.groupId))
 );
+```
 
-const accessibleDatabases = databases.filter(Boolean);
+This works because the group ID and database ID share the same value by convention. When setting up a workspace, create the group using the database ID returned from `databases.create()`:
+
+```typescript
+// Create the database (ID is assigned by the server)
+const db = await client.databases.create({
+  title: "Team Workspace",
+  databaseType: "workspace",
+});
+
+// Create the group using the database ID as the group ID
+await client.groups.create("workspace", {
+  groupId: db.databaseId,
+  name: "Team Workspace Members",
+});
+await client.groups.addMember("workspace", db.databaseId, currentUser.userId);
 ```
 
 This pattern is especially useful in multi-tenant apps where each team or project has its own database and group, and users are granted access through group membership rather than direct database permissions.
