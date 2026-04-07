@@ -650,6 +650,29 @@ await Category.upsertByUnique(
 );
 ```
 
+### Upsert by Natural Key (`upsertOn`)
+
+Use the `upsertOn` option in `save()` to upsert by a natural unique field (e.g., `email`, `slug`) without knowing the existing record's ID. The field must have a single-field `uniqueConstraints` entry on the model.
+
+```typescript
+const user = new User({ email: "alice@example.com", name: "Alice", role: "admin" });
+// Creates a new record if none exists with that email, or merges into the existing one
+const result = await user.save({ upsertOn: "email" });
+```
+
+Behavior:
+- **No existing record**: creates a new record with an auto-generated ID (or the caller-provided ID)
+- **Existing record found**: merges the provided fields into the existing record; unprovided fields are preserved; returns the existing record's ID
+- **Caller provides an ID that mismatches the found record**: throws an error (conflict)
+
+`upsertOn` validates that the field has a registered unique index. It throws if the field is missing from the data or has a null/empty value.
+
+### Save Merge Semantics
+
+`save()` uses **merge semantics**: only the fields you set on the instance are written; existing fields not included in the change set are preserved. Setting a field to `null` removes it from the stored record.
+
+This applies both to new saves and updates, and is consistent across single saves and batch operations.
+
 ## Design Patterns
 
 ### Singleton Model per Document (Avoiding ID Confusion)
