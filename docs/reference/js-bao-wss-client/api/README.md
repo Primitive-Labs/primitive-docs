@@ -2422,21 +2422,22 @@ await db.delete("contacts", record.id);
 
 ### Permissions
 
-Control per-user access to databases. Permission levels: `owner`, `read-write`, `reader`.
+Control per-user access to databases. Only the database owner can add or remove managers.
 
 ```typescript
 // List permissions on a database
 const perms = await client.databases.listPermissions(databaseId);
 
-// Grant a user permission
-await client.databases.grantPermission(databaseId, {
+// Add a user as a manager
+await client.databases.addManager(databaseId, {
   userId: "user-123",
-  permission: "read-write",
 });
 
-// Revoke a user's permission
-await client.databases.revokePermission(databaseId, "user-123");
+// Remove a manager
+await client.databases.removeManager(databaseId, "user-123");
 ```
+
+> **Deprecated:** `grantPermission()` and `revokePermission()` still work but are deprecated aliases for `addManager()` and `removeManager()`.
 
 ### Groups
 

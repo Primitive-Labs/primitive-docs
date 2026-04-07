@@ -2543,7 +2543,7 @@ Async function that prompts the user for a PIN; required when the offline grant 
 
 ***
 
-### updateLocalSnapshotFlag()
+### ~~updateLocalSnapshotFlag()~~
 
 > **updateLocalSnapshotFlag**(`documentId`, `hasSnapshot`): `Promise`\<`void`\>
 
@@ -2566,6 +2566,12 @@ Whether the document has a local IndexedDB snapshot
 #### Returns
 
 `Promise`\<`void`\>
+
+#### Deprecated
+
+No longer called internally — `hasIndexedDbSnapshot` is now
+  ignored in favour of checking live ydoc content via `ydocHasData()`.
+  Retained for external callers; will be removed in a future major version.
 
 ***
 
@@ -2692,7 +2698,7 @@ Polling interval (ms, default 50)
 
 ### waitForWriteConfirmation()
 
-> **waitForWriteConfirmation**(`documentId`, `timeoutMs`, `pollMs`): `Promise`\<`void`\>
+> **waitForWriteConfirmation**(`documentId`, `timeoutMs`, `pollMs`): `Promise`\<`boolean`\>
 
 Wait until the server confirms it has all of this client's writes.
 Polls [checkStateVector](#checkstatevector) until `includesWrites` is true.
@@ -2719,7 +2725,7 @@ Polling interval (ms, default 50)
 
 #### Returns
 
-`Promise`\<`void`\>
+`Promise`\<`boolean`\>
 
 ## Sub-APIs
 

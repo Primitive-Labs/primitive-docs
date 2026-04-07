@@ -1533,7 +1533,7 @@ Polling interval (ms, default 50)
 
 ### waitForWriteConfirmation()
 
-> **waitForWriteConfirmation**(`documentId`, `timeoutMs?`, `pollMs?`): `Promise`\<`void`\>
+> **waitForWriteConfirmation**(`documentId`, `timeoutMs?`, `pollMs?`): `Promise`\<`boolean`\>
 
 Wait until the server confirms it has all of this client's writes.
 
@@ -1559,4 +1559,4 @@ Polling interval (ms, default 50)
 
 #### Returns
 
-`Promise`\<`void`\>
+`Promise`\<`boolean`\>

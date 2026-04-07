@@ -305,6 +305,10 @@
               "text": "Interfaces",
               "items": [
                 {
+                  "text": "AddManagerParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/AddManagerParams"
+                },
+                {
                   "text": "AnalyticsAutoEventsOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/AnalyticsAutoEventsOptions"
                 },
@@ -323,6 +327,10 @@
                 {
                   "text": "BasicUserInfo",
                   "link": "/reference/js-bao-wss-client/api/interfaces/BasicUserInfo"
+                },
+                {
+                  "text": "BatchUserProfile",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BatchUserProfile"
                 },
                 {
                   "text": "BlobListResult",
@@ -555,6 +563,10 @@
                 {
                   "text": "GoOfflineOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/GoOfflineOptions"
+                },
+                {
+                  "text": "GrantPermissionParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GrantPermissionParams"
                 },
                 {
                   "text": "GroupDocumentInfo",
