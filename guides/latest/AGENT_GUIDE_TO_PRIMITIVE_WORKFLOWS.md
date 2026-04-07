@@ -222,6 +222,9 @@ name = "Human Readable Name"          # Required: display name
 description = "What this workflow does"  # Optional
 status = "draft"                      # draft | active | archived
 
+# Access control (optional)
+accessRule = "hasRole('admin')"       # CEL expression restricting who can start this workflow
+
 # Concurrency settings (optional)
 perUserMaxRunning = 4                 # Max concurrent runs per user (default: 4)
 perUserMaxQueued = 100                # Max queued runs per user (default: 100)
@@ -239,6 +242,60 @@ outputSchema = "{\"type\":\"object\",\"properties\":{...}}"
 id = "step-1"
 kind = "transform"
 # ... step-specific fields
+```
+
+## Access Control
+
+The `accessRule` field accepts a CEL expression that controls who can start a workflow. It is evaluated when:
+
+- A client calls `client.workflows.start()`
+- A `workflow.call` step invokes the workflow from another workflow
+
+It is **not** evaluated when a workflow is triggered via an inbound webhook — webhook-triggered runs bypass the access rule because the webhook endpoint handles its own authentication (e.g., Stripe signature verification).
+
+**Behavior:**
+
+- **No rule** (omitted or empty): any authenticated app member can start the workflow
+- **Admin/owner**: always bypass the access rule regardless of the expression
+- **Other roles**: the CEL expression is evaluated against the user's context
+
+**Available CEL context:**
+
+| Variable | Description |
+|---|---|
+| `user.userId` | The user's ID |
+| `user.role` | The user's app role (`owner`, `admin`, `member`) |
+
+**Available CEL functions:**
+
+| Function | Description |
+|---|---|
+| `hasRole(role)` | Returns `true` if the user has the specified app role |
+| `isMemberOf(groupType, groupId)` | Returns `true` if the user belongs to the specified group |
+| `memberGroups(groupType)` | Returns the list of group IDs the user belongs to for a group type |
+
+**Examples:**
+
+```toml
+[workflow]
+key = "admin-report"
+accessRule = "hasRole('admin')"           # Only admins (and owners) can start
+```
+
+```toml
+[workflow]
+key = "team-action"
+accessRule = "isMemberOf('team', 'engineering')"  # Only engineering team members
+```
+
+**Security guidance for webhook workflows:** If a workflow is triggered by an inbound webhook (e.g., Stripe, GitHub), add a restrictive `accessRule` to prevent clients from calling `client.workflows.start()` directly with a crafted payload, bypassing webhook signature verification:
+
+```toml
+[workflow]
+key = "stripe-webhook"
+name = "Stripe Webhook Handler"
+status = "active"
+accessRule = "hasRole('owner')"  # Prevent direct client starts — only webhook triggers
 ```
 
 ## Step Types

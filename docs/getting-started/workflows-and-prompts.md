@@ -158,6 +158,18 @@ POST /app/{appId}/webhook/{webhookKey}
 
 When an event is received, the webhook verifies the signature and starts the configured workflow with the event payload as `rootInput`. Supported verification schemes are `stripe`, `github`, `slack`, `custom`, and `none`.
 
+**Securing webhook workflows:** Webhook-triggered workflows should use `accessRule` to prevent clients from bypassing signature verification by calling `client.workflows.start()` directly with a crafted payload:
+
+```toml
+[workflow]
+key = "handle-payment"
+name = "Handle Payment"
+status = "active"
+accessRule = "hasRole('owner')"  # Only webhook triggers can start this — clients are blocked
+```
+
+The `accessRule` is a CEL expression evaluated on `client.workflows.start()` calls but **not** on webhook triggers (which have their own signature verification). Setting it to `hasRole('owner')` effectively restricts direct starts to app owners while allowing webhooks to trigger normally. See the [Workflows Agent Guide](/guides/latest/AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md#access-control) for the full `accessRule` reference.
+
 Use `inputMapping` to extract a nested path from the payload before passing it to the workflow:
 ```json
 { "inputMapping": "data.object" }
