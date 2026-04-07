@@ -260,6 +260,72 @@ sql = "SELECT * FROM product WHERE id = :productId"
 inputSelectors = { productId = "order.productId" }
 ```
 
+## Listing and Discovering Databases
+
+### `databases.list()` — Owner and Manager Only
+
+`databases.list()` returns only databases where the current user has a direct permission grant (`owner` or `manager`). It does **not** return databases that the user can access through registered operations and CEL-based access rules.
+
+::: warning
+If your app relies on `databases.list()` to populate a dashboard or workspace list, invited team members who interact with databases solely through registered operations will not see those databases — even if they have full operational access. This can cause databases to appear "missing" for non-owner users.
+:::
+
+```typescript
+// Only returns databases where the user is owner or manager
+const databases = await client.databases.list();
+```
+
+App-level admins (console admins) are an exception — they see all databases in the app.
+
+### `databases.get()` — Any Authenticated User
+
+Unlike `list()`, `databases.get(databaseId)` is available to any authenticated user who knows the database ID. It does not require owner or manager permission. This makes it suitable for loading database details when you already have the ID from another source (e.g., group metadata or a shared link).
+
+```typescript
+// Works for any authenticated user — no owner/manager permission required
+const db = await client.databases.get(databaseId);
+```
+
+### Discovering Databases via Group Memberships
+
+For apps where databases are shared with teams through registered operations (not direct permissions), use group memberships to discover accessible databases. The common pattern is to use the database ID as the group ID, so the user's group memberships directly give you the database IDs.
+
+```typescript
+import { jsBaoClientService } from "primitive-app";
+
+const client = await jsBaoClientService.getClientAsync();
+
+// 1. Get the current user's group memberships
+const memberships = await client.groups.listUserMemberships(currentUser.userId);
+
+// 2. Filter to the group type that represents your workspaces/projects
+const workspaceGroups = memberships.filter(m => m.groupType === "workspace");
+
+// 3. Each group ID is also the database ID — load them directly
+const databases = await Promise.all(
+  workspaceGroups.map(group => client.databases.get(group.groupId))
+);
+```
+
+This works because the group ID and database ID share the same value by convention. When setting up a workspace, create the group using the database ID returned from `databases.create()`:
+
+```typescript
+// Create the database (ID is assigned by the server)
+const db = await client.databases.create({
+  title: "Team Workspace",
+  databaseType: "workspace",
+});
+
+// Create the group using the database ID as the group ID
+await client.groups.create("workspace", {
+  groupId: db.databaseId,
+  name: "Team Workspace Members",
+});
+await client.groups.addMember("workspace", db.databaseId, currentUser.userId);
+```
+
+This pattern is especially useful in multi-tenant apps where each team or project has its own database and group, and users are granted access through group membership rather than direct database permissions.
+
 ## Common Patterns
 
 ### User-Scoped Data
