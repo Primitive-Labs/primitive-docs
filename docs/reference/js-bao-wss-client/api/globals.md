@@ -12,11 +12,13 @@
 
 ## Interfaces
 
+- [AddManagerParams](interfaces/AddManagerParams.md)
 - [AnalyticsAutoEventsOptions](interfaces/AnalyticsAutoEventsOptions.md)
 - [AnalyticsClient](interfaces/AnalyticsClient.md)
 - [AnalyticsEventInput](interfaces/AnalyticsEventInput.md)
 - [AuthStateEvent](interfaces/AuthStateEvent.md)
 - [BasicUserInfo](interfaces/BasicUserInfo.md)
+- [BatchUserProfile](interfaces/BatchUserProfile.md)
 - [BlobListResult](interfaces/BlobListResult.md)
 - [BlobPrefetchOptions](interfaces/BlobPrefetchOptions.md)
 - [BlobProxyUrlOptions](interfaces/BlobProxyUrlOptions.md)
@@ -75,6 +77,7 @@
 - [GeminiStructuredOutput](interfaces/GeminiStructuredOutput.md)
 - [GetWorkflowStatusOptions](interfaces/GetWorkflowStatusOptions.md)
 - [GoOfflineOptions](interfaces/GoOfflineOptions.md)
+- [~~GrantPermissionParams~~](interfaces/GrantPermissionParams.md)
 - [GroupDocumentInfo](interfaces/GroupDocumentInfo.md)
 - [GroupInfo](interfaces/GroupInfo.md)
 - [GroupMemberInfo](interfaces/GroupMemberInfo.md)
