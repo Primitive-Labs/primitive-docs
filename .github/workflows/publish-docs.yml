@@ -20,26 +20,22 @@ jobs:
           token: ${{ secrets.DOCS_REPO_PAT }}
           fetch-depth: 0
 
+      - name: Configure git auth for submodules
+        run: git config --global url."https://x-access-token:${{ secrets.DOCS_REPO_PAT }}@github.com/".insteadOf "https://github.com/"
+
       - name: Initialize submodules (resilient)
-        env:
-          GIT_TOKEN: ${{ secrets.DOCS_REPO_PAT }}
         run: |
           git submodule init
           git submodule foreach --quiet 'echo $name $sm_path' | while read name sm_path; do
-            # Get the commit pinned by the parent repo
             pinned_sha=$(git ls-tree HEAD "$sm_path" | awk "{print \$3}")
             echo "::group::Submodule $name (pinned: ${pinned_sha:0:12})"
 
-            # Try normal submodule update first
             if git submodule update --single-branch "$sm_path" 2>/dev/null; then
               echo "✓ Checked out pinned commit"
             else
               echo "⚠ Pinned commit $pinned_sha not found, falling back to branch HEAD"
-              # Get the branch configured in .gitmodules (default: main)
               branch=$(git config -f .gitmodules "submodule.${name}.branch" || echo "main")
               url=$(git config -f .gitmodules "submodule.${name}.url")
-
-              # Clone fresh and checkout branch HEAD
               rm -rf "$sm_path"
               git clone --single-branch --branch "$branch" "$url" "$sm_path"
               echo "✓ Checked out latest $branch"

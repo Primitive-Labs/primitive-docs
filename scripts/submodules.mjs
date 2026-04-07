@@ -27,6 +27,14 @@ ensureGitRepo()
 
 if (cmd === 'init') {
   ensureGitmodulesIfNeeded()
+  // In CI, submodules are already initialized by the workflow — skip if populated
+  const check = spawnSync('git', ['submodule', 'foreach', '--quiet', 'echo $sm_path'], { encoding: 'utf8' })
+  const paths = (check.stdout || '').trim().split('\n').filter(Boolean)
+  const allPopulated = paths.length > 0 && paths.every(p => existsSync(p + '/.git') || existsSync(p + '/package.json'))
+  if (allPopulated) {
+    console.log('Submodules already initialized, skipping.')
+    process.exit(0)
+  }
   runGit(['submodule', 'update', '--init', '--recursive'])
 } else if (cmd === 'update') {
   ensureGitmodulesIfNeeded()
