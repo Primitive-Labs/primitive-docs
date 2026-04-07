@@ -59,6 +59,30 @@ primitive groups create --type "team" --name "engineering" --display-name "Engin
 
 ### Managing Members
 
+You can add members by **email** or by user ID. Most apps should use email — it's what your users know, and the server resolves it to a user ID automatically.
+
+```typescript
+// Add a member by email (recommended for user-facing flows)
+await client.groups.addMember("team", "engineering", {
+  email: "alice@example.com",
+});
+
+// Add a member by user ID (for internal/programmatic use)
+await client.groups.addMember("team", "engineering", {
+  userId: "user-456",
+});
+
+// List members
+const members = await client.groups.listMembers("team", "engineering");
+
+// List groups a user belongs to
+const memberships = await client.groups.listUserMemberships(userId);
+```
+
+Provide **either** `email` or `userId`, not both. The server returns `404` if the email doesn't match an existing user, or `409` if they're already a member.
+
+Via the CLI:
+
 ```bash
 # Add a member
 primitive groups add-member --group-id <groupId> --user-id <userId> --role member
@@ -71,19 +95,6 @@ primitive groups update-member --group-id <groupId> --user-id <userId> --role ad
 
 # Remove a member
 primitive groups remove-member --group-id <groupId> --user-id <userId>
-```
-
-In your app code:
-
-```typescript
-// Add a member
-await client.groups.addMember(groupId, { userId, role: "member" });
-
-// List members
-const { members } = await client.groups.listMembers(groupId);
-
-// List groups a user belongs to
-const { groups } = await client.groups.listUserMemberships(userId);
 ```
 
 ### Group Roles
