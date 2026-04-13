@@ -21,7 +21,7 @@ export default defineConfig({
 });
 ```
 
-The overlay has three tabs: Document Explorer, Blob Explorer, and Test Runner.
+The overlay has three tabs: Document Explorer, Test Harness, and Blob Explorer.
 
 ## Document Explorer
 
