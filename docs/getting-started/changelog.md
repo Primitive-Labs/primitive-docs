@@ -4,6 +4,15 @@ Recent changes to the Primitive platform libraries.
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao-wss v1.3.0 — 2026-04-13
+
+- **Boolean gate conditions** — substitution variables (`$database.metadata.*`, `$params.*`, `$steps.*`) can now appear directly as elements in `$and`/`$or` filter arrays; `false`/`null` short-circuits the branch to no-match without hitting the database, enabling safe server-side feature flags
+- **Operation timing instrumentation** — pass `timing: true` to `executeOperation` to get per-phase millisecond breakdowns (`celEvaluation`, `doInvocation`, etc.) in `result._timing`
+- **CEL `now()` in trigger expressions** — trigger `set` values are now CEL expressions; use `now()` instead of the old `$now` token
+- **Param-level access control** — individual operation parameters can declare their own `access` CEL expression, evaluated against the caller-supplied `value`
+- **Critical fix: server sync delay** — `syncComplete` now sent after `syncStep2`, resolving a 10-second first-open delay
+- **Critical fix: Safari IDB performance** — IDB connections closed on `pagehide`, zombie transactions aborted on timeout, fixing 1.5–16s page load delays on Safari
+
 ## js-bao v0.3.1 — 2026-04-13
 
 - Added `filter`, `sort`, and `limit` options to `aggregate()` for filtering records before grouping, sorting aggregation results, and capping the number of groups returned.
