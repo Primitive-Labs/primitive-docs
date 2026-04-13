@@ -4,25 +4,26 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
-## js-bao-wss v1.3.0 — 2026-04-13
-
-- You can now use boolean gate conditions in workflow filters — place substitution variables (`$database.metadata.*`, `$params.*`, `$steps.*`) directly in `$and`/`$or` arrays to short-circuit branches without hitting the database
-- Pass `timing: true` to `executeOperation` to get per-phase millisecond breakdowns (`celEvaluation`, `doInvocation`, etc.) in `result._timing`
-- Trigger `set` values are now CEL expressions — use `now()` instead of the old `$now` token
-- Individual operation parameters can declare their own `access` CEL expression for param-level access control
-- Fixed a 10-second first-open sync delay and Safari IndexedDB performance issues causing 1.5–16s page load delays
-
 ## js-bao v0.3.1 — 2026-04-13
 
-- You can now pass `filter`, `sort`, and `limit` options to `aggregate()` to filter records before grouping, sort results, and cap the number of groups returned
-- Aggregating by a `stringset` field now counts occurrences per tag value, returning a `{ tagValue: count }` object
-- New TOML schema loaders (`loadSchemaFromTomlString`, `loadSchemaFromToml`) let you define model schemas in TOML files
-- New YDoc introspection utilities (`discoverSchema`, `discoverModelNames`, `schemaToToml`, `dumpYDocToPlain`, `summarizePlainYDoc`) for server-side schema discovery and document inspection
+- New `upsertOn` option for `save()` — pass `upsertOn: "fieldName"` to create-or-update a record by a unique field value instead of requiring an explicit ID, with transactional lookup to prevent race conditions
+- Schema discovery and TOML utilities (`discoverSchema`, `discoverModelNames`, `schemaToToml`, `loadSchemaFromTomlString`, `loadSchemaFromToml`) are now re-exported from all bundle entry points (browser, node, cloudflare)
+- New YDoc dump utilities for debugging: `dumpYDocToPlain()` and `summarizePlainYDoc()` let you inspect document structure as plain JavaScript objects (node bundle)
+- Fixed schema discovery failing when YDoc share entries weren't materialized before instanceof checks
+
+## js-bao-wss — 2026-04-10
+
+- Model-less documents — you can now work with Yjs documents without pre-defining TypeScript model classes; the server auto-discovers document schema at runtime
+- New `getDocumentSchema()` API and `schema-discovered` event for client-side schema introspection; pass `schemaToml` to `JsBaoClient` for client-side model validation
+- Workflow runs triggered via webhooks and `workflow.start` are now visible through the API (previously hidden)
+- `upsertOn` support for conditionally creating or updating records based on field values
+- Fixed awareness state keying — `sendAwarenessState` and `_broadcastAwareness` now consistently use `connectionId`, preventing duplicate awareness entries
+- Fixed HTTP 400 errors when syncing database records with no top-level field changes
 
 ## primitive-app v2.1.7 — 2026-04-13
 
-- You can now pass a `keyboardShortcut` option (e.g. `"cmd+shift+l"`) to the `primitiveDevTools` Vite plugin to toggle the dev tools overlay from the keyboard
-- Test harness now runs each test in an isolated local-only document, automatically cleaning up after each test
-- `window.__primitiveAppClient` and `window.__primitiveAppModels` are exposed on localhost for interactive debugging in the browser console
+- New `getOrCreateWithAlias()` API replaces the old multi-step document alias flow — handles race conditions server-side, eliminating the need for client-side retry logic
+- Fixed passkey credential prompt unexpectedly appearing after OTP sign-in — auth flow now properly cancels pending passkey ceremonies
+- New `VITE_APP_NAME` environment variable to customize the browser tab title
 
 <!-- CHANGELOG:END -->
