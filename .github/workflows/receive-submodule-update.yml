@@ -235,13 +235,16 @@ jobs:
                ```markdown
                ## <package-name> v<version> — <YYYY-MM-DD>
 
-               <A concise summary of the changes: new features, bug fixes, breaking changes, etc.
-               Write 2-5 bullet points covering the most important changes.
-               Base this on the commit messages and API changes provided above.>
+               <2-5 bullet points describing what's new for developers using this library.
+               Focus on new capabilities, new APIs, changed behavior, and important bug fixes.
+               Write from the perspective of "what can a developer do now that they couldn't before?"
+               For example: "You can now pass `filter` to `aggregate()` to filter records before grouping."
+               Do NOT describe documentation changes, internal refactors, or CI updates.>
                ```
 
                - The package names are: `js-bao`, `js-bao-wss`, `primitive-app`.
                - If the version has not changed from the previous changelog entry for the same package, still add an entry but note it as a patch/update at the same version.
+               - If the changes are purely internal (refactors, CI, docs-only) with no user-facing impact, skip the changelog entry.
 
             6. **Write a summary**: After reviewing and making any changes, write a brief summary to `.claude-summary.md` with:
                - What changes you reviewed
