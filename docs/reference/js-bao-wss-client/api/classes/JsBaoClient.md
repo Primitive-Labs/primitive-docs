@@ -339,6 +339,27 @@ The document to check permissions for
 
 ***
 
+### getDocumentSchema()
+
+> **getDocumentSchema**(`documentId`): [`DiscoveredSchema`](../interfaces/DiscoveredSchema.md) \| `null`
+
+Get the discovered schema for a document.
+Returns null if no schema has been discovered yet (document not synced, or explicit models were provided).
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The document to get the schema for
+
+#### Returns
+
+[`DiscoveredSchema`](../interfaces/DiscoveredSchema.md) \| `null`
+
+***
+
 ### isDocOpen()
 
 > **isDocOpen**(`documentId`): `boolean`

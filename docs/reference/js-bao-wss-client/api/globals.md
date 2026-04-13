@@ -49,6 +49,11 @@
 - [DatabaseOwnershipTransferResult](interfaces/DatabaseOwnershipTransferResult.md)
 - [DatabasePermissionEntry](interfaces/DatabasePermissionEntry.md)
 - [DatabasesAPI](interfaces/DatabasesAPI.md)
+- [DiscoveredConstraint](interfaces/DiscoveredConstraint.md)
+- [DiscoveredField](interfaces/DiscoveredField.md)
+- [DiscoveredModel](interfaces/DiscoveredModel.md)
+- [DiscoveredRelationship](interfaces/DiscoveredRelationship.md)
+- [DiscoveredSchema](interfaces/DiscoveredSchema.md)
 - [DocumentAccessResult](interfaces/DocumentAccessResult.md)
 - [DocumentAliasesAPI](interfaces/DocumentAliasesAPI.md)
 - [DocumentAliasInfo](interfaces/DocumentAliasInfo.md)
@@ -122,6 +127,7 @@
 - [RuleSetsAPI](interfaces/RuleSetsAPI.md)
 - [RuleSetSchema](interfaces/RuleSetSchema.md)
 - [RuleSetTestResult](interfaces/RuleSetTestResult.md)
+- [SchemaDiscoveredEvent](interfaces/SchemaDiscoveredEvent.md)
 - [SessionAPI](interfaces/SessionAPI.md)
 - [SessionInfo](interfaces/SessionInfo.md)
 - [StartWorkflowOptions](interfaces/StartWorkflowOptions.md)
@@ -166,12 +172,15 @@
 
 ## Functions
 
+- [attachAndRegisterModel](functions/attachAndRegisterModel.md)
 - [~~createModelClass~~](functions/createModelClass.md)
 - [defineModelSchema](functions/defineModelSchema.md)
+- [discoverSchema](functions/discoverSchema.md)
 - [generateULID](functions/generateULID.md)
 - [initializeClient](functions/initializeClient.md)
 - [initJsBao](functions/initJsBao.md)
 - [isJsBaoError](functions/isJsBaoError.md)
+- [loadSchemaFromTomlString](functions/loadSchemaFromTomlString.md)
 
 ## References
 
@@ -188,5 +197,11 @@ Renames and re-exports [DoDb](type-aliases/DoDb.md)
 ***
 
 ### ModelIdentifier
+
+Renames and re-exports [DoDb](type-aliases/DoDb.md)
+
+***
+
+### SaveOptions
 
 Renames and re-exports [DoDb](type-aliases/DoDb.md)

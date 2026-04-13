@@ -232,6 +232,33 @@ list.title = "My List";
 await list.save({ targetDocument: trackedDoc.documentId });
 ```
 
+**Collection and document readiness:**
+
+- `multiDocStore.isCollectionReady('todolists')` returns a `ComputedRef<boolean>` that is `true` once the collection has finished opening all its documents. Pass this directly as `documentReady` to `useJsBaoDataLoader`:
+
+```typescript
+const { data, initialDataLoaded } = useJsBaoDataLoader({
+  subscribeTo: [TodoItem],
+  queryParams: ...,
+  documentReady: multiDocStore.isCollectionReady('todolists'), // ComputedRef<boolean>
+  async loadData(queryParams) { ... },
+});
+```
+
+- `multiDocStore.isDocumentReady(selectedDocIdRef)` returns a `ComputedRef<boolean>` that is `true` when a specific document is open. The argument must be a `Ref<string>` or `ComputedRef<string>` (not a plain string), so that readiness updates reactively when the selected document changes:
+
+```typescript
+const selectedDocId = ref('doc-abc123');
+const { data, initialDataLoaded } = useJsBaoDataLoader({
+  subscribeTo: [TodoItem],
+  queryParams: ...,
+  documentReady: multiDocStore.isDocumentReady(selectedDocId), // ComputedRef<boolean>
+  async loadData(queryParams) { ... },
+});
+```
+
+Always pass the `ComputedRef` directly — never call `.value` on it when passing to `useJsBaoDataLoader`.
+
 **Critical:** When working with multiDocumentStore collections, ALWAYS use `multiDocStore.createDocument()` to create new documents. Using `documentsStore.createDocumentWithAlias()` or other low-level methods bypasses the collection's auto-open and tracking logic, causing documents to not appear in reactive lists.
 
 ## Data Modeling Decisions
