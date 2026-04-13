@@ -296,7 +296,25 @@ const stats = await Task.aggregate({
     { type: "avg", field: "priority" },
     { type: "sum", field: "estimatedHours" },
   ],
+  filter: { completed: false },             // optional: filter records before aggregating
+  sort: { field: "count", direction: -1 },  // optional: sort results
+  limit: 10,                                // optional: cap number of groups returned
 });
+// Returns: [{ category: "work", count: 8, avg_priority: 2.5, sum_estimatedHours: 40 }, ...]
+```
+
+### StringSet Facet Aggregation
+
+When `groupBy` contains a `stringset` field, each string value becomes a separate group:
+
+```typescript
+// Count tasks per tag
+const tagCounts = await Task.aggregate({
+  groupBy: ["tags"],  // "tags" is a stringset field
+  operations: [{ type: "count" }],
+  sort: { field: "count", direction: -1 },
+});
+// Returns: { "work": 15, "urgent": 8, "personal": 5, ... }
 ```
 
 ## Subscribing to Changes
