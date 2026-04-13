@@ -160,6 +160,16 @@
 
 ***
 
+### schemaToml?
+
+> `optional` **schemaToml**: `string`
+
+TOML schema string for client-side model validation.
+Parsed via `loadSchemaFromTomlString` from js-bao.
+Precedence: models > schemaToml > auto-discover from YDoc.
+
+***
+
 ### serviceWorkerBridge?
 
 > `optional` **serviceWorkerBridge**: `object`

@@ -404,11 +404,10 @@ const result = await MyModel.query(
 | `$in`           | Matches any in array           | `{ status: { $in: ["active", "pending"] } }`         |
 | `$nin`          | Not in array                   | `{ status: { $nin: ["deleted", "archived"] } }`      |
 | `$startsWith`   | String prefix match            | `{ title: { $startsWith: "Bug:" } }`                 |
+| `$endsWith`     | String suffix match            | `{ filename: { $endsWith: ".md" } }`                 |
 | `$containsText` | Case-insensitive contains      | `{ title: { $containsText: "urgent" } }`             |
 | `$exists`       | Field exists/not null          | `{ dueDate: { $exists: true } }`                     |
 | `$contains`     | StringSet contains value       | `{ tags: { $contains: "tutorial" } }`                |
-| `$containsAny`  | StringSet contains any         | `{ tags: { $containsAny: ["js", "ts"] } }`           |
-| `$containsAll`  | StringSet contains all         | `{ tags: { $containsAll: ["tutorial", "advanced"] } }`|
 
 **Logical operators:**
 
