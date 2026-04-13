@@ -25,12 +25,12 @@ Every operation has an access control expression written in [CEL (Common Express
 primitive use "My App"
 
 # Create a database
-primitive databases create --name "products" --display-name "Product Catalog"
+primitive databases create "Product Catalog" --type products
 ```
 
 ### 2. Define Operations
 
-Create a TOML config file for your database operations:
+Create a TOML config file for your database type:
 
 ```bash
 # Initialize config directory
@@ -40,47 +40,41 @@ primitive sync init --dir ./config
 primitive sync pull --dir ./config
 ```
 
-Then define operations in `config/databases/products.toml`:
+Then define operations in `config/database-types/products.toml`:
 
 ```toml
-[database]
-name = "products"
-displayName = "Product Catalog"
+[type]
+databaseType = "products"
 
-[[types]]
-name = "product"
-displayName = "Product"
-
-[[types.operations]]
+[[operations]]
 name = "list-products"
-operationType = "query"
-sql = "SELECT * FROM product ORDER BY name ASC"
-access = "true"  # Anyone can list
+type = "query"
+modelName = "product"
+access = "true"
+definition = '{"sort":{"name":1}}'
 
-[[types.operations]]
+[[operations]]
 name = "get-product"
-operationType = "query"
-sql = "SELECT * FROM product WHERE id = :id"
+type = "query"
+modelName = "product"
 access = "true"
-params = [{ name = "id", type = "TEXT", required = true }]
+definition = '{"filter":{"id":"$params.id"}}'
+params = '{"id":{"type":"string","required":true}}'
 
-[[types.operations]]
+[[operations]]
 name = "create-product"
-operationType = "mutation"
-sql = "INSERT INTO product (id, name, price, createdBy) VALUES (:id, :name, :price, :createdBy)"
-access = "isMemberOf('admin')"  # Only admins can create
-params = [
-  { name = "id", type = "TEXT", required = true },
-  { name = "name", type = "TEXT", required = true },
-  { name = "price", type = "REAL", required = true },
-  { name = "createdBy", type = "TEXT", required = true },
-]
+type = "mutation"
+modelName = "product"
+access = "isMemberOf('admin', database.metadata.adminGroupId)"
+definition = '{"operations":[{"op":"save","data":{"name":"$params.name","price":"$params.price","createdBy":"$user.userId"}}]}'
+params = '{"name":{"type":"string","required":true},"price":{"type":"number","required":true}}'
 
-[[types.operations]]
+[[operations]]
 name = "count-products"
-operationType = "count"
-sql = "SELECT COUNT(*) as count FROM product"
+type = "count"
+modelName = "product"
 access = "true"
+definition = '{}'
 ```
 
 ### 3. Push to Server
@@ -95,76 +89,85 @@ primitive sync push --dir ./config
 import { jsBaoClientService } from "primitive-app";
 
 const client = await jsBaoClientService.getClientAsync();
-const db = client.databases;
 
 // List products
-const { records } = await db.executeOperation("products", "product", "list-products");
+const { data: products } = await client.databases.executeOperation(databaseId, "list-products");
 
 // Get a single product
-const { records: [product] } = await db.executeOperation(
-  "products", "product", "get-product",
-  { id: "prod-123" }
+const { data: [product] } = await client.databases.executeOperation(
+  databaseId, "get-product",
+  { params: { id: "prod-123" } }
 );
 
 // Create a product (requires admin group membership)
-await db.executeOperation("products", "product", "create-product", {
-  id: crypto.randomUUID(),
-  name: "Widget",
-  price: 29.99,
-  createdBy: currentUser.userId,
+await client.databases.executeOperation(databaseId, "create-product", {
+  params: {
+    name: "Widget",
+    price: 29.99,
+  },
 });
 
 // Count products
-const { count } = await db.executeCount("products", "product", "count-products");
+const { count } = await client.databases.executeOperation(databaseId, "count-products");
 ```
 
 ## Operation Types
 
 ### Queries
-Return rows from the database. Can include parameters and pagination.
+Return records from the database. Can include parameters, sorting, filtering, and pagination.
 
 ```toml
-[[types.operations]]
+[[operations]]
 name = "search-products"
-operationType = "query"
-sql = "SELECT * FROM product WHERE name LIKE '%' || :search || '%' ORDER BY name LIMIT :limit OFFSET :offset"
+type = "query"
+modelName = "product"
 access = "true"
-params = [
-  { name = "search", type = "TEXT", required = true },
-  { name = "limit", type = "INTEGER", required = false },
-  { name = "offset", type = "INTEGER", required = false },
-]
+definition = '{"filter":{"name":{"$startsWith":"$params.search"}},"sort":{"name":1}}'
+params = '{"search":{"type":"string","required":true}}'
+```
+
+**Response:** `{ data: [...records], hasMore: boolean, nextCursor?: string }`
+
+Callers can override `limit`, `cursor`, and `direction` at call time:
+
+```typescript
+const { data, hasMore, nextCursor } = await client.databases.executeOperation(
+  databaseId, "search-products",
+  { params: { search: "widget" }, limit: 20, cursor: previousCursor }
+);
 ```
 
 ### Mutations
-Insert, update, or delete records.
+Create, update, or delete records. Supports `save`, `patch`, `delete`, `increment`, `addToSet`, and `removeFromSet`.
 
 ```toml
-[[types.operations]]
+[[operations]]
 name = "update-product"
-operationType = "mutation"
-sql = "UPDATE product SET name = :name, price = :price WHERE id = :id"
-access = "isMemberOf('admin')"
-params = [
-  { name = "id", type = "TEXT", required = true },
-  { name = "name", type = "TEXT", required = true },
-  { name = "price", type = "REAL", required = true },
-]
+type = "mutation"
+modelName = "product"
+access = "hasRole('admin')"
+definition = '{"operations":[{"op":"patch","id":"$params.id","data":{"name":"$params.name","price":"$params.price"}}]}'
+params = '{"id":{"type":"string","required":true},"name":{"type":"string","required":true},"price":{"type":"number","required":true}}'
 ```
 
+**Response:** `{ results: [{ success: boolean, id: string }] }`
+
 ### Counts
-Return a single count value.
+Return a single count value. **Response:** `{ count: number }`
 
 ### Aggregates
 Return grouped or summarized data.
 
 ```toml
-[[types.operations]]
+[[operations]]
 name = "sales-by-category"
-operationType = "aggregate"
-sql = "SELECT category, SUM(price) as total, COUNT(*) as count FROM product GROUP BY category"
-access = "isMemberOf('admin')"
+type = "aggregate"
+modelName = "product"
+access = "hasRole('admin')"
+definition = '{"groupBy":["category"],"operations":[{"type":"sum","field":"price","outputField":"total"},{"type":"count","outputField":"count"}]}'
 ```
+
+**Response:** `{ result: { "category-a": { total: 500, count: 10 }, ... } }`
 
 ## Access Control with CEL
 
@@ -177,88 +180,95 @@ CEL expressions give you fine-grained control over who can execute each operatio
 access = "true"
 
 # Only authenticated users
-access = "userId != ''"
+access = "user.userId != ''"
+
+# Only app admins
+access = "hasRole('admin')"
 
 # Only members of a specific group
-access = "isMemberOf('admin')"
+access = "isMemberOf('team', database.metadata.teamId)"
 
 # Only the record owner
-access = "params.createdBy == userId"
+access = "params.createdBy == user.userId"
 
 # Members of any of these groups
-access = "isMemberOf('admin') || isMemberOf('editor')"
-
-# Group members with a specific role
-access = "hasGroupRole('team-123', 'manager')"
+access = """isMemberOf('admin', 'admins') || isMemberOf('team', database.metadata.teamId)"""
 ```
 
 ### Available CEL Variables
 
 | Variable | Description |
 |---|---|
-| `userId` | The authenticated user's ID |
+| `user.userId` | The authenticated user's ID |
+| `user.role` | The user's app role |
+| `database.id` | The database instance ID |
+| `database.metadata` | The database's metadata object |
 | `params.*` | Operation parameters |
-| `isMemberOf(groupId)` | Check group membership |
-| `hasGroupRole(groupId, role)` | Check group membership with a specific role |
-| `memberGroups(groupTypeId)` | List groups of a type the user belongs to |
+| `isMemberOf(groupType, groupId)` | Check group membership |
+| `memberGroups(groupType)` | List groups of a type the user belongs to |
+| `hasRole(role)` | Check if the user has a specific app role |
 
 ### Per-Parameter Access
 
 Restrict who can set specific parameters:
 
 ```toml
-[[types.operations]]
+[[operations]]
 name = "update-user-role"
-operationType = "mutation"
-sql = "UPDATE app_user SET role = :role WHERE id = :userId"
-access = "isMemberOf('admin')"
-params = [
-  { name = "userId", type = "TEXT", required = true },
-  { name = "role", type = "TEXT", required = true, access = "isMemberOf('super-admin')" },
-]
+type = "mutation"
+modelName = "app_user"
+access = "hasRole('admin')"
+definition = '{"operations":[{"op":"patch","id":"$params.userId","data":{"role":"$params.role"}}]}'
+params = '{"userId":{"type":"string","required":true},"role":{"type":"string","required":true,"access":"hasRole(\"super-admin\")"}}'
 ```
 
 ## Triggers
 
-Triggers run server-side SQL before or after an operation, enabling computed fields, validation, and side effects.
+Triggers are computed fields that run automatically before a record is saved. Configure them per model in the database type TOML:
 
 ```toml
-[[types.operations]]
-name = "create-order"
-operationType = "mutation"
-sql = "INSERT INTO orders (id, productId, quantity, userId) VALUES (:id, :productId, :quantity, :userId)"
-access = "userId != ''"
-params = [
-  { name = "id", type = "TEXT", required = true },
-  { name = "productId", type = "TEXT", required = true },
-  { name = "quantity", type = "INTEGER", required = true },
-  { name = "userId", type = "TEXT", required = true },
+[triggers.orders]
+triggers = [
+  { on = "create", set = { createdAt = "now()", createdBy = "user.userId" } },
+  { on = "update", set = { modifiedAt = "now()" } },
+  { on = "save", when = "record.status == 'complete' && record.completedAt == null", set = { completedAt = "now()" } },
 ]
-
-[[types.operations.triggers]]
-timing = "after"
-sql = "UPDATE product SET stock = stock - :quantity WHERE id = :productId"
 ```
+
+| Field | Description |
+|---|---|
+| `on` | When to fire: `"create"`, `"update"`, or `"save"` (both) |
+| `when` | Optional CEL condition — trigger only fires if true |
+| `set` | Map of field name to CEL expression value |
+
+**Available in trigger expressions:** `user.userId`, `user.role`, `record.*`, `database.id`, `database.metadata`, `now()`
 
 ## Pipelines
 
 Chain multiple read operations together, where later steps can reference results from earlier ones:
 
 ```toml
-[[types.operations]]
+[[operations]]
 name = "order-with-product"
-operationType = "pipeline"
-
-[[types.operations.steps]]
-name = "order"
-sql = "SELECT * FROM orders WHERE id = :orderId"
-params = [{ name = "orderId", type = "TEXT", required = true }]
-
-[[types.operations.steps]]
-name = "product"
-sql = "SELECT * FROM product WHERE id = :productId"
-inputSelectors = { productId = "order.productId" }
+type = "pipeline"
+modelName = "_pipeline"
+access = "true"
+definition = '{"steps":[{"name":"order","type":"query","modelName":"orders","filter":{"id":"$params.orderId"}},{"name":"product","type":"query","modelName":"product","filter":{"id":"$steps.order.first.productId"}}],"return":"all"}'
+params = '{"orderId":{"type":"string","required":true}}'
 ```
+
+**Pipeline step references:**
+
+| Variable | Description |
+|---|---|
+| `$steps.stepName.first` | First record from a query step |
+| `$steps.stepName.first.field` | A field from the first record |
+| `$steps.stepName.count` | Record count from a query or count step |
+| `$steps.stepName.results` | Full results of the step |
+
+::: warning
+Pipelines are **read-only** — they support `query`, `count`, and `aggregate` steps only. For read-then-mutate flows, execute a pipeline to read the data, then call a separate mutation operation.
+:::
 
 ## Listing and Discovering Databases
 
@@ -317,11 +327,12 @@ const db = await client.databases.create({
 });
 
 // Create the group using the database ID as the group ID
-await client.groups.create("workspace", {
+await client.groups.create({
+  groupType: "workspace",
   groupId: db.databaseId,
   name: "Team Workspace Members",
 });
-await client.groups.addMember("workspace", db.databaseId, currentUser.userId);
+await client.groups.addMember("workspace", db.databaseId, { userId: currentUser.userId });
 ```
 
 This pattern is especially useful in multi-tenant apps where each team or project has its own database and group, and users are granted access through group membership rather than direct database permissions.
@@ -332,30 +343,33 @@ This pattern is especially useful in multi-tenant apps where each team or projec
 Let users query their own records:
 
 ```toml
-[[types.operations]]
+[[operations]]
 name = "my-orders"
-operationType = "query"
-sql = "SELECT * FROM orders WHERE userId = :userId ORDER BY createdAt DESC"
-access = "params.userId == userId"
-params = [{ name = "userId", type = "TEXT", required = true }]
+type = "query"
+modelName = "orders"
+access = "params.userId == user.userId"
+definition = '{"filter":{"userId":"$params.userId"},"sort":{"createdAt":-1}}'
+params = '{"userId":{"type":"string","required":true}}'
 ```
 
 ### Admin + User Access
 Admins see everything, users see their own:
 
 ```toml
-[[types.operations]]
+[[operations]]
 name = "list-orders-admin"
-operationType = "query"
-sql = "SELECT * FROM orders ORDER BY createdAt DESC"
-access = "isMemberOf('admin')"
+type = "query"
+modelName = "orders"
+access = "hasRole('admin')"
+definition = '{"sort":{"createdAt":-1}}'
 
-[[types.operations]]
+[[operations]]
 name = "list-orders-user"
-operationType = "query"
-sql = "SELECT * FROM orders WHERE userId = :userId ORDER BY createdAt DESC"
-access = "params.userId == userId"
-params = [{ name = "userId", type = "TEXT", required = true }]
+type = "query"
+modelName = "orders"
+access = "params.userId == user.userId"
+definition = '{"filter":{"userId":"$params.userId"},"sort":{"createdAt":-1}}'
+params = '{"userId":{"type":"string","required":true}}'
 ```
 
 ## Next Steps

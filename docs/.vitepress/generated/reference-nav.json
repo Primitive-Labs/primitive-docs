@@ -85,12 +85,24 @@
                   "link": "/reference/js-bao/api/functions/autoRegisterModel"
                 },
                 {
+                  "text": "clearMetaSyncCache",
+                  "link": "/reference/js-bao/api/functions/clearMetaSyncCache"
+                },
+                {
                   "text": "createModelClass",
                   "link": "/reference/js-bao/api/functions/createModelClass"
                 },
                 {
                   "text": "defineModelSchema",
                   "link": "/reference/js-bao/api/functions/defineModelSchema"
+                },
+                {
+                  "text": "discoverModelNames",
+                  "link": "/reference/js-bao/api/functions/discoverModelNames"
+                },
+                {
+                  "text": "discoverSchema",
+                  "link": "/reference/js-bao/api/functions/discoverSchema"
                 },
                 {
                   "text": "dumpYDocToPlain",
@@ -105,20 +117,48 @@
                   "link": "/reference/js-bao/api/functions/generateULID"
                 },
                 {
+                  "text": "inferFieldType",
+                  "link": "/reference/js-bao/api/functions/inferFieldType"
+                },
+                {
                   "text": "initJsBao",
                   "link": "/reference/js-bao/api/functions/initJsBao"
+                },
+                {
+                  "text": "loadSchemaFromToml",
+                  "link": "/reference/js-bao/api/functions/loadSchemaFromToml"
+                },
+                {
+                  "text": "loadSchemaFromTomlString",
+                  "link": "/reference/js-bao/api/functions/loadSchemaFromTomlString"
                 },
                 {
                   "text": "Model",
                   "link": "/reference/js-bao/api/functions/Model"
                 },
                 {
+                  "text": "registerFunctionDefault",
+                  "link": "/reference/js-bao/api/functions/registerFunctionDefault"
+                },
+                {
                   "text": "resetJsBao",
                   "link": "/reference/js-bao/api/functions/resetJsBao"
                 },
                 {
+                  "text": "schemaToToml",
+                  "link": "/reference/js-bao/api/functions/schemaToToml"
+                },
+                {
                   "text": "summarizePlainYDoc",
                   "link": "/reference/js-bao/api/functions/summarizePlainYDoc"
+                },
+                {
+                  "text": "syncInferredMeta",
+                  "link": "/reference/js-bao/api/functions/syncInferredMeta"
+                },
+                {
+                  "text": "syncModelMeta",
+                  "link": "/reference/js-bao/api/functions/syncModelMeta"
                 }
               ]
             },
@@ -132,6 +172,26 @@
                 {
                   "text": "DatabaseConfig",
                   "link": "/reference/js-bao/api/interfaces/DatabaseConfig"
+                },
+                {
+                  "text": "DiscoveredConstraint",
+                  "link": "/reference/js-bao/api/interfaces/DiscoveredConstraint"
+                },
+                {
+                  "text": "DiscoveredField",
+                  "link": "/reference/js-bao/api/interfaces/DiscoveredField"
+                },
+                {
+                  "text": "DiscoveredModel",
+                  "link": "/reference/js-bao/api/interfaces/DiscoveredModel"
+                },
+                {
+                  "text": "DiscoveredRelationship",
+                  "link": "/reference/js-bao/api/interfaces/DiscoveredRelationship"
+                },
+                {
+                  "text": "DiscoveredSchema",
+                  "link": "/reference/js-bao/api/interfaces/DiscoveredSchema"
                 },
                 {
                   "text": "DocumentConnectionEvent",
@@ -276,12 +336,20 @@
               "text": "Functions",
               "items": [
                 {
+                  "text": "attachAndRegisterModel",
+                  "link": "/reference/js-bao-wss-client/api/functions/attachAndRegisterModel"
+                },
+                {
                   "text": "createModelClass",
                   "link": "/reference/js-bao-wss-client/api/functions/createModelClass"
                 },
                 {
                   "text": "defineModelSchema",
                   "link": "/reference/js-bao-wss-client/api/functions/defineModelSchema"
+                },
+                {
+                  "text": "discoverSchema",
+                  "link": "/reference/js-bao-wss-client/api/functions/discoverSchema"
                 },
                 {
                   "text": "generateULID",
@@ -298,6 +366,10 @@
                 {
                   "text": "isJsBaoError",
                   "link": "/reference/js-bao-wss-client/api/functions/isJsBaoError"
+                },
+                {
+                  "text": "loadSchemaFromTomlString",
+                  "link": "/reference/js-bao-wss-client/api/functions/loadSchemaFromTomlString"
                 }
               ]
             },
@@ -451,6 +523,26 @@
                 {
                   "text": "DatabasesAPI",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DatabasesAPI"
+                },
+                {
+                  "text": "DiscoveredConstraint",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DiscoveredConstraint"
+                },
+                {
+                  "text": "DiscoveredField",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DiscoveredField"
+                },
+                {
+                  "text": "DiscoveredModel",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DiscoveredModel"
+                },
+                {
+                  "text": "DiscoveredRelationship",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DiscoveredRelationship"
+                },
+                {
+                  "text": "DiscoveredSchema",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DiscoveredSchema"
                 },
                 {
                   "text": "DocumentAccessResult",
@@ -743,6 +835,10 @@
                 {
                   "text": "RuleSetTestResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/RuleSetTestResult"
+                },
+                {
+                  "text": "SchemaDiscoveredEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/SchemaDiscoveredEvent"
                 },
                 {
                   "text": "SessionAPI",

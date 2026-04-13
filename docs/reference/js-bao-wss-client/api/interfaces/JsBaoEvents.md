@@ -230,6 +230,12 @@
 
 ***
 
+### schema-discovered
+
+> **schema-discovered**: [`SchemaDiscoveredEvent`](SchemaDiscoveredEvent.md)
+
+***
+
 ### status
 
 > **status**: [`StatusChangedEvent`](StatusChangedEvent.md)
