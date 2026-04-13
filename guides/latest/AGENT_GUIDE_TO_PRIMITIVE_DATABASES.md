@@ -529,6 +529,16 @@ const result = await client.databases.executeOperation(databaseId, "listTasks", 
 | `aggregate` | `{ result: { [groupValue]: { ...computedFields } } }` |
 | `pipeline` | `{ steps: { [stepName]: { type, ...stepResult } } }` — each step's result matches its operation type (query steps have `data`, count steps have `count`, aggregate steps have `result`) |
 
+**Operation timing:** Pass `timing: true` to get per-phase millisecond timings in `result._timing`. Works on all operation types.
+
+```typescript
+const result = await client.databases.executeOperation(databaseId, "listTasks", {
+  params: { projectId: "proj-1" },
+  timing: true,
+});
+// result._timing: { totalMs, databaseLookup, operationLookup, celEvaluation, doInvocation, ... }
+```
+
 ### Bulk operations
 
 Execute any operation across many items in one call (up to 100,000). Useful for bulk inserts, deletes, updates, or any other mutation:
@@ -652,6 +662,32 @@ Multiple filters on different fields are implicitly combined with AND:
 // Combine $or with other filters:
 { category: "electronics", $or: [{ onSale: true }, { price: { $lt: 20 } }] }
 ```
+
+### Boolean gate conditions
+
+Substitution variables (`$database.metadata.*`, `$params.*`, `$steps.*`) can appear **directly as elements** in `$and`/`$or` arrays (not as key-value pairs). The resolved boolean value gates that branch:
+
+| Value | In `$and` | In `$or` |
+|-------|-----------|----------|
+| `true` | No-op — remaining conditions apply | Short-circuits to match-all |
+| `false` / `null` / missing | Short-circuits to no-match (empty result, no DB hit) | Removed — other branches still apply |
+
+**Common use case — per-database feature flag:**
+
+```json
+{
+  "filter": {
+    "$or": [
+      { "authorId": "$user.userId" },
+      { "$and": ["$database.metadata.peerVisibility", { "status": "approved" }] }
+    ]
+  }
+}
+```
+
+When `$database.metadata.peerVisibility` is `true`, the `$and` branch includes approved posts. When it's `false` or missing, the branch short-circuits to no-match — users only see their own records. A missing key evaluates to `null`, so the gate is safely closed before the flag is set.
+
+This also works with `$steps.*` references in pipelines (see [Settings record pattern](#settings-record-pattern)).
 
 ### Sort, limit, pagination
 
@@ -952,11 +988,11 @@ name = "listVisiblePosts"
 type = "pipeline"
 modelName = "_pipeline"
 access = "isMemberOf('class-students', database.id)"
-definition = '{"steps":[{"name":"settings","type":"query","modelName":"settings","filter":{"key":"class-settings"},"limit":1},{"name":"posts","type":"query","modelName":"posts","filter":{"$or":[{"authorId":"$user.userId"},{"$and":[{"peerVisible":"$steps.settings.first.peerVisible"},{"status":"approved"}]}]},"sort":{"createdAt":-1},"limit":50}],"return":"posts"}'
+definition = '{"steps":[{"name":"settings","type":"query","modelName":"settings","filter":{"key":"class-settings"},"limit":1},{"name":"posts","type":"query","modelName":"posts","filter":{"$or":[{"authorId":"$user.userId"},{"$and":["$steps.settings.first.peerVisible",{"status":"approved"}]}]},"sort":{"createdAt":-1},"limit":50}],"return":"posts"}'
 params = '{}'
 ```
 
-This pipeline first reads the settings record, then uses `$steps.settings.first.peerVisible` in the posts query filter. When `peerVisible` is `true`, the `$and` branch includes approved posts from all students. When the settings record doesn't have `peerVisible` set, the `$steps` reference is omitted from the filter (same omission behavior as `$params.*`), so students only see their own posts.
+This pipeline first reads the settings record, then uses `$steps.settings.first.peerVisible` as a **boolean gate** in the posts query. When `peerVisible` is `true`, the `$and` branch opens and includes approved posts from all students. When the settings record doesn't have `peerVisible` set (or it's `false`), the gate short-circuits to no-match, so students only see their own posts. See [Boolean gate conditions](#boolean-gate-conditions) for details on this pattern.
 
 ### User-scoped data via operations
 

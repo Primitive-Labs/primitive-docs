@@ -270,6 +270,40 @@ params = '{"orderId":{"type":"string","required":true}}'
 Pipelines are **read-only** — they support `query`, `count`, and `aggregate` steps only. For read-then-mutate flows, execute a pipeline to read the data, then call a separate mutation operation.
 :::
 
+## Conditional Filters (Boolean Gates)
+
+Substitution variables like `$database.metadata.*`, `$params.*`, or `$steps.*` can be placed **directly as elements** inside `$and` or `$or` filter arrays. When a variable resolves to a boolean, `null`, or is missing, it controls whether that branch executes — without touching the database:
+
+| Value in array | In `$and` | In `$or` |
+|---|---|---|
+| `true` | No-op — remaining conditions apply | Short-circuits to match-all |
+| `false` / `null` / missing | Short-circuits to no-match (empty result, no DB hit) | Removed — remaining branches apply |
+
+This is useful for server-side feature flags that toggle visibility without any client-side logic:
+
+```toml
+[[operations]]
+name = "list-posts"
+type = "query"
+modelName = "posts"
+access = "isMemberOf('class-students', database.id)"
+definition = '{"filter":{"$or":[{"authorId":"$user.userId"},{"$and":["$database.metadata.peerVisibility",{"status":"approved"}]}]}}'
+```
+
+When `database.metadata.peerVisibility` is `true`, students see their own posts plus all approved posts. When it's `false` or not set, the `$and` branch short-circuits to no-match — students only see their own posts.
+
+Combined with the settings record pattern, you can make this dynamic without redeploying. Gate on a pipeline step result:
+
+```toml
+definition = '{"steps":[{"name":"settings","type":"query","modelName":"settings","filter":{"key":"class-settings"},"limit":1},{"name":"posts","type":"query","modelName":"posts","filter":{"$or":[{"authorId":"$user.userId"},{"$and":["$steps.settings.first.peerVisible",{"status":"approved"}]}]}}],"return":"posts"}'
+```
+
+When the settings record has `peerVisible: true`, the gate opens. When missing or `false`, the gate closes and students only see their own posts.
+
+::: tip
+A missing metadata key (`$database.metadata.nonExistent` → `null`) naturally closes the gate. This makes the default safe — no content is exposed before the flag is explicitly set.
+:::
+
 ## Listing and Discovering Databases
 
 ### `databases.list()` — Owner and Manager Only
@@ -371,6 +405,22 @@ access = "params.userId == user.userId"
 definition = '{"filter":{"userId":"$params.userId"},"sort":{"createdAt":-1}}'
 params = '{"userId":{"type":"string","required":true}}'
 ```
+
+## Operation Timing
+
+To debug slow operations, pass `timing: true` to `executeOperation`. The response includes a `_timing` object with per-phase millisecond breakdowns:
+
+```typescript
+const result = await client.databases.executeOperation(databaseId, "list-products", {
+  params: { search: "widget" },
+  timing: true,
+});
+console.log(result._timing);
+// { totalMs: 45.2, databaseLookup: 3.1, operationLookup: 2.8, validation: 0.4,
+//   celEvaluation: 1.3, doInvocation: 25.8, responseProcessing: 1.9 }
+```
+
+Timing is available on all operation types: query, mutation, count, aggregate, and pipeline.
 
 ## Next Steps
 
