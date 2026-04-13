@@ -49,14 +49,16 @@ jobs:
 
       - name: Initialize submodules to latest main
         run: |
-          git submodule init
-          git submodule foreach --quiet 'echo $name $sm_path' | while read name sm_path; do
+          # Parse .gitmodules directly (git submodule foreach only works on already-checked-out submodules)
+          git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | while read key sm_path; do
+            name="${key#submodule.}"
+            name="${name%.path}"
             branch=$(git config -f .gitmodules "submodule.${name}.branch" || echo "main")
             url=$(git config -f .gitmodules "submodule.${name}.url")
             echo "::group::Submodule $name → latest $branch"
             rm -rf "$sm_path"
             git clone --depth 1 --single-branch --branch "$branch" "$url" "$sm_path"
-            echo "✓ Checked out latest $branch"
+            echo "✓ Cloned latest $branch into $sm_path"
             echo "::endgroup::"
           done
 
@@ -150,13 +152,10 @@ jobs:
           echo "relevant_guides=$RELEVANT_GUIDES" >> $GITHUB_OUTPUT
           echo "source_paths=$SOURCE_PATHS" >> $GITHUB_OUTPUT
 
-      - name: Update submodule to latest main
+      - name: Stage submodule pointer update
         if: steps.context.outputs.test_mode != 'true'
         run: |
-          cd library_repos/${{ steps.context.outputs.submodule }}
-          git fetch origin main
-          git checkout origin/main
-          cd ../..
+          # Submodules were already cloned to latest main in init step
           git add library_repos/${{ steps.context.outputs.submodule }}
 
       - name: Update documentation with Claude

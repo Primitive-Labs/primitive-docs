@@ -28,12 +28,15 @@ jobs:
 
       - name: Initialize submodules (resilient)
         run: |
-          git submodule init
-          git submodule foreach --quiet 'echo $name $sm_path' | while read name sm_path; do
+          # Parse .gitmodules directly (git submodule foreach only works on already-checked-out submodules)
+          git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | while read key sm_path; do
+            name="${key#submodule.}"
+            name="${name%.path}"
             pinned_sha=$(git ls-tree HEAD "$sm_path" | awk "{print \$3}")
             echo "::group::Submodule $name (pinned: ${pinned_sha:0:12})"
 
-            if git submodule update --single-branch "$sm_path" 2>/dev/null; then
+            git submodule init -- "$sm_path"
+            if git submodule update --single-branch -- "$sm_path" 2>/dev/null; then
               echo "✓ Checked out pinned commit"
             else
               echo "⚠ Pinned commit $pinned_sha not found, cloning latest branch HEAD"
