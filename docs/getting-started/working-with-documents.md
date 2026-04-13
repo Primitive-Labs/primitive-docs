@@ -232,11 +232,10 @@ When a match is found, the save returns the existing record's ID. Only the field
 | `$lt` / `$lte` | Less than (or equal) | `{ dueDate: { $lt: new Date() } }` |
 | `$in` / `$nin` | In / not in array | `{ status: { $in: ["pending", "active"] } }` |
 | `$startsWith` | String prefix | `{ name: { $startsWith: "Project" } }` |
+| `$endsWith` | String suffix | `{ name: { $endsWith: ".md" } }` |
 | `$containsText` | Case-insensitive contains | `{ title: { $containsText: "urgent" } }` |
 | `$exists` | Field exists | `{ dueDate: { $exists: true } }` |
 | `$contains` | StringSet contains value | `{ tags: { $contains: "tutorial" } }` |
-| `$containsAny` | StringSet contains any | `{ tags: { $containsAny: ["js", "ts"] } }` |
-| `$containsAll` | StringSet contains all | `{ tags: { $containsAll: ["tutorial", "advanced"] } }` |
 
 ### Logical Operators
 
