@@ -227,16 +227,33 @@ jobs:
                - Keep explanations concise but thorough
                - Maintain consistent heading structure
 
-            5. **Write a summary**: After reviewing and making any changes, write a brief summary to `.claude-summary.md` with:
+            5. **Update the changelog**: Read `docs/getting-started/changelog.md` and add a new entry for this update.
+               - Check the submodule's `package.json` to get the current version number.
+               - Insert the new entry **immediately after** the `<!-- CHANGELOG:START -->` comment, so the newest entry is always first.
+               - Use this format:
+
+               ```markdown
+               ## <package-name> v<version> — <YYYY-MM-DD>
+
+               <A concise summary of the changes: new features, bug fixes, breaking changes, etc.
+               Write 2-5 bullet points covering the most important changes.
+               Base this on the commit messages and API changes provided above.>
+               ```
+
+               - The package names are: `js-bao`, `js-bao-wss`, `primitive-app`.
+               - If the version has not changed from the previous changelog entry for the same package, still add an entry but note it as a patch/update at the same version.
+
+            6. **Write a summary**: After reviewing and making any changes, write a brief summary to `.claude-summary.md` with:
                - What changes you reviewed
                - What documentation updates you made (if any)
                - Why these changes were or weren't needed
                This summary will be included in the PR description.
 
-            6. **Signal whether updates were made**:
+            7. **Signal whether updates were made**:
                - If you made documentation changes, create a file `.claude-docs-updated` containing `true`
-               - If no documentation changes were needed, do NOT create this file
+               - If no documentation changes were needed (other than the changelog), do NOT create this file
                - This determines whether a PR will be created
+               - **Always create `.claude-docs-updated` if you updated the changelog**
 
             ### Important
 
@@ -244,7 +261,7 @@ jobs:
             - Only modify files in `docs/getting-started/` and `guides/latest/`
             - Focus on the narrative guides that explain concepts and usage patterns
             - **Only make changes that are directly relevant to the submodule update** - do not make unrelated edits or improvements
-            - **It is perfectly fine to make no changes** - if the code changes don't affect documentation, just write a summary explaining why no updates were needed. Do not invent changes just to have something to commit.
+            - **Always update the changelog** - even if no guide changes are needed, the changelog entry should still be added.
           claude_args: |
             --allowedTools "Read,Edit,Write,Glob,Grep,Bash(pnpm docs:build),Bash(pnpm gen:reference)"
 
