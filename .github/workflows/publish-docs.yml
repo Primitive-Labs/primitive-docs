@@ -36,11 +36,11 @@ jobs:
             if git submodule update --single-branch "$sm_path" 2>/dev/null; then
               echo "✓ Checked out pinned commit"
             else
-              echo "⚠ Pinned commit $pinned_sha not found, falling back to branch HEAD"
+              echo "⚠ Pinned commit $pinned_sha not found, cloning latest branch HEAD"
               branch=$(git config -f .gitmodules "submodule.${name}.branch" || echo "main")
               url=$(git config -f .gitmodules "submodule.${name}.url")
               rm -rf "$sm_path"
-              git clone --single-branch --branch "$branch" "$url" "$sm_path"
+              git clone --depth 1 --single-branch --branch "$branch" "$url" "$sm_path"
               echo "✓ Checked out latest $branch"
             fi
 

@@ -47,24 +47,16 @@ jobs:
       - name: Configure git auth for submodules
         run: git config --global url."https://x-access-token:${{ secrets.DOCS_REPO_PAT }}@github.com/".insteadOf "https://github.com/"
 
-      - name: Initialize submodules (resilient)
+      - name: Initialize submodules to latest main
         run: |
           git submodule init
           git submodule foreach --quiet 'echo $name $sm_path' | while read name sm_path; do
-            pinned_sha=$(git ls-tree HEAD "$sm_path" | awk "{print \$3}")
-            echo "::group::Submodule $name (pinned: ${pinned_sha:0:12})"
-
-            if git submodule update --single-branch "$sm_path" 2>/dev/null; then
-              echo "✓ Checked out pinned commit"
-            else
-              echo "⚠ Pinned commit $pinned_sha not found, falling back to branch HEAD"
-              branch=$(git config -f .gitmodules "submodule.${name}.branch" || echo "main")
-              url=$(git config -f .gitmodules "submodule.${name}.url")
-              rm -rf "$sm_path"
-              git clone --single-branch --branch "$branch" "$url" "$sm_path"
-              echo "✓ Checked out latest $branch"
-            fi
-
+            branch=$(git config -f .gitmodules "submodule.${name}.branch" || echo "main")
+            url=$(git config -f .gitmodules "submodule.${name}.url")
+            echo "::group::Submodule $name → latest $branch"
+            rm -rf "$sm_path"
+            git clone --depth 1 --single-branch --branch "$branch" "$url" "$sm_path"
+            echo "✓ Checked out latest $branch"
             echo "::endgroup::"
           done
 
@@ -158,12 +150,12 @@ jobs:
           echo "relevant_guides=$RELEVANT_GUIDES" >> $GITHUB_OUTPUT
           echo "source_paths=$SOURCE_PATHS" >> $GITHUB_OUTPUT
 
-      - name: Update submodule to latest
+      - name: Update submodule to latest main
         if: steps.context.outputs.test_mode != 'true'
         run: |
           cd library_repos/${{ steps.context.outputs.submodule }}
           git fetch origin main
-          git checkout ${{ steps.context.outputs.ref }}
+          git checkout origin/main
           cd ../..
           git add library_repos/${{ steps.context.outputs.submodule }}
 
