@@ -13,17 +13,26 @@ The Primitive Admin Console is a web-based dashboard for managing your apps, use
 ### Users & Groups
 - View all users in your app
 - Invite new users and manage pending invitations
+- Enable member invitations and set quota limits
+- View pending invitations and the email-based document shares or group adds attached to them
 - Manage console admins (who can access the admin console) and admin invitations
 - Manage waitlist (when in invite-only mode)
 
+### Sharing & Access
+- Review and approve/deny pending document access requests
+- Browse bookmarks and shared-document state per user
+- View audit trail of share, invitation, and access-request activity
+
 ### Databases
 - Browse databases and their types
-- View and test registered operations
-- Inspect operation access control expressions
+- View and test registered operations (including `applyToQuery` and `executeBatch`)
+- Inspect operation access control expressions and per-subscription filter rules
+- Grant group-based permissions on a database
 - Run operations directly to verify behavior
 
 ### Workflows
 - View workflow definitions and their status (draft, active, archived)
+- Manage cron triggers (create, edit, enable/disable, fire manually)
 - Start workflow runs with test inputs
 - Monitor run progress and inspect step-by-step output
 - View run history and debug failures
@@ -39,6 +48,16 @@ The Primitive Admin Console is a web-based dashboard for managing your apps, use
 - Manage integration secrets
 - Test integrations with sample requests
 - View recent call logs
+
+### Email Templates
+- Manage built-in email templates (magic link, OTP, access-request-created, etc.)
+- Register custom email template types with arbitrary kebab-case names
+- Preview rendered templates and send test emails
+
+### Blob Buckets
+- Create and configure blob buckets (access policy, TTL tier, CEL rules)
+- Browse blobs and generate signed URLs for inspection
+- Delete buckets and their contents
 
 ### Analytics
 - View usage metrics and event counts

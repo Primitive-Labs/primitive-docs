@@ -74,6 +74,11 @@ primitive workflows publish welcome-email
 | `workflow.call` | Run another workflow inline (synchronously) |
 | `workflow.start` | Start child workflow instances in parallel |
 | `workflow.await` | Wait for child workflow instances to complete |
+| `database.applyToQuery` | Query-and-mutate in one server-side pass |
+| `database.executeBatch` | Apply many individual writes with per-item CEL access |
+| `analytics.query` | Run an analytics query (see Analytics Query Step below) |
+| `email.send` | Send an email (template-based or inline; see Email Steps below) |
+| `blob` | Upload or manipulate blobs in a bucket (see [Blob Buckets](./blob-buckets.md)) |
 
 ### Template Syntax
 
@@ -124,6 +129,33 @@ console.log(status.outputs); // Final outputs when completed
 const { runs } = await client.workflows.listRuns("welcome-email");
 ```
 
+### Scheduling Workflows with Cron
+
+Workflows don't have to be triggered by a user or a webhook — you can run them on a schedule. Create a cron trigger that fires a workflow on any standard cron expression, with IANA timezone support and an overlap policy:
+
+```bash
+primitive cron-triggers create \
+  --key "nightly-digest" \
+  --workflow "send-digest" \
+  --schedule "0 9 * * *" \
+  --timezone "America/Los_Angeles"
+```
+
+See [Scheduled and Real-Time Automation](./scheduled-and-realtime-automation.md) for the full cron walkthrough.
+
+### Debugging Workflow Runs
+
+Every step's output is persisted and reachable via the app-level workflow run steps endpoint:
+
+```typescript
+const steps = await client.workflows.runSteps(workflowRunId);
+steps.forEach(step => {
+  console.log(step.name, step.status, step.output);
+});
+```
+
+You'll see the same data in the admin console under the run's detail view.
+
 ### Real-Time Status via WebSocket
 
 ```typescript
@@ -134,6 +166,67 @@ client.on("workflowStatus", (event) => {
   }
 });
 ```
+
+## Email Steps
+
+The `email.send` step sends an email from inside a workflow. It has two modes.
+
+### Template Mode
+
+Use a registered email template — either a built-in type (`magic-link`, `otp`, etc.) or a custom one you registered:
+
+```toml
+[[steps]]
+name = "order-confirmation"
+type = "email.send"
+templateType = "order-confirmation"
+to = "{{ input.customerEmail }}"
+variables = { orderId = "{{ input.orderId }}", total = "{{ input.total }}" }
+```
+
+Register custom template types with any kebab-case name. Manage them with the CLI:
+
+```bash
+primitive email-templates set order-confirmation \
+  --subject "Your order #{{orderId}}" \
+  --html-file ./order.html
+```
+
+### Inline Mode
+
+For one-off or dynamically constructed emails, specify subject and body directly in the step:
+
+```toml
+[[steps]]
+name = "report-ready"
+type = "email.send"
+to = "{{ input.email }}"
+subject = "Your report is ready"
+htmlBody = "<p>Download: <a href=\"{{ outputs.save.signedUrl }}\">link</a></p>"
+textBody = "Download: {{ outputs.save.signedUrl }}"
+```
+
+Inline mode bypasses templates entirely — useful when the subject or body depends on upstream step output and creating a template for it wouldn't add value.
+
+## Analytics Query Step
+
+Workflows can query analytics data server-side:
+
+```toml
+[[steps]]
+name = "top-users-weekly"
+type = "analytics.query"
+queryType = "top-users"
+windowDays = 7
+limit = 25
+```
+
+All 16 analytics query types are available (overview, top-users, user-detail, events, events-grouped, cohort-retention, workflows, prompts, integrations, etc.). Two things worth knowing:
+
+- **Default deny, admin/owner bypass.** The runner looks up the triggering user's app role and rejects non-admin callers before making the upstream call. Keep analytics workflows locked down with `accessRule = "hasRole('admin')"`.
+- **Per-run cap of 50 queries.** If a single run issues more than 50 analytics queries, the excess are skipped.
+
+Cache TTL overrides are available via `cacheTtlSeconds` — pass `0` or `null` to bypass the cache for a fresh read.
 
 ## Inbound Webhooks
 
@@ -349,5 +442,7 @@ primitive workflows runs get <runId>
 ## Next Steps
 
 - **[Working with Databases](./working-with-databases.md)** — Server-side data that workflows can act on
+- **[Scheduled and Real-Time Automation](./scheduled-and-realtime-automation.md)** — Cron triggers and live database subscriptions
+- **[Blob Buckets](./blob-buckets.md)** — Storage that workflows write to via the `blob` step
 - **[Primitive CLI](./primitive-cli.md)** — Full CLI command reference
 - **[Overview](/)** — See how workflows fit into the platform

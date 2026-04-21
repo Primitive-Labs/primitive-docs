@@ -15,7 +15,7 @@ A **database** is:
 - Each database is an isolated Durable Object with its own SQLite instance — Strong consistency, zero-config scaling
 - All data access goes through **registered operations** with per-operation authorization
 - Databases can be organized by **type** — a named configuration shared across many database instances
-- Supports queries, mutations, counts, aggregates, multi-step pipelines, atomic operations, and bulk imports
+- Supports queries, mutations, counts, aggregates, multi-step pipelines, atomic operations, batch writes, apply-to-query, and real-time subscriptions
 
 **Size Guidelines:** Individual databases can hold up to ~5GB of data. For larger needs, split data across multiple databases (one per tenant, project, or domain) — each is a separate Durable Object that scales independently.
 
@@ -265,8 +265,9 @@ Export creates a directory under `<output>/databases/<database-id>/` containing 
 
 A **database type** is a named configuration shared across many databases. It provides:
 
-- **Registered operations** — queries, mutations, counts, aggregates, pipelines with per-operation CEL access control
+- **Registered operations** — queries, mutations, counts, aggregates, pipelines, batch writes, and apply-to-query with per-operation CEL access control
 - **Triggers** — computed fields that run server-side before save
+- **Subscriptions** — named WebSocket subscriptions with CEL access rules and per-change filter rules
 - **Metadata access rules** — CEL expression controlling who can update database metadata
 - **Rule set attachment** — for managing who can edit the type config and operations
 
@@ -789,6 +790,67 @@ const results = await db.batch([
 ]);
 ```
 
+### Registered `executeBatch` Operations
+
+For end-user batch writes through a registered operation, use `type = "executeBatch"` with a per-item CEL rule. Each item in the batch is authorized independently, so a single failing item does not fail the whole batch.
+
+```toml
+[[operations]]
+name = "import-contacts"
+type = "executeBatch"
+modelName = "contact"
+access = "hasRole('admin')"
+itemAccess = "params.createdBy == user.userId"
+```
+
+```typescript
+await client.databases.executeOperation(databaseId, "import-contacts", {
+  items: [
+    { op: "save",  data: { name: "Alice", createdBy: userId } },
+    { op: "patch", id: "rec-1", data: { status: "verified" } },
+    { op: "delete", id: "rec-2" },
+  ],
+});
+// Response: { results: [{ ok: true, id }, { ok: false, error: "..." }, ...] }
+```
+
+**Use `executeBatch` when** the caller needs to apply many individual writes it constructed on the client, each of which should be authorized separately.
+
+## Apply-to-Query
+
+For "update every record that matches this filter," use `applyToQuery` — a single server-side operation that runs a query and applies a mutation to each matching record.
+
+```toml
+[[operations]]
+name = "mark-overdue"
+type = "applyToQuery"
+modelName = "task"
+access = "hasRole('admin')"
+query = '{"filter":{"dueDate":{"$lt":"$params.now"},"status":"pending"}}'
+mutation = '{"op":"patch","data":{"status":"overdue"}}'
+params = '{"now":{"type":"string","required":true}}'
+```
+
+```typescript
+const result = await client.databases.executeOperation(databaseId, "mark-overdue", {
+  params: { now: new Date().toISOString() },
+});
+// { matched: 142, updated: 142, truncated: false }
+```
+
+**Truncation.** If the query matches more records than the per-call cap, `truncated: true` is returned — loop until `truncated: false`:
+
+```typescript
+while (true) {
+  const r = await client.databases.executeOperation(databaseId, "mark-overdue", {
+    params: { now },
+  });
+  if (!r.truncated) break;
+}
+```
+
+**Use `applyToQuery` instead of `executeBatch` when** you don't want to ship the record list across the wire — the server already knows which records match.
+
 ## Aggregation
 
 ```typescript
@@ -914,9 +976,9 @@ await client.databases.transferOwnership(databaseId, "new-owner-id");
 
 **Anti-pattern: Adding end users as managers.** It is almost never correct to add individual end users as managers of a database. The `manager` role bypasses CEL access gates entirely and grants administrative control over the database — it is not a way to give users access to data. The proper pattern is that only a small number of privileged accounts (the creator, perhaps one or two co-admins) have direct owner/manager access to a database, and **all other user access goes through registered operations** with CEL access expressions. If you find yourself writing a loop that grants `manager` to each user who needs to interact with a database, stop — define operations with appropriate `access` rules instead.
 
-### Group-based permissions
+### Group-Based Database Access
 
-Use `DatabaseGroupPermission` to grant database access (owner or manager level) to every member of a group in one step. Any user who belongs to the group — now or in the future — gets that permission level. The resolved permission for a user is the highest level found across their direct `DatabasePermission` and any matching `DatabaseGroupPermission`.
+Use `DatabaseGroupPermission` to grant database access to every member of a group in one step. Members gain the specified permission level (currently `manager` only); membership changes propagate automatically.
 
 ```typescript
 // Grant manager access to every member of the "team:engineering" group
@@ -936,9 +998,72 @@ await client.databases.revokeGroupPermission(databaseId, "team", "engineering");
 const dbs = await client.groups.listDatabases("team", "engineering");
 ```
 
-Group members see the database in their `databases.list()` result and can call `databases.get(databaseId)`. Only the database owner (or an app admin) can grant or revoke group permissions.
+Resolution semantics:
+
+| Call | Resolves group access? |
+|------|------------------------|
+| `databases.get(databaseId)` | Yes — group members (via any matching `DatabaseGroupPermission`) can load metadata |
+| `databases.list()` | **No** — direct grants only (matches `documents.list()` semantics) |
+| `groups.listDatabases(groupType, groupId)` | Yes — the canonical way for a group member to discover databases they have group-level access to |
+
+Group-accessible databases do not appear in `databases.list()`. If your app needs a unified "all databases I can access" view, combine `databases.list()` (direct) with `groups.listDatabases(...)` for each of the user's memberships.
+
+**Use groups for management-level access to a database; still use registered-operation CEL for end-user data access.** Do not replace operation-level CEL gates with a group permission — that grants administrative powers, not just data access. Only the database owner (or an app admin) can grant or revoke group permissions.
 
 See the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) for group-based access patterns.
+
+## Real-Time Subscriptions
+
+Databases push changes to connected clients over WebSocket. Define subscriptions in the database type config and subscribe from the client.
+
+### Registering
+
+```toml
+[[subscriptions]]
+name = "my-open-tickets"
+modelName = "ticket"
+access = "user.userId != ''"
+filter = "record.assigneeId == user.userId && record.status == 'open'"
+
+[[subscriptions]]
+name = "tickets-by-team"
+modelName = "ticket"
+access = "isMemberOf('team', params.teamId)"
+filter = "record.teamId == params.teamId"
+params = '{"teamId":{"type":"string","required":true}}'
+```
+
+- `access` is evaluated at subscribe time. A false result rejects the subscribe call.
+- `filter` is evaluated per-change, per-subscriber. Only matches are delivered.
+- `filter` can only narrow what `access` allows; it cannot grant access the rule denies.
+
+### Subscribing
+
+```typescript
+const sub = await client.databases
+  .database(databaseId)
+  .subscribe("my-open-tickets");
+
+sub.on("change", (event) => {
+  // event.op: "save" | "patch" | "delete"
+  // event.before / event.after
+  applyChange(event);
+});
+
+sub.unsubscribe();
+```
+
+### Critical Rules
+
+1. **Always pair initial load with subscription.** Subscriptions deliver deltas only; the initial state comes from a regular operation call. Keep the query's filter and the subscription's filter semantically equivalent.
+
+2. **Writer's connection is excluded.** The client that triggered the mutation does not receive the change event.
+
+3. **No replay on reconnect.** Re-query on reconnection; the server does not buffer missed changes.
+
+4. **Workflow mutations fan out too.** A `database.mutate` step in a workflow wakes up every matching client subscription. This is the primary way to build live workflow-progress UIs.
+
+See the [Scheduling and Real-Time guide](AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md) for the full walkthrough.
 
 ## Schema Introspection
 

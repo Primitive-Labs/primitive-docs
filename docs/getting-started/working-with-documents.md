@@ -350,15 +350,48 @@ Use `PrimitiveLoadingGate` in your template to show loading state until `initial
 
 ## Sharing Documents
 
+Share a document by user ID, by email (grant resolves at signup if they aren't a member yet), or with an entire group:
+
 ```typescript
-// Share via email invitation
-await documentsStore.shareDocument(documentId, "colleague@example.com", "read-write");
+// By user ID
+await client.documents.setPermissions(documentId, [
+  { userId: "user-abc", permission: "read-write" },
+]);
+
+// By email — works whether or not the recipient is a member yet
+await client.documents.setPermissions(documentId, [
+  { email: "colleague@example.com", permission: "read-write" },
+]);
+
+// With a group
+await client.documents.setGroupPermission(documentId, {
+  groupType: "team",
+  groupId: "engineering",
+  permission: "read-write",
+});
 ```
 
 The `primitive-app` library provides a `PrimitiveDocumentList` component with built-in sharing UI.
 
+For the full sharing story — member invitations with quotas, email-based grants, access requests, and bookmarks — see [Sharing and Invitations](./sharing-and-invitations.md).
+
+## Bookmarks
+
+When a user creates a document, it's automatically added to their bookmarks. Invited users who accept an invitation also get an auto-bookmark. Bookmarks are how users curate their "home screen":
+
+```typescript
+const { items } = await client.me.bookmarks.list();
+```
+
+See [Sharing and Invitations](./sharing-and-invitations.md#bookmarks) for the full bookmarks API.
+
+## Document Access Requests
+
+A `403` from `client.documents.get(documentId)` can now include a `canRequestAccess` hint. Users with a document link can submit a request, and document owners can approve or deny it. See [Sharing and Invitations](./sharing-and-invitations.md#document-access-requests).
+
 ## Next Steps
 
 - **[Choosing Your Data Model](./choosing-your-data-model.md)** — When to use documents vs. databases
+- **[Sharing and Invitations](./sharing-and-invitations.md)** — Full sharing, invitations, and access requests
 - **[Working with Databases](./working-with-databases.md)** — Server-side structured storage
 - **[Blobs and Files](./blobs-and-files.md)** — File storage within documents

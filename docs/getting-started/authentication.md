@@ -83,6 +83,33 @@ primitive email-templates set magic-link \
 primitive email-templates test magic-link
 ```
 
+## Invitations and Pending Shares
+
+Any sign-in method resolves pending invitations and email-based shares automatically:
+
+- If an invitation exists for the user's email, it's consumed and the user joins the app.
+- Any pending document shares or group adds that were addressed to their email are applied atomically after the account is created — documents are shared, group memberships are added, bookmarks are set up.
+- Domain-mode apps re-validate the email domain at resolution time. A pending share for `alice@outside.com` won't land in an app restricted to `@mycompany.com`.
+
+From the end-user's perspective: they sign in for the first time, and the things other people invited them into are already there. No manual "accept invitation" step.
+
+See [Sharing and Invitations](./sharing-and-invitations.md) for how to create these shares.
+
+## Test User Sign-In for Automated Testing
+
+For automated tests, Primitive supports a `+primitive` OTP bypass. Passing an email like `alice+primitive@example.com` to the OTP flow skips the email send and lets the test issue a short-lived token directly.
+
+Guardrails worth knowing:
+
+- **Env-gated.** The bypass is only active when the server is running with the test-mode env var set. It is off in production.
+- **30-minute tokens.** Tokens issued via this path expire after 30 minutes regardless of your normal session length.
+- **Admin-role boundaries.** The bypass cannot issue admin tokens — only regular-user tokens.
+- **Requires a matching invitation.** The user still needs a valid `AppInvitation` for the app; the bypass doesn't create accounts out of thin air.
+
+Use this for integration tests and local dev. Do not rely on it for staging or production flows.
+
+See [Primitive CLI](./primitive-cli.md#test-users-for-automated-testing) for CLI usage.
+
 ## How It Works Under the Hood
 
 For reference, here's what the template handles for you:
@@ -95,4 +122,5 @@ For reference, here's what the template handles for you:
 ## Next Steps
 
 - **[Users and Groups](./users-and-groups.md)** — Organize users and manage access control
+- **[Sharing and Invitations](./sharing-and-invitations.md)** — Invitations, email-based shares, access requests
 - **[Overview](/)** — See how auth fits into the platform

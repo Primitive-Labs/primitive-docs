@@ -155,6 +155,47 @@ params = '{"id":{"type":"string","required":true},"name":{"type":"string","requi
 ### Counts
 Return a single count value. **Response:** `{ count: number }`
 
+### Apply-to-Query
+Query-and-mutate in a single server-side operation. Useful when you need to update every record matching a filter without round-tripping the IDs through the client.
+
+```toml
+[[operations]]
+name = "mark-overdue"
+type = "applyToQuery"
+modelName = "task"
+access = "hasRole('admin')"
+query = '{"filter":{"dueDate":{"$lt":"$params.now"},"status":"pending"}}'
+mutation = '{"op":"patch","data":{"status":"overdue"}}'
+params = '{"now":{"type":"string","required":true}}'
+```
+
+**Response:** `{ matched: number, updated: number, truncated: boolean }`
+
+If the query matches more records than the server's per-call cap, `truncated` is `true` and you should re-run the operation until it returns `truncated: false`.
+
+### Batch
+Apply many individual writes in a single request, with CEL access checked per-item.
+
+```toml
+[[operations]]
+name = "import-contacts"
+type = "executeBatch"
+modelName = "contact"
+access = "hasRole('admin')"
+itemAccess = "params.createdBy == user.userId"
+```
+
+Each item in the batch is checked against `itemAccess` independently — a single failing item doesn't fail the whole batch.
+
+```typescript
+await client.databases.executeOperation(databaseId, "import-contacts", {
+  items: [
+    { op: "save", data: { name: "Alice", email: "alice@example.com", createdBy: userId } },
+    { op: "save", data: { name: "Bob", email: "bob@example.com", createdBy: userId } },
+  ],
+});
+```
+
 ### Aggregates
 Return grouped or summarized data.
 
@@ -304,6 +345,34 @@ When the settings record has `peerVisible: true`, the gate opens. When missing o
 A missing metadata key (`$database.metadata.nonExistent` → `null`) naturally closes the gate. This makes the default safe — no content is exposed before the flag is explicitly set.
 :::
 
+## Real-Time Subscriptions
+
+Databases can push changes to connected clients over WebSocket — your app doesn't have to poll. Define a subscription in your type config, subscribe from the client, and the server fans out change events to every connection whose filter matches.
+
+```toml
+[[subscriptions]]
+name = "my-open-tickets"
+modelName = "ticket"
+access = "user.userId != ''"
+filter = "record.assigneeId == user.userId && record.status == 'open'"
+```
+
+```typescript
+const sub = await client.databases
+  .database(databaseId)
+  .subscribe("my-open-tickets");
+
+sub.on("change", (event) => {
+  // event.op: "save" | "patch" | "delete"
+  // event.before / event.after
+  applyChange(event);
+});
+```
+
+Writes from workflows fan out to subscriptions the same way as writes from clients — making this the primary pattern for live "workflow progress" UIs.
+
+See [Scheduled and Real-Time Automation](./scheduled-and-realtime-automation.md) for the full walkthrough including parameterized subscriptions, access enforcement, and reconnection behavior.
+
 ## Listing and Discovering Databases
 
 ### `databases.list()` — Owner and Manager Only
@@ -323,12 +392,26 @@ App-level admins (console admins) are an exception — they see all databases in
 
 ### `databases.get()` — Any Authenticated User
 
-Unlike `list()`, `databases.get(databaseId)` is available to any authenticated user who knows the database ID. It does not require owner or manager permission. This makes it suitable for loading database details when you already have the ID from another source (e.g., group metadata or a shared link).
+Unlike `list()`, `databases.get(databaseId)` is available to any authenticated user who knows the database ID. It does not require owner or manager permission. `databases.get()` also resolves **group-based** access via `DatabaseGroupPermission` (see below), so users who only have access through a shared group can still load database metadata.
 
 ```typescript
 // Works for any authenticated user — no owner/manager permission required
 const db = await client.databases.get(databaseId);
 ```
+
+### Group-Based Database Access
+
+Alongside direct permission grants, a database can be shared with an entire group using `DatabaseGroupPermission`. This mirrors the document-sharing model:
+
+```typescript
+await client.databases.setGroupPermission(databaseId, {
+  groupType: "team",
+  groupId: "engineering",
+  permission: "manager",
+});
+```
+
+Members of the group can then call `databases.get(databaseId)` and execute operations. Note that `databases.list()` deliberately does **not** include group-access databases — this matches the documents semantics, where the list is "things I directly own" and discovery of shared things happens through another channel (group memberships, bookmarks, or a shared link).
 
 ### Discovering Databases via Group Memberships
 
@@ -426,4 +509,5 @@ Timing is available on all operation types: query, mutation, count, aggregate, a
 
 - **[Choosing Your Data Model](./choosing-your-data-model.md)** — When to use databases vs. documents
 - **[Users and Groups](./users-and-groups.md)** — Set up groups for database access control
+- **[Scheduled and Real-Time Automation](./scheduled-and-realtime-automation.md)** — Subscriptions and cron-triggered workflows
 - **[Primitive CLI](./primitive-cli.md)** — Full CLI reference for database management

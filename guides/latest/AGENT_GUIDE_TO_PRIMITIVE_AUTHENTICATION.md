@@ -426,17 +426,58 @@ await client.logout();
 
 ---
 
-## Customizing Email Templates
+## Deferred Grant Resolution at Signup
 
-The emails Primitive sends for Magic Link and OTP authentication can be customized via the CLI:
+Signing in also resolves any pending `DeferredDocumentPermission` and `DeferredGroupAdd` records for the user's email. This happens automatically inside `UserProvisioningService` on first provision, after cleanup-on-access runs.
+
+**Implications for agent code:**
+
+1. **Don't duplicate permission logic after signup.** If someone shared a document with the user's email before they signed up, the document is already in their bookmarks and they already have access — do not re-check and re-grant.
+2. **Domain-mode apps re-validate at resolution time.** A deferred grant for an email outside the allowed domains is dropped silently, and the invitation is rejected.
+3. **The `invitation`/`accepted` WS event fires after resolution completes.** Subscribe to it if you want to refresh UI on another already-signed-in user's session (the inviter).
+
+See the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md#deferred-grants) for the full flow.
+
+---
+
+## Test User Sign-In for Automated Tests
+
+For integration tests and local development, Primitive supports a `+primitive` OTP bypass that issues short-lived tokens without going through the email flow.
 
 ```bash
-# See available email types and their current status
+# Creates/selects the user and returns a 30-minute token
+primitive test-users login alice+primitive@example.com
+```
+
+```typescript
+// In an integration test
+const token = await runCli("test-users login alice+primitive@example.com");
+client.auth.setToken(token);
+```
+
+**Guardrails:**
+
+- Env-gated. Production servers reject these requests.
+- 30-minute tokens. Regardless of normal session length.
+- Regular-user scope only — cannot mint admin tokens.
+- Requires a valid `AppInvitation` for the app.
+
+**Do not use in production flows.** This path exists solely for automated tests and local dev.
+
+---
+
+## Customizing Email Templates
+
+The emails Primitive sends for Magic Link, OTP, access requests, share notifications, and any custom workflow emails can be customized via the CLI:
+
+```bash
+# See all email types (built-in + custom) and their override status
 primitive email-templates list
 
 # View a template (shows subject, HTML/text body, and available variables)
 primitive email-templates get magic-link
 primitive email-templates get otp
+primitive email-templates get access-request-created
 
 # See what variables are available in a template
 primitive email-templates variables magic-link
@@ -447,6 +488,11 @@ primitive email-templates set magic-link \
   --html-file ./emails/magic-link.html \
   --text-file ./emails/magic-link.txt
 
+# Register a custom template type (any kebab-case name)
+primitive email-templates set order-confirmation \
+  --subject "Order {{orderId}}" \
+  --html-file ./emails/order.html
+
 # Send a test email to verify your template
 primitive email-templates test magic-link
 
@@ -454,7 +500,9 @@ primitive email-templates test magic-link
 primitive email-templates delete magic-link
 ```
 
-Email template overrides are also tracked as part of `primitive sync`, stored as TOML files in `email-templates/`. This lets you version-control your email customizations alongside other app configuration.
+Email template overrides are tracked as part of `primitive sync`, stored as TOML files in `email-templates/`. This lets you version-control your email customizations alongside other app configuration.
+
+Custom template types can be referenced from the `email.send` workflow step. See the [Workflows guide](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md) for the step reference.
 
 ---
 

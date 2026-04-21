@@ -178,14 +178,22 @@ await client.groups.delete("team", "engineering");
 ### Add members
 
 ```typescript
-// By user ID
+// By user ID — immediate
 await client.groups.addMember("team", "engineering", { userId: "user-456" });
 
-// By email (server resolves to userId)
-await client.groups.addMember("team", "engineering", { email: "alice@example.com" });
+// By email — immediate if the user exists, deferred if they don't
+const result = await client.groups.addMember("team", "engineering", {
+  email: "alice@example.com",
+});
+// { status: "added", userId } — existing user
+// { status: "deferred", invitationId } — non-member; resolves at signup
 ```
 
-Provide either `userId` or `email`, not both. Returns `404` if the email doesn't match an existing user, or `409` if already a member.
+Provide either `userId` or `email`, not both. Returns `409` if already a member.
+
+If the email does not match an existing app user, the server creates an `AppInvitation` plus a `DeferredGroupAdd`. When that user signs up with the matching email, the membership is added in the same transaction that creates their account. Until then, `isMemberOf` returns false for that user — do not assume membership before the acceptance event.
+
+See the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md) for the full deferred-grant lifecycle.
 
 ### List members
 
@@ -533,7 +541,7 @@ await client.groups.addMember("team", "backend", { userId });
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | 409 on addMember | User is already a member | Check membership before adding, or handle the conflict |
-| 404 on addMember by email | Email doesn't match an app user | Ensure the user has joined the app first |
+| `addMember` by email returns `status: "deferred"` | Email isn't an app user yet | Expected — membership resolves when they sign up; show a pending UI |
 | 403 on group create | Group type has a rule set that denied the operation | Check the `group.create` rule; admins/owners bypass rules |
 | Group permission not taking effect on document | User hasn't reopened the document | Close and reopen the document to pick up new group permissions |
 | CEL `isMemberOf` returns false | User not added to the group, or wrong groupType/groupId | Verify membership with `listUserMemberships` |

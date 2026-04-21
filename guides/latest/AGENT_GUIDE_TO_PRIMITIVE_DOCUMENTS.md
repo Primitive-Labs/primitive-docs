@@ -780,7 +780,40 @@ await jsBaoClient.documents.open(result.documentId);
 
 ## Sharing Documents
 
-Documents can be shared with individual users or with groups. For group-based document sharing, see the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md#groups-and-documents).
+Documents can be shared with individual users (by userId or email), with groups, or exposed to a request-access flow for users with a link. For the full picture — member invitations with quotas, deferred grants, access requests, and bookmarks — see the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md).
+
+### Quick Reference
+
+```typescript
+// By userId
+await client.documents.setPermissions(documentId, [
+  { userId: "user-abc", permission: "read-write" },
+]);
+
+// By email — resolves if the user exists, otherwise creates a deferred grant
+// that resolves at signup
+await client.documents.setPermissions(documentId, [
+  { email: "alice@example.com", permission: "read-write" },
+]);
+
+// With a group
+await client.documents.setGroupPermission(documentId, {
+  groupType: "team",
+  groupId: "engineering",
+  permission: "read-write",
+});
+
+// Respond to a 403 with canRequestAccess hint
+try {
+  await client.documents.get(documentId);
+} catch (err) {
+  if (err.details?.canRequestAccess) {
+    await client.documents.requestAccess(documentId, { message: "..." });
+  }
+}
+```
+
+Documents are auto-bookmarked for their creator and for any invitee who accepts an invitation. Use `client.me.sharedDocuments()` to render a "shared with me" view — do not filter bookmarks for this purpose.
 
 ### Using PrimitiveShareDocumentDialog
 

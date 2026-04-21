@@ -50,25 +50,61 @@ To log out:
 primitive logout
 ```
 
-## Setting Your App Context
+## Project Configuration and Environments
 
-Most commands operate on a specific app. Instead of passing `--app` to every command, set a default context:
+Primitive CLI config is **project-scoped**. When you run `primitive init` or any CLI command in a project directory, the CLI creates a `.primitive/config.json` alongside your code. Check this file into version control — it's shared with your team and ensures everyone targets the same apps.
+
+```
+my-app/
+├── .primitive/
+│   └── config.json      # project-scoped, checked into git
+├── src/
+└── package.json
+```
+
+Your personal credentials stay in `~/.primitive/credentials.json` — never in the project config, never checked in.
+
+### Named Environments
+
+A single project usually targets multiple backends — a development app for day-to-day coding, a staging app for QA, a production app for your customers. `.primitive/config.json` supports **named environments** for each:
+
+```bash
+# Create environments for each backend
+primitive env create dev --app "My App (Dev)"
+primitive env create staging --app "My App (Staging)"
+primitive env create prod --app "My App (Prod)"
+
+# Switch environments
+primitive env use dev
+
+# List
+primitive env list
+
+# Show which environment is active
+primitive env current
+```
+
+Once set, every subsequent command (including `primitive sync push`, `primitive workflows list`, etc.) uses the active environment's app.
+
+### Per-Command Override
+
+Pass `--env <name>` to override for a single command without switching the default:
+
+```bash
+primitive workflows runs list --env staging
+primitive sync push --dir ./config --env prod
+```
+
+### Ad-Hoc App Context
+
+For one-off shells outside a project directory, `primitive use` sets an active app in your user config without touching any `.primitive/config.json`:
 
 ```bash
 primitive use "My App"
+primitive context     # show current context
 ```
 
-This stores your current app context so subsequent commands know which app to target. You can also run this without arguments to interactively select from your apps:
-
-```bash
-primitive use
-```
-
-To see your current context:
-
-```bash
-primitive context
-```
+Inside a project directory, prefer `primitive env` — it's checked in, scoped to the project, and makes it trivial to switch between dev/staging/prod.
 
 ## Common Commands
 
@@ -243,6 +279,40 @@ primitive workflows publish my-workflow
 primitive workflows runs list
 ```
 
+### Cron Triggers
+
+Schedule workflows to run on a cron expression:
+
+```bash
+primitive cron-triggers list
+primitive cron-triggers create \
+  --key nightly-digest \
+  --workflow send-digest \
+  --schedule "0 9 * * *" \
+  --timezone "America/Los_Angeles"
+primitive cron-triggers run nightly-digest       # fire manually
+primitive cron-triggers disable nightly-digest
+primitive cron-triggers enable nightly-digest
+primitive cron-triggers delete nightly-digest
+```
+
+See [Scheduled and Real-Time Automation](./scheduled-and-realtime-automation.md).
+
+### Blob Buckets
+
+Manage general-purpose blob storage:
+
+```bash
+primitive blob-buckets list
+primitive blob-buckets create --key avatars --access-policy authenticated --ttl-tier persistent
+primitive blob-buckets blobs avatars
+primitive blob-buckets upload avatars ./file.png --content-type image/png
+primitive blob-buckets signed-url avatars <blobId> --expires 3600
+primitive blob-buckets delete avatars --force
+```
+
+See [Blob Buckets](./blob-buckets.md).
+
 ### Email Templates
 
 Customize the emails Primitive sends for authentication (magic links, OTP codes, etc.):
@@ -267,7 +337,7 @@ primitive email-templates test magic-link
 primitive email-templates delete magic-link
 ```
 
-Email template types include `magic-link` and `otp`. Each type exposes template variables (e.g. `{{magicLinkUrl}}`, `{{otpCode}}`) that Primitive substitutes at send time. Use `primitive email-templates variables <type>` to see the full list.
+Email template types include built-in types (`magic-link`, `otp`, `access-request-created`, `access-request-resolved`, and others) plus any custom kebab-case type names you register. Each type exposes template variables (e.g. `{{magicLinkUrl}}`, `{{otpCode}}`) that Primitive substitutes at send time. Use `primitive email-templates variables <type>` to see the full list.
 
 ### Analytics
 
@@ -285,6 +355,30 @@ primitive analytics workflows
 primitive analytics prompts
 primitive analytics integrations
 ```
+
+## Test Users for Automated Testing
+
+For integration tests and local dev, the CLI can issue short-lived tokens for test users without going through the normal email flow. Test accounts use the `+primitive` email alias convention:
+
+```bash
+# Issue a 30-minute test token for a user (creates the user if needed, for a test-mode app)
+primitive test-users login alice+primitive@example.com
+```
+
+```typescript
+// In an integration test
+const token = await runCli("test-users login alice+primitive@example.com");
+client.auth.setToken(token);
+```
+
+Guardrails:
+
+- **Env-gated.** The bypass only works against a server running in test mode. Production servers reject it.
+- **30-minute tokens.** Tokens expire after 30 minutes regardless of your normal session length.
+- **Regular-user scope.** The bypass cannot mint admin tokens.
+- **Requires an invitation.** The user still needs a valid `AppInvitation` for the app.
+
+Use this for automated tests and local development. Do not use it in staging or production workflows. See [Authentication](./authentication.md#test-user-sign-in-for-automated-testing) for more.
 
 ## Scripting
 

@@ -701,6 +701,123 @@ onPartialFailure = "continue"   # or "fail" (default)
 
 **Output:** `{ completed: [{ runId, instanceId, output }], failed: [{ runId, instanceId, error }], allSucceeded: boolean }`
 
+### 22. `email.send` — Send Email
+
+Send an email from a workflow. Two modes.
+
+**Template mode** — render a registered email template with variables:
+
+```toml
+[[steps]]
+id = "confirm"
+kind = "email.send"
+templateType = "order-confirmation"
+to = "{{ input.customerEmail }}"
+
+[steps.variables]
+orderId = "{{ input.orderId }}"
+total = "{{ input.total }}"
+```
+
+`templateType` accepts any registered template type — built-in (`magic-link`, `otp`, `access-request-created`, etc.) or any custom kebab-case name you've registered. Register custom types via `primitive email-templates set <type>` or the admin console.
+
+**Inline mode** — construct subject/body directly in the step:
+
+```toml
+[[steps]]
+id = "report"
+kind = "email.send"
+to = "{{ input.email }}"
+subject = "Your report is ready"
+htmlBody = "<p>Download: <a href=\"{{ outputs.upload.signedUrl }}\">link</a></p>"
+textBody = "Download: {{ outputs.upload.signedUrl }}"
+```
+
+**Rules:**
+
+- Use template mode when the same email shape is sent from multiple places or needs to be edited without redeploying.
+- Use inline mode for one-off or dynamically-constructed emails where a template adds no value.
+- Either `templateType` or `subject`+`htmlBody` (or `textBody`) must be present — not both.
+- `to` accepts a single address or an array.
+
+### 23. `blob` — Read/Write Blob Buckets
+
+Interacts with general-purpose blob buckets from inside a workflow.
+
+```toml
+[[steps]]
+id = "save-report"
+kind = "blob"
+action = "upload"
+bucket = "reports"
+filename = "{{ meta.workflowRunId }}.pdf"
+contentType = "application/pdf"
+bytesFrom = "{{ outputs.generate-pdf.bytes }}"
+
+[steps.metadata]
+reportType = "monthly"
+teamId = "{{ input.teamId }}"
+```
+
+Actions: `upload`, `read`, `delete`, `signedUrl`. Output includes `blobId` and (for `upload` / `signedUrl`) a `signedUrl` the caller can pass to subsequent steps such as `email.send`.
+
+See the [Blobs guide](AGENT_GUIDE_TO_PRIMITIVE_BLOBS.md) for bucket configuration.
+
+### 24. `analytics.query` — Run Analytics Query
+
+Runs any of the analytics query types server-side.
+
+```toml
+[[steps]]
+id = "top-users"
+kind = "analytics.query"
+queryType = "top-users"
+windowDays = 7
+limit = 25
+saveAs = "topUsers"
+```
+
+**Query types:** every type the analytics API exposes — `overview`, `top-users`, `user-detail`, `user-search`, `events`, `events-grouped`, `cohort-retention`, `workflows`, `prompts`, `integrations`, and more. See the [Analytics guide](AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.md).
+
+**Critical rules:**
+
+1. **Default deny with admin/owner bypass.** The runner looks up the triggering user's app role and rejects non-admin callers before making the upstream call.
+2. **Lock down the enclosing workflow.** Gate the workflow with `accessRule = "hasRole('admin')"` so a non-admin cannot start it at all.
+3. **Per-run cap of 50 queries.** Each workflow run can issue at most 50 analytics queries; the excess are skipped.
+4. **Cache TTL override.** Pass `cacheTtlSeconds = 0` to bypass the cache for fresh reads; omit for the default TTL.
+
+### 25. `database.applyToQuery` — Query-and-Mutate
+
+Runs a registered `applyToQuery` operation:
+
+```toml
+[[steps]]
+id = "mark-overdue"
+kind = "database.applyToQuery"
+databaseId = "{{ input.tasksDbId }}"
+operation = "mark-overdue"
+
+[steps.params]
+now = "{{ meta.startedAt }}"
+```
+
+Output: `{ matched, updated, truncated }`. If `truncated: true`, re-invoke in a loop (or use `forEach` with a retry).
+
+### 26. `database.executeBatch` — Batch Writes
+
+Runs a registered `executeBatch` operation with an array of items:
+
+```toml
+[[steps]]
+id = "import"
+kind = "database.executeBatch"
+databaseId = "{{ input.contactsDbId }}"
+operation = "import-contacts"
+itemsFrom = "{{ input.rows }}"
+```
+
+Each item is authorized per-item via the operation's `itemAccess` rule. Output: `{ results: [{ ok, id } | { ok: false, error }] }`.
+
 ## Templating Syntax
 
 Workflows use Mustache-style `{{ }}` templates with path resolution.
@@ -1206,6 +1323,41 @@ primitive workflows analytics top --days 7
 ```
 
 All debugging commands support `--json` for machine-readable output.
+
+### Cron Triggers
+
+Schedule a workflow to fire on a cron expression. See the [Scheduling and Real-Time guide](AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md) for the full story; the essentials for an agent setting one up:
+
+```bash
+primitive cron-triggers create \
+  --key nightly-digest \
+  --workflow send-digest \
+  --schedule "0 9 * * *" \
+  --timezone "America/Los_Angeles"
+
+primitive cron-triggers list
+primitive cron-triggers run nightly-digest     # fire manually for testing
+primitive cron-triggers disable nightly-digest
+primitive cron-triggers delete nightly-digest
+```
+
+Rules:
+
+1. Per-app cap of 50 cron triggers — consolidate with fan-out (`workflow.start`) if you need more distinct schedules.
+2. Always set an IANA `timezone` for user-visible schedules.
+3. Default `overlapPolicy` is `"skip"`; use `"queue"` only when each firing represents distinct non-idempotent work.
+4. The referenced workflow must already be published (`primitive workflows publish <key>`).
+
+### Workflow Run Steps (App-Level Debugging)
+
+Every step's config, input, output, and error is persisted and retrievable through the app-level runs endpoint:
+
+```typescript
+const steps = await client.workflows.runSteps(workflowRunId);
+// [{ id, kind, status, input, output, error, startedAt, finishedAt }, ...]
+```
+
+Use this when writing a UI that shows "what this run did" rather than just the aggregate status. Step output order reflects execution order — later steps can reference earlier step output identically to how they would inside the workflow.
 
 ### Manage Configurations
 

@@ -2,8 +2,8 @@
 
 Primitive provides document-scoped file storage for images, PDFs, attachments, and any binary data. Files are uploaded to the server, with automatic offline caching and upload queuing.
 
-::: info Document-Scoped (for now)
-Blobs are currently scoped to a document — access control follows the document's permissions. A more generic blob service that works outside of a document context is coming soon.
+::: info Two kinds of blob storage
+This page covers **document-scoped blobs** — files attached to a specific document, with access following the document's permissions. For general-purpose storage that isn't tied to a document (avatars, public assets, workflow outputs, time-boxed downloads), see [Blob Buckets](./blob-buckets.md).
 :::
 
 ## Uploading Files
@@ -91,4 +91,5 @@ Use the **Blob Explorer** in the dev tools overlay to browse, upload, and manage
 ## Next Steps
 
 - **[Working with Documents](./working-with-documents.md)** — Documents that blobs are scoped to
+- **[Blob Buckets](./blob-buckets.md)** — General-purpose blob storage for non-document files
 - **[Dev Tools](./devtools.md)** — Blob Explorer and other development tools

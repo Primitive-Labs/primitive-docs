@@ -20,19 +20,23 @@
     {
       "topic": "blobs",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_BLOBS.md",
-      "description": "Storing and managing binary files with offline support",
-      "keywords": ["blobs", "files", "upload", "download", "images", "PDFs", "storage", "offline", "cache", "prefetch"],
+      "description": "Storing and managing binary files — document-scoped blobs and general-purpose blob buckets",
+      "keywords": ["blobs", "files", "upload", "download", "images", "PDFs", "storage", "offline", "cache", "prefetch", "bucket", "buckets", "blob bucket", "signed url", "ttl", "access policy", "avatars"],
       "useCases": [
-        "Uploading files and images",
+        "Uploading files and images scoped to a document",
         "Downloading and displaying blobs",
         "Caching blobs for offline access",
         "Managing upload queues",
         "Prefetching blobs for offline use",
-        "Using blobs in img/video tags"
+        "Using blobs in img/video tags",
+        "Creating general-purpose blob buckets (avatars, public assets, workflow outputs)",
+        "Configuring access policies and TTL tiers for buckets",
+        "Generating time-limited signed URLs",
+        "Applying CEL-based access rules to buckets"
       ],
-      "concepts": ["blobs.upload", "blobs.read", "blobs.list", "blobs.delete", "blobs.prefetch", "downloadUrl", "proxyUrl", "upload queue", "service worker"],
-      "prerequisites": ["documents"],
-      "relatedGuides": ["documents"]
+      "concepts": ["blobs.upload", "blobs.read", "blobs.list", "blobs.delete", "blobs.prefetch", "downloadUrl", "proxyUrl", "upload queue", "service worker", "blobBuckets.bucket", "bucket.upload", "bucket.signedUrl", "accessPolicy", "ttlTier", "BlobBucket"],
+      "prerequisites": [],
+      "relatedGuides": ["documents", "workflows"]
     },
     {
       "topic": "data-modeling",
@@ -54,26 +58,65 @@
       "topic": "users-and-groups",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md",
       "description": "Built-in user model, groups, memberships, and CEL-based access control patterns",
-      "keywords": ["users", "groups", "memberships", "access control", "roles", "permissions", "CEL", "rule sets", "isMemberOf", "memberGroups", "teams", "user model", "profile"],
+      "keywords": ["users", "groups", "memberships", "access control", "roles", "permissions", "CEL", "rule sets", "isMemberOf", "memberGroups", "teams", "user model", "profile", "email-based add"],
       "useCases": [
         "Accessing built-in user profile info (name, email, avatar)",
         "Creating and managing groups for team-based access",
-        "Adding and removing group members",
-        "Granting group-based document permissions",
+        "Adding group members by userId or email",
+        "Removing group members",
+        "Granting group-based document and database permissions",
         "Using groups in database CEL access expressions",
         "Configuring rule sets for group management",
         "Modeling user relationships (parent-child, mentor-mentee)",
         "Supplementing platform user data without replacing it"
       ],
-      "concepts": ["users.getBasic", "groups.create", "groups.addMember", "groups.listMembers", "groupTypeConfigs", "ruleSets", "isMemberOf", "memberGroups", "hasRole", "grantGroupPermission", "appRole", "autoAddCreator"],
+      "concepts": ["users.getBasic", "groups.create", "groups.addMember", "groups.removeMember", "groups.listMembers", "groupTypeConfigs", "ruleSets", "isMemberOf", "memberGroups", "hasRole", "grantGroupPermission", "appRole", "autoAddCreator"],
       "prerequisites": [],
-      "relatedGuides": ["databases", "documents", "data-modeling", "authentication"]
+      "relatedGuides": ["databases", "documents", "data-modeling", "authentication", "sharing-and-invitations"]
+    },
+    {
+      "topic": "sharing-and-invitations",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md",
+      "description": "Invitations, document and database sharing, member invitation quotas, access requests, and bookmarks",
+      "keywords": ["sharing", "share", "invitation", "invitations", "invite", "email invite", "access request", "request access", "bookmarks", "bookmark", "member invitation", "quota", "sharing by email", "setPermissions", "setGroupPermission"],
+      "useCases": [
+        "Sharing a document by userId, email, or group",
+        "Sharing a database with a group",
+        "Inviting users to an app (admin or member-initiated)",
+        "Enforcing member-invitation quotas",
+        "Responding to a document access denial with a request-access flow",
+        "Approving or denying document access requests",
+        "Rendering a 'people with access + pending invitations' panel",
+        "Managing a user's bookmarks",
+        "Listing documents a user has been shared into"
+      ],
+      "concepts": ["client.documents.setPermissions", "client.documents.setGroupPermission", "client.invitations.create", "client.invitations.getQuota", "client.invitations.revoke", "client.documents.requestAccess", "client.documents.approveAccessRequest", "client.documents.denyAccessRequest", "client.me.bookmarks", "client.me.sharedDocuments", "canRequestAccess", "AppInvitation", "memberInvitationsEnabled", "memberInvitationLimit"],
+      "prerequisites": [],
+      "relatedGuides": ["documents", "users-and-groups", "authentication"]
+    },
+    {
+      "topic": "scheduling-and-realtime",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md",
+      "description": "Cron-scheduled workflows and real-time database subscriptions over WebSocket",
+      "keywords": ["cron", "schedule", "scheduled workflow", "CronTrigger", "timezone", "overlap", "subscription", "subscriptions", "db.subscribe", "real-time", "WebSocket", "live data", "DatabaseSubscription"],
+      "useCases": [
+        "Scheduling a workflow to run on a cron expression",
+        "Handling timezones and overlap policies for scheduled jobs",
+        "Pausing, resuming, or manually firing a cron trigger",
+        "Subscribing to real-time database changes from the client",
+        "Registering parameterized subscriptions with CEL access and filter rules",
+        "Building load+subscribe UIs for live views",
+        "Driving workflow-progress UIs by subscribing to workflow-written records"
+      ],
+      "concepts": ["CronTrigger", "client.cronTriggers.create", "client.cronTriggers.run", "overlapPolicy", "IANA timezone", "DatabaseSubscription", "client.databases.database().subscribe", "access rule", "filter rule", "WebSocketNotifier"],
+      "prerequisites": [],
+      "relatedGuides": ["workflows", "databases"]
     },
     {
       "topic": "databases",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md",
-      "description": "Server-side database storage with CEL-based access control, registered operations, and triggers",
-      "keywords": ["databases", "database", "server-side", "CEL", "access control", "operations", "triggers", "query", "mutation", "aggregate", "pipeline", "Durable Objects", "SQLite", "permissions", "groups"],
+      "description": "Server-side database storage with CEL-based access control, registered operations, triggers, real-time subscriptions, and group permissions",
+      "keywords": ["databases", "database", "server-side", "CEL", "access control", "operations", "triggers", "query", "mutation", "aggregate", "pipeline", "Durable Objects", "SQLite", "permissions", "groups", "subscription", "subscriptions", "real-time", "applyToQuery", "executeBatch", "batch", "apply to query", "DatabaseGroupPermission"],
       "useCases": [
         "Creating and managing server-side databases",
         "Defining registered operations with access control",
@@ -81,13 +124,16 @@
         "Setting up group-based access with CEL expressions",
         "Querying and filtering database records",
         "Executing mutations and batch operations",
+        "Running query-and-mutate operations with applyToQuery",
         "Building multi-step pipeline operations",
+        "Subscribing to real-time database changes over WebSocket",
+        "Granting database access to a group via DatabaseGroupPermission",
         "Importing CSV data into databases",
         "Managing database permissions"
       ],
-      "concepts": ["databases.create", "databases.connect", "databases.executeOperation", "DatabaseTypeConfig", "registered operations", "CEL expressions", "isMemberOf", "hasRole", "triggers", "pipeline", "aggregate", "bulk import", "DoDb", "syncIndexes"],
+      "concepts": ["databases.create", "databases.connect", "databases.executeOperation", "DatabaseTypeConfig", "registered operations", "CEL expressions", "isMemberOf", "hasRole", "triggers", "pipeline", "aggregate", "bulk import", "DoDb", "syncIndexes", "applyToQuery", "executeBatch", "itemAccess", "databases.database().subscribe", "DatabaseSubscription", "DatabaseGroupPermission", "setGroupPermission"],
       "prerequisites": [],
-      "relatedGuides": ["documents", "data-modeling", "users-and-groups"]
+      "relatedGuides": ["documents", "data-modeling", "users-and-groups", "scheduling-and-realtime"]
     },
     {
       "topic": "documents",
@@ -109,19 +155,26 @@
     {
       "topic": "workflows",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md",
-      "description": "Creating multi-step automation pipelines with AI/LLM calls and integrations",
-      "keywords": ["workflows", "automation", "pipelines", "steps", "LLM", "AI", "OpenAI", "Gemini", "TOML", "templates"],
+      "description": "Creating multi-step automation pipelines with AI/LLM calls, integrations, email, blobs, analytics, cron scheduling, and database operations",
+      "keywords": ["workflows", "automation", "pipelines", "steps", "LLM", "AI", "OpenAI", "Gemini", "TOML", "templates", "email.send", "blob step", "analytics.query", "applyToQuery", "executeBatch", "cron", "scheduled", "inline email", "custom email template"],
       "useCases": [
         "Building multi-step automation pipelines",
         "Chaining LLM calls together",
         "Calling external APIs from workflows",
         "Using managed prompts in workflows",
+        "Sending emails from workflows (template or inline mode)",
+        "Writing blobs from workflows",
+        "Running analytics queries from workflows",
+        "Running query+mutate database operations",
+        "Running batch database writes with per-item CEL",
+        "Scheduling workflows with cron triggers",
         "Conditional step execution",
-        "Data transformation between steps"
+        "Data transformation between steps",
+        "Inspecting workflow run steps for debugging"
       ],
-      "concepts": ["workflow", "steps", "llm.chat", "gemini.generate", "integration.call", "prompt.execute", "transform", "runIf", "saveAs", "templates", "publish", "preview"],
+      "concepts": ["workflow", "steps", "llm.chat", "gemini.generate", "integration.call", "prompt.execute", "transform", "runIf", "saveAs", "templates", "publish", "preview", "email.send", "blob", "analytics.query", "database.applyToQuery", "database.executeBatch", "cron trigger", "overlapPolicy", "workflow run steps"],
       "prerequisites": [],
-      "relatedGuides": ["prompts", "integrations"]
+      "relatedGuides": ["prompts", "integrations", "scheduling-and-realtime", "blobs", "analytics"]
     },
     {
       "topic": "prompts",

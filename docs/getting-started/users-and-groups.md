@@ -59,7 +59,7 @@ primitive groups create --type "team" --name "engineering" --display-name "Engin
 
 ### Managing Members
 
-You can add members by **email** or by user ID. Most apps should use email — it's what your users know, and the server resolves it to a user ID automatically.
+You can add members by **email** or by user ID. Most apps should use email — it's what your users know, and the server resolves it automatically.
 
 ```typescript
 // Add a member by email (recommended for user-facing flows)
@@ -79,7 +79,19 @@ const members = await client.groups.listMembers("team", "engineering");
 const memberships = await client.groups.listUserMemberships(userId);
 ```
 
-Provide **either** `email` or `userId`, not both. The server returns `404` if the email doesn't match an existing user, or `409` if they're already a member.
+Provide **either** `email` or `userId`, not both.
+
+### Email-Based Adds Work for Non-Members Too
+
+If the email you pass to `addMember` doesn't match an existing app user, the server creates an invitation and remembers the pending add. When that person signs up with that email, they're automatically added to the group.
+
+This means you can onboard someone into the right team *before* they've created an account — and `isMemberOf` checks start working the moment they sign up, no admin action needed.
+
+See [Sharing and Invitations](./sharing-and-invitations.md) for the full picture (invitation lifecycle, cascade on revoke, domain-mode re-validation).
+
+::: warning CEL membership resolves at signup
+`isMemberOf('team', 'engineering')` returns `false` for a pending (not-yet-signed-up) member until their signup completes. If a workflow or operation needs to act "as if" the person were already a member, wait until the `invitation`/`accepted` event fires.
+:::
 
 Via the CLI:
 
@@ -185,6 +197,7 @@ Rule sets are versioned and include built-in testing and debugging tools — you
 
 ## Next Steps
 
+- **[Sharing and Invitations](./sharing-and-invitations.md)** — Invitations, email-based shares, access requests, bookmarks
 - **[Working with Databases](./working-with-databases.md)** — Use groups in database access control
 - **[Working with Documents](./working-with-documents.md)** — Share documents with groups
 - **[Authentication](./authentication.md)** — How users get authenticated

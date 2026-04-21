@@ -21,7 +21,7 @@ Most apps use one or both — see [Choosing Your Data Model](./choosing-your-dat
 Every user gets a built-in profile (name, email, avatar) managed by the platform. Groups let you organize users into teams, roles, or any relationship — with flexible, expression-based access control that works across both documents and databases.
 
 ### Workflows
-Server-side multi-step automation pipelines. Chain together LLM calls, data transformations, external API requests, delays, and conditional logic. Define them as TOML config files in your repo.
+Server-side multi-step automation pipelines. Chain together LLM calls, data transformations, external API requests, delays, and conditional logic. Define them as TOML config files in your repo. Trigger them from your app, from inbound webhooks, or on a cron schedule.
 
 ### Managed Prompts
 Version-controlled LLM prompt templates with built-in testing. Define prompt configurations, test them against expected outputs, and use them in workflows or directly from your app.
@@ -30,7 +30,10 @@ Version-controlled LLM prompt templates with built-in testing. Define prompt con
 Securely proxy requests to external APIs. Primitive stores your API keys server-side and handles authentication, so your client code never sees credentials.
 
 ### Blob Storage
-Upload, download, and manage files (images, PDFs, attachments) scoped to documents. Includes offline caching, upload queues, and prefetching.
+Upload, download, and manage files (images, PDFs, attachments). Document-scoped blobs inherit document permissions and include offline caching, upload queues, and prefetching. General-purpose blob buckets add TTL tiers, signed URLs, and CEL-based access rules for storage that lives outside a specific document.
+
+### Sharing and Access
+Share documents and databases with other users — by user ID, by email (grants that resolve at signup), or with an entire group. Document access requests let users with a link ask for access Google-Docs-style. Member invitations with quotas let regular members invite teammates without admin involvement.
 
 ### Analytics
 Automatic lifecycle event tracking (daily active users, session end, network recovery) plus custom event logging. Query metrics via the CLI or REST API.
