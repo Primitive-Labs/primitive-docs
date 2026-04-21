@@ -6,6 +6,14 @@
 
 # Interface: MeAPI
 
+## Properties
+
+### bookmarks
+
+> `readonly` **bookmarks**: `MeBookmarksAPI`
+
+Generic bookmark operations for the current user.
+
 ## Methods
 
 ### cacheInfo()
@@ -63,6 +71,26 @@ Lists pending document invitations for the current user.
 #### Returns
 
 `Promise`\<`object`[]\>
+
+***
+
+### sharedDocuments()
+
+> **sharedDocuments**(`options?`): `Promise`\<[`SharedDocumentListResult`](SharedDocumentListResult.md)\>
+
+List documents shared with the current user.
+Includes individually-shared documents (DocumentPermission) and
+pending legacy DocumentInvitations.
+
+#### Parameters
+
+##### options?
+
+`PaginationOptions`
+
+#### Returns
+
+`Promise`\<[`SharedDocumentListResult`](SharedDocumentListResult.md)\>
 
 ***
 

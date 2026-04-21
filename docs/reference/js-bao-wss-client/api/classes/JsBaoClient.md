@@ -1744,6 +1744,29 @@ Disconnect from the WebSocket server.
 
 ***
 
+### fetchBinary()
+
+> **fetchBinary**(`method`, `path`): `Promise`\<`ArrayBuffer`\>
+
+Fetch a binary (non-JSON) resource from the API using current auth.
+ Used by blob downloads that return raw bytes.
+
+#### Parameters
+
+##### method
+
+`string`
+
+##### path
+
+`string`
+
+#### Returns
+
+`Promise`\<`ArrayBuffer`\>
+
+***
+
 ### forceReconnect()
 
 > **forceReconnect**(): `void`
@@ -2758,6 +2781,14 @@ Analytics client for tracking events and metrics.
 
 ***
 
+### blobBuckets
+
+> **blobBuckets**: [`BlobBucketsAPI`](../interfaces/BlobBucketsAPI.md)
+
+Sub-API for managing general-purpose blob buckets (not tied to documents).
+
+***
+
 ### cache
 
 > **cache**: [`CacheFacade`](../interfaces/CacheFacade.md)
@@ -2771,6 +2802,14 @@ Key-value cache facade backed by IndexedDB.
 > **collections**: [`CollectionsAPI`](../interfaces/CollectionsAPI.md)
 
 Sub-API for managing document collections.
+
+***
+
+### cronTriggers
+
+> **cronTriggers**: [`CronTriggersAPI`](../interfaces/CronTriggersAPI.md)
+
+Sub-API for managing cron triggers (workflow schedulers).
 
 ***
 
@@ -2819,6 +2858,14 @@ Sub-API for managing group type configurations.
 > **integrations**: [`IntegrationsAPI`](../interfaces/IntegrationsAPI.md)
 
 Sub-API for managing third-party integrations.
+
+***
+
+### invitations
+
+> **invitations**: `InvitationsAPI`
+
+Sub-API for app-level invitations and deferred grants.
 
 ***
 

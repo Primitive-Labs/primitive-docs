@@ -4,6 +4,14 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao-wss v1.0.0 — 2026-04-21
+
+- New `applyToQuery` registered operation type — apply a mutation (`patch`, `delete`, `increment`, `addToSet`/`removeFromSet`) to all records matching a server-side filter in a single request, eliminating the query-then-mutate round trip
+- Database group permissions (`DatabaseGroupPermission`) — grant `manager` access to a database for every member of a group in one call via `client.databases.grantGroupPermission()`; `databases.list()` now includes group-accessible databases
+- `executeBatch()` replaces `importBulk()` for bulk registered operation execution — `importBulk` is now deprecated and delegates to `executeBatch`
+- `collections.list()` now returns only collections the caller is a direct member of (matches `documents.list` semantics); new `collections.listAll()` for app admins to retrieve all collections in the app
+- Real-time database subscriptions — register parameterized server-side subscriptions with CEL filters via `DatabaseSubscription` to push live updates to connected clients
+
 ## js-bao v0.3.1 — 2026-04-13
 
 - New `upsertOn` option for `save()` — pass `upsertOn: "fieldName"` to create-or-update a record by a unique field value instead of requiring an explicit ID, with transactional lookup to prevent race conditions

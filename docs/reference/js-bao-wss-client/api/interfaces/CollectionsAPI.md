@@ -106,6 +106,12 @@ The unique identifier of the collection to delete
 
 Get collection info by ID.
 
+Callers must either be an admin/owner of the app, hold a direct
+`_col-reader` or `_col-writer` membership on the collection, or belong
+to a user-group that has been granted a `CollectionGroupPermission` of
+`reader` or `read-write`. Otherwise the server returns 404 (to avoid
+leaking collection existence).
+
 #### Parameters
 
 ##### collectionId
@@ -170,7 +176,39 @@ Permission grant details
 
 > **list**(`options?`): `Promise`\<`PaginatedResult`\<[`CollectionInfo`](CollectionInfo.md)\>\>
 
-List collections the user has access to.
+List collections the caller is a direct member of (reader or read-write).
+
+This returns only collections the caller has been explicitly added to —
+it does NOT include collections accessible only via a user-created group
+that holds a `CollectionGroupPermission`. Admins see only their own direct
+memberships too; use `listAll()` for the full app-wide set.
+
+Each returned item includes a `permission` field (`"reader"` or
+`"read-write"`) reflecting the caller's direct access level.
+
+#### Parameters
+
+##### options?
+
+`PaginationOptions`
+
+Pagination controls
+
+#### Returns
+
+`Promise`\<`PaginatedResult`\<[`CollectionInfo`](CollectionInfo.md)\>\>
+
+***
+
+### listAll()
+
+> **listAll**(`options?`): `Promise`\<`PaginatedResult`\<[`CollectionInfo`](CollectionInfo.md)\>\>
+
+List every collection in the app (admin-only).
+
+Non-admin callers receive a 403. Unlike `list()`, the returned items do
+not include a `permission` field (since the caller may not have direct
+access to many of them).
 
 #### Parameters
 
@@ -191,6 +229,11 @@ Pagination controls
 > **listCollectionsForDocument**(`documentId`, `options?`): `Promise`\<`PaginatedResult`\<[`DocumentCollectionInfo`](DocumentCollectionInfo.md)\>\>
 
 List collections that contain a specific document.
+
+For admin/owner callers, returns every collection the document belongs
+to. For non-admin callers, returns only collections the caller is a
+direct member of (`_col-reader` or `_col-writer`). Access via a
+user-created group is NOT counted here (consistent with `list()`).
 
 #### Parameters
 

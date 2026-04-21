@@ -393,6 +393,10 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/AnalyticsEventInput"
                 },
                 {
+                  "text": "AppInvitationInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/AppInvitationInfo"
+                },
+                {
                   "text": "AuthStateEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/AuthStateEvent"
                 },
@@ -403,6 +407,22 @@
                 {
                   "text": "BatchUserProfile",
                   "link": "/reference/js-bao-wss-client/api/interfaces/BatchUserProfile"
+                },
+                {
+                  "text": "BlobBucketInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobBucketInfo"
+                },
+                {
+                  "text": "BlobBucketsAPI",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobBucketsAPI"
+                },
+                {
+                  "text": "BlobInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobInfo"
+                },
+                {
+                  "text": "BlobListOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobListOptions"
                 },
                 {
                   "text": "BlobListResult",
@@ -421,12 +441,20 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/BlobReadOptions"
                 },
                 {
+                  "text": "BlobSignedUrlResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobSignedUrlResult"
+                },
+                {
                   "text": "BlobUploadCompletedEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/BlobUploadCompletedEvent"
                 },
                 {
                   "text": "BlobUploadFailedEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/BlobUploadFailedEvent"
+                },
+                {
+                  "text": "BlobUploadParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BlobUploadParams"
                 },
                 {
                   "text": "BlobUploadProgressEvent",
@@ -443,6 +471,42 @@
                 {
                   "text": "BlobUploadStatus",
                   "link": "/reference/js-bao-wss-client/api/interfaces/BlobUploadStatus"
+                },
+                {
+                  "text": "BookmarkAddParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkAddParams"
+                },
+                {
+                  "text": "BookmarkAddResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkAddResult"
+                },
+                {
+                  "text": "BookmarkItem",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkItem"
+                },
+                {
+                  "text": "BookmarkListOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkListOptions"
+                },
+                {
+                  "text": "BookmarkListResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkListResult"
+                },
+                {
+                  "text": "BookmarkRemoveResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkRemoveResult"
+                },
+                {
+                  "text": "BookmarkRenameResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkRenameResult"
+                },
+                {
+                  "text": "BucketBlobListResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BucketBlobListResult"
+                },
+                {
+                  "text": "BucketBlobUploadResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BucketBlobUploadResult"
                 },
                 {
                   "text": "CacheFacade",
@@ -489,6 +553,30 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/ConfirmApplyResult"
                 },
                 {
+                  "text": "CreateBlobBucketParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CreateBlobBucketParams"
+                },
+                {
+                  "text": "CreateCronTriggerParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CreateCronTriggerParams"
+                },
+                {
+                  "text": "CreateInvitationParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CreateInvitationParams"
+                },
+                {
+                  "text": "CronTriggerInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CronTriggerInfo"
+                },
+                {
+                  "text": "CronTriggerListResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CronTriggerListResult"
+                },
+                {
+                  "text": "CronTriggersAPI",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CronTriggersAPI"
+                },
+                {
                   "text": "CsvImportOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/CsvImportOptions"
                 },
@@ -501,8 +589,20 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/CsvImportResult"
                 },
                 {
+                  "text": "DatabaseChangeEvent",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseChangeEvent"
+                },
+                {
+                  "text": "DatabaseChangePayload",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseChangePayload"
+                },
+                {
                   "text": "DatabaseConfig",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseConfig"
+                },
+                {
+                  "text": "DatabaseGroupPermissionEntry",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseGroupPermissionEntry"
                 },
                 {
                   "text": "DatabaseInfo",
@@ -523,6 +623,34 @@
                 {
                   "text": "DatabasesAPI",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DatabasesAPI"
+                },
+                {
+                  "text": "DatabaseSubscribeOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseSubscribeOptions"
+                },
+                {
+                  "text": "DeferredDocumentGrant",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DeferredDocumentGrant"
+                },
+                {
+                  "text": "DeferredGrantListResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DeferredGrantListResult"
+                },
+                {
+                  "text": "DeferredGrantRevokeResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DeferredGrantRevokeResult"
+                },
+                {
+                  "text": "DeferredGroupGrant",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DeferredGroupGrant"
+                },
+                {
+                  "text": "DeferredPermissionGrant",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DeferredPermissionGrant"
+                },
+                {
+                  "text": "DirectPermissionGrant",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DirectPermissionGrant"
                 },
                 {
                   "text": "DiscoveredConstraint",
@@ -657,8 +785,16 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/GoOfflineOptions"
                 },
                 {
+                  "text": "GrantDatabaseGroupPermissionParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GrantDatabaseGroupPermissionParams"
+                },
+                {
                   "text": "GrantPermissionParams",
                   "link": "/reference/js-bao-wss-client/api/interfaces/GrantPermissionParams"
+                },
+                {
+                  "text": "GroupDatabaseInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/GroupDatabaseInfo"
                 },
                 {
                   "text": "GroupDocumentInfo",
@@ -705,6 +841,14 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/InvitationEvent"
                 },
                 {
+                  "text": "InvitationListResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/InvitationListResult"
+                },
+                {
+                  "text": "InvitationQuota",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/InvitationQuota"
+                },
+                {
                   "text": "JsBaoClientOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/JsBaoClientOptions"
                 },
@@ -723,6 +867,14 @@
                 {
                   "text": "ListWorkflowRunsResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/ListWorkflowRunsResult"
+                },
+                {
+                  "text": "ListWorkflowStepRunsOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ListWorkflowStepRunsOptions"
+                },
+                {
+                  "text": "ListWorkflowStepRunsResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ListWorkflowStepRunsResult"
                 },
                 {
                   "text": "LlmAPI",
@@ -797,6 +949,10 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/PermissionEvent"
                 },
                 {
+                  "text": "PermissionUpdateResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PermissionUpdateResult"
+                },
+                {
                   "text": "PromptsAPI",
                   "link": "/reference/js-bao-wss-client/api/interfaces/PromptsAPI"
                 },
@@ -849,6 +1005,14 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/SessionInfo"
                 },
                 {
+                  "text": "SharedDocument",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/SharedDocument"
+                },
+                {
+                  "text": "SharedDocumentListResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/SharedDocumentListResult"
+                },
+                {
                   "text": "StartWorkflowOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/StartWorkflowOptions"
                 },
@@ -875,6 +1039,10 @@
                 {
                   "text": "TriggerDefInfo",
                   "link": "/reference/js-bao-wss-client/api/interfaces/TriggerDefInfo"
+                },
+                {
+                  "text": "UpdateCronTriggerParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/UpdateCronTriggerParams"
                 },
                 {
                   "text": "UserProfile",
@@ -917,6 +1085,10 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/WorkflowStatusResult"
                 },
                 {
+                  "text": "WorkflowStepRunRecord",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/WorkflowStepRunRecord"
+                },
+                {
                   "text": "YjsPersistenceContext",
                   "link": "/reference/js-bao-wss-client/api/interfaces/YjsPersistenceContext"
                 },
@@ -934,8 +1106,20 @@
                   "link": "/reference/js-bao-wss-client/api/type-aliases/AuthCode"
                 },
                 {
+                  "text": "BlobBucketAccessPolicy",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/BlobBucketAccessPolicy"
+                },
+                {
+                  "text": "BlobBucketTtlTier",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/BlobBucketTtlTier"
+                },
+                {
                   "text": "BlobDisposition",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/BlobDisposition"
+                },
+                {
+                  "text": "DeferredGrant",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/DeferredGrant"
                 },
                 {
                   "text": "DocumentAliasScope",

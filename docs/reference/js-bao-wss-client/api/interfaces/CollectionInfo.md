@@ -53,3 +53,14 @@
 ### name
 
 > **name**: `string`
+
+***
+
+### permission?
+
+> `optional` **permission**: `"read-write"` \| `"reader"`
+
+Caller's direct permission on the collection.
+Populated by `list()` only (not `listAll()` or `get()`).
+"reader" = caller is in the `_col-reader` system group
+"read-write" = caller is in the `_col-writer` system group

@@ -10,7 +10,7 @@
 
 ### on
 
-> **on**: `"create"` \| `"update"` \| `"save"`
+> **on**: `"save"` \| `"create"` \| `"update"`
 
 ***
 
