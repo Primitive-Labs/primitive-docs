@@ -172,6 +172,40 @@ The name of the model whose field schema to retrieve
 
 ***
 
+### executeBatch()
+
+> **executeBatch**(`databaseId`, `operationName`, `batch`): `Promise`\<\{ `failed`: `number`; `imported`: `number`; \}\>
+
+Execute a batch of records using a named mutation operation.
+
+#### Parameters
+
+##### databaseId
+
+`string`
+
+The unique identifier of the database to execute against
+
+##### operationName
+
+`string`
+
+The name of the mutation operation to invoke for each record
+
+##### batch
+
+`object`[]
+
+Array of parameter objects, each passed to the operation as a single invocation
+
+#### Returns
+
+`Promise`\<\{ `failed`: `number`; `imported`: `number`; \}\>
+
+Object with `imported` and `failed` record counts
+
+***
+
 ### executeOperation()
 
 > **executeOperation**(`databaseId`, `name`, `options?`): `Promise`\<`any`\>
@@ -209,6 +243,12 @@ Execution options for parameters, pagination, and diagnostics
 > **get**(`databaseId`): `Promise`\<[`DatabaseInfo`](DatabaseInfo.md)\>
 
 Get database info by ID.
+
+Access is granted when the caller is an app admin, holds a direct
+`DatabasePermission` (owner/manager), **or** has a matching
+`DatabaseGroupPermission` via one of their group memberships.
+Returns 403 "Access denied" for users whose only access is via
+CEL-gated operations.
 
 #### Parameters
 
@@ -272,6 +312,33 @@ The name of the operation to retrieve
 
 ***
 
+### grantGroupPermission()
+
+> **grantGroupPermission**(`databaseId`, `params`): `Promise`\<[`DatabaseGroupPermissionEntry`](DatabaseGroupPermissionEntry.md)\>
+
+Grant a group permission on a database. Members of the specified group
+will gain the specified permission level on the database.
+
+#### Parameters
+
+##### databaseId
+
+`string`
+
+The unique identifier of the database to grant access to
+
+##### params
+
+[`GrantDatabaseGroupPermissionParams`](GrantDatabaseGroupPermissionParams.md)
+
+The group permission to grant
+
+#### Returns
+
+`Promise`\<[`DatabaseGroupPermissionEntry`](DatabaseGroupPermissionEntry.md)\>
+
+***
+
 ### ~~grantPermission()~~
 
 > **grantPermission**(`databaseId`, `params`): `Promise`\<[`DatabasePermissionEntry`](DatabasePermissionEntry.md)\>
@@ -302,11 +369,9 @@ Use [addManager](#addmanager) instead.
 
 ***
 
-### importBulk()
+### ~~importBulk()~~
 
 > **importBulk**(`databaseId`, `operationName`, `batch`): `Promise`\<\{ `failed`: `number`; `imported`: `number`; \}\>
-
-Import a batch of records using a named mutation operation.
 
 #### Parameters
 
@@ -314,25 +379,21 @@ Import a batch of records using a named mutation operation.
 
 `string`
 
-The unique identifier of the database to import into
-
 ##### operationName
 
 `string`
-
-The name of the mutation operation to invoke for each record
 
 ##### batch
 
 `object`[]
 
-Array of parameter objects, each passed to the operation as a single invocation
-
 #### Returns
 
 `Promise`\<\{ `failed`: `number`; `imported`: `number`; \}\>
 
-Object with `imported` and `failed` record counts
+#### Deprecated
+
+Use executeBatch instead
 
 ***
 
@@ -366,11 +427,41 @@ Import configuration (see [CsvImportOptions](CsvImportOptions.md) for full detai
 
 > **list**(): `Promise`\<[`DatabaseInfo`](DatabaseInfo.md)[]\>
 
-List all databases owned by the current user.
+List all databases the current user can access.
+
+Returns databases where the user has any of:
+- A direct `DatabasePermission` (owner or manager)
+- A `DatabaseGroupPermission` matching one of the user's group memberships
+
+App admins see every database in the app. Each entry carries a
+`permission` field reflecting the highest permission level the
+caller has on that database. Databases the user can only access via
+CEL-gated operations are **not** included in this list.
 
 #### Returns
 
 `Promise`\<[`DatabaseInfo`](DatabaseInfo.md)[]\>
+
+***
+
+### listGroupPermissions()
+
+> **listGroupPermissions**(`databaseId`): `Promise`\<[`DatabaseGroupPermissionEntry`](DatabaseGroupPermissionEntry.md)[]\>
+
+List all group-based permissions for a database.
+
+#### Parameters
+
+##### databaseId
+
+`string`
+
+The unique identifier of the database whose group
+  permissions to list
+
+#### Returns
+
+`Promise`\<[`DatabaseGroupPermissionEntry`](DatabaseGroupPermissionEntry.md)[]\>
 
 ***
 
@@ -440,6 +531,38 @@ The user ID of the manager to remove
 
 ***
 
+### revokeGroupPermission()
+
+> **revokeGroupPermission**(`databaseId`, `groupType`, `groupId`): `Promise`\<\{ `success`: `boolean`; \}\>
+
+Revoke a group's permission on a database.
+
+#### Parameters
+
+##### databaseId
+
+`string`
+
+The unique identifier of the database to revoke access from
+
+##### groupType
+
+`string`
+
+The type of group whose permission to revoke
+
+##### groupId
+
+`string`
+
+The identifier of the group whose permission to revoke
+
+#### Returns
+
+`Promise`\<\{ `success`: `boolean`; \}\>
+
+***
+
 ### ~~revokePermission()~~
 
 > **revokePermission**(`databaseId`, `userId`): `Promise`\<\{ `success`: `boolean`; \}\>
@@ -467,6 +590,69 @@ The user whose permission should be removed
 #### Deprecated
 
 Use [removeManager](#removemanager) instead.
+
+***
+
+### subscribe()
+
+> **subscribe**(`databaseId`, `subscriptionKey`, `options`): () => `void`
+
+Subscribe to real-time database changes for a server-registered
+subscription (created via the `/databases/:id/subscriptions` admin
+endpoint). The server filters events by the subscription's CEL
+`filter` and access rule, so the callback only fires for rows the
+subscriber is allowed to see.
+
+Sends `db.subscribe` over the active WebSocket; inbound `db.change`
+frames are routed back to this callback. On reconnect, the client
+automatically re-issues `db.subscribe` for every active subscription
+(matches the existing doc-subscription reconnect behavior).
+
+#### Parameters
+
+##### databaseId
+
+`string`
+
+The database the subscription is registered on.
+
+##### subscriptionKey
+
+`string`
+
+The subscription key (admin-defined).
+
+##### options
+
+[`DatabaseSubscribeOptions`](DatabaseSubscribeOptions.md)
+
+`params` forwarded to the server's filter CEL, plus
+  the `onChange` callback.
+
+#### Returns
+
+`unsub()` — removes the callback and sends `db.unsubscribe`.
+
+> (): `void`
+
+##### Returns
+
+`void`
+
+#### Example
+
+```ts
+const unsub = client.databases.subscribe(dbId, "my-tasks", {
+  params: { userId: currentUserId },
+  onChange: (event) => {
+    for (const change of event.changes) {
+      console.log(change.op, change.id, change.data);
+    }
+  },
+});
+// Later:
+unsub();
+```
 
 ***
 

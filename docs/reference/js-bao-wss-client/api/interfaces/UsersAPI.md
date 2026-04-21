@@ -53,3 +53,25 @@ Array of user IDs to look up (max 100)
 `Promise`\<[`BatchUserProfile`](BatchUserProfile.md)[]\>
 
 Array of user profiles (only users that exist and belong to the app)
+
+***
+
+### lookup()
+
+> **lookup**(`email`): `Promise`\<\{ `exists`: `boolean`; `user?`: \{ `email`: `string`; `name`: `string`; `userId`: `string`; \}; \}\>
+
+Look up a user by email in the current app.
+
+#### Parameters
+
+##### email
+
+`string`
+
+Email address to look up
+
+#### Returns
+
+`Promise`\<\{ `exists`: `boolean`; `user?`: \{ `email`: `string`; `name`: `string`; `userId`: `string`; \}; \}\>
+
+Object with exists boolean and optional user info

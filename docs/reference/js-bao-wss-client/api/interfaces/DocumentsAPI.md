@@ -60,6 +60,49 @@ The tag string to add
 
 ***
 
+### approveAccessRequest()
+
+> **approveAccessRequest**(`documentId`, `requestId`, `options?`): `Promise`\<\{ `message`: `string`; `request`: `DocumentAccessRequest`; `success`: `boolean`; \}\>
+
+Approve a pending access request.
+Only document owners and app admins may call this.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The unique identifier of the document
+
+##### requestId
+
+`string`
+
+The identifier of the request to approve
+
+##### options?
+
+Options
+
+###### documentUrl?
+
+`string`
+
+URL included in the notification email to the requester
+
+###### permission?
+
+`"read-write"` \| `"reader"`
+
+Optionally override the requested permission level
+
+#### Returns
+
+`Promise`\<\{ `message`: `string`; `request`: `DocumentAccessRequest`; `success`: `boolean`; \}\>
+
+***
+
 ### blobs()
 
 > **blobs**(`documentId`): [`DocumentBlobContext`](DocumentBlobContext.md)
@@ -371,6 +414,43 @@ The identifier of the specific invitation to delete
 #### Returns
 
 `Promise`\<\{ `message`: `string`; `success`: `boolean`; \}\>
+
+***
+
+### denyAccessRequest()
+
+> **denyAccessRequest**(`documentId`, `requestId`, `options?`): `Promise`\<\{ `message`: `string`; `request`: `DocumentAccessRequest`; `success`: `boolean`; \}\>
+
+Deny a pending access request.
+Only document owners and app admins may call this.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The unique identifier of the document
+
+##### requestId
+
+`string`
+
+The identifier of the request to deny
+
+##### options?
+
+Options
+
+###### documentUrl?
+
+`string`
+
+URL included in the notification email to the requester
+
+#### Returns
+
+`Promise`\<\{ `message`: `string`; `request`: `DocumentAccessRequest`; `success`: `boolean`; \}\>
 
 ***
 
@@ -833,6 +913,27 @@ Controls which documents are returned, how they are loaded, and pagination
 
 ***
 
+### listAccessRequests()
+
+> **listAccessRequests**(`documentId`): `Promise`\<`DocumentAccessRequest`[]\>
+
+List pending access requests for a document.
+Only document owners and app admins may call this.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The unique identifier of the document whose access requests to list
+
+#### Returns
+
+`Promise`\<`DocumentAccessRequest`[]\>
+
+***
+
 ### listGroupPermissions()
 
 > **listGroupPermissions**(`documentId`): `Promise`\<[`DocumentGroupPermissionEntry`](DocumentGroupPermissionEntry.md)[]\>
@@ -1141,6 +1242,60 @@ The tag string to remove
 
 ***
 
+### requestAccess()
+
+> **requestAccess**(`documentId`, `options`): `Promise`\<`DocumentAccessRequestResponse`\>
+
+Request access to a document you currently don't have permission to.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The unique identifier of the document to request access to
+
+##### options
+
+Request options
+
+###### documentUrl?
+
+`string`
+
+URL included in the notification email so owners can navigate to the document
+
+###### message?
+
+`string`
+
+Optional note (max 500 chars) to include with the request
+
+###### permission
+
+`"read-write"` \| `"reader"`
+
+The permission level being requested ("read-write" or "reader")
+
+###### reviewUrl?
+
+`string`
+
+URL included in the notification email for owners to review the request
+
+###### sendEmail?
+
+`boolean`
+
+If false, skip sending the owner notification email (default: true)
+
+#### Returns
+
+`Promise`\<`DocumentAccessRequestResponse`\>
+
+***
+
 ### resumeAllUploads()
 
 > **resumeAllUploads**(`documentId?`): `void`
@@ -1373,7 +1528,7 @@ If true, sends an email notification about the updated permission
 
 ### updatePermissions()
 
-> **updatePermissions**(`documentId`, `data`): `Promise`\<`void`\>
+> **updatePermissions**(`documentId`, `data`): `Promise`\<[`PermissionUpdateResult`](PermissionUpdateResult.md)\>
 
 Update user permissions on a document.
 
@@ -1389,7 +1544,7 @@ The unique identifier of the document to update permissions on
 
 Single or batch permission update; provide either `userId`+`permission` for a single user, or `permissions` array for bulk updates
 
-\{ `documentUrl?`: `string`; `note?`: `string`; `permission`: `string`; `sendEmail?`: `boolean`; `userId`: `string`; \}
+\{ `documentUrl?`: `string`; `email?`: `string`; `note?`: `string`; `permission`: `string`; `sendEmail?`: `boolean`; `userId?`: `string`; \}
 
 Single or batch permission update; provide either `userId`+`permission` for a single user, or `permissions` array for bulk updates
 
@@ -1398,6 +1553,10 @@ Single or batch permission update; provide either `userId`+`permission` for a si
 `string`
 
 URL included in the notification email so recipients can navigate to the document
+
+###### email?
+
+`string`
 
 ###### note?
 
@@ -1417,7 +1576,7 @@ The permission level to grant (e.g., "read-write", "reader")
 
 If true, sends an email notification to the affected user(s)
 
-###### userId
+###### userId?
 
 `string`
 
@@ -1455,7 +1614,7 @@ If true, sends an email notification to the affected user(s)
 
 #### Returns
 
-`Promise`\<`void`\>
+`Promise`\<[`PermissionUpdateResult`](PermissionUpdateResult.md)\>
 
 ***
 

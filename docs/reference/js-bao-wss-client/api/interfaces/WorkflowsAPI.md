@@ -122,6 +122,24 @@ List workflow runs for the current user
 
 ***
 
+### listStepRuns()
+
+> **listStepRuns**(`options`): `Promise`\<[`ListWorkflowStepRunsResult`](ListWorkflowStepRunsResult.md)\>
+
+List step runs for a specific workflow run. The run must have been started by the current user.
+
+#### Parameters
+
+##### options
+
+[`ListWorkflowStepRunsOptions`](ListWorkflowStepRunsOptions.md)
+
+#### Returns
+
+`Promise`\<[`ListWorkflowStepRunsResult`](ListWorkflowStepRunsResult.md)\>
+
+***
+
 ### releaseApply()
 
 > **releaseApply**(`options`): `Promise`\<[`ReleaseApplyResult`](ReleaseApplyResult.md)\>

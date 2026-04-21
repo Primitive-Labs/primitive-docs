@@ -132,6 +132,32 @@ Filtering and pagination options
 
 ***
 
+### listDatabases()
+
+> **listDatabases**(`groupType`, `groupId`): `Promise`\<[`GroupDatabaseInfo`](GroupDatabaseInfo.md)[]\>
+
+Lists all databases accessible to a group via DatabaseGroupPermission.
+
+#### Parameters
+
+##### groupType
+
+`string`
+
+The type category of the group
+
+##### groupId
+
+`string`
+
+The unique identifier of the group within its type
+
+#### Returns
+
+`Promise`\<[`GroupDatabaseInfo`](GroupDatabaseInfo.md)[]\>
+
+***
+
 ### listDocuments()
 
 > **listDocuments**(`groupType`, `groupId`): `Promise`\<[`GroupDocumentInfo`](GroupDocumentInfo.md)[]\>

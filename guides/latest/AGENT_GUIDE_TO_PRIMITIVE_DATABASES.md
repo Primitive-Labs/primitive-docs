@@ -446,7 +446,7 @@ Aggregate types: `count`, `sum`, `avg`, `min`, `max`.
 
 #### Pipeline — multi-step read operations
 
-Pipelines are **read-only** — they support `query`, `count`, and `aggregate` steps only. Mutations cannot be included in a pipeline. For "read-then-mutate" flows, execute a pipeline to read the data, then call a separate mutation operation from your app code.
+Pipelines are **read-only** — they support `query`, `count`, and `aggregate` steps only. Mutations cannot be included in a pipeline. For server-side "query-then-mutate" in a single request, use `applyToQuery` instead (see below).
 
 Pipelines execute multiple read-only steps with cross-step references:
 
@@ -473,6 +473,33 @@ params = '{"projectId":{"type":"string","required":true}}'
 
 **Response:** `{ steps: { recentTasks: { type: "query", data: [...] }, statusBreakdown: { type: "aggregate", result: {...} }, openBugs: { type: "count", count: 2 } } }`
 
+#### applyToQuery — server-side query+mutate
+
+`applyToQuery` finds records matching a filter and applies a mutation action to every matched record in a single server-side request, eliminating the query-then-mutate round trip.
+
+```toml
+[[operations]]
+name = "archiveCompleted"
+type = "applyToQuery"
+modelName = "tasks"
+access = "hasRole('admin')"
+definition = '{"source":{"filter":{"status":"completed","updatedAt":{"$lt":"$params.olderThan"}},"limit":500},"action":{"op":"patch","data":{"archived":true}}}'
+params = '{"olderThan":{"type":"string","required":true}}'
+```
+
+Supported action ops: `delete`, `patch` (requires `data`), `increment` (requires `fields`), `addToSet`/`removeFromSet` (require `stringSets`).
+
+**Limits and partial-mutation safety:**
+
+- When `source.limit` is **not set**, a default cap of 1000 records applies. If the matching set exceeds this cap, the request is **rejected with HTTP 400** to prevent silent partial mutation — narrow the filter or set `source.limit` explicitly.
+- When `source.limit` **is set**, the action applies to the first `limit` records. If truncated, the response includes `truncated: true, appliedLimit: <limit>`.
+
+**Safe to loop on `truncated: true`:** Only when the mutation causes matched records to no longer satisfy the filter (e.g., `delete`, or `patch` that changes a filtered field). Looping on `increment` or unrelated `patch` re-processes the same records indefinitely.
+
+**Response:** `{ matched: 500, affected: 498, failed: 2 }`
+
+Pass `?dryRun=true` to preview matched records without applying the action.
+
 ## Using Databases in App Code
 
 The client library is used at runtime to create database instances, execute operations, and manage data.
@@ -490,11 +517,11 @@ const db = await client.databases.create({
 ### Listing and fetching databases
 
 ```typescript
-// List databases the current user owns or manages.
-// NOTE: This does NOT return all databases the user has access to —
-// only those where they are an owner or manager. To navigate to a
-// specific database, use group membership or state stored elsewhere
-// rather than relying on this list.
+// List databases the current user can access — includes databases
+// where the user has a direct permission (owner or manager) OR a
+// matching DatabaseGroupPermission via their group memberships.
+// App admins see every database. Databases accessible only via
+// CEL-gated registered operations are not included.
 const databases = await client.databases.list();
 
 // Get a specific database
@@ -544,7 +571,7 @@ const result = await client.databases.executeOperation(databaseId, "listTasks", 
 Execute any operation across many items in one call (up to 100,000). Useful for bulk inserts, deletes, updates, or any other mutation:
 
 ```typescript
-const result = await client.databases.importBulk(databaseId, "createTask", [
+const result = await client.databases.executeBatch(databaseId, "createTask", [
   { params: { title: "Task 1", projectId: "proj-1" } },
   { params: { title: "Task 2", projectId: "proj-1" } },
 ]);
@@ -886,6 +913,30 @@ await client.databases.transferOwnership(databaseId, "new-owner-id");
 ```
 
 **Anti-pattern: Adding end users as managers.** It is almost never correct to add individual end users as managers of a database. The `manager` role bypasses CEL access gates entirely and grants administrative control over the database — it is not a way to give users access to data. The proper pattern is that only a small number of privileged accounts (the creator, perhaps one or two co-admins) have direct owner/manager access to a database, and **all other user access goes through registered operations** with CEL access expressions. If you find yourself writing a loop that grants `manager` to each user who needs to interact with a database, stop — define operations with appropriate `access` rules instead.
+
+### Group-based permissions
+
+Use `DatabaseGroupPermission` to grant database access (owner or manager level) to every member of a group in one step. Any user who belongs to the group — now or in the future — gets that permission level. The resolved permission for a user is the highest level found across their direct `DatabasePermission` and any matching `DatabaseGroupPermission`.
+
+```typescript
+// Grant manager access to every member of the "team:engineering" group
+await client.databases.grantGroupPermission(databaseId, {
+  groupType: "team",
+  groupId: "engineering",
+  permission: "manager", // only valid value for group permissions
+});
+
+// List all group permissions on a database
+const groupPerms = await client.databases.listGroupPermissions(databaseId);
+
+// Revoke a group permission
+await client.databases.revokeGroupPermission(databaseId, "team", "engineering");
+
+// List all databases accessible to a group (callable by group members or app admins)
+const dbs = await client.groups.listDatabases("team", "engineering");
+```
+
+Group members see the database in their `databases.list()` result and can call `databases.get(databaseId)`. Only the database owner (or an app admin) can grant or revoke group permissions.
 
 See the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) for group-based access patterns.
 

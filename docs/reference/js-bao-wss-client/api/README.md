@@ -1669,16 +1669,41 @@ The client emits a unified `invitation` event for real-time invitation changes d
 
 - `{ type: "invitation"; action: "created" | "updated" | "cancelled" | "declined" | "accepted"; invitationId; documentId; permission; title?; invitedBy?; invitedAt?; expiresAt?; acceptedBy?; document?: { title?; tags?; createdAt?; lastModified?; createdBy? } }`
 
-The `accepted` action is sent to the inviter when the invitee accepts the invitation. The `acceptedBy` field contains the userId of the user who accepted.
+#### Actions — who receives each
+
+Events are **targeted**: most actions are delivered to only one side of the invitation (inviter _or_ invitee, not both). A consumer that only subscribes from the invitee side will never see `accepted`, and a consumer that only subscribes from the inviter side will never see `created`, `updated`, or `cancelled`. Both sides of the UI should handle the actions relevant to them.
+
+| `action`     | Delivered to          | When it fires                                                                 |
+| ------------ | --------------------- | ----------------------------------------------------------------------------- |
+| `created`    | **Invitee only**      | A new pending invitation has been issued to this user.                        |
+| `updated`    | **Invitee only**      | An existing pending invitation's permission / expiry was changed.             |
+| `cancelled`  | **Invitee only**      | The inviter (or an admin) cancelled a pending invitation before acceptance.   |
+| `declined`   | **Invitee + inviter** | The invitee explicitly declined; both sides are notified.                     |
+| `accepted`   | **Inviter only**      | The invitee accepted; `acceptedBy` carries the accepting user's `userId`.     |
+
+Consumers writing a `switch` on `evt.action` should include a `default` branch that's either a no-op or a warning rather than throwing — new action values may be added in the future (non-breaking).
 
 Example:
 
 ```ts
 client.on("invitation", (evt) => {
-  if (evt.action === "accepted") {
-    console.log(`${evt.acceptedBy} accepted invitation to ${evt.documentId}`);
-  } else {
-    console.log("invitation event", evt.action, evt.documentId, evt.invitationId);
+  switch (evt.action) {
+    case "created":
+    case "updated":
+    case "cancelled":
+      // invitee-side: refresh pending-invitations list / badge
+      break;
+    case "declined":
+      // inviter-side: invite is no longer pending
+      break;
+    case "accepted":
+      // inviter-side: new collaborator
+      console.log(`${evt.acceptedBy} accepted invitation to ${evt.documentId}`);
+      break;
+    default:
+      // Unknown action — log and ignore rather than throw, so the client
+      // stays forward-compatible if new action values are added later.
+      console.warn("Unknown invitation action", evt);
   }
 });
 ```
