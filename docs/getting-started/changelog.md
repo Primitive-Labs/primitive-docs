@@ -4,6 +4,10 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao-wss v1.0.0 — 2026-04-21
+
+- New `configure-blob-lifecycle` script (`node scripts/configure-blob-lifecycle.js --env <env>`) configures Cloudflare R2 lifecycle rules for all BlobBucket TTL prefixes (`1d/`, `3d/`, `14d/`, `28d/`, `180d/`, `365d/`). Run this once per environment after deploying to ensure blobs stored with a TTL tier are automatically expired by R2.
+
 ## Latest (unreleased)
 
 Covers the current `js-bao-wss` server and `js-bao-wss-client` changes that will ship in the next release. A large set of changes across sharing, server-side automation, and storage:
