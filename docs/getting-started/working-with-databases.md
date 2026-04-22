@@ -311,6 +311,38 @@ params = '{"orderId":{"type":"string","required":true}}'
 Pipelines are **read-only** — they support `query`, `count`, and `aggregate` steps only. For read-then-mutate flows, execute a pipeline to read the data, then call a separate mutation operation.
 :::
 
+## Optional Filter Fields
+
+A `$params.fieldName` substitution in a filter is automatically optional: if the caller doesn't pass that parameter, the filter key is dropped before the query runs. Any value the caller does pass is used verbatim — including falsy values like `""`, `0`, `false`, and explicit `null`. Only a missing parameter removes the key.
+
+This lets a single operation handle both "list all" and "list filtered by X" cases:
+
+```toml
+[[operations]]
+name = "list-posts"
+type = "query"
+modelName = "posts"
+access = "true"
+definition = '{"filter":{"status":"approved","authorId":"$params.authorId"},"sort":{"createdAt":-1},"limit":50}'
+params = '{"authorId":{"type":"string","required":false}}'
+```
+
+| Caller passes | Filter becomes | Result |
+|---|---|---|
+| nothing | `{"status":"approved"}` | All approved posts |
+| `{authorId: "user-123"}` | `{"status":"approved","authorId":"user-123"}` | Approved posts by that author |
+| `{authorId: ""}` | `{"status":"approved","authorId":""}` | Approved posts where `authorId` is literally `""` |
+
+The same rule applies to pipeline step filters, and to `$database.metadata.*` and `$steps.*` references — anywhere a substitution variable can appear, a missing value drops the key and a provided value is passed through as-is.
+
+::: tip
+Reach for one operation with optional filter params before declaring a separate operation for each filter combination. `"required": false` scales cleanly as filter options grow.
+:::
+
+::: warning
+If a filter references `$params.X` but `X` isn't declared in the operation's `params` block, the key is always dropped — the operation silently becomes a match-all for that field. Make sure every `$params.*` reference has a matching `params` entry.
+:::
+
 ## Conditional Filters (Boolean Gates)
 
 Substitution variables like `$database.metadata.*`, `$params.*`, or `$steps.*` can be placed **directly as elements** inside `$and` or `$or` filter arrays. When a variable resolves to a boolean, `null`, or is missing, it controls whether that branch executes — without touching the database:

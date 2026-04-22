@@ -361,10 +361,38 @@ Use these in operation definitions (filters, data, IDs):
 | `$params.fieldName` | Caller-provided parameter |
 | `$steps.stepName.*` | Pipeline cross-step references (see Pipelines) |
 
-If a substitution variable (`$params.fieldName`, `$database.metadata.*`, or `$steps.*`) references a value that is missing, the field is **omitted** — not set to null or empty string. This applies everywhere substitution variables are used:
+If a substitution variable (`$params.fieldName`, `$database.metadata.*`, or `$steps.*`) resolves to no value, the key whose value is that variable is **omitted** from the resolved definition — not set to null, undefined, or empty string. Any value the caller actually provides is passed through verbatim, including falsy values (`""`, `0`, `false`, and explicit `null`). The mechanism: substitution replaces the variable with the caller's value or with `undefined` if missing, and the resolved object is JSON-serialized before being forwarded — `JSON.stringify` drops keys whose values are `undefined`, so an unset optional param naturally produces an absent key.
 
-- **In filters:** The filter key is removed, so the query matches all values for that field.
+This applies everywhere substitution variables are used:
+
+- **In filters (query, count, aggregate):** The filter key is removed, so the query matches all values for that field.
+- **In pipeline step filters:** Same rule — the step's filter key is removed when the referenced value is missing.
 - **In mutation data (save/patch):** The field is excluded from the written record entirely. An optional `$params.fieldName` in save data that the caller doesn't provide results in that field not being set on the record — it is not set to null or empty string.
+
+#### Optional filter fields
+
+A parameter declared `"required": false` makes its filter field optional: callers can include it to narrow results, or omit it to ignore that field. Use one operation with an optional filter instead of declaring separate ops per filter combination (e.g., `listPosts` + `listPostsByAuthor`).
+
+```toml
+[[operations]]
+name = "listPosts"
+type = "query"
+modelName = "posts"
+access = "true"
+definition = '{"filter":{"status":"approved","authorId":"$params.authorId"},"sort":{"createdAt":-1},"limit":50}'
+params = '{"authorId":{"type":"string","required":false}}'
+```
+
+| Caller input | Resolved filter | Behavior |
+|---|---|---|
+| `{}` | `{"status":"approved"}` | All approved posts |
+| `{"authorId":"user-123"}` | `{"status":"approved","authorId":"user-123"}` | Approved posts by that author |
+| `{"authorId":""}` | `{"status":"approved","authorId":""}` | Approved posts where `authorId` is the empty string (filter key is kept — only `undefined` drops) |
+| `{"authorId":null}` | `{"status":"approved","authorId":null}` | Approved posts where `authorId` is explicitly null |
+
+The same pattern works for pipeline step filters, `$database.metadata.*` references, and `$steps.*` references — in every case, a missing value drops the key and a provided value (including falsy) is used verbatim.
+
+> **Gotcha:** If a filter references `$params.X` but `X` isn't declared in the operation's `params` schema, the key is always dropped and the operation silently becomes a match-all for that field. Double-check that every `$params.*` reference in a filter or data payload has a matching entry in `params`.
 
 ### Operation types
 
