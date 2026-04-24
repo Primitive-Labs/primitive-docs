@@ -313,7 +313,7 @@ Pipelines are **read-only** — they support `query`, `count`, and `aggregate` s
 
 ## Optional Filter Fields
 
-A `$params.fieldName` substitution in a filter is automatically optional: if the caller doesn't pass that parameter, the filter key is dropped before the query runs. Any value the caller does pass is used verbatim — including falsy values like `""`, `0`, `false`, and explicit `null`. Only a missing parameter removes the key.
+A `$params.fieldName` substitution in a filter is automatically optional: if the caller doesn't pass that parameter, the filter key is dropped before the query reaches the database — an unset substitution doesn't become `{field: undefined}` in the dispatched filter, it's removed entirely. Any value the caller does pass is used verbatim — including falsy values like `""`, `0`, `false`, and explicit `null`. Only a missing parameter removes the key.
 
 This lets a single operation handle both "list all" and "list filtered by X" cases:
 

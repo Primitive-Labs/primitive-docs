@@ -371,7 +371,7 @@ This applies everywhere substitution variables are used:
 
 #### Optional filter fields
 
-A parameter declared `"required": false` makes its filter field optional: callers can include it to narrow results, or omit it to ignore that field. Use one operation with an optional filter instead of declaring separate ops per filter combination (e.g., `listPosts` + `listPostsByAuthor`).
+A parameter declared `"required": false` makes its filter field optional: callers can include it to narrow results, or omit it to ignore that field. When the caller doesn't pass the parameter, the filter key is dropped before the query reaches the database — an unset substitution doesn't become `{field: undefined}` in the dispatched filter, it's removed entirely. Use one operation with an optional filter instead of declaring separate ops per filter combination (e.g., `listPosts` + `listPostsByAuthor`).
 
 ```toml
 [[operations]]
