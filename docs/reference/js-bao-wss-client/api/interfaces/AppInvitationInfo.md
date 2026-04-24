@@ -56,6 +56,17 @@
 
 ***
 
+### inviteToken?
+
+> `optional` **inviteToken**: `string` \| `null`
+
+Tokenized accept token — combine with your app's accept-page URL
+ to build a working CTA (e.g. `${baseUrl}/invite/accept?inviteToken=…`).
+ `null` only for legacy rows that have not been upgraded yet — new
+ invitations always have one.
+
+***
+
 ### note?
 
 > `optional` **note**: `string` \| `null`

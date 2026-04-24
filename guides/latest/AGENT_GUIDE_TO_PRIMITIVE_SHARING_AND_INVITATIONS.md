@@ -98,6 +98,37 @@ await client.invitations.revoke(invitationId);
 
 Revoking an `AppInvitation` rescinds the right to join the app and cascades to every pending email-based share or group add linked to that invitation. If the invitee hasn't signed up yet, this is the single API call that fully undoes the invitation + any pending shares.
 
+### Custom Email CTAs — `getAcceptToken` and `accept`
+
+When your app sends its own invitation email (e.g. branded HTML via a workflow step), you need to embed a working accept link. The `inviteToken` is returned directly from `invitations.create()`:
+
+```typescript
+const invitation = await client.invitations.create({
+  email: "alice@example.com",
+  role: "member",
+  sendEmail: false, // suppress the platform's default email
+});
+
+const acceptUrl = `https://app.example.com/invite/accept?inviteToken=${invitation.inviteToken}`;
+// Embed acceptUrl in your own branded email
+```
+
+To retrieve the token for an existing invitation (e.g. for a "resend" flow):
+
+```typescript
+const info = await client.invitations.getAcceptToken(invitationId);
+// { invitationId, inviteToken, email, expiresAt, status }
+```
+
+When the user lands on your accept page and is authenticated, consume the token:
+
+```typescript
+const result = await client.invitations.accept(inviteToken);
+// { status: "accepted", invitationId, grantsResolved: { groups, documents } }
+```
+
+`accept` marks the invitation accepted (write-once) and resolves all pending deferred grants linked to it — even if the user's current account email differs from the invited email. Throws `INVITE_TOKEN_INVALID`, `INVITE_TOKEN_EXPIRED`, or `INVITE_ALREADY_ACCEPTED` on failure.
+
 ---
 
 ## Document Sharing
@@ -355,11 +386,16 @@ const pending = invitations.filter(i => !i.accepted);
 // [{ invitationId, email, role, invitedAt, expiresAt, source, ... }, ...]
 ```
 
-::: warning Scoping to a specific document or group
-`AppInvitation.source` is a free-form string (e.g. `"document_share"`), not a structured scope. There is currently no client-facing API that efficiently answers "what invitations are pending for *this specific document*" or "…for *this specific group*."
+### Pending Invitations (Per-Group)
 
-In practice, most sharing UIs show pending invitations at the app level (an admin/settings page) rather than per-document or per-group. If you need per-resource pending lists, that's a platform gap — see the "Current Limitations" section below.
-:::
+Use `listPendingInvitations` to get unresolved, non-expired invitations scoped to a specific group:
+
+```typescript
+const pending = await client.groups.listPendingInvitations(groupType, groupId);
+// [{ email, role, invitationId, createdAt, expiresAt, addedBy }, ...]
+```
+
+This is the right call to build a per-group "Members + Pending" panel without approximating from the app-level list.
 
 ### Canceling a Pending Invitation
 
@@ -383,25 +419,11 @@ Group:
 
 ```typescript
 await client.groups.removeMember(groupType, groupId, userId);
-// or by email (for an existing member):
+// or by email — removes member AND cancels any pending deferred invitation:
 await client.groups.removeMember(groupType, groupId, { email });
 ```
 
----
-
-## Current Limitations
-
-Two gaps agents should be aware of, both tracked in [js-bao-wss#452](https://github.com/Primitive-Labs/js-bao-wss/issues/452):
-
-### 1. Removal APIs don't cancel pending invitations
-
-The ideal semantics would be: calling `client.documents.setPermissions(docId, [{ email, permission: null }])` or `client.groups.removeMember(..., { email })` should remove the user if they're already a member *and* cancel any pending deferred share/add for that email if they haven't signed up yet. Today, these APIs only handle the "already a member" case. Cancelling a pending invitation requires revoking the whole `AppInvitation`, which cascades to every grant linked to it (not just the one you wanted to cancel).
-
-### 2. No per-document / per-group pending-invitation listing
-
-The data model has the `deferredForDocument` and `deferredForGroup` GSIs ready to support this, but no client-facing API surfaces them. Agents building a per-resource "pending" view today can only approximate by listing all `AppInvitation`s at the app level.
-
-A low-level `client.deferredGrants.*` surface exists internally for admin debugging; **do not build regular product flows on top of it** — its shape is an implementation detail and may change.
+When removing by email, the server handles both the "already a member" case and the "pending invite" case in one call. To cancel a pending invitation and all of its linked grants across resources, revoke the `AppInvitation` directly.
 
 ## Deferred Grants: Internal Detail
 
@@ -485,6 +507,9 @@ else showDeniedMessage();
 | `ACCESS_REQUEST_ALREADY_PENDING` | Requester already has a pending request for this doc |
 | `ACCESS_REQUEST_RESOLVED` | Attempting to re-resolve a request |
 | `DOMAIN_NOT_ALLOWED` | Email is outside domain-mode allowed domains |
+| `INVITE_TOKEN_INVALID` | `invitations.accept` called with an unrecognized token |
+| `INVITE_TOKEN_EXPIRED` | `invitations.accept` called after the invitation's `expiresAt` |
+| `INVITE_ALREADY_ACCEPTED` | `invitations.accept` called on an already-accepted invitation |
 
 ---
 

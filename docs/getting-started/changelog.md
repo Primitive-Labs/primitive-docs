@@ -4,6 +4,16 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao-wss v1.0.0 — 2026-04-24
+
+- You can now build custom invitation email CTAs: `invitations.create()` (and deferred group/document branches) return `invitationId` + `inviteToken`, and a new `invitations.getAcceptToken(id)` method lets you retrieve the token for any existing invitation.
+- Authenticated users can accept an invitation by token via `invitations.accept(inviteToken)`, resolving all pending deferred grants to their account — even when the signup email differs from the invited email.
+- `groups.listUserMemberships(userId, { groupType })` now accepts an optional `groupType` filter for server-side push-down (no post-query filtering needed).
+- `databases.list({ databaseType })` now accepts an optional `databaseType` filter to narrow results to a single database type.
+- `DocumentCollection` gains `collectionType` and `contextId` fields. Set `contextId` at create time to tie a collection to an external entity (class, project, etc.); CEL collection rules can then reference `collection.contextId` (e.g. `isMemberOf('class', collection.contextId)`).
+- `groups.removeMember({ email })` now also cancels any pending deferred invitation for that email when no direct membership exists — a single call handles both the "already a member" and "pending" cases.
+- `groups.listUserMemberships()` results now include a `name` field (and optional `description`) for each group, joined at query time.
+
 ## Latest (unreleased)
 
 Covers the current `js-bao-wss` server and `js-bao-wss-client` changes that will ship in the next release. A large set of changes across sharing, server-side automation, and storage:

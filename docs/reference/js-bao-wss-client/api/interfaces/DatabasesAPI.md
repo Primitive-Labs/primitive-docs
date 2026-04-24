@@ -425,7 +425,7 @@ Import configuration (see [CsvImportOptions](CsvImportOptions.md) for full detai
 
 ### list()
 
-> **list**(): `Promise`\<[`DatabaseInfo`](DatabaseInfo.md)[]\>
+> **list**(`options?`): `Promise`\<[`DatabaseInfo`](DatabaseInfo.md)[]\>
 
 List all databases the current user can access.
 
@@ -437,6 +437,14 @@ App admins see every database in the app. Each entry carries a
 `permission` field reflecting the highest permission level the
 caller has on that database. Databases the user can only access via
 CEL-gated operations are **not** included in this list.
+
+#### Parameters
+
+##### options?
+
+[`ListDatabasesOptions`](ListDatabasesOptions.md)
+
+Optional filters (e.g. `databaseType` to limit to one type)
 
 #### Returns
 

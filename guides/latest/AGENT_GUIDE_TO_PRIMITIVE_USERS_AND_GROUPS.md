@@ -216,7 +216,10 @@ await client.groups.removeMember("team", "engineering", { email: "alice@example.
 
 ```typescript
 const memberships = await client.groups.listUserMemberships("user-456");
-// [{ groupType, groupId, addedAt, addedBy }]
+// [{ groupType, groupId, name, description?, addedAt, addedBy }]
+
+// Filter to a single group type (server-side push-down)
+const teamOnly = await client.groups.listUserMemberships("user-456", { groupType: "team" });
 ```
 
 ## Group Type Configuration

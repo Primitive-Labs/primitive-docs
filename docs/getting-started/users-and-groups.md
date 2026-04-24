@@ -77,6 +77,10 @@ const members = await client.groups.listMembers("team", "engineering");
 
 // List groups a user belongs to
 const memberships = await client.groups.listUserMemberships(userId);
+// [{ groupType, groupId, name, description?, addedAt, addedBy }, ...]
+
+// Filter to a single group type (server-side push-down)
+const teamMemberships = await client.groups.listUserMemberships(userId, { groupType: "team" });
 ```
 
 Provide **either** `email` or `userId`, not both.

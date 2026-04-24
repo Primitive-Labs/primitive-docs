@@ -377,6 +377,10 @@
               "text": "Interfaces",
               "items": [
                 {
+                  "text": "AcceptInviteResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/AcceptInviteResult"
+                },
+                {
                   "text": "AddManagerParams",
                   "link": "/reference/js-bao-wss-client/api/interfaces/AddManagerParams"
                 },
@@ -641,12 +645,20 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/DeferredGrantRevokeResult"
                 },
                 {
+                  "text": "DeferredGroupAdd",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DeferredGroupAdd"
+                },
+                {
                   "text": "DeferredGroupGrant",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DeferredGroupGrant"
                 },
                 {
                   "text": "DeferredPermissionGrant",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DeferredPermissionGrant"
+                },
+                {
+                  "text": "DirectGroupAdd",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DirectGroupAdd"
                 },
                 {
                   "text": "DirectPermissionGrant",
@@ -837,6 +849,10 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/IntegrationsAPI"
                 },
                 {
+                  "text": "InvitationAcceptTokenInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/InvitationAcceptTokenInfo"
+                },
+                {
                   "text": "InvitationEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/InvitationEvent"
                 },
@@ -857,8 +873,16 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/JsBaoEvents"
                 },
                 {
+                  "text": "ListDatabasesOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ListDatabasesOptions"
+                },
+                {
                   "text": "ListLocalDocumentsOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/ListLocalDocumentsOptions"
+                },
+                {
+                  "text": "ListUserMembershipsOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ListUserMembershipsOptions"
                 },
                 {
                   "text": "ListWorkflowRunsOptions",
@@ -943,6 +967,14 @@
                 {
                   "text": "PendingCreateFailedEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/PendingCreateFailedEvent"
+                },
+                {
+                  "text": "PendingGroupInvitationEntry",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PendingGroupInvitationEntry"
+                },
+                {
+                  "text": "PendingInvitationEntry",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PendingInvitationEntry"
                 },
                 {
                   "text": "PermissionEvent",
@@ -1140,6 +1172,10 @@
                 {
                   "text": "GeminiRole",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/GeminiRole"
+                },
+                {
+                  "text": "GroupAddMemberResult",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/GroupAddMemberResult"
                 },
                 {
                   "text": "InferAttrs",
