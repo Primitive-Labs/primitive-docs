@@ -418,6 +418,9 @@ If your app relies on `databases.list()` to populate a dashboard or workspace li
 ```typescript
 // Only returns databases where the user is owner or manager
 const databases = await client.databases.list();
+
+// Filter to a specific database type
+const workspaceDbs = await client.databases.list({ databaseType: "workspace" });
 ```
 
 App-level admins (console admins) are an exception — they see all databases in the app.

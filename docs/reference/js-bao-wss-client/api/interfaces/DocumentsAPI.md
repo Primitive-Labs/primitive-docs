@@ -998,6 +998,30 @@ List all documents that were created locally but not yet committed to the server
 
 ***
 
+### listPendingInvitations()
+
+> **listPendingInvitations**(`documentId`): `Promise`\<[`PendingInvitationEntry`](PendingInvitationEntry.md)[]\>
+
+List pending (unresolved, non-expired) invitations scoped to this document.
+
+Returns denormalized rows suitable for rendering alongside the existing
+`getPermissions()` list in a sharing UI — callers never need to touch
+the internal deferred-grants surface.
+
+#### Parameters
+
+##### documentId
+
+`string`
+
+The unique identifier of the document
+
+#### Returns
+
+`Promise`\<[`PendingInvitationEntry`](PendingInvitationEntry.md)[]\>
+
+***
+
 ### open()
 
 > **open**(`documentId`, `options?`): `Promise`\<\{ `doc`: `Doc` \| `null`; `metadata`: `any`; \}\>
@@ -1192,9 +1216,18 @@ An optional reason string describing why the awareness states are being removed 
 
 ### removePermission()
 
-> **removePermission**(`documentId`, `userId`): `Promise`\<`void`\>
+> **removePermission**(`documentId`, `target`): `Promise`\<`void`\>
 
-Remove a user's permission from a document.
+Remove a user's permission from a document, or cancel a pending (deferred)
+invitation by email.
+
+- Pass a string `userId` to remove an existing user's direct permission.
+- Pass `{ userId }` to do the same via the structured form.
+- Pass `{ email }` to cancel a pending invitation (or, if the email
+  resolves to an app member, remove their direct permission).
+
+When the caller's own permission is removed, the document is also
+evicted locally.
 
 #### Parameters
 
@@ -1204,11 +1237,11 @@ Remove a user's permission from a document.
 
 The unique identifier of the document to revoke access from
 
-##### userId
+##### target
 
-`string`
+Either a user ID string, or an object with `userId` / `email`
 
-The user whose permission to remove; if this is the current user, the document is also evicted locally
+`string` | \{ `email?`: `undefined`; `userId`: `string`; \} | \{ `email`: `string`; `userId?`: `undefined`; \}
 
 #### Returns
 

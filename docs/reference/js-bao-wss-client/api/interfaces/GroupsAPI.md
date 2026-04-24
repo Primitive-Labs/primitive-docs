@@ -10,9 +10,20 @@
 
 ### addMember()
 
-> **addMember**(`groupType`, `groupId`, `params`): `Promise`\<[`GroupMemberInfo`](GroupMemberInfo.md)\>
+> **addMember**(`groupType`, `groupId`, `params`): `Promise`\<[`GroupAddMemberResult`](../type-aliases/GroupAddMemberResult.md)\>
 
 Adds a user to a group by user ID or email address.
+
+Returns a discriminated union based on whether the target is an existing
+app user (direct add) or a yet-to-sign-up email (deferred add):
+
+- `{ status: "added", userId, addedAt, addedBy, ... }` — new membership.
+- `{ status: "already_member", userId, addedAt, addedBy, ... }` — the
+  user was already a member (no error; `addedAt`/`addedBy` reflect the
+  pre-existing row). Replaces the previous HTTP 409 on duplicate.
+- `{ status: "pending_signup", email, deferredId, expiresAt, ... }` —
+  email not yet in the app; a DeferredGroupAdd row has been created (or
+  an existing unresolved one is returned idempotently).
 
 #### Parameters
 
@@ -36,7 +47,7 @@ User identifier (provide either userId or email, not both)
 
 #### Returns
 
-`Promise`\<[`GroupMemberInfo`](GroupMemberInfo.md)\>
+`Promise`\<[`GroupAddMemberResult`](../type-aliases/GroupAddMemberResult.md)\>
 
 ***
 
@@ -222,9 +233,37 @@ Pagination options (limit, cursor)
 
 ***
 
+### listPendingInvitations()
+
+> **listPendingInvitations**(`groupType`, `groupId`): `Promise`\<[`PendingGroupInvitationEntry`](PendingGroupInvitationEntry.md)[]\>
+
+Lists pending (unresolved, non-expired) invitations scoped to a group.
+Returns denormalized rows so callers can render "members + pending"
+without touching the internal deferred-grants surface.
+
+#### Parameters
+
+##### groupType
+
+`string`
+
+The type category of the group
+
+##### groupId
+
+`string`
+
+The unique identifier of the group within its type
+
+#### Returns
+
+`Promise`\<[`PendingGroupInvitationEntry`](PendingGroupInvitationEntry.md)[]\>
+
+***
+
 ### listUserMemberships()
 
-> **listUserMemberships**(`userId`): `Promise`\<[`GroupMembershipInfo`](GroupMembershipInfo.md)[]\>
+> **listUserMemberships**(`userId`, `options?`): `Promise`\<[`GroupMembershipInfo`](GroupMembershipInfo.md)[]\>
 
 Lists all group memberships for a given user.
 
@@ -235,6 +274,12 @@ Lists all group memberships for a given user.
 `string`
 
 The ID of the user whose memberships to retrieve
+
+##### options?
+
+[`ListUserMembershipsOptions`](ListUserMembershipsOptions.md)
+
+Optional filters (e.g. `groupType` to limit to one group type)
 
 #### Returns
 

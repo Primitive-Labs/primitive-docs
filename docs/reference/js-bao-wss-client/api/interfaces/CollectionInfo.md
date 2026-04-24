@@ -20,6 +20,27 @@
 
 ***
 
+### collectionType
+
+> **collectionType**: `string`
+
+Controls which CollectionTypeConfig (and therefore which rule set)
+applies to this collection. Defaults to `"default"` when not supplied
+at create time. Immutable after create.
+
+***
+
+### contextId
+
+> **contextId**: `string` \| `null`
+
+Per-instance context identifier. Parallels `AppGroup.groupId`. Used by
+CEL rules (`collection.contextId`) to identify the external entity the
+collection is bound to (e.g. a class ID, project ID). `null` for
+collections not bound to any context. Immutable after create.
+
+***
+
 ### createdAt
 
 > **createdAt**: `string`

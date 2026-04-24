@@ -996,6 +996,11 @@ When sharing multiple documents as a unit, group them into a **collection** and 
 const collection = await client.collections.create({
   name: "Q1 Reports",
   description: "All quarterly report documents",
+  // Optional: tie the collection to a group type's rule set
+  collectionType: "class-reports",
+  // Optional: bind to an external entity (e.g. a class or project ID)
+  // Exposed to CEL rules as `collection.contextId`
+  contextId: "math-101",
 });
 
 // Add documents to a collection
@@ -1011,6 +1016,18 @@ const docs = await client.collections.listDocuments(collection.collectionId);
 // List which collections a document belongs to
 const collections = await client.collections.listCollectionsForDocument(documentId);
 ```
+
+**Using `contextId` in CEL collection rules:**
+
+When a collection has a `contextId`, CEL rules attached via a `CollectionTypeConfig` can reference it. This lets you express per-context membership gates — for example, only a student's teacher can add documents to their class collection:
+
+```
+# In a CollectionTypeConfig rule set:
+# "Can the caller create a collection in this context?"
+create = "isMemberOf('class-teachers', collection.contextId)"
+```
+
+`collection.contextId` is `null` for collections created without one; existing collections silently receive `null` and continue to behave as before.
 
 **Sharing a collection with a group (fans out to all documents):**
 

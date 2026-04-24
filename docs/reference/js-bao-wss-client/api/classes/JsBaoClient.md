@@ -1038,7 +1038,7 @@ Override the default OAuth redirect URI for the magic link callback
 
 ### magicLinkVerify()
 
-> **magicLinkVerify**(`token`): `Promise`\<\{ `isNewUser?`: `boolean`; `promptAddPasskey?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
+> **magicLinkVerify**(`token`, `options?`): `Promise`\<\{ `isNewUser?`: `boolean`; `promptAddPasskey?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
 
 Verify a magic link token and authenticate the user.
 
@@ -1049,6 +1049,18 @@ Verify a magic link token and authenticate the user.
 `string`
 
 The magic link token from the email URL
+
+##### options?
+
+Optional flow parameters
+
+###### inviteToken?
+
+`string`
+
+When present (#466), accepts the named invitation
+  server-side during verify and resolves deferred grants to the signing-in user,
+  even when the magic-link email differs from the invited email
 
 #### Returns
 
@@ -1079,7 +1091,7 @@ The email address to send the OTP code to
 
 ### otpVerify()
 
-> **otpVerify**(`email`, `code`): `Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
+> **otpVerify**(`email`, `code`, `options?`): `Promise`\<\{ `isNewUser?`: `boolean`; `user`: \{ `email`: `string`; `name?`: `string`; `userId`: `string`; \}; \}\>
 
 Verify a one-time password (OTP) code and authenticate the user.
 On success, the client will be authenticated and connected.
@@ -1097,6 +1109,18 @@ The email address the OTP was sent to
 `string`
 
 The OTP code entered by the user
+
+##### options?
+
+Optional flow parameters
+
+###### inviteToken?
+
+`string`
+
+When present (#466), accepts the named invitation
+  server-side during verify and resolves deferred grants to the signing-in user,
+  even when the signup email differs from the invited email
 
 #### Returns
 
@@ -1176,7 +1200,7 @@ List all passkeys registered for the current user.
 
 ### passkeyRegisterFinish()
 
-> **passkeyRegisterFinish**(`credential`, `challengeToken`, `deviceName?`): `Promise`\<\{ `success`: `boolean`; \}\>
+> **passkeyRegisterFinish**(`credential`, `challengeToken`, `deviceName?`, `options?`): `Promise`\<\{ `credentialBackedUp?`: `boolean`; `invitation?`: \{ `grantsResolved`: \{ `documents`: `number`; `groups`: `number`; \}; `invitationId`: `string`; \}; `success`: `boolean`; \}\>
 
 Complete passkey registration with the browser's credential response.
 
@@ -1200,9 +1224,20 @@ The challenge token returned by passkeyRegisterStart()
 
 Optional human-readable name for this passkey (e.g. "MacBook Pro")
 
+##### options?
+
+Optional flow parameters
+
+###### inviteToken?
+
+`string`
+
+When present (#466), accepts the named invitation
+  server-side for the authenticated caller and resolves deferred grants to them
+
 #### Returns
 
-`Promise`\<\{ `success`: `boolean`; \}\>
+`Promise`\<\{ `credentialBackedUp?`: `boolean`; `invitation?`: \{ `grantsResolved`: \{ `documents`: `number`; `groups`: `number`; \}; `invitationId`: `string`; \}; `success`: `boolean`; \}\>
 
 ***
 
@@ -1295,6 +1330,12 @@ URL to return to after the OAuth flow completes
 ##### options?
 
 Additional flow options
+
+###### inviteToken?
+
+`string`
+
+If provided, accepts the invitation server-side on callback (#466) and resolves deferred grants to the new user even when OAuth email differs from invited email
 
 ###### waitlist?
 

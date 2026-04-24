@@ -83,6 +83,29 @@ await client.invitations.revoke(invitationId);
 
 Revoking cascades — any pending email-based document shares or group adds attached to the invitation are removed in the same operation.
 
+### Custom Invitation Emails
+
+If you send your own invitation emails instead of relying on the platform's default template, you need to embed a working accept link in your email. Use `getAcceptToken` to fetch the token for an existing invitation, then compose the URL yourself:
+
+```typescript
+const info = await client.invitations.getAcceptToken(invitationId);
+// info: { invitationId, inviteToken, email, expiresAt, status }
+
+const acceptUrl = `https://app.example.com/invite/accept?inviteToken=${info.inviteToken}`;
+// Embed acceptUrl in your custom email
+```
+
+The `inviteToken` is also returned directly from `invitations.create()`, so you can skip the `getAcceptToken` call when building the URL immediately after creating the invitation.
+
+When the recipient clicks the link, accept the invitation on their behalf once they're authenticated:
+
+```typescript
+await client.invitations.accept(inviteToken);
+// Returns: { status: "accepted", invitationId, grantsResolved: { groups, documents } }
+```
+
+This resolves all pending deferred grants linked to the invitation (document shares, group adds) to the authenticated user — even if their signup email differs from the invited email.
+
 
 ## Document Sharing
 
@@ -351,8 +374,15 @@ const pending = invitations.filter(i => !i.accepted);
 // [{ invitationId, email, role, invitedAt, expiresAt, source, ... }, ...]
 ```
 
-::: warning Scoping to a specific document or group
-`AppInvitation.source` is a free-form string label — not a structured scope. Today there's no client API that efficiently answers "which invitations are pending for *this specific document*" or "…for *this specific group*." Most apps surface pending invitations at the app level (admin/settings page) rather than per-resource. If you need per-resource pending lists, that's a platform gap tracked in [js-bao-wss#452](https://github.com/Primitive-Labs/js-bao-wss/issues/452).
+::: tip Per-resource pending lists
+You can now list pending invitations scoped to a specific group:
+
+```typescript
+const pending = await client.groups.listPendingInvitations(groupType, groupId);
+// [{ email, role, invitationId, createdAt, expiresAt, addedBy }, ...]
+```
+
+This returns only unresolved, non-expired invitations for that group. For app-level pending lists, use `client.invitations.list()` as before.
 :::
 
 ### Canceling a Pending Invitation
@@ -381,7 +411,7 @@ await client.groups.removeMember(groupType, groupId, userId);
 await client.groups.removeMember(groupType, groupId, { email });
 ```
 
-These APIs act only on users who already have access. They do not cancel pending invitations today — for that, revoke the `AppInvitation`.
+When removing by email, the server also cancels any pending deferred invitation for that email if no direct membership exists — a single call handles both the "already a member" and "pending invite" cases. To cancel a pending invitation and all shares/group adds attached to it (not just for one group), revoke the `AppInvitation` directly.
 
 ## A Worked Example
 
