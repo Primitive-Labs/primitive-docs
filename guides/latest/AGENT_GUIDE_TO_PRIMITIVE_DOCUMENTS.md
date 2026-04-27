@@ -59,21 +59,27 @@ await jsBaoClient.documents.open(documentId);
 const result = await MyModel.query({}, { documents: documentId });
 ```
 
-Documents are ready to be queried once the .open() call finishes. Applications should wait for all required documents to be opened and show a loading state until all needed documents have been opened. Often it's handy to track this with an `isReady` ref.
+Documents are ready to be queried once the `.open()` call finishes. Applications should wait for all required documents to be opened and show a loading state until all needed documents have been opened. Often it's handy to track this with an `isReady` ref.
+
+**Wrong** — querying or saving before the document is open throws (or returns nothing for queries on no-document models):
+
+```typescript
+// DON'T: kick off open() and immediately query
+jsBaoClient.documents.open(documentId);          // missing await
+const result = await TodoItem.query({});         // throws DocumentClosedError on save,
+                                                 // returns empty data for query
+```
 
 **Note on `jsBaoDocumentStore.isReady`:** The template app provides `jsBaoDocumentStore` with an `isReady` property. This indicates that the **store itself** has finished initializing — it does NOT indicate that any particular document has been opened. You still need to track document-specific readiness separately (e.g., after calling `documents.open()`) before querying data in those documents.
 
-**Document opening ownership and error handling:**
+**Where in the Vue tree to open documents:**
 
-- **Do not open documents in sub-components.** Open documents in the page/layout/store layer that owns route or session-level lifecycle. Pass readiness/data down to sub-components via props/composables.
-- **Handle open failures explicitly.** If `documents.open()` fails (permissions, missing document, network issues), surface an error state and/or redirect. Do not silently continue.
-- **Calling `open()` on an already open document is safe.** It is okay for higher-level lifecycle code to call `open()` defensively.
-
-**When in the Vue hierarchy to open documents:**
-
-- **Wait for authentication first.** Do not open documents before authentication completes. The `userStore.isAuthenticated` ref is the correct signal — not `isInitialized`, which only means the store is set up but does not guarantee the user has a session. The template's `AppLayout` gates content rendering on `isAuthenticated`, so components inside the layout can safely open documents on mount. For stores that initialize outside the layout, watch `isAuthenticated` reactively (see the [Authentication guide's Auth State Model section](AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.md#auth-state-model)).
-- **Session-scoped documents:** Open at app/layout level after login when documents should stay open for most of the session. This is typically a small/medium bounded set (guideline: < 20). Use this when real-time updates are needed across pages, or data must be queried from multiple routes/components.
-- **Route-scoped documents:** Open on route entry when the document is only needed in that context (or document count can grow unbounded), and close on route leave. Show loading until `documents.open()` completes and, when using `useJsBaoDataLoader`, until `initialDataLoaded` is true.
+- **Open in pages/layouts/stores, not sub-components.** Sub-components receive readiness and data as props.
+- **Open after authentication, not before.** Gate on `userStore.isAuthenticated` (not `isInitialized`). The template's `AppLayout` already gates rendering on `isAuthenticated`, so components mounted inside it can call `open()` safely.
+- **Session-scoped documents** (small bounded set, < ~20): open once at app/layout level for the session.
+- **Route-scoped documents** (per-page, unbounded count, or transient): open on route entry, close on route leave. Render a loading state until `documents.open()` resolves and (with `useJsBaoDataLoader`) `initialDataLoaded` is true.
+- **Handle open failures explicitly** — surface an error or redirect. Don't silently continue.
+- **`open()` is idempotent** — calling it on an already-open document is a no-op.
 
 ### 2. Document List Access
 
@@ -132,36 +138,17 @@ await jsBaoClient.documents.open(result.documentId);
 
 ### Pattern 2: One Document at a Time (Workspaces)
 
-**Best for:** Apps where users create discrete projects or workspaces they might share
+**Best for:** Apps where users create discrete projects/workspaces they might share independently — accounting (per company), project management (per project), shared shopping lists (per household).
 
-Users have multiple documents but work in one at a time. They can create new documents, switch between them, and share each with different people.
+Users have multiple documents but work in one at a time, switching between them. Track a `currentDocument` ref and call `open()` on the chosen document.
 
-**Examples:**
-
-- Accounting app (one document per company)
-- Project management (one document per project)
-- Shared shopping lists (one list per household)
-
-**User experience:** Users see a document switcher in the UI. They can create new workspaces, rename them, share them with teammates, and switch between them.
-
-**UI Components:** This project includes document management components in `src/components/documents/` that are particularly helpful for this pattern:
-
-- **`PrimitiveDocumentSwitcher`** - A dropdown menu designed for the sidebar header. Shows the current app/document name with an icon, lists available documents for quick switching, displays pending invitation badges, and links to a "Manage Documents" page. Emits events when users switch documents so the app can handle the transition.
-
-- **`PrimitiveDocumentList`** - A full document management interface suitable for a dedicated "Manage Documents" page. Displays documents in a table (desktop) or list (mobile) with support for renaming, sharing, deleting, and accepting invitations. Handles permission-based UI (only owners can delete, etc.).
-
-Both components load document data directly from the js-bao client, listen for metadata changes to stay current, and work well together—the switcher for quick access, the list for full management.
-
-**Implementation:**
+**UI components** in `src/components/documents/`: `PrimitiveDocumentSwitcher` (sidebar dropdown) and `PrimitiveDocumentList` (full management page with rename/share/delete).
 
 ```typescript
-// List available documents
+// List, open, create
 const documents = await jsBaoClient.documents.list();
-
-// Open the selected document
 await jsBaoClient.documents.open(selectedDocumentId);
 
-// Create a new document/workspace
 const { metadata } = await jsBaoClient.documents.create({
   title: "New Project",
   tags: ["workspace"],
@@ -169,32 +156,15 @@ const { metadata } = await jsBaoClient.documents.create({
 await jsBaoClient.documents.open(metadata.documentId);
 ```
 
-When using this pattern, it's often convenient to keep track of a `currentDocument` reference and switch this as users open different documents.
-
 ### Pattern 3: Multiple Documents
 
-**Best for:** Apps that need to be able to query over multiple documents, each of which has a different sharing context.
+**Best for:** Apps that query across many documents, each with its own sharing context — chat (per channel), multi-tenant dashboards, collaborative workspaces with distinct collections.
 
-Apps can manage opening and closing documents as needed, with the guideline that all documents that need to receive live updates from changes, or be queried across must be open.
-
-Often times it's convenient to organize documents by tag, so that it's easy to open all documents that match a known tag.
-
-**Examples:**
-
-- Chat app (one document per channel, multiple channels visible)
-- Multi-tenant dashboard (separate data per client)
-- Collaborative workspace with distinct data collections
-
-**User experience:** The app manages which documents are open. Users might see a list of channels, each backed by a separate document with its own sharing settings.
-
-**Implementation:**
+All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `documents.list({ tag })`.
 
 ```typescript
-// Get all documents with a specific tag
-const documents = await jsBaoClient.documents.list();
-const channels = documents.filter((doc) => doc.tags?.includes("channel"));
-
-// Open all channel documents
+// Open every document with a given tag
+const channels = await jsBaoClient.documents.list({ tag: "channel" });
 await Promise.all(
   channels.map((ch) => jsBaoClient.documents.open(ch.documentId))
 );
@@ -309,28 +279,40 @@ await jsBaoClient.documents.removeTag(documentId, "archived");
 
 When creating a new js-bao model file, follow this exact workflow:
 
-**Step 1: Create the minimal model file** with only these required sections:
+**Step 1: Create the minimal model file** with only the schema and class declaration. Do NOT write the auto-generated sections yourself — codegen produces them.
 
 ```typescript
 import { BaseModel, defineModelSchema } from "js-bao";
 
 const todoSchema = defineModelSchema({
-  name: "Todo",
-  // Add fields here as needed (see Field Types below)
+  name: "todos",
+  fields: {
+    id: { type: "id", autoAssign: true, indexed: true },
+    title: { type: "string", indexed: true },
+    completed: { type: "boolean", default: false },
+  },
 });
 
-export class Todo extends BaseModel {
-  static schema = todoSchema;
-}
+export class Todo extends BaseModel {}
 ```
 
 **Step 2: Add the model to `getJsBaoConfig`** in your config file so js-bao knows about it.
 
-**Step 3: Run `pnpm codegen`** to generate the auto-generated sections. This generates TypeScript types, field accessors, and other boilerplate code.
+**Step 3: Run `pnpm codegen`** to generate the auto-generated sections. Codegen inserts a header (`InferAttrs` type alias and a merged interface) and a footer that calls `attachAndRegisterModel(Todo, todoSchema)`. The class itself stays untouched, so add custom methods/getters there freely.
 
 **Step 4: Make any additional edits** to the schema (adding fields, constraints, etc.) and run `pnpm codegen` again.
 
-**CRITICAL: NEVER create or edit auto-generated sections yourself.** The codegen script maintains these code blocks. Look for comments like `// --- auto-generated ---` to identify them. If you manually edit these sections, your changes will be overwritten the next time codegen runs.
+**CRITICAL: NEVER edit the auto-generated header/footer.** They are bracketed by `BEGIN AUTO-GENERATED` / `END AUTO-GENERATED` markers and will be overwritten on the next codegen run.
+
+**Wrong** — manually attaching `static schema` skips the registry hook that wires up field accessors and unique-constraint indexes:
+
+```typescript
+// DON'T DO THIS — model never gets registered with ModelRegistry,
+// queries/saves will throw "Model not properly initialized".
+export class Todo extends BaseModel {
+  static schema = todoSchema;
+}
+```
 
 ### Field Types
 
@@ -361,17 +343,49 @@ const schema = defineModelSchema({
 
 ### Unique Constraints
 
-Enforce uniqueness across one or more fields:
+Two ways to enforce uniqueness:
 
 ```typescript
-const schema = defineModelSchema({
+// 1. Single-field uniqueness via field option (use this when possible —
+//    enables `upsertOn` on save).
+const userSchema = defineModelSchema({
+  name: "users",
+  fields: {
+    id: { type: "id", autoAssign: true },
+    email: { type: "string", unique: true, indexed: true },
+  },
+});
+
+// 2. Multi-field (composite) uniqueness via options.uniqueConstraints.
+//    Each entry is a NAMED constraint — the name is what you pass to
+//    upsertByUnique / findByUnique.
+const categorySchema = defineModelSchema({
   name: "categories",
   fields: {
     id: { type: "id", autoAssign: true },
     name: { type: "string" },
     parentId: { type: "string" },
   },
-  uniqueConstraints: [["name", "parentId"]], // name+parentId must be unique
+  options: {
+    uniqueConstraints: [
+      { name: "name_parent_unique", fields: ["name", "parentId"] },
+    ],
+  },
+});
+```
+
+**Wrong** — these forms compile but the constraint will be silently dropped or wrongly typed:
+
+```typescript
+// DON'T: top-level uniqueConstraints (must be inside `options`)
+defineModelSchema({ name: "...", fields: {...}, uniqueConstraints: [...] });
+
+// DON'T: array-of-arrays shorthand — not supported. Each entry must be
+// { name, fields }.
+defineModelSchema({
+  name: "...",
+  fields: {...},
+  options: { uniqueConstraints: [["name", "parentId"]] as any },
 });
 ```
 
@@ -411,13 +425,30 @@ const result = await Task.query({
 
 ## Querying Data
 
-### Single Document Query
+`Model.query()` returns a `PaginatedResult`: `{ data: T[], nextCursor?, prevCursor?, hasMore }`. ALWAYS access rows through `.data`.
 
 ```typescript
-const result = await MyModel.query(
+// Query a specific document
+const result = await TodoItem.query(
   { completed: false },
   { documents: documentId, sort: { order: 1 } }
 );
+const items = result.data;             // T[]
+const more = result.hasMore;           // boolean
+
+// Query across all open documents (default)
+const all = await TodoItem.query({ completed: false });
+
+// Single result helper — returns T | null
+const item = await TodoItem.queryOne({ id: someId });
+```
+
+**Wrong** — `.query()` does NOT return an array directly:
+
+```typescript
+// DON'T:
+const items = await TodoItem.query({ completed: false }); // items is { data, nextCursor, ... }
+items.map(...);  // TypeError: items.map is not a function
 ```
 
 ### Query Operators
@@ -435,6 +466,8 @@ const result = await MyModel.query(
 | `$containsText` | Case-insensitive contains      | `{ title: { $containsText: "urgent" } }`             |
 | `$exists`       | Field exists/not null          | `{ dueDate: { $exists: true } }`                     |
 | `$contains`     | StringSet contains value       | `{ tags: { $contains: "tutorial" } }`                |
+| `$all`          | StringSet contains all values  | `{ tags: { $all: ["work", "urgent"] } }`             |
+| `$size`         | StringSet size comparison      | `{ tags: { $size: { $gte: 2 } } }`                   |
 
 **Logical operators:**
 
@@ -486,45 +519,46 @@ const totalCount = await Task.count({});
 
 ### Loading Related Data (Includes)
 
-Use `include` in query options to load related records alongside results. Related records are attached under `._related` on each result object.
+Use `include` in query options to load related records alongside results. Related records are attached under `._related` on each result row (rows live on `.data`).
 
 **Include types:**
 
-| Type | Relationship | FK location |
-|------|-------------|-------------|
-| `refersTo` | One related record | FK field on source model |
-| `hasMany` | Multiple related records | FK field on target model pointing back |
-| `refersToMany` | Multiple related records | StringSet field on source model |
+| Type | Relationship | FK location | Required spec field |
+|------|-------------|-------------|--------------------|
+| `refersTo` | One related record | FK field on source model | `sourceField` |
+| `hasMany` | Multiple related records | FK field on target model pointing back | `foreignKey` |
+| `refersToMany` | Multiple related records | StringSet field on source model holding target IDs | `sourceField` |
 
 ```typescript
 // refersTo: Post has an authorId pointing to a User
-const posts = await Post.query({}, {
+const result = await Post.query({}, {
   include: [{
     model: "users",
     type: "refersTo",
     sourceField: "authorId",  // FK field on Post
     as: "author",             // key in _related (defaults to model name)
-    projection: { name: 1 }, // optional field subset
+    projection: { name: 1 },  // optional field subset
   }],
 });
-// posts[0]._related.author = { id, name }
+// result.data[0]._related.author = { id, name }
 
 // hasMany: Comment has a postId field pointing back to Post
-const posts = await Post.query({}, {
+const result = await Post.query({}, {
   include: [{
     model: "comments",
     type: "hasMany",
     foreignKey: "postId",    // FK on Comment pointing to Post
+    localField: "id",        // field on Post to match against (defaults to "id")
     as: "comments",
     sort: { createdAt: -1 },
     limit: 10,               // per-parent cap
-    filter: { status: "approved" }, // optional filter on related records
+    filter: { status: "approved" },
   }],
 });
-// posts[0]._related.comments = [{ id, text, ... }]
+// result.data[0]._related.comments = [{ id, text, ... }]
 
 // refersToMany: Post has a tagIds StringSet field containing Tag IDs
-const posts = await Post.query({}, {
+const result = await Post.query({}, {
   include: [{
     model: "tags",
     type: "refersToMany",
@@ -532,13 +566,13 @@ const posts = await Post.query({}, {
     as: "tags",
   }],
 });
-// posts[0]._related.tags = [{ id, name }, ...]
+// result.data[0]._related.tags = [{ id, name }, ...]
 ```
 
 Includes can be nested (up to 3 levels deep) by adding an `include` array to an include spec:
 
 ```typescript
-const articles = await Article.query({}, {
+const result = await Article.query({}, {
   include: [{
     model: "comments",
     type: "hasMany",
@@ -553,12 +587,12 @@ const articles = await Article.query({}, {
     }],
   }],
 });
-// articles[0]._related.comments[0]._related.author = { id, name }
+// result.data[0]._related.comments[0]._related.author = { id, name }
 ```
 
 ### Aggregations
 
-Group and calculate statistics:
+Group and calculate statistics. Returns a **nested object keyed by group values** (not an array):
 
 ```typescript
 const stats = await Task.aggregate({
@@ -572,19 +606,26 @@ const stats = await Task.aggregate({
   sort: { field: "count", direction: -1 },  // optional: sort results
   limit: 10,                                // optional: cap number of groups returned
 });
-// Returns: [{ category: "work", count: 8, avg_priority: 2.5, sum_estimatedHours: 40 }, ...]
+// Returns:
+// {
+//   work:     { count: 8, avg_priority: 2.5, sum_estimatedHours: 40 },
+//   personal: { count: 3, avg_priority: 1.0, sum_estimatedHours:  6 },
+// }
 ```
 
-**StringSet facet aggregation** — grouping by a `stringset` field counts per tag value:
+Multi-field `groupBy` produces deeper nesting (`result[group1][group2] = { ...ops }`). Operation result keys are `count`, `sum_<field>`, `avg_<field>`, `min_<field>`, `max_<field>`.
+
+**StringSet facet aggregation** — grouping by a `stringset` field counts per value. When the only operation is `count`, the value collapses to a number:
 
 ```typescript
 const tagCounts = await Task.aggregate({
   groupBy: ["tags"],  // "tags" is a stringset field
   operations: [{ type: "count" }],
-  sort: { field: "count", direction: -1 },
 });
 // Returns: { "work": 15, "urgent": 8, "personal": 5, ... }
 ```
+
+Only one stringset facet field is allowed per aggregation. To check membership of a specific value across records, use a `StringSetMembership` groupBy entry: `{ field: "tags", contains: "urgent" }`.
 
 ### useJsBaoDataLoader Pattern
 
@@ -653,6 +694,23 @@ todo.completed = true;
 await todo.save();
 ```
 
+**Wrong** — common save footguns:
+
+```typescript
+// DON'T: forget to await — the next read may not see the change yet,
+// and unhandled rejections (e.g. document closed) get swallowed.
+todo.completed = true;
+todo.save();              // missing await
+router.push("/done");
+
+// DON'T: try to spread/clone a model object — instances are not POJOs.
+const copy = { ...todo }; // loses reactivity, getters, save method
+const copy2 = JSON.parse(JSON.stringify(todo)); // also broken
+
+// DO: read fields directly, or call .toJSON() if defined.
+const snapshot = { id: todo.id, title: todo.title, completed: todo.completed };
+```
+
 ### Choosing How to Target Documents for Saves
 
 When saving new objects, you need to specify which document they go into. There are three ways to do this:
@@ -679,15 +737,44 @@ if (task) {
 
 ### Upsert by Unique Constraint
 
-Create or update based on unique fields:
+`upsertByUnique(constraintName, lookupValue(s), data, options?)` — finds an existing record by a named constraint and updates it, or creates one if none exists. The `data` object MUST include the same constraint field values as `lookupValue` (mismatch throws). When creating a new record, `targetDocument` is REQUIRED.
 
 ```typescript
-// If a category with this name+parentId exists, update it; otherwise create it
+// Composite-key example — uses the constraint name from defineModelSchema above.
 await Category.upsertByUnique(
-  ["name", "parentId"], // unique constraint fields
-  { name: "Work", parentId: null }, // match values
-  { color: "blue" } // fields to set/update
+  "name_parent_unique",                    // constraint name
+  ["Work", null],                          // values in field order
+  { name: "Work", parentId: null, color: "blue" },
+  { targetDocument: documentId }           // required if a new record is created
 );
+
+// Single-field example — value can be a scalar instead of an array.
+// Auto-generated constraint name uses the schema `name`, not the class name.
+await User.upsertByUnique(
+  "users_email_unique",                    // <schemaName>_<fieldName>_unique
+  "alice@example.com",
+  { email: "alice@example.com", name: "Alice" },
+  { targetDocument: documentId }
+);
+```
+
+Single-field constraints declared via `unique: true` get an auto-generated name of `<schemaName>_<fieldName>_unique` (where `schemaName` is the `name` you passed to `defineModelSchema`). Use `options.uniqueConstraints` to control the name.
+
+For single-field upserts where the value already lives on the instance, `save({ upsertOn })` is simpler than `upsertByUnique` — see next section.
+
+**Wrong** — common mistakes that throw at runtime:
+
+```typescript
+// DON'T: pass field names instead of the constraint name
+await Category.upsertByUnique(["name", "parentId"], ...); // throws: constraint not found
+
+// DON'T: omit targetDocument when creating
+await Category.upsertByUnique("name_parent_unique", ["Work", null], { name: "Work", parentId: null });
+// throws: targetDocument is required when creating new records
+
+// DON'T: data values that don't match lookupValue
+await Category.upsertByUnique("name_parent_unique", ["Work", null], { name: "Home", parentId: null }, { targetDocument });
+// throws: Mismatch between dataToUpsert.'name' and uniqueLookupValue
 ```
 
 ### Upsert by Natural Key (`upsertOn`)
@@ -785,32 +872,57 @@ Documents can be shared with individual users (by userId or email), with groups,
 ### Quick Reference
 
 ```typescript
-// By userId
-await client.documents.setPermissions(documentId, [
-  { userId: "user-abc", permission: "read-write" },
-]);
+// By userId — single user
+await client.documents.updatePermissions(documentId, {
+  userId: "user-abc",
+  permission: "read-write",
+});
+
+// Batch — multiple users at once
+await client.documents.updatePermissions(documentId, {
+  permissions: [
+    { userId: "user-abc", permission: "read-write" },
+    { userId: "user-xyz", permission: "reader" },
+  ],
+});
 
 // By email — resolves if the user exists, otherwise creates a deferred grant
-// that resolves at signup
-await client.documents.setPermissions(documentId, [
-  { email: "alice@example.com", permission: "read-write" },
-]);
+// that auto-applies at signup. Use createInvitation (not updatePermissions) for
+// the email path.
+await client.documents.createInvitation(
+  documentId,
+  "alice@example.com",
+  "read-write",
+  { sendEmail: true, documentUrl: `${window.location.origin}/lists` }
+);
 
 // With a group
-await client.documents.setGroupPermission(documentId, {
+await client.documents.grantGroupPermission(documentId, {
   groupType: "team",
   groupId: "engineering",
   permission: "read-write",
 });
 
-// Respond to a 403 with canRequestAccess hint
+// Respond to a 403 with canRequestAccess hint. `permission` is REQUIRED.
 try {
-  await client.documents.get(documentId);
+  await client.documents.open(documentId);
 } catch (err) {
   if (err.details?.canRequestAccess) {
-    await client.documents.requestAccess(documentId, { message: "..." });
+    await client.documents.requestAccess(documentId, {
+      permission: "read-write",
+      message: "Please grant me access",
+    });
   }
 }
+```
+
+**Wrong** — these names look reasonable but do not exist on the API:
+
+```typescript
+// DON'T:
+await client.documents.setPermissions(...);      // use updatePermissions
+await client.documents.setGroupPermission(...);  // use grantGroupPermission
+await client.documents.requestAccess(id, { message: "..." }); // missing required `permission`
 ```
 
 Documents are auto-bookmarked for their creator and for any invitee who accepts an invitation. Use `client.me.sharedDocuments()` to render a "shared with me" view — do not filter bookmarks for this purpose.
@@ -885,16 +997,16 @@ const hasAllWrites = await jsBaoClient.documents.includesWrites(documentId);
 const fullyInSync = await jsBaoClient.documents.inSync(documentId);
 ```
 
-Both return `false` if the client is disconnected or the check times out. An optional `timeoutMs` parameter controls how long to wait (default: 3000ms).
+Both return `false` if the client is disconnected or the check times out. An optional `timeoutMs` parameter controls how long to wait (default: 5000ms).
 
-For cases where you need to wait until the server is confirmed to have all writes, use the polling helpers on the client directly:
+For cases where you need to wait until the server is confirmed to have all writes, use the polling helpers — they exist on both `documents.*` and the client root:
 
 ```typescript
-// Wait until server has all writes (throws if timeout exceeded)
-await jsBaoClient.waitForWriteConfirmation(documentId);
+// Wait until server has all writes (returns true on success, false on timeout)
+await jsBaoClient.documents.waitForWriteConfirmation(documentId);
 
-// Wait until fully in sync
-await jsBaoClient.waitForInSync(documentId);
+// Wait until fully in sync (throws on timeout)
+await jsBaoClient.documents.waitForInSync(documentId);
 ```
 
 ### Updating Document Metadata
@@ -919,211 +1031,108 @@ await jsBaoClient.documents.delete(documentId, { forceCloseIfOpen: true });
 
 Note: Root documents cannot be deleted.
 
-### Programmatic Sharing
+### Programmatic Sharing — Full Reference
 
-In addition to the `PrimitiveShareDocumentDialog` UI component, documents can be shared programmatically — useful when sharing should happen in response to application events (e.g., sharing a post's content document with a class when it's approved).
-
-**Listing permissions:**
+Beyond the Quick Reference and the `PrimitiveShareDocumentDialog` UI, the full programmatic surface:
 
 ```typescript
-// Get all user permissions on a document
-const permissions = await jsBaoClient.documents.getPermissions(documentId);
-// Returns: [{ userId, email, name, permission, grantedAt }, ...]
-```
+// Inspect access
+await jsBaoClient.documents.getPermissions(documentId);
+// → [{ userId, email, name, permission, grantedAt }, ...]
+await jsBaoClient.documents.listGroupPermissions(documentId);
+await jsBaoClient.documents.listPendingInvitations(documentId);
 
-**Group-based permissions:**
-
-```typescript
-// Grant a group access to a document
-await jsBaoClient.documents.grantGroupPermission(documentId, {
-  groupType: "class-students",
-  groupId: classId,
-  permission: "read-write", // "reader" | "read-write" | "owner"
-});
-
-// Revoke a group's access
-await jsBaoClient.documents.revokeGroupPermission(documentId, "class-students", classId);
-
-// List all group permissions on a document
-const permissions = await jsBaoClient.documents.listGroupPermissions(documentId);
-```
-
-**User-based permissions:**
-
-```typescript
-// Grant or update a specific user's access
+// Mutate access
 await jsBaoClient.documents.updatePermissions(documentId, {
-  userId: targetUserId,
-  permission: "read-write",
+  userId, permission: "read-write",
 });
-
-// Batch update multiple users' permissions
 await jsBaoClient.documents.updatePermissions(documentId, {
-  permissions: [
-    { userId: user1Id, permission: "read-write" },
-    { userId: user2Id, permission: "reader" },
-  ],
+  permissions: [{ userId, permission: "reader" }, ...],
 });
-
-// Remove a specific user's access
-await jsBaoClient.documents.removePermission(documentId, targetUserId);
-
-// Transfer ownership to another user
+await jsBaoClient.documents.removePermission(documentId, userId);
+// Cancel a pending email invitation:
+await jsBaoClient.documents.removePermission(documentId, { email });
 await jsBaoClient.documents.transferOwnership(documentId, newOwnerId);
 
-// Invite a user by email
-await jsBaoClient.documents.createInvitation(documentId, "user@example.com", "read-write", {
-  sendEmail: true,
-  documentUrl: `${window.location.origin}/lists`,
-  note: "Check out this list!",
+await jsBaoClient.documents.grantGroupPermission(documentId, {
+  groupType, groupId, permission: "read-write",
 });
+await jsBaoClient.documents.revokeGroupPermission(documentId, groupType, groupId);
+
+// Email invitations — `documentUrl` is REQUIRED when sendEmail is true
+await jsBaoClient.documents.createInvitation(
+  documentId, "user@example.com", "read-write",
+  { sendEmail: true, documentUrl: `${origin}/lists`, note: "..." }
+);
+await jsBaoClient.documents.acceptInvitation(documentId);
+await jsBaoClient.documents.declineInvitation(documentId, invitationId);
+
+// Access requests (when caller has no access yet)
+await jsBaoClient.documents.requestAccess(documentId, {
+  permission: "read-write", message, documentUrl, reviewUrl,
+});
+await jsBaoClient.documents.listAccessRequests(documentId);     // owners only
+await jsBaoClient.documents.approveAccessRequest(documentId, requestId);
 ```
 
 ### Collections
 
-When sharing multiple documents as a unit, group them into a **collection** and manage permissions on the collection rather than on each document individually. Permissions granted to a collection are automatically materialized onto all its documents (current and future). When sharing the same document with many individual users, consider sharing it with a **group** instead (see the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md)).
+Group documents into a **collection** to share them as a unit. Permissions granted on a collection materialize onto all current and future documents in it.
 
 **Key properties:**
-- Permissions are **additive, max-wins** — collections can only add access, never restrict it
-- A document can belong to multiple collections; permissions from all sources combine
-- Deleting a collection revokes the permissions it granted but **never deletes the documents** and preserves any direct grants
-- Individual member access is O(1) regardless of collection size (uses system-managed groups internally)
-
-**Per-context collections (`collectionType` + `contextId`):**
-
-`DocumentCollection` has two optional, immutable-after-create fields that mirror `AppGroup.groupType` + `groupId`:
-
-| Field | Purpose |
-|---|---|
-| `collectionType` | Selects which `CollectionTypeConfig` (and therefore which CEL rule set) applies. Defaults to `"default"` when omitted at create time. |
-| `contextId` | Per-instance identifier tying the collection to an external entity (e.g. a class ID, project ID). Exposed to CEL rules as `collection.contextId`. `null` when the collection isn't bound to anything. |
-
-This lets a collection's CEL rules express "caller is a member of the group this collection belongs to":
-
-```json
-// Rule set bound via CollectionTypeConfig with collectionType: "class-resources"
-{
-  "document": {
-    "add": "isMemberOf('class-teachers', collection.contextId)",
-    "list": "isMemberOf('class-students', collection.contextId)
-              || isMemberOf('class-teachers', collection.contextId)"
-  }
-}
-```
-
-Collection rule sets see a dedicated `collection.*` CEL namespace (separate from the shared `group.*` namespace used by group rule sets). Both fields are optional — collections created without them have `collectionType: null` / `contextId: null` and use the default ruleset behavior.
-
-**Creating and managing collections:**
+- Permissions are **additive, max-wins** — a collection can only add access, never restrict it.
+- A document can be in multiple collections; access from all sources combines.
+- Deleting a collection revokes its permissions but never deletes the documents or any direct grants.
+- Member access is O(1) regardless of collection size (uses system-managed groups internally).
 
 ```typescript
-// Create a default collection — collectionType defaults to "default"
+// Create
 const collection = await client.collections.create({
   name: "Q1 Reports",
   description: "All quarterly report documents",
-  // Optional: tie the collection to a group type's rule set
+  // Optional, immutable-after-create — bind to a CollectionTypeConfig rule set
+  // and an external entity (exposed to CEL as collection.contextId).
   collectionType: "class-reports",
-  // Optional: bind to an external entity (e.g. a class or project ID)
-  // Exposed to CEL rules as `collection.contextId`
   contextId: "math-101",
 });
 
-// Create a per-context collection — bind to an external entity
-const classCollection = await client.collections.create({
-  name: "Math 101 Resources",
-  collectionType: "class-resources",
-  contextId: classId, // exposed to CEL as collection.contextId
-});
-// collectionType and contextId are immutable after create
-
-// Add documents to a collection
+// Add / remove documents
 await client.collections.addDocument(collection.collectionId, documentId);
-
-// Remove a document (revokes only collection-sourced permissions)
 await client.collections.removeDocument(collection.collectionId, documentId);
 
-// List documents in a collection
-const docs = await client.collections.listDocuments(collection.collectionId);
-// Returns: { items: CollectionDocumentInfo[], cursor?: string }
+// List
+await client.collections.listDocuments(collection.collectionId);
+// → { items: CollectionDocumentInfo[], cursor?: string }
+await client.collections.listCollectionsForDocument(documentId);
 
-// List which collections a document belongs to
-const collections = await client.collections.listCollectionsForDocument(documentId);
-```
-
-**Using `contextId` in CEL collection rules:**
-
-When a collection has a `contextId`, CEL rules attached via a `CollectionTypeConfig` can reference it. This lets you express per-context membership gates — for example, only a student's teacher can add documents to their class collection:
-
-```
-# In a CollectionTypeConfig rule set:
-# "Can the caller create a collection in this context?"
-create = "isMemberOf('class-teachers', collection.contextId)"
-```
-
-`collection.contextId` is `null` for collections created without one; existing collections silently receive `null` and continue to behave as before.
-
-**Sharing a collection with a group (fans out to all documents):**
-
-```typescript
-// Grant a group access — materializes permissions on all documents in the collection
+// Share with a group (fans out to every document in the collection)
 await client.collections.grantGroupPermission(collection.collectionId, {
-  groupType: "team",
-  groupId: "engineering",
-  permission: "read-write", // "reader" | "read-write"
+  groupType: "team", groupId: "engineering", permission: "read-write",
 });
-
-// Revoke group access — cleans up materialized permissions, preserves direct grants
 await client.collections.revokeGroupPermission(collection.collectionId, "team", "engineering");
-```
 
-**Sharing a collection with individual users:**
-
-```typescript
-// Add a user (O(1) — no per-document writes)
+// Share with individual users (O(1))
 await client.collections.addMember(collection.collectionId, {
-  userId: targetUserId,
-  permission: "reader",
+  userId: targetUserId, permission: "reader",
 });
-
-// Change permission level — call addMember again with new permission
-await client.collections.addMember(collection.collectionId, {
-  userId: targetUserId,
-  permission: "read-write",
-});
-
-// Remove a user
 await client.collections.removeMember(collection.collectionId, targetUserId);
-```
+// Change a user's permission: call addMember again with the new level.
 
-**Viewing all access on a collection:**
-
-```typescript
+// Inspect all access
 const access = await client.collections.getAccess(collection.collectionId);
-// access.groups: [{ groupType, groupId, permission, grantedAt, grantedBy }, ...]
-// access.members: [{ userId, permission, addedAt, addedBy }, ...]
+// → { groups: [...], members: [...] }
 ```
 
-**CLI commands:**
+For per-context CEL rules using `collectionType` + `contextId`, see the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md).
+
+**CLI:**
 
 ```bash
-# Create and manage collections
 primitive collections create "Q1 Reports" --description "Quarterly reports"
 primitive collections list
-primitive collections delete <collection-id>
-
-# Manage documents in a collection
-primitive collections docs add <collection-id> <document-id>
-primitive collections docs remove <collection-id> <document-id>
-primitive collections docs list <collection-id>
-
-# Share with groups
+primitive collections docs {add|remove|list} <collection-id> [<document-id>]
 primitive collections share <collection-id> --group team/engineering --permission read-write
-primitive collections unshare <collection-id> --group team/engineering
-
-# Manage individual members
-primitive collections members add <collection-id> <user-id> --permission reader
-primitive collections members remove <collection-id> <user-id>
-
-# View all access
+primitive collections members {add|remove} <collection-id> <user-id> [--permission reader]
 primitive collections access <collection-id>
 ```
 
@@ -1180,3 +1189,9 @@ Export creates a directory per document containing `metadata.json`, `document.yj
 | Document created but not in sidebar/list        | Used `documentsStore` directly instead of `multiDocStore`                | Always use `multiDocStore.createDocument()` when working with collections                            |
 | HTTP 400 when sharing with email                | Missing `documentUrl` in invitation                                       | Pass `invite-url-template` prop to `PrimitiveShareDocumentDialog`                                    |
 | New document not queryable immediately          | Document not opened after creation                                        | Use `multiDocStore.createDocument()` which handles opening automatically                             |
+| `setPermissions is not a function`              | Method doesn't exist                                                      | Use `updatePermissions(documentId, { userId, permission })`                                          |
+| `setGroupPermission is not a function`          | Method doesn't exist                                                      | Use `grantGroupPermission(documentId, { groupType, groupId, permission })`                           |
+| "Model not properly initialized" on save/query  | Schema attached manually instead of via `attachAndRegisterModel`          | Re-run `pnpm codegen`; never set `static schema = ...` by hand                                       |
+| `upsertByUnique`: "constraint not found"        | Passed field array instead of constraint name                             | Pass the named constraint string (e.g. `"users_email_unique"`)                                       |
+| `upsertByUnique`: "targetDocument is required"  | Creating a new record without specifying its document                     | Pass `{ targetDocument: docId }` as the 4th argument                                                 |
+| `query()` result missing `.map`/`.filter`       | Forgot result is a `PaginatedResult`                                      | Use `result.data` (also has `.nextCursor`, `.hasMore`)                                               |

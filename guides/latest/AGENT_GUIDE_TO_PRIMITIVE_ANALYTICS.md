@@ -6,41 +6,41 @@ Guidelines for AI agents implementing analytics tracking in Primitive apps.
 
 Primitive provides built-in analytics via `client.analytics`. Events are buffered client-side, batched over WebSocket, and stored server-side for querying. The system handles offline persistence, rate limiting, and automatic lifecycle events out of the box.
 
-**Key constraint:** Every analytics event requires an authenticated user. Events without a `user_ulid` are dropped. Use `ANALYTICS_UNAUTHENTICATED_USER` for pre-auth screens.
+**Key constraints:**
+- Every analytics event requires an authenticated user. Events without a `user_ulid` are dropped silently. Use `ANALYTICS_UNAUTHENTICATED_USER` for pre-auth screens.
+- A tenant ID (resolved automatically from `client.appId`) must also be present, or the event is dropped.
 
 ---
 
 ## What's Tracked Automatically (Zero Developer Work)
 
-A Primitive app that simply initializes `JsBaoClient` with default options gets DAU/WAU/MAU tracking, session analytics, document activity, permission audit trails, and full workflow/prompt/integration observability — all without writing a single `logEvent` call.
+Initializing `JsBaoClient` with default options gets you DAU/WAU/MAU tracking, session analytics, document/permission audit trails, and full workflow/prompt/integration observability with no `logEvent` calls.
 
 ### Client-Side Auto Events
 
 All enabled by default. The client automatically emits these lifecycle events:
 
-| Action | Feature | When it fires |
-|--------|---------|---------------|
-| `user_active_daily` | `session` | First auth on a UTC day |
-| `user_returned` | `session` | Tab becomes visible after 5+ minutes hidden |
-| `session_end` | `session` | Page unload / client destroy (includes duration) |
-| `first_doc_open` | `documents` | First document opened in the session |
-| `first_doc_edit` | `documents` | First document edited in the session |
-| `offline_recovery` | `network` | Client transitions offline → online |
-| `sync_error` | `sync` | Outbound sync fails and is retried |
-| `blob_upload_started` | `blobs` | Blob upload begins |
-| `blob_upload_succeeded` | `blobs` | Blob upload completes |
-| `blob_upload_failed` | `blobs` | Blob upload fails |
-| `service_worker_token_update` | `service_worker` | Service worker receives token refresh |
-| `llm_request_started` | `llm` | LLM chat request begins |
-| `llm_request_succeeded` | `llm` | LLM chat request completes |
-| `llm_request_failed` | `llm` | LLM chat request fails |
-| `gemini_request_started` | `gemini` | Gemini request begins |
-| `gemini_request_succeeded` | `gemini` | Gemini request completes |
-| `gemini_request_failed` | `gemini` | Gemini request fails |
+| Action | Feature | Default | When it fires |
+|--------|---------|---------|---------------|
+| `user_active_daily` | `session` | on | First authenticated activity on a UTC day |
+| `user_returned` | `session` | on | Tab becomes visible after `minResumeMs` (default 5 min) hidden |
+| `session_end` | `session` | on | `beforeunload` or `client.destroy()` (records `duration_ms`) |
+| `sync_error` | `sync` | on | Outbound sync fails (rate-limited, default min 30s between events) |
+| `blob_upload_started` | `blobs` | on | Blob upload begins |
+| `blob_upload_succeeded` | `blobs` | on | Blob upload completes |
+| `blob_upload_failed` | `blobs` | on | Blob upload fails |
+| `prompt_started` | `llm` | on | `client.llm.chat()` request begins |
+| `prompt_succeeded` | `llm` | on | `client.llm.chat()` succeeds (records `duration_ms`) |
+| `prompt_failed` | `llm` | on | `client.llm.chat()` fails |
+| `prompt_started` | `gemini` | on | Gemini request begins |
+| `prompt_succeeded` | `gemini` | on | Gemini request succeeds |
+| `prompt_failed` | `gemini` | on | Gemini request fails |
+
+> **Footgun:** Some option names in `analyticsAutoEvents` (`boot`, `firstDocOpen`, `firstDocEdit`, `offlineRecovery`, `serviceWorker`) are accepted by the type but are **no-ops in the current build** — toggling them has no effect. Don't tell users you're tracking events that no longer fire.
 
 ### Server-Side Events
 
-The platform automatically emits these server-side analytics. These require no client code at all.
+The platform emits these from the server. No client code at all.
 
 | Action | Feature | When |
 |--------|---------|------|
@@ -50,11 +50,12 @@ The platform automatically emits these server-side analytics. These require no c
 | `document.opened` | `documents` | Document opened |
 | `document.updated` | `documents` | Document updated |
 | `document.deleted` | `documents` | Document deleted |
-| `document.tag_added` | `documents` | Tag added to document |
-| `document.tag_removed` | `documents` | Tag removed from document |
-| `permission.granted` | `permissions` | Permission granted on a document |
-| `permission.revoked` | `permissions` | Permission revoked on a document |
-| `ownership.transferred` | `ownership` / `permissions` | Document ownership transferred |
+| `document.tag_added` | `documents` | Tag added |
+| `document.tag_removed` | `documents` | Tag removed |
+| `permission.granted` | `permissions` | Permission granted |
+| `permission.revoked` | `permissions` | Permission revoked |
+| `permission.pending.cancelled` | `permissions` | Pending invite-permission cancelled |
+| `ownership.transferred` | `permissions` / `ownership` | Document ownership transferred (emitted from both controllers) |
 | `invitation.sent` | `invitations` | Invitation sent |
 | `invitation.cancelled` | `invitations` | Invitation cancelled |
 | `invitation.declined` | `invitations` | Invitation declined |
@@ -68,35 +69,33 @@ The platform automatically emits these server-side analytics. These require no c
 | `created` | `token` | API token created |
 | `revoked` | `token` | API token revoked |
 
-Server events also record `duration_ms` and LLM token counts (`input_tokens`, `output_tokens`, `total_tokens`) for prompt and workflow events.
+Workflow and prompt events also record `duration_ms` and LLM token counts (`input_tokens`, `output_tokens`, `total_tokens`) when available.
 
 ### Auto-Populated Fields
 
-Every event (auto or custom) gets these fields populated automatically with no developer input:
+Every event (auto or custom) gets these populated automatically:
 
-`tenant_id`, `route`, `device_type`, `os_name`, `os_version`, `browser_name`, `browser_version`, `plan`
+`tenant_id` (from `client.appId`), `route` (from `window.location.pathname`), `device_type`, `os_name`, `os_version`, `browser_name`, `browser_version`, `plan` (default `"unknown"`), `connection_id`.
 
 ### Offline Persistence
 
-Events are automatically persisted to IndexedDB while offline (up to 1 MB). When the buffer exceeds 1 MB, the oldest events are trimmed. On reconnect, persisted events are flushed automatically. Rate limiting continues to apply: 300 events/minute with a burst cap of 60. No special code is needed.
+Events are persisted to IndexedDB while offline (cap **1 MiB**). When the buffer exceeds the cap, the **oldest** events are dropped. On reconnect, persisted events are flushed automatically. Rate limiting still applies: **300 events/minute, burst cap 60 tokens**. No special code needed.
 
 ---
 
 ## Logging Custom Events
 
-If the built-in auto events don't cover your needs, you can log custom events.
-
 ### Basic Event
 
 ```typescript
 client.analytics.logEvent({
-  action: "photo_upload",
+  action: "photo_uploaded",
   feature: "gallery",
   user_ulid: currentUserUlid,
 });
 ```
 
-The `action` and `user_ulid` fields are required in the TypeScript interface. However, `user_ulid` is resolved automatically from the authenticated session at runtime if the queue's context providers can supply it. In practice, you must pass `user_ulid` to satisfy the type checker (or use `ANALYTICS_UNAUTHENTICATED_USER` for pre-auth events).
+`action` and `user_ulid` are required by the TypeScript interface. At runtime, `user_ulid` will be back-filled from the queue's user-resolver if you omit it AND the resolver returns a value — but the type checker won't let you omit it, so always pass it explicitly (or use `ANALYTICS_UNAUTHENTICATED_USER`).
 
 ### Event with Context
 
@@ -104,7 +103,6 @@ The `action` and `user_ulid` fields are required in the TypeScript interface. Ho
 client.analytics.logEvent({
   action: "search_executed",
   feature: "search",
-  route: "/search",
   user_ulid: currentUserUlid,
   context_json: {
     query: "quarterly report",
@@ -113,49 +111,66 @@ client.analytics.logEvent({
 });
 ```
 
-`context_json` accepts a `Record<string, unknown>` or a JSON string. It is truncated to 1 KB before sending.
+`context_json` accepts a `Record<string, unknown>` or a JSON string. It is serialized then **truncated to 1 KiB** of UTF-8 (truncation respects code-point boundaries). If you pass an object and don't override defaults, the queue auto-includes `ua`, `language`, and `screen` dimensions.
 
 ### AnalyticsEventInput Fields
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `action` | `string` | Yes | Event name (e.g. `"login"`, `"upload"`) |
-| `user_ulid` | `string` | Yes | User ULID (resolved from session at runtime, but required in the TS type) |
-| `feature` | `string` | No | Feature or module name |
+| `action` | `string` | Yes | Event name (verb_noun: `"login"`, `"photo_uploaded"`) |
+| `user_ulid` | `string` | Yes | User ULID, or `ANALYTICS_UNAUTHENTICATED_USER` |
+| `feature` | `string` | No | Feature/module name (defaults to `"unspecified"`) |
 | `route` | `string` | No | Page path (defaults to `window.location.pathname`) |
-| `plan` | `string` | No | Plan name (auto-resolved from context, defaults to `"unknown"`) |
+| `plan` | `string` | No | Plan name (auto-resolved, defaults to `"unknown"`) |
 | `tenant_id` | `string` | No | App ULID (auto-populated from `client.appId`) |
 | `device_type` | `string` | No | `"desktop"`, `"mobile"`, etc. (auto-detected) |
 | `os_name` | `string` | No | OS name (auto-detected) |
 | `os_version` | `string` | No | OS version (auto-detected) |
 | `browser_name` | `string` | No | Browser name (auto-detected) |
 | `browser_version` | `string` | No | Browser version (auto-detected) |
-| `app_version` | `string` | No | Your app's version |
-| `context_json` | `string \| Record<string, unknown> \| null` | No | Debug context (max 1 KB) |
+| `app_version` | `string` | No | Your app's version (or set via `setAppVersionOverride`) |
+| `context_json` | `string \| Record<string, unknown> \| null` | No | Debug context (truncated to 1 KiB) |
 | `user_created_at_epoch_s` | `number` | No | User signup timestamp (epoch seconds) |
+
+### Don't
+
+```typescript
+// WRONG: No user_ulid — TypeScript error AND silently dropped at runtime
+client.analytics.logEvent({ action: "click", feature: "nav" });
+
+// WRONG: huge context payload (will be truncated to 1 KiB, losing data)
+client.analytics.logEvent({
+  action: "report_generated",
+  user_ulid: u,
+  context_json: { entireReportBody: hugeString },
+});
+
+// WRONG: high-frequency telemetry (will be rate-limited and dropped)
+window.addEventListener("mousemove", () => {
+  client.analytics.logEvent({ action: "mouse_move", user_ulid: u });
+});
+```
 
 ---
 
 ## Logging Snapshots
 
-Use `logSnapshot()` to record a state snapshot event with optional context:
+`logSnapshot()` records a state snapshot event. It auto-resolves the user; if no user is authenticated, the call is a no-op (no error).
 
 ```typescript
 client.analytics.logSnapshot({ screen: "settings", tab: "billing" });
 ```
 
-This logs an event with action `_snapshot` and feature `_state`.
+This logs an event with `action: "_snapshot"`, `feature: "_state"`, and your context as `context_json`.
 
 ---
 
 ## Pre-Auth Events
 
-Events are normally dropped when no user is authenticated. To log events on pre-auth screens (e.g. a landing page), use the `ANALYTICS_UNAUTHENTICATED_USER` constant:
+Events with no authenticated user are dropped. To log on pre-auth screens (landing pages, sign-up flow), pass `ANALYTICS_UNAUTHENTICATED_USER`:
 
 ```typescript
-import {
-  ANALYTICS_UNAUTHENTICATED_USER,
-} from "js-bao-wss-client";
+import { ANALYTICS_UNAUTHENTICATED_USER } from "js-bao-wss-client";
 
 client.analytics.logEvent({
   action: "landing_page_view",
@@ -164,180 +179,45 @@ client.analytics.logEvent({
 });
 ```
 
-This bypasses the "missing user" validation guard. Use sparingly — most analytics should be tied to real users.
+The constant value is `"UNAUTHENTICATED"`. Use sparingly — most analytics should be tied to real users.
 
 ---
 
 ## Manual Flush
 
-Events are buffered and flushed automatically every 100ms or when the buffer reaches 25 KB. To force an immediate flush (e.g. before navigation or logout):
+Events are buffered and auto-flushed every **100ms** or when the buffer reaches **25 KiB**. The client **also auto-flushes on `beforeunload`, on tab visibility hidden, and when the WebSocket reconnects**, so you rarely need to call `flush()` manually.
 
 ```typescript
 client.analytics.flush();
 ```
 
-A common pattern is flushing on page unload:
+Pre-existing browser hooks (added by the client itself):
+- `beforeunload` → fires `session_end`, then flushes
+- `visibilitychange` (hidden) → flushes
+- `visibilitychange` (visible) → triggers `user_returned`
+- `status` → on reconnect, flushes
+
+So **don't** add your own `beforeunload → flush` listener — it's redundant and `session_end` is already handled.
+
+---
+
+## Plan and App Version Overrides
+
+If your app reports its plan/version dynamically (e.g. after an in-app upgrade), set them on the client. They flow into every subsequent event automatically.
 
 ```typescript
-window.addEventListener("beforeunload", () => {
-  client.analytics.flush();
-});
+client.analytics.setPlanOverride("pro");
+client.analytics.setAppVersionOverride("2.1.4");
+
+// Pass null/undefined to clear an override
+client.analytics.setPlanOverride(null);
 ```
 
 ---
 
-## Querying Analytics (CLI)
+## Configuring Auto Events
 
-The `primitive` CLI provides commands for querying analytics data:
-
-### App Overview
-
-```bash
-# DAU, WAU, MAU, and growth accounting
-primitive analytics overview
-primitive analytics overview --window-days 28
-primitive analytics overview --json
-```
-
-### Active Users Time Series
-
-```bash
-# Daily active users for a time window
-primitive analytics daily-active
-primitive analytics daily-active --window-days 14
-
-# Rolling active users (28 data points)
-primitive analytics rolling-active
-primitive analytics rolling-active --window-days 7
-```
-
-### Cohort Retention
-
-```bash
-# Weekly cohort retention matrix
-primitive analytics cohort-retention
-primitive analytics cohort-retention --json
-```
-
-### Top Users
-
-```bash
-# Most active users by event count
-primitive analytics top-users
-primitive analytics top-users --window-days 7 --limit 20
-```
-
-### User Search & Detail
-
-```bash
-# Search users by email or ULID
-primitive analytics user-search --query user@example.com
-
-# Detailed activity breakdown for a specific user
-primitive analytics user-detail <user-ulid>
-primitive analytics user-detail <user-ulid> --json
-
-# Latest context snapshot for a user
-primitive analytics user-snapshot <user-ulid>
-```
-
-### Event Feed
-
-```bash
-# Paginated raw event feed
-primitive analytics events
-primitive analytics events --window-days 7 --page 1
-
-# Events grouped by a dimension (action, feature, route, country, deviceType, plan, day)
-primitive analytics events-grouped
-primitive analytics events-grouped --group-by feature --window-days 14
-```
-
-### Integration Metrics
-
-```bash
-# Invocation counts, error rates, and latency per integration
-primitive analytics integrations
-primitive analytics integrations --window-days 7 --json
-```
-
-### Workflow & Prompt Analytics
-
-```bash
-# Top workflows by run count
-primitive analytics workflows
-primitive analytics workflows --limit 5 --window-days 14
-
-# Top prompts by execution count
-primitive analytics prompts
-primitive analytics prompts --limit 5 --window-days 14
-```
-
-All commands accept `--json` for machine-readable output and default to a 30-day window.
-
----
-
-## Querying Analytics (API)
-
-The REST API exposes analytics endpoints (all require admin permission):
-
-```typescript
-// Overview: DAU, WAU, MAU, daily series
-GET /app/{appId}/api/analytics/overview?windowDays=28
-
-// Granular active-user endpoints
-GET /app/{appId}/api/analytics/overview/dau?windowDays=28
-GET /app/{appId}/api/analytics/overview/wau?windowDays=28
-GET /app/{appId}/api/analytics/overview/mau?windowDays=28
-GET /app/{appId}/api/analytics/overview/growth?windowDays=28
-
-// Daily/rolling active users and cohort retention
-GET /app/{appId}/api/analytics/daily-active?windowDays=28
-GET /app/{appId}/api/analytics/rolling-active?windowDays=28
-GET /app/{appId}/api/analytics/cohort-retention?windowDays=28
-
-// Top users by activity
-GET /app/{appId}/api/analytics/users/top?windowDays=7&limit=10
-
-// Search users
-GET /app/{appId}/api/analytics/users/search?q=...&limit=25
-
-// User timeline and action breakdown
-GET /app/{appId}/api/analytics/users/{userUlid}/timeline?windowDays=14
-GET /app/{appId}/api/analytics/users/{userUlid}/events?windowDays=14&limit=50
-GET /app/{appId}/api/analytics/users/{userUlid}/detail?windowDays=7
-GET /app/{appId}/api/analytics/users/{userUlid}/snapshot?windowDays=7
-
-// Integration invocation metrics
-GET /app/{appId}/api/analytics/integrations?windowDays=30
-
-// Workflow analytics
-GET /app/{appId}/api/analytics/workflows/overview?windowDays=30
-GET /app/{appId}/api/analytics/workflows/top?windowDays=30&limit=10
-
-// Prompt analytics
-GET /app/{appId}/api/analytics/prompts/overview?windowDays=30
-GET /app/{appId}/api/analytics/prompts/top?windowDays=30&limit=10
-
-// Raw event browsing and grouping
-GET /app/{appId}/api/analytics/events?windowDays=7&page=0
-GET /app/{appId}/api/analytics/events/grouped?windowDays=7&groupBy=action
-```
-
----
-
-## Best Practices
-
-1. **Use meaningful `action` names** — use verb_noun format: `"photo_uploaded"`, `"report_generated"`, `"settings_changed"`
-2. **Group with `feature`** — set `feature` consistently to enable per-feature dashboards: `"gallery"`, `"settings"`, `"billing"`
-3. **Keep `context_json` small** — it's truncated to 1 KB; include only what's useful for debugging
-4. **Don't log high-frequency events** — the rate limiter caps at 300 events/minute; design around meaningful actions, not continuous telemetry
-5. **Flush before navigation** — call `client.analytics.flush()` in `beforeunload` to avoid losing the last batch
-6. **Disable noisy auto events** — turn off `firstDocOpen`/`firstDocEdit` if they're not useful for your app
-
----
-
-## Complete Example: Feature Usage Tracking
+Pass `analyticsAutoEvents` to the constructor. All sub-options default to enabled.
 
 ```typescript
 import { JsBaoClient } from "js-bao-wss-client";
@@ -349,16 +229,140 @@ const client = new JsBaoClient({
   analyticsAutoEvents: {
     dailyAuth: true,
     returnActive: true,
+    minResumeMs: 5 * 60 * 1000, // default
     sessionEnd: true,
-    firstDocOpen: false,
-    firstDocEdit: false,
+    syncErrors: { enabled: true, minIntervalMs: 30_000 }, // or just `true`/`false`
+    blobUploads: { start: false, success: true, failure: true },
+    llm: { start: false, success: true, failure: true }, // or `false` to disable all
+    gemini: false,
+  },
+});
+```
+
+Accepted shapes:
+- `dailyAuth`, `returnActive`, `sessionEnd`: `boolean`
+- `minResumeMs`: `number` (ms before another `user_returned` will fire)
+- `syncErrors`: `boolean | { enabled?: boolean; minIntervalMs?: number }`
+- `blobUploads`: `{ start?: boolean; success?: boolean; failure?: boolean }`
+- `llm`, `gemini`: `boolean | { start?: boolean; success?: boolean; failure?: boolean }`
+
+Options accepted but currently no-ops (do not rely on): `boot`, `firstDocOpen`, `firstDocEdit`, `offlineRecovery`, `serviceWorker`.
+
+---
+
+## Querying Analytics (CLI)
+
+The `primitive` CLI provides commands for querying analytics. All accept `--json` for machine-readable output.
+
+```bash
+# DAU / WAU / MAU + growth (default --window-days 28)
+primitive analytics overview
+primitive analytics overview --window-days 28 --json
+
+# Active users time series
+primitive analytics daily-active --window-days 28
+primitive analytics rolling-active --window-days 7   # default 7
+
+# Cohort retention (no window flag — returns full matrix)
+primitive analytics cohort-retention
+
+# Top users (default --window-days 30, --limit 10)
+primitive analytics top-users --window-days 7 --limit 20
+
+# Search users (--query is required)
+primitive analytics user-search --query user@example.com
+
+# Per-user breakdown
+primitive analytics user-detail <user-ulid>
+primitive analytics user-snapshot <user-ulid>
+
+# Raw event feed (default --window-days 7, --page 0)
+primitive analytics events --window-days 7 --page 0
+
+# Group by: action | feature | route | country | deviceType | plan | day
+primitive analytics events-grouped --group-by feature --window-days 14
+
+# Integration / workflow / prompt analytics (default --window-days 30)
+primitive analytics integrations
+primitive analytics workflows --limit 5
+primitive analytics prompts --limit 5
+```
+
+---
+
+## Querying Analytics (REST API)
+
+All endpoints require `admin` permission on the app.
+
+```text
+# DAU / WAU / MAU / growth — separate endpoints (no combined `/overview`)
+GET /app/{appId}/api/analytics/overview/dau?windowDays=28
+GET /app/{appId}/api/analytics/overview/wau?windowDays=28
+GET /app/{appId}/api/analytics/overview/mau?windowDays=28
+GET /app/{appId}/api/analytics/overview/growth?windowDays=28
+
+# Active-user series
+GET /app/{appId}/api/analytics/daily-active?windowDays=28
+GET /app/{appId}/api/analytics/rolling-active?windowDays=7
+GET /app/{appId}/api/analytics/cohort-retention
+
+# Users
+GET /app/{appId}/api/analytics/users/top?windowDays=30&limit=10
+GET /app/{appId}/api/analytics/users/search?q=...&limit=25
+GET /app/{appId}/api/analytics/users/{userUlid}/detail
+GET /app/{appId}/api/analytics/users/{userUlid}/snapshot
+
+# Events
+GET /app/{appId}/api/analytics/events?windowDays=7&page=0
+GET /app/{appId}/api/analytics/events/grouped?windowDays=7&groupBy=action
+
+# Integrations / workflows / prompts (admin-only top lists)
+GET /app/{appId}/api/analytics/integrations?windowDays=30
+GET /app/{appId}/api/analytics/workflows/top?windowDays=30&limit=10
+GET /app/{appId}/api/analytics/prompts/top?windowDays=30&limit=10
+```
+
+> The REST API does **not** expose `users/{userUlid}/timeline`, `users/{userUlid}/events`, `workflows/overview`, `prompts/overview`, or a combined `overview` endpoint. Use the granular endpoints above.
+
+---
+
+## Best Practices
+
+1. **Use verb_noun action names** — `"photo_uploaded"`, `"report_generated"`, `"settings_changed"`.
+2. **Group with `feature`** — set consistently to enable per-feature dashboards (`"gallery"`, `"settings"`, `"billing"`).
+3. **Keep `context_json` small** — truncated to 1 KiB. Don't dump request bodies or full reports.
+4. **Don't log high-frequency events** — rate limiter caps at 300/min with burst 60. Design around meaningful actions, not continuous telemetry.
+5. **Don't add your own `beforeunload` flush** — the client already does this.
+6. **Don't toggle no-op options** (`boot`, `firstDocOpen`, `firstDocEdit`, `offlineRecovery`, `serviceWorker`) and assume something happens.
+7. **Use `setPlanOverride` / `setAppVersionOverride`** instead of passing `plan` / `app_version` on every `logEvent` call.
+
+---
+
+## Complete Example: Feature Usage Tracking
+
+```typescript
+import { JsBaoClient, ANALYTICS_UNAUTHENTICATED_USER } from "js-bao-wss-client";
+
+const client = new JsBaoClient({
+  appId: "app-123",
+  apiUrl: "https://api.example.com",
+  wsUrl: "wss://ws.example.com",
+  analyticsAutoEvents: {
+    sessionEnd: true,
     blobUploads: { start: false, success: true, failure: true },
     llm: { start: false, success: true, failure: true },
   },
 });
 
-// Track a custom action (assumes you have the user ULID from auth)
-function trackFeatureUsed(userUlid: string, feature: string, action: string, context?: Record<string, unknown>) {
+// Set version once after init (or after deploy notification)
+client.analytics.setAppVersionOverride("2.1.4");
+
+function trackFeatureUsed(
+  userUlid: string,
+  feature: string,
+  action: string,
+  context?: Record<string, unknown>
+) {
   client.analytics.logEvent({
     action,
     feature,
@@ -367,18 +371,18 @@ function trackFeatureUsed(userUlid: string, feature: string, action: string, con
   });
 }
 
-// Usage
-trackFeatureUsed(userUlid, "reports", "report_generated", {
+// Authenticated event
+trackFeatureUsed(currentUserUlid, "reports", "report_generated", {
   reportType: "quarterly",
   format: "pdf",
 });
 
-trackFeatureUsed(userUlid, "search", "search_executed", {
-  resultCount: 15,
+// Pre-auth event (landing page)
+client.analytics.logEvent({
+  action: "landing_page_view",
+  feature: "onboarding",
+  user_ulid: ANALYTICS_UNAUTHENTICATED_USER,
 });
 
-// Flush on exit
-window.addEventListener("beforeunload", () => {
-  client.analytics.flush();
-});
+// No need for a beforeunload flush — the client adds one automatically.
 ```

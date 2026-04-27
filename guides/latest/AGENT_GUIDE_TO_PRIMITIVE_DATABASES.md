@@ -224,66 +224,49 @@ ruleSetName = "team-rules"     # optional — rule set for group management
 autoAddCreator = true          # auto-add creator as member (default: true)
 ```
 
-### CLI commands for database management
+### CLI commands for direct database management
 
-Beyond sync, the CLI provides direct commands for managing databases:
+Beyond sync, the CLI exposes commands for one-off ops (use `--help` for full flags):
 
 ```bash
-# Database types
-primitive database-types list
-primitive database-types get project
-primitive database-types create project --triggers '...'
-primitive database-types operations list project
-primitive database-types operations get project listTasks
+primitive database-types list | get <type> | operations list <type>
+primitive databases list | get <id> | create "Title" --type <type> [--metadata '{...}'] | delete <id>
+primitive databases metadata update <id> --metadata '{"teamId":"team-1"}'
 
-# Database instances
-primitive databases list
-primitive databases create "My DB" --type project
-primitive databases create "My DB" --type project --metadata '{"teamId":"team-1"}'
-primitive databases get <database-id>
-primitive databases delete <database-id>
+# Admin record introspection
+primitive databases records models <id>
+primitive databases records describe <id> <model>
+primitive databases records query <id> <model> --filter '{"status":"open"}'
 
-# Database operations
-primitive databases operations list <database-id>
-primitive databases metadata update <database-id> --metadata '{"teamId":"team-1"}'
-
-# Record introspection and querying (admin only)
-primitive databases records models <database-id>
-primitive databases records describe <database-id> <model-name>
-primitive databases records query <database-id> <model-name> --filter '{"status":"open"}'
-primitive databases records query <database-id> <model-name> --filter-file ./filter.json
-primitive databases records query <database-id> <model-name> --filter-file ./filter.toml
-
-# Export / Import (data migration)
-primitive databases export <database-id> --output ./primitive-export    # Export records, indexes, constraints
-primitive databases import <path> --overwrite --dry-run                 # Import from export directory
+# Data migration (records + indexes + constraints; type config excluded — run sync push on target first)
+primitive databases export <id> --output ./out
+primitive databases import ./out --overwrite [--dry-run]
 ```
-
-Export creates a directory under `<output>/databases/<database-id>/` containing `metadata.json`, `records.jsonl`, `indexes.json`, and `constraints.json`. Import restores records and indexes into a new or existing database. Database type config (operations, triggers, access rules) is not included in the export — run `primitive sync push` on the target app before importing to ensure the type config exists.
 
 ## Database Types
 
 A **database type** is a named configuration shared across many databases. It provides:
 
-- **Registered operations** — queries, mutations, counts, aggregates, pipelines, batch writes, and apply-to-query with per-operation CEL access control
-- **Triggers** — computed fields that run server-side before save
-- **Subscriptions** — named WebSocket subscriptions with CEL access rules and per-change filter rules
-- **Metadata access rules** — CEL expression controlling who can update database metadata
-- **Rule set attachment** — for managing who can edit the type config and operations
+- **Registered operations** (`type` is one of `query`, `mutation`, `count`, `aggregate`, `pipeline`, `applyToQuery`) with per-operation CEL `access`
+- **Triggers** — computed fields evaluated in the DO before each save
+- **`metadataAccess`** — CEL expression that lets non-owner/manager users **read and update** database metadata (defaults to deny when unset; owner/manager always have access)
+- **Rule set attachment** — controls who can edit the type config and its operations
+
+Real-time subscriptions are configured **per-database**, not on the type — see [Real-Time Subscriptions](#real-time-subscriptions).
 
 ### Triggers
 
-Triggers are computed fields that run automatically before a record is saved. They are configured per model in the `[triggers]` section of the database type TOML file.
+Triggers are computed fields that run server-side in the Durable Object before a record is saved. Configured per model in the `[triggers.<modelName>]` block of the database type TOML.
 
 **Trigger fields:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `on` | string | Yes | When to fire: `"create"`, `"update"`, or `"save"` (both) |
-| `when` | string | No | CEL condition — trigger only fires if this evaluates to true |
-| `set` | object | Yes | Map of field name to CEL expression value |
+| `when` | string | No | CEL boolean expression — trigger only fires if true. Errors → trigger does not fire (silent deny) |
+| `set` | object | Yes | Map of field name to CEL expression. Each expression is evaluated and assigned. If the expression errors, the field is NOT set (returns `undefined`) |
 
-**Trigger CEL context:**
+**Trigger CEL context** (note: bare CEL expressions, NOT `$` substitution syntax):
 
 | Variable | Description |
 |----------|-------------|
@@ -291,9 +274,14 @@ Triggers are computed fields that run automatically before a record is saved. Th
 | `user.role` | The user's app role |
 | `record.*` | The record being saved (current field values) |
 | `database.id` | The database ID |
-| `database.metadata` | The database's metadata object |
+| `database.metadata.*` | The database's metadata object |
+| `secrets.*` | App secrets (loaded only when expression references `secrets.`) |
 | `now()` | Current ISO 8601 timestamp |
-| `lookup(modelName, id)` | Load another record for cross-references |
+| `lookup(modelName, id)` | Load another record by ID; returns `null` if missing |
+| `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`, `hasRole(role)` | Membership/role checks |
+| `fromWorkflow()`, `fromWorkflow(key)` | True if the write was issued by a workflow step (or a specific workflow) |
+
+**Don't confuse trigger CEL with operation substitutions.** Triggers use bare CEL — `user.userId`, `now()`. Operation `definition` and `params` use `$user.userId`, `$now`, `$params.x`, `$database.metadata.x` substitutions, which are deep string-replacement on the JSON template, NOT CEL.
 
 ## Registered Operations
 
@@ -326,15 +314,22 @@ For group-based access patterns, per-parameter access, and detailed CEL examples
 
 ### Parameters
 
-Declare parameters that callers must provide. In TOML config files, `params` is a JSON string:
+Declare parameters callers must provide. In TOML, `params` is a JSON string:
 
 ```toml
 params = '{"projectId":{"type":"string","required":true},"status":{"type":"string"}}'
 ```
 
-Parameter types: `"string"`, `"number"`, `"boolean"`, `"object"`.
+| Field | Required | Description |
+|-------|----------|-------------|
+| `type` | yes | One of `"string"`, `"number"`, `"boolean"`, `"object"` |
+| `required` | no | Default `false`. If `true`, request fails 400 when missing |
+| `access` | no | CEL expression evaluated against the caller's value (bound as `value`); false → 403 |
+| `coerce` | no | Default `true`. If `false`, type-mismatched inputs are rejected instead of being coerced |
 
-**Per-parameter access control:** Add an `access` CEL expression to a parameter to restrict what values a caller can pass. The caller's value is available as `value`:
+By default, scalar mismatches are coerced where safe (`"42"` → `42` for type `"number"`, `"true"` → `true` for type `"boolean"`, etc.). Undeclared params (not in the schema) are rejected with 400.
+
+**Per-parameter access control** restricts what value a caller may pass:
 
 ```json
 {
@@ -350,28 +345,20 @@ Parameter types: `"string"`, `"number"`, `"boolean"`, `"object"`.
 
 ### Substitution variables
 
-Use these in operation definitions (filters, data, IDs):
+Used **as string values inside operation definitions** (filter values, data fields, IDs, modelName). Substitution is a literal deep string-replacement on the JSON template — it is NOT CEL.
 
 | Variable | Resolves to |
 |----------|-------------|
 | `$user.userId` | Current user's ID |
 | `$now` | Current ISO 8601 timestamp |
 | `$database.id` | The database instance ID |
-| `$database.metadata.key` | Value from database metadata (null if missing) |
-| `$params.fieldName` | Caller-provided parameter |
-| `$steps.stepName.*` | Pipeline cross-step references (see Pipelines) |
+| `$database.metadata.key` | Value from database metadata (`null` if key missing) |
+| `$params.fieldName` | Caller-provided parameter (`undefined` if not passed) |
+| `$steps.stepName.<accessor>` | Pipeline cross-step reference (see Pipelines) |
 
-If a substitution variable (`$params.fieldName`, `$database.metadata.*`, or `$steps.*`) resolves to no value, the key whose value is that variable is **omitted** from the resolved definition — not set to null, undefined, or empty string. Any value the caller actually provides is passed through verbatim, including falsy values (`""`, `0`, `false`, and explicit `null`). The mechanism: substitution replaces the variable with the caller's value or with `undefined` if missing, and the resolved object is JSON-serialized before being forwarded — `JSON.stringify` drops keys whose values are `undefined`, so an unset optional param naturally produces an absent key.
+**Missing-value rule (critical):** if a substitution resolves to `undefined` (e.g. an optional param the caller didn't pass), `JSON.stringify` drops the surrounding key entirely. The resulting filter / data object simply doesn't have that key — it is NOT set to `null` or empty string. Any value the caller actually passes (including `""`, `0`, `false`, explicit `null`) flows through verbatim.
 
-This applies everywhere substitution variables are used:
-
-- **In filters (query, count, aggregate):** The filter key is removed, so the query matches all values for that field.
-- **In pipeline step filters:** Same rule — the step's filter key is removed when the referenced value is missing.
-- **In mutation data (save/patch):** The field is excluded from the written record entirely. An optional `$params.fieldName` in save data that the caller doesn't provide results in that field not being set on the record — it is not set to null or empty string.
-
-#### Optional filter fields
-
-A parameter declared `"required": false` makes its filter field optional: callers can include it to narrow results, or omit it to ignore that field. When the caller doesn't pass the parameter, the filter key is dropped before the query reaches the database — an unset substitution doesn't become `{field: undefined}` in the dispatched filter, it's removed entirely. Use one operation with an optional filter instead of declaring separate ops per filter combination (e.g., `listPosts` + `listPostsByAuthor`).
+This is how optional filters work: declare `{required: false}` and the filter narrows when the param is provided, matches all when it isn't.
 
 ```toml
 [[operations]]
@@ -383,16 +370,13 @@ definition = '{"filter":{"status":"approved","authorId":"$params.authorId"},"sor
 params = '{"authorId":{"type":"string","required":false}}'
 ```
 
-| Caller input | Resolved filter | Behavior |
-|---|---|---|
-| `{}` | `{"status":"approved"}` | All approved posts |
-| `{"authorId":"user-123"}` | `{"status":"approved","authorId":"user-123"}` | Approved posts by that author |
-| `{"authorId":""}` | `{"status":"approved","authorId":""}` | Approved posts where `authorId` is the empty string (filter key is kept — only `undefined` drops) |
-| `{"authorId":null}` | `{"status":"approved","authorId":null}` | Approved posts where `authorId` is explicitly null |
+| Caller input | Resolved filter |
+|---|---|
+| `{}` | `{"status":"approved"}` (all approved) |
+| `{"authorId":"u-1"}` | `{"status":"approved","authorId":"u-1"}` |
+| `{"authorId":""}` | `{"status":"approved","authorId":""}` (matches empty string — only `undefined` drops) |
 
-The same pattern works for pipeline step filters, `$database.metadata.*` references, and `$steps.*` references — in every case, a missing value drops the key and a provided value (including falsy) is used verbatim.
-
-> **Gotcha:** If a filter references `$params.X` but `X` isn't declared in the operation's `params` schema, the key is always dropped and the operation silently becomes a match-all for that field. Double-check that every `$params.*` reference in a filter or data payload has a matching entry in `params`.
+> **Gotcha:** If a filter or data field references `$params.X` but `X` isn't declared in `params`, the substitution always resolves to `undefined` and the key silently drops — your operation becomes a match-all for that field, or your save omits the field entirely. The validator catches obvious cases at registration time, but always double-check the params schema covers every `$params.*` reference.
 
 ### Operation types
 
@@ -489,18 +473,20 @@ definition = '{"steps":[{"name":"recentTasks","type":"query","modelName":"tasks"
 params = '{"projectId":{"type":"string","required":true}}'
 ```
 
-**Pipeline step references:**
+**Pipeline step references** — only these accessors exist (no `$steps.X.result`):
 
-| Variable | Description |
-|----------|-------------|
-| `$steps.stepName.first` | First record from a query step |
-| `$steps.stepName.first.field` | A field from the first record |
-| `$steps.stepName.all.field` | Array of a field from all records |
-| `$steps.stepName.count` | Record count from a query or count step |
-| `$steps.stepName.results` | Full results (query: array, count: number, aggregate: object) |
-| `$steps.stepName.result` | Aggregate result object |
+| Variable | Valid for step type | Resolves to |
+|----------|---------------------|-------------|
+| `$steps.X.first` | query | First record (object) or `null` |
+| `$steps.X.first.fieldName` | query | A field from the first record, or `null` |
+| `$steps.X.all.fieldName` | query | Array of that field across all records (filters out undefined) |
+| `$steps.X.count` | query / count / aggregate | Record count, count value, or # of aggregate group keys |
+| `$steps.X.results` | query / count / aggregate | Full data array, count number, or aggregate object |
 
-**Response:** `{ steps: { recentTasks: { type: "query", data: [...] }, statusBreakdown: { type: "aggregate", result: {...} }, openBugs: { type: "count", count: 2 } } }`
+**Response shape** depends on `return`:
+
+- `"return": "all"` (default) → `{ steps: { stepName: { type, data | count | result } } }`
+- `"return": "<stepName>"` → just that step's payload at top level (`{data}` for query, `{count}` for count, `{result}` for aggregate)
 
 #### applyToQuery — server-side query+mutate
 
@@ -546,18 +532,15 @@ const db = await client.databases.create({
 ### Listing and fetching databases
 
 ```typescript
-// List databases the current user can access — includes databases
-// where the user has a direct permission (owner or manager) OR a
-// matching DatabaseGroupPermission via their group memberships.
-// App admins see every database. Databases accessible only via
-// CEL-gated registered operations are not included.
+// Lists DBs where the user has a direct permission (owner or manager).
+// Databases the user can access ONLY via CEL-gated operations are NOT
+// returned, and databases reachable via DatabaseGroupPermission are
+// also NOT returned by list() (use groups.listDatabases for those).
+// App admins see all DBs in the app.
 const databases = await client.databases.list();
 
-// Filter to one databaseType. Wire shape: `?type=<databaseType>`.
-// Server-side post-join JS filter (not an SK push-down — the access
-// join runs first, then the type filter narrows the result).
-// App admins making the same call get the filter applied to the
-// full app-wide set.
+// Filter to one databaseType (post-join JS filter — narrows the
+// set above, doesn't widen it).
 const projects = await client.databases.list({ databaseType: "project" });
 
 // Get a specific database
@@ -587,10 +570,11 @@ const result = await client.databases.executeOperation(databaseId, "listTasks", 
 | Operation Type | Response Shape |
 |----------------|---------------|
 | `query` | `{ data: [...records], hasMore: boolean, nextCursor?: string }` |
-| `mutation` | `{ results: [{ success: boolean, id: string }] }` |
+| `mutation` | `{ results: [{ success: boolean, id: string }] }` (entire request returns 409 if any sub-op fails) |
 | `count` | `{ count: number }` |
 | `aggregate` | `{ result: { [groupValue]: { ...computedFields } } }` |
-| `pipeline` | `{ steps: { [stepName]: { type, ...stepResult } } }` — each step's result matches its operation type (query steps have `data`, count steps have `count`, aggregate steps have `result`) |
+| `pipeline` | When `return = "all"`: `{ steps: { [stepName]: { type, data \| count \| result } } }`. When `return = "<step>"`: that step's payload at top level |
+| `applyToQuery` | `{ matched, affected, failed, truncated?, appliedLimit?, warning? }` (or `{matched, affected: 0, failed: 0, dryRun: true, sample: [...]}` when called with `?dryRun=true`) |
 
 **Operation timing:** Pass `timing: true` to get per-phase millisecond timings in `result._timing`. Works on all operation types.
 
@@ -602,9 +586,9 @@ const result = await client.databases.executeOperation(databaseId, "listTasks", 
 // result._timing: { totalMs, databaseLookup, operationLookup, celEvaluation, doInvocation, ... }
 ```
 
-### Bulk operations
+### Bulk operation calls (`executeBatch`)
 
-Execute any operation across many items in one call (up to 100,000). Useful for bulk inserts, deletes, updates, or any other mutation:
+`executeBatch` invokes a single registered **mutation** operation many times in one HTTP request (up to 100,000 items). Each item is a `{ params }` object — the operation runs once per item, with its `op.access` and per-parameter `access` rules **re-evaluated against each item's params**.
 
 ```typescript
 const result = await client.databases.executeBatch(databaseId, "createTask", [
@@ -613,6 +597,16 @@ const result = await client.databases.executeBatch(databaseId, "createTask", [
 ]);
 // { imported: 2, failed: 0 }
 ```
+
+**Constraints:**
+
+- Only `type = "mutation"` operations are accepted (400 otherwise).
+- All items in the batch must satisfy the operation's `access` and per-param `access` rules. If **any** item fails authorization, the **whole batch is rejected with 403** before any writes happen.
+- Param schema validation is also per-item; the first invalid item rejects the batch with 400.
+- Save/patch/delete ops from successfully-resolved items are funneled through one DO `/batch` call (transactional at the DO layer); increment / addToSet / removeFromSet ops are dispatched in parallel afterwards.
+- Response is `{ imported, failed }` — `failed` counts items whose individual write succeeded at the auth/validation stage but was rejected by the DO (e.g., `ifNotExists` conflict).
+
+**Don't:** there is no per-item `itemAccess` field on registered operations. To restrict what params a caller can pass per item, put the rule on the operation's `access` (referencing `params.*`) or on individual `params.<name>.access` (referencing `value`) — both are re-evaluated for every batch item.
 
 ### Managing database metadata
 
@@ -812,81 +806,25 @@ await db.addToSet("products", "prod-1", { tags: ["featured"] });
 await db.removeFromSet("products", "prod-1", { tags: ["sale"] });
 ```
 
-## Batch Writes
+## Batch Writes (direct)
 
-Execute multiple operations in a single request:
+`db.batch` executes multiple writes atomically at the DO layer. Returns one `BatchOperationResult` per input op (`{success, id, error?, values?}` — `values` for increment ops); a per-item failure does NOT throw, so check `.success` on each result.
 
 ```typescript
 const results = await db.batch([
-  { op: "save", modelName: "tasks", id: "t-1", data: { title: "A" } },
-  { op: "patch", modelName: "tasks", id: "t-2", data: { done: true } },
-  { op: "delete", modelName: "tasks", id: "t-3" },
+  { op: "save",      modelName: "tasks", id: "t-1", data: { title: "A" } },
+  { op: "patch",     modelName: "tasks", id: "t-2", data: { done: true } },
+  { op: "delete",    modelName: "tasks", id: "t-3" },
   { op: "increment", modelName: "tasks", id: "t-4", fields: { priority: 1 } },
+  { op: "addToSet",  modelName: "tasks", id: "t-5", stringSets: { tags: ["urgent"] } },
 ]);
-```
 
-### Registered `executeBatch` Operations
-
-For end-user batch writes through a registered operation, use `type = "executeBatch"` with a per-item CEL rule. Each item in the batch is authorized independently, so a single failing item does not fail the whole batch.
-
-```toml
-[[operations]]
-name = "import-contacts"
-type = "executeBatch"
-modelName = "contact"
-access = "hasRole('admin')"
-itemAccess = "params.createdBy == user.userId"
-```
-
-```typescript
-await client.databases.executeOperation(databaseId, "import-contacts", {
-  items: [
-    { op: "save",  data: { name: "Alice", createdBy: userId } },
-    { op: "patch", id: "rec-1", data: { status: "verified" } },
-    { op: "delete", id: "rec-2" },
-  ],
-});
-// Response: { results: [{ ok: true, id }, { ok: false, error: "..." }, ...] }
-```
-
-**Use `executeBatch` when** the caller needs to apply many individual writes it constructed on the client, each of which should be authorized separately.
-
-## Apply-to-Query
-
-For "update every record that matches this filter," use `applyToQuery` — a single server-side operation that runs a query and applies a mutation to each matching record.
-
-```toml
-[[operations]]
-name = "mark-overdue"
-type = "applyToQuery"
-modelName = "task"
-access = "hasRole('admin')"
-query = '{"filter":{"dueDate":{"$lt":"$params.now"},"status":"pending"}}'
-mutation = '{"op":"patch","data":{"status":"overdue"}}'
-params = '{"now":{"type":"string","required":true}}'
-```
-
-```typescript
-const result = await client.databases.executeOperation(databaseId, "mark-overdue", {
-  params: { now: new Date().toISOString() },
-});
-// { matched: 142, updated: 142, truncated: false }
-```
-
-**Truncation.** If the query matches more records than the per-call cap, `truncated: true` is returned — loop until `truncated: false`:
-
-```typescript
-while (true) {
-  const r = await client.databases.executeOperation(databaseId, "mark-overdue", {
-    params: { now },
-  });
-  if (!r.truncated) break;
+for (const r of results) {
+  if (!r.success) console.warn("op failed:", r.id, r.error);
 }
 ```
 
-**Use `applyToQuery` instead of `executeBatch` when** you don't want to ship the record list across the wire — the server already knows which records match.
-
-## Aggregation
+### Aggregation (direct)
 
 ```typescript
 const result = await db.aggregate("orders", {
@@ -935,7 +873,7 @@ const Task: TypedModelConstructor<Task> = createModelClass({ schema: taskSchema 
 export { Task };
 ```
 
-Database field types: `id` (primary key, use `autoAssign: true` for ULIDs), `string`, `number`.
+Database field types: `id` (primary key, use `autoAssign: true` for ULIDs), `string`, `number`, `boolean`, `date`, `stringset` (set-of-strings field — use with `addToSet`/`removeFromSet`).
 
 ### Indexes
 
@@ -1009,94 +947,90 @@ await client.databases.removeManager(databaseId, "co-admin-user-id");
 await client.databases.transferOwnership(databaseId, "new-owner-id");
 ```
 
-**Anti-pattern: Adding end users as managers.** It is almost never correct to add individual end users as managers of a database. The `manager` role bypasses CEL access gates entirely and grants administrative control over the database — it is not a way to give users access to data. The proper pattern is that only a small number of privileged accounts (the creator, perhaps one or two co-admins) have direct owner/manager access to a database, and **all other user access goes through registered operations** with CEL access expressions. If you find yourself writing a loop that grants `manager` to each user who needs to interact with a database, stop — define operations with appropriate `access` rules instead.
+**Don't add end users as managers.** `manager` bypasses every CEL operation gate. The right pattern is: a small fixed set of admin accounts hold owner/manager; everyone else goes through registered operations with `access` rules.
 
 ### Group-Based Database Access
 
-Use `DatabaseGroupPermission` to grant database access to every member of a group in one step. Members gain the specified permission level (currently `manager` only); membership changes propagate automatically.
+`DatabaseGroupPermission` grants the same admin-level access (`manager`) to every member of a group at once. Membership changes propagate automatically. Only `"manager"` is supported.
 
 ```typescript
-// Grant manager access to every member of the "team:engineering" group
 await client.databases.grantGroupPermission(databaseId, {
   groupType: "team",
   groupId: "engineering",
-  permission: "manager", // only valid value for group permissions
+  permission: "manager",
 });
 
-// List all group permissions on a database
 const groupPerms = await client.databases.listGroupPermissions(databaseId);
-
-// Revoke a group permission
 await client.databases.revokeGroupPermission(databaseId, "team", "engineering");
 
-// List all databases accessible to a group (callable by group members or app admins)
+// Group members discover their group-accessible databases via this:
 const dbs = await client.groups.listDatabases("team", "engineering");
 ```
 
-Resolution semantics:
-
 | Call | Resolves group access? |
 |------|------------------------|
-| `databases.get(databaseId)` | Yes — group members (via any matching `DatabaseGroupPermission`) can load metadata |
-| `databases.list()` | **No** — direct grants only (matches `documents.list()` semantics) |
-| `groups.listDatabases(groupType, groupId)` | Yes — the canonical way for a group member to discover databases they have group-level access to |
+| `databases.get(id)` | Yes |
+| `databases.list()` | **No** — direct grants only |
+| `groups.listDatabases(type, id)` | Yes — canonical for group members |
 
-Group-accessible databases do not appear in `databases.list()`. If your app needs a unified "all databases I can access" view, combine `databases.list()` (direct) with `groups.listDatabases(...)` for each of the user's memberships.
+For a unified "all DBs I can access" view, combine `databases.list()` with `groups.listDatabases(...)` for each membership.
 
-**Use groups for management-level access to a database; still use registered-operation CEL for end-user data access.** Do not replace operation-level CEL gates with a group permission — that grants administrative powers, not just data access. Only the database owner (or an app admin) can grant or revoke group permissions.
-
-See the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) for group-based access patterns.
+**Group permissions are still admin-level access — they don't replace operation-level CEL.** Only the database owner (or an app admin) can grant/revoke group permissions.
 
 ## Real-Time Subscriptions
 
-Databases push changes to connected clients over WebSocket. Define subscriptions in the database type config and subscribe from the client.
+Databases push changes to connected clients over WebSocket. Subscriptions are **per-database** (not per-type) and **created via the REST/admin API, not via the TOML sync flow**. Up to 20 active subscriptions per database; up to 5 declared params per subscription.
 
-### Registering
+### Registering a subscription (admin API)
 
-```toml
-[[subscriptions]]
-name = "my-open-tickets"
-modelName = "ticket"
-access = "user.userId != ''"
-filter = "record.assigneeId == user.userId && record.status == 'open'"
+`POST /app/{appId}/api/databases/{databaseId}/subscriptions` — body shape:
 
-[[subscriptions]]
-name = "tickets-by-team"
-modelName = "ticket"
-access = "isMemberOf('team', params.teamId)"
-filter = "record.teamId == params.teamId"
-params = '{"teamId":{"type":"string","required":true}}'
+```json
+{
+  "subscriptionKey": "my-open-tickets",
+  "displayName": "My open tickets",
+  "description": "Tickets assigned to me",
+  "filter": "record.assigneeId == user.userId && record.status == 'open'",
+  "accessRule": "user.userId != ''",
+  "params": { "teamId": { "type": "string", "required": false } }
+}
 ```
 
-- `access` is evaluated at subscribe time. A false result rejects the subscribe call.
-- `filter` is evaluated per-change, per-subscriber. Only matches are delivered.
-- `filter` can only narrow what `access` allows; it cannot grant access the rule denies.
+Field semantics:
 
-### Subscribing
+- `accessRule` (CEL) — evaluated at subscribe time; false → subscribe is rejected.
+- `filter` (CEL) — evaluated per-change, per-subscriber against `record.*`. Only matches are delivered. Cannot grant access `accessRule` denies.
+- `params` — declared params bound to the subscriber and exposed as `params.*` inside `filter` and `accessRule`. Supported types: `string`, `number`, `boolean`.
+
+CEL context for both `accessRule` and `filter`: `user.*`, `record.*` (filter only — the changed row), `database.id`, `database.metadata.*`, `params.*`, plus the standard membership functions.
+
+### Subscribing from the client
 
 ```typescript
-const sub = await client.databases
-  .database(databaseId)
-  .subscribe("my-open-tickets");
-
-sub.on("change", (event) => {
-  // event.op: "save" | "patch" | "delete"
-  // event.before / event.after
-  applyChange(event);
+const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
+  params: { teamId: "team-1" },
+  onChange: (event) => {
+    // event.changes: Array of { op, modelName, id, data?, previousData? }
+    for (const change of event.changes) {
+      // change.op: "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet"
+      applyChange(change);
+    }
+  },
 });
 
-sub.unsubscribe();
+// Later:
+unsub();
 ```
+
+`subscribe` is synchronous; the unsubscribe callback returns immediately. The client auto-reissues `db.subscribe` on WebSocket reconnect.
 
 ### Critical Rules
 
-1. **Always pair initial load with subscription.** Subscriptions deliver deltas only; the initial state comes from a regular operation call. Keep the query's filter and the subscription's filter semantically equivalent.
-
-2. **Writer's connection is excluded.** The client that triggered the mutation does not receive the change event.
-
-3. **No replay on reconnect.** Re-query on reconnection; the server does not buffer missed changes.
-
-4. **Workflow mutations fan out too.** A `database.mutate` step in a workflow wakes up every matching client subscription. This is the primary way to build live workflow-progress UIs.
+1. **Always pair initial load with subscription.** Subscriptions deliver deltas only — fetch initial state with a regular `executeOperation` call and keep the query's filter semantically equivalent to the subscription's `filter`.
+2. **Writer's connection is excluded.** The client that triggered the mutation does not receive the change event back.
+3. **No replay on reconnect.** Re-query on reconnect; the server does not buffer missed changes.
+4. **Each change carries `previousData` only when the database has active subscribers.** If you need to compare old vs new in your filter, you can; the server pre-reads the row before mutating.
+5. **Workflow mutations fan out too.** A `database.mutate` step in a workflow wakes up every matching subscription.
 
 See the [Scheduling and Real-Time guide](AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md) for the full walkthrough.
 
@@ -1157,7 +1091,7 @@ const result = await client.databases.importCsv(databaseId, {
 
 - **Create multiple databases for isolation.** Each database is a separate Durable Object. Use separate databases for separate tenants, projects, or data domains to leverage per-database scaling.
 - **Use database types** to share operation definitions and triggers across databases of the same kind.
-- **Keep metadata minimal — use groups for access control.** Metadata has a 1KB limit and is meant for a few identifying fields: the creator's user ID, a related object ID (e.g., a team or project ID), or a category label. Its primary purpose is to connect a database to a group for CEL access checks — e.g., store a `teamId` so operations can use `isMemberOf('team', database.metadata.teamId)`. The group membership is what controls access; metadata just provides the lookup key. Do not replicate data into metadata to check field-by-field in CEL — if you need complex access rules, model them with groups instead. Metadata can be updated, but changing it affects access rule evaluation for all operations on that database, so treat it as mostly-static. For mutable settings that users toggle at runtime, store them as database records and use pipeline queries with `$steps.*` references to incorporate settings into subsequent query filters (see the [settings record pattern](#settings-record-pattern) below).
+- **Keep metadata minimal — use groups for access control.** Metadata is meant for a few identifying fields (e.g. a `teamId`) used as lookup keys in CEL — `isMemberOf('team', database.metadata.teamId)`. Group membership controls access; metadata just provides the key. Don't replicate data into metadata for field-by-field CEL checks — model that with groups. For runtime-toggleable settings, store them as records and read them in a pipeline (see [Settings record pattern](#settings-record-pattern)).
 - **Use triggers** to enforce server-side invariants (created timestamps, audit fields) — don't trust client-provided values.
 
 ### Operations design
@@ -1167,21 +1101,38 @@ const result = await client.databases.importCsv(databaseId, {
 - **Set restrictive access by default.** Start with specific CEL expressions and widen as needed.
 - **Use projections** to limit response payloads — only return fields the client needs.
 - **Use pipelines** for dashboard-style views that need data from multiple models in one round-trip. Pipelines are read-only — for "read-then-mutate" flows, use a pipeline to read, then call a separate mutation operation.
-- **Anti-pattern: Passing explicit IDs in save operations.** The server ignores any `id` field in save data and always assigns a server-generated ULID. Do not include `"id":"$params.id"` in mutation definitions — it will be silently discarded. Instead, read the server-assigned ID from the mutation response (`results[].id`) and use that for subsequent record linking, references, or client-side state. To find specific records later, query by unique field values or use `limit: 1` queries rather than relying on a predetermined ID.
+- **Default to server-assigned IDs in `save`.** When neither `opDef.id` nor `data.id` is provided, the server generates a ULID and returns it in `results[].id`. You may pass an explicit id via `opDef.id` or `data.id` (they must match if both are set, otherwise the request is rejected) — but only do that when you genuinely need a deterministic id (idempotency, foreign-key linkage to a precomputed key). Never pipe `$params.id` into save data unless that param is itself derived from a trusted source.
 
 ### Security
 
-- **Treat `$params.*` as untrusted.** Operation parameters come directly from the calling client and can be set to any value. Never use `$params.*` for sensitive fields like roles, permissions, or status values that control authorization.
-- **Use server-derived values for sensitive fields.** Hardcode literal values in operation definitions (e.g., `"role": "teacher"`) and gate each operation with a CEL `access` expression. For example, instead of a single `createPost` operation with `"authorRole": "$params.authorRole"`, create separate `createTeacherPost` (with `"authorRole": "teacher"` and `access = "isMemberOf('class-teachers', ...)"`) and `createStudentPost` (with `"authorRole": "student"` and `access = "isMemberOf('class-students', ...)"`) operations. The CEL check ensures only the right users can call each operation, and the role is set server-side.
+- **`$params.*` is caller-controlled. Never use it for authorization-relevant fields.** Substitution is literal — whatever the caller passes ends up in the resolved JSON.
 
-For access control best practices (group-based access, per-parameter access, rule sets), see the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md).
+  ```toml
+  # WRONG — caller can claim any role:
+  definition = '{"operations":[{"op":"save","data":{"authorRole":"$params.authorRole","title":"$params.title"}}]}'
+
+  # RIGHT — split into per-role operations, hardcode the role server-side, gate each with CEL:
+  [[operations]]
+  name = "createTeacherPost"
+  type = "mutation"
+  modelName = "posts"
+  access = "isMemberOf('class-teachers', database.metadata.classId)"
+  definition = '{"operations":[{"op":"save","data":{"authorRole":"teacher","title":"$params.title","authorId":"$user.userId"}}]}'
+  params = '{"title":{"type":"string","required":true}}'
+  ```
+
+- **Don't use `addManager` to grant "access to data."** `manager` bypasses every operation-level CEL gate and grants administrative control. End-user data access goes through registered operations with CEL `access`; `manager` is reserved for the small set of accounts that should be able to update title, metadata, and (for `owner`) delete the database.
+- **Per-parameter `access` is enforced on both `executeOperation` and `executeBatch`.** A param rule like `"access": "value == user.userId"` is re-evaluated for every batch item — that's the right place to put per-item authorization, NOT a (non-existent) `itemAccess` field.
+- **Trigger CEL is fail-closed.** Any error during a `when` or `set` expression silently skips the trigger — so a malformed expression doesn't crash the write but also doesn't run. Test triggers explicitly.
+
+For broader access-control patterns (group-based access, per-parameter access, rule sets), see the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md).
 
 ### Performance
 
-- **Register indexes** on fields you filter or sort on.
-- **Use `limit` in operations** to avoid returning unbounded result sets.
-- **Use `count` operations** instead of querying all records just to count them.
-- **Use bulk import** for initial data loading or batch migrations.
+- **Register indexes** on every field used in `filter` or `sort`. Without an index, the DO falls back to scanning all records of that model.
+- **Cap with `limit`.** Definition `limit` clamps caller-supplied `limit` to its own value (effective limit = `min(definition.limit, callerLimit)`).
+- **`count` ops are much cheaper than `query` for "how many".**
+- **Use `executeBatch`** for client-side bulk writes (up to 100,000 items per call); use `applyToQuery` to mutate every record matching a server-side filter without shipping the IDs across the wire.
 
 ## Common Patterns
 
@@ -1254,6 +1205,9 @@ Any field starting with `_` (underscore) is reserved for internal use. The inter
 | Using `addManager` for end-user access | Granting manager/owner gives administrative control, not scoped data access | Define registered operations with CEL access expressions instead |
 | 400 on operation registration | Invalid CEL expression or missing required fields | Validate CEL syntax; ensure `name`, `type`, `modelName`, `access`, `definition` are provided |
 | Empty results from query | Missing index on filtered field | Register indexes on fields used in filters |
-| `$params.x` not substituted | Parameter not declared in `params` | Add the parameter to the operation's `params` schema |
-| Passed `id` in save data ignored | Server always assigns a ULID — explicit IDs in save operations are discarded | Remove `id` from save data; read the server-assigned ID from the mutation response (`results[].id`) |
+| `$params.x` not substituted (filter key dropped, save field missing) | Parameter not declared in `params` schema | Add `x` to the operation's `params` schema; otherwise `$params.x` resolves to `undefined` and the surrounding key is silently dropped |
+| 400 "ID conflict in save operation" | Both `opDef.id` and `data.id` were provided and differ | Set the id in one place only |
+| 400 "applyToQuery matched more than 1000 records" | Default cap hit because `source.limit` was not set | Narrow `source.filter`, or set `source.limit` explicitly to opt into truncation |
+| 409 from a mutation operation | One or more sub-ops in the batch failed (e.g., `ifNotExists` conflict) | Inspect the error message; mutation operations bundle all sub-ops into one DO `/batch` call and surface the first failure |
+| `executeBatch` rejected with 400 "executeBatch only supports mutation operations" | Operation type is not `mutation` | Only `type = "mutation"` operations work with `executeBatch` |
 | Records not found after save | Querying wrong `modelName` | Model names are case-sensitive collection identifiers |

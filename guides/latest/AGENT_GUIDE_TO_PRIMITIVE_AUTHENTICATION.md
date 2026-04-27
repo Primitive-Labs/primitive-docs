@@ -1,50 +1,64 @@
 # Agent Guide to Primitive Authentication
 
-Guidelines for AI agents implementing authentication flows in Primitive apps.
+Implementing auth flows for Primitive apps. All methods live on `JsBaoClient` (package: `js-bao-wss-client`).
 
-## Overview
+## Auth Methods
 
-Primitive supports multiple authentication methods:
+| Method | When to use |
+|--------|-------------|
+| OAuth (Google) | Primary auth, redirect-based |
+| Magic Link | Passwordless email link |
+| OTP | 6-digit email code (10 min expiry) |
+| Passkey | WebAuthn for returning users (requires existing account) |
 
-| Method | Description | Use Case |
-|--------|-------------|----------|
-| OAuth (Google) | Redirect-based Google sign-in | Primary auth for most apps |
-| Magic Link | Passwordless email link | Simple, no password needed |
-| OTP | 6-digit email code | Quick verification |
-| Passkey | WebAuthn/biometric | Secure, passwordless return visits |
+Each method must be enabled in the Admin Console. Check availability with `getAuthConfig()` before showing UI.
 
-All methods must be enabled in the Primitive Admin Console before use.
-
-## Checking Available Auth Methods
+## Discovering Available Methods
 
 ```typescript
 const config = await client.getAuthConfig();
+// {
+//   appId, name, mode, waitlistEnabled,
+//   googleOAuthEnabled, googleClientId, hasOAuth, redirectUris,
+//   passkeyEnabled, passkeyRpId, passkeyRpName, hasPasskey,
+//   magicLinkEnabled, otpEnabled
+// }
 
-if (config.hasOAuth) console.log("Google OAuth available");
-if (config.magicLinkEnabled) console.log("Magic link available");
-if (config.otpEnabled) console.log("OTP available");
-if (config.hasPasskey) console.log("Passkeys available");
+if (config.hasOAuth) showGoogleButton();
+if (config.magicLinkEnabled) showMagicLinkForm();
+if (config.otpEnabled) showOtpForm();
+if (config.hasPasskey) showPasskeyButton();
 ```
+
+`hasOAuth` is true only when both `googleOAuthEnabled` and `googleClientId` are set. `hasPasskey` requires `passkeyEnabled` and a configured `passkeyRpId`.
 
 ---
 
-## OAuth (Google Sign-In)
+## OAuth (Google)
 
-### Start OAuth Flow
+### Start the flow
 
 ```typescript
 const hasOAuth = await client.checkOAuthAvailable();
 if (hasOAuth) {
-  // continueUrl (optional): where to redirect after OAuth completes
-  await client.startOAuthFlow(continueUrl); // Redirects to Google
+  await client.startOAuthFlow(continueUrl); // Redirects browser to Google
 }
 ```
 
-**Note:** `startOAuthFlow` requires `oauthRedirectUri` to be set in the client options (passed to `initializeClient`). It throws if not configured.
+`startOAuthFlow` throws `Error("OAuth not configured")` if `oauthRedirectUri` was not passed to `initializeClient`. The browser navigates away — code after the call doesn't run on success.
 
-### Handle OAuth Callback
+Optional second argument supports waitlist enrollment and invite-token acceptance:
 
-In your callback page (e.g., `/oauth/callback`), use the instance method when you already have a client:
+```typescript
+await client.startOAuthFlow(continueUrl, {
+  waitlist: { source: "landing-page", note: "interested in beta" },
+  inviteToken: tokenFromEmail,
+});
+```
+
+### Handle the callback (instance method — preferred)
+
+When the callback page can construct a client (you already have the JWT or are happy to re-init):
 
 ```typescript
 const params = new URLSearchParams(window.location.search);
@@ -53,158 +67,168 @@ const state = params.get("state");
 
 if (code && state) {
   await client.handleOAuthCallback(code, state);
-  // Client is now authenticated and WebSocket is connected
+  // Token now stored, WebSocket reconnected. Navigate.
   window.location.href = "/";
 }
 ```
 
-Alternatively, use the static method when you don't have a client instance yet (e.g., a standalone callback page):
+### Handle the callback (static method — when no client yet)
 
 ```typescript
 import { JsBaoClient } from "js-bao-wss-client";
 
-const params = new URLSearchParams(window.location.search);
-const code = params.get("code");
-const state = params.get("state");
+const token = await JsBaoClient.exchangeOAuthCode({
+  apiUrl: API_URL,
+  appId: APP_ID,
+  code,
+  state,
+  // Pass these if your app uses a refresh proxy:
+  refreshProxyBaseUrl: `${window.location.origin}/proxy`,
+  refreshProxyCookieMaxAgeSeconds: 7 * 24 * 60 * 60,
+});
+// Persist however your app does (storage / cookie / pass to initializeClient)
+```
 
-if (code && state) {
-  const token = await JsBaoClient.exchangeOAuthCode({
-    apiUrl: API_URL,
-    appId: APP_ID,
-    code,
-    state,
-  });
+**Don't:**
 
-  // Store token and initialize client
-  localStorage.setItem("jwt", token);
-  window.location.href = "/";
-}
+```typescript
+// WRONG — startOAuthFlow does not return a token. It redirects.
+const token = await client.startOAuthFlow();
+
+// WRONG — handleOAuthCallback does not return the token either; it stores it.
+const { token } = await client.handleOAuthCallback(code, state);
 ```
 
 ---
 
-## Magic Link Authentication
+## Magic Link
 
-### Request Magic Link
+### Request
 
 ```typescript
+// Requires oauthRedirectUri set on the client OR explicit redirectUri option.
 await client.magicLinkRequest("user@example.com");
-// User receives email with sign-in link
+
+// Override the redirect:
+await client.magicLinkRequest("user@example.com", {
+  redirectUri: "https://app.example.com/auth/magic-callback",
+});
 ```
 
-### Handle Magic Link Callback
+Throws `Error("Redirect URI not configured")` if neither is set.
+
+### Verify (callback page reads `?magic_token=...`)
 
 ```typescript
-const params = new URLSearchParams(window.location.search);
-const magicToken = params.get("magic_token");
+const magicToken = new URLSearchParams(window.location.search).get("magic_token");
 
 if (magicToken) {
   const { user, isNewUser, promptAddPasskey } = await client.magicLinkVerify(magicToken);
-
-  if (isNewUser) {
-    // Show onboarding for new users
-  }
-
-  if (promptAddPasskey) {
-    // Prompt user to add passkey for faster future logins
-  }
+  // Token is now stored on the client and WS auto-connects.
+  if (isNewUser) showOnboarding();
+  if (promptAddPasskey) offerPasskeyRegistration();
 }
+```
+
+The query param name is **`magic_token`** (not `token`, `magicToken`, or `code`).
+
+To accept an invitation server-side at verify time (so the deferred grant resolves to the signing-in user even when emails differ), pass `inviteToken`:
+
+```typescript
+await client.magicLinkVerify(magicToken, { inviteToken: inviteTokenFromUrl });
 ```
 
 ---
 
-## OTP (Email Code) Authentication
-
-### Request OTP
+## OTP (Email Code)
 
 ```typescript
 await client.otpRequest("user@example.com");
-// User receives 6-digit code via email
-// Code valid for 10 minutes
-```
 
-### Verify OTP
-
-```typescript
+// User enters the 6-digit code from email.
 const { user, isNewUser } = await client.otpVerify("user@example.com", "123456");
 
-if (isNewUser) {
-  // Show onboarding
-}
+if (isNewUser) showOnboarding();
 ```
 
-### Error Handling
+Same `{ inviteToken }` option is supported on `otpVerify`.
+
+### Error handling
+
+`AuthError` is thrown for non-2xx responses with a machine-readable `code`. Import from the package:
 
 ```typescript
+import { AuthError, AUTH_CODES } from "js-bao-wss-client";
+
 try {
   await client.otpVerify(email, code);
-} catch (error) {
-  switch (error.code) {
-    case "OTP_NOT_ENABLED":
-      // OTP not enabled for this app
-      break;
-    case "RATE_LIMITED":
-      // Too many attempts
-      break;
-    case "OTP_MAX_ATTEMPTS":
-      // Max verification attempts, request new code
-      break;
-    case "INVALID_TOKEN":
-      // Invalid or expired code
-      break;
+} catch (err) {
+  if (err instanceof AuthError) {
+    switch (err.code) {
+      case AUTH_CODES.OTP_NOT_ENABLED:        // OTP off in admin console
+      case AUTH_CODES.RATE_LIMITED:           // too many requests
+      case AUTH_CODES.OTP_MAX_ATTEMPTS:       // too many bad guesses; request new code
+      case AUTH_CODES.INVALID_TOKEN:          // bad/expired code
+      case AUTH_CODES.INVITATION_REQUIRED:    // invite-only app, no invitation
+      case AUTH_CODES.DOMAIN_NOT_ALLOWED:     // domain-mode app, email not in allowed domains
+      case AUTH_CODES.ADDED_TO_WAITLIST:      // waitlist enabled, user added
+      case AUTH_CODES.RESERVED_EMAIL_FOR_ADMIN: // reserved domain
+        showUserMessage(err.message);
+        return;
+    }
   }
+  throw err;
 }
 ```
+
+The same `AuthError` codes apply to `magicLinkRequest`/`magicLinkVerify` and `passkey*` methods.
 
 ---
 
-## Passkey Authentication
+## Passkeys
 
-Passkeys require an existing account (created via OAuth, Magic Link, or OTP).
+`passkeyAuthStart` works without an existing session (used to sign in). `passkeyRegisterStart` and management methods require an authenticated client.
 
-### Sign In with Passkey
+### Sign in
 
 ```typescript
 import { startAuthentication } from "@simplewebauthn/browser";
 
-// 1. Get authentication options
 const { options, challengeToken } = await client.passkeyAuthStart();
-
-// 2. Authenticate with browser
 const credential = await startAuthentication({ optionsJSON: options });
-
-// 3. Complete authentication
-const { user } = await client.passkeyAuthFinish(credential, challengeToken);
+const { user, isNewUser } = await client.passkeyAuthFinish(credential, challengeToken);
 ```
 
-### Add Passkey to Account
-
-User must be authenticated first:
+### Register (must be authenticated)
 
 ```typescript
 import { startRegistration } from "@simplewebauthn/browser";
 
-// 1. Get registration options
 const { options, challengeToken } = await client.passkeyRegisterStart();
-
-// 2. Create passkey with browser
 const credential = await startRegistration({ optionsJSON: options });
 
-// 3. Complete registration
 await client.passkeyRegisterFinish(credential, challengeToken, "MacBook Pro");
+// Optional 4th arg: { inviteToken } for invite acceptance during registration.
 ```
 
-### Manage Passkeys
+**Don't:**
 
 ```typescript
-// List passkeys
+// WRONG — must call startAuthentication/startRegistration between start and finish.
+const { challengeToken } = await client.passkeyAuthStart();
+await client.passkeyAuthFinish(/* ??? */, challengeToken);
+
+// WRONG — passkeyRegisterStart 401s if there is no current session.
+// Sign the user in (OAuth/magic link/OTP/existing passkey) before registering.
+```
+
+### Manage
+
+```typescript
 const { passkeys } = await client.passkeyList();
 // [{ passkeyId, deviceName, createdAt, lastUsedAt }]
 
-// Update device name
 await client.passkeyUpdate(passkeyId, { deviceName: "Work Laptop" });
-
-// Delete passkey
 await client.passkeyDelete(passkeyId);
 ```
 
@@ -212,208 +236,123 @@ await client.passkeyDelete(passkeyId);
 
 ## Auth Events
 
-Listen for authentication state changes:
+These are the canonical events. `auth-failed` and `auth:onlineAuthRequired` are the ones most apps must handle.
 
 ```typescript
-// Auth failed - prompt re-login
-client.on("auth-failed", ({ message }) => {
-  console.error("Auth failed:", message);
+// Token refresh failed or server invalidated session — prompt re-login.
+client.on("auth-failed", ({ message, reason }) => {
   redirectToLogin();
 });
 
-// Auth succeeded
+// Token applied successfully (login, refresh, or OAuth callback).
 client.on("auth-success", ({ token, previousToken, cause }) => {
-  console.log("Authenticated, cause:", cause);
+  // cause: "oauthCallback" | "magicLinkVerify" | "otpVerify" | "passkeyAuth" | "manual" | ...
 });
 
-// Online auth required (went online without token)
+// Came back online without a valid token. Show sign-in.
 client.on("auth:onlineAuthRequired", () => {
-  promptUserToSignIn();
+  promptSignIn();
 });
 
-// Auth state changes
+// Generic state machine event — fires on transitions.
 client.on("auth:state", ({ authenticated, mode, userId }) => {
-  // mode is "online" | "offline" | "none" | "auto"
-  console.log("Auth state:", authenticated, mode, userId);
+  // mode: "online" | "offline" | "none" | "auto"
 });
 
-// Logout lifecycle
-client.on("auth:logout", () => {
-  // Logout started - clear sensitive state
-});
-
-client.on("auth:logout:complete", () => {
-  // Logout finished
-});
+client.on("auth:logout", () => clearSensitiveUI());
+client.on("auth:logout:complete", () => navigateHome());
 ```
 
-### Minimal Auth Handler
+**Don't:**
+
+```typescript
+// WRONG — there is no onAuthStateChange or signInWithGoogle on JsBaoClient.
+// Use the events above and the explicit start*/verify* methods.
+client.onAuthStateChange((u) => {});
+await client.signInWithGoogle();
+```
+
+### Minimal handler
 
 ```typescript
 const promptLogin = () => navigateToLogin();
-
 client.on("auth-failed", promptLogin);
 client.on("auth:onlineAuthRequired", promptLogin);
-client.on("auth:state", ({ authenticated }) => {
-  if (!authenticated) promptLogin();
-});
+client.on("auth:state", ({ authenticated }) => { if (!authenticated) promptLogin(); });
 ```
 
 ---
 
-## Auth State Model
-
-The [primitive-app-template](https://github.com/AnchorPal/primitive-app-template) provides a `userStore` (Pinia store) and `AppLayout` component that implement the patterns described in this section. If you're not using the template, the same concepts apply — you'll need to implement equivalent auth state tracking in your own store/component layer.
-
-The `userStore` exposes two key flags. Understanding their semantics is important for writing correct application code.
-
-### `isInitialized` — one-way gate
-
-Once `true`, it stays `true` for the lifetime of the app. It means the store has completed setup: event listeners are registered, auth config is loaded, and the store's reactive state is meaningful. It does **not** imply the user is authenticated.
-
-Used by the router guard to catch developer errors (navigating to protected routes before the store is ready). Most application code does not need to check this directly.
-
-### `isAuthenticated` — live reactive signal
-
-Indicates whether the user has a valid session **right now**. Unlike `isInitialized`, this can change in both directions at any time:
-
-- `false → true`: returning user (JWT in storage) during `initialize()`, or OAuth/magic link/passkey completing later
-- `true → false`: server-side session invalidation (`auth-failed` event), explicit logout
-
-This is a reactive ref, not a promise that resolves once. Treat it as ongoing state, not a one-time gate.
-
-### `currentUser`
-
-Populated **before** `isAuthenticated` becomes `true`. Safe to read whenever `isAuthenticated` is `true`.
-
-### Auth-Dependent Code Patterns
-
-#### AppLayout auth gate (recommended default)
-
-The template's `AppLayout` (provided by primitive-app-template) gates all child content on `isAuthenticated`. If you're not using the template, implement an equivalent gate in your own layout. This means any component rendered inside the layout can assume:
-
-- `currentUser` is available and non-null
-- If auth is lost mid-session (token expiry, server-side invalidation), the component unmounts automatically
-
-```vue
-<!-- AppLayout.vue template structure -->
-<template v-if="!userStore.isAuthenticated">
-  <LoadingSpinner />
-</template>
-<div v-else>
-  <!-- All app content here — currentUser guaranteed available -->
-  <router-view />
-</div>
-```
-
-This is the primary mechanism for preventing auth timing bugs. Components inside the layout **do not** need to check `isAuthenticated` or guard against `currentUser` being null.
-
-#### Downstream stores — react to `isAuthenticated`
-
-Stores that depend on auth state (e.g., opening documents, loading user-specific data) should watch `isAuthenticated` reactively rather than checking it once:
+## Token Inspection & Manual Token
 
 ```typescript
-// In a layout or app-level component
-watch(
-  () => userStore.isAuthenticated,
-  async (isAuth, wasAuth) => {
-    if (isAuth && !wasAuth) {
-      // Auth gained — initialize auth-dependent resources
-      await myStore.initialize();
-    } else if (!isAuth && wasAuth) {
-      // Auth lost — clean up
-      myStore.reset();
-    }
-  },
-  { immediate: true }
-);
+client.isAuthenticated();         // boolean
+client.getToken();                // string | null
+
+// Manually set a token (e.g. you obtained one out-of-band). Triggers
+// auth-success and pushes through the normal apply-token pipeline.
+client.setToken(jwt, { cause: "external" });
+
+// Wait until a userId is available. Default timeout 5000ms.
+const userId = await client.waitForUserId({ timeoutMs: 5000 });
+
+// Wait until authenticated AND offline DBs are ready. Returns mode.
+const { userId, mode } = await client.waitForAuthReady({ timeoutMs: 6000 });
 ```
 
-This handles both directions: initialization when auth arrives, and cleanup when auth is lost.
+`isAuthenticated()` returns true when either an online JWT or an unlocked offline identity is present.
 
-#### Sequencing: auth → documents → data
+**Don't:**
 
-The correct initialization sequence for auth-dependent data loading is:
+```typescript
+// WRONG — there is no client.auth.setToken. It's client.setToken(...).
+client.auth.setToken(jwt);
 
-1. **Auth ready** (`isAuthenticated` becomes `true`)
-2. **Open required documents** (call `documents.open()`)
-3. **Query data** (via `useJsBaoDataLoader` with `documentReady`)
-
-Do not open documents or query data before authentication is complete. The template's AppLayout auth gate ensures this structurally for components inside the layout; if you're not using the template, ensure your own layout provides an equivalent gate.
-
-### How the Router Guard and Layout Gate Work Together
-
-These serve complementary purposes:
-
-- **Router guard** (`beforeEach`): prevents **navigation** to protected routes when `isAuthenticated` is `false`. Runs on route transitions only.
-- **Layout auth gate** (`v-if`): prevents **rendering** of protected content. Handles the case where `isAuthenticated` transitions from `true → false` while the user is already on a protected route (e.g., session expiry).
-
-The router guard is navigation-scoped; the layout gate is render-scoped. Together they ensure protected content is never visible to unauthenticated users, regardless of how the auth state changes.
+// WRONG — opening documents before auth is ready throws or fails silently.
+const doc = await client.openDocument(id);     // before await client.waitForAuthReady()
+```
 
 ---
 
 ## JWT Persistence
 
-Persist JWT across page reloads (optional). Import from `js-bao-wss-client`:
+Optional — persists the JWT to storage so a page reload doesn't require re-authentication.
 
 ```typescript
 import { initializeClient } from "js-bao-wss-client";
 
 const client = await initializeClient({
-  // ... other options
+  apiUrl, wsUrl, appId, oauthRedirectUri,
   auth: {
     persistJwtInStorage: true,
-    storageKeyPrefix: "my-app", // Namespace for multi-tenant
+    storageKeyPrefix: "my-app", // namespace; required for multi-tenant on same origin
   },
 });
 
-// Check persistence status
 const info = client.getAuthPersistenceInfo();
-// { mode: "persisted", hydrated: true/false }
+// { mode: "memory" | "persisted", hydrated: boolean }
 ```
 
-**Notes:**
-- Token only reused if still valid (not within 2 min of expiry)
-- Cleared on logout or auth failure
-- Useful for reducing refresh calls on reload
+Persisted tokens within ~2 min of expiry are not reused. Tokens are cleared on logout and on `auth-failed`.
 
 ---
 
-## First-Party Refresh Proxy
-
-For Safari and browsers that block third-party cookies:
+## Refresh Proxy (Safari / 3rd-party cookie blockers)
 
 ```typescript
 const client = await initializeClient({
-  // ... other options
+  // ...
   auth: {
     refreshProxy: {
       baseUrl: `${window.location.origin}/proxy`,
-      cookieMaxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
-      enabled: true, // optional, defaults to true when refreshProxy is provided
+      cookieMaxAgeSeconds: 7 * 24 * 60 * 60,
+      enabled: true, // optional; defaults to true when refreshProxy is provided
     },
   },
 });
 ```
 
-The `baseUrl` should point to a same-origin worker that forwards to `/app/:appId/api/auth/*`.
-
----
-
-## Token Management
-
-```typescript
-// Check if authenticated
-if (client.isAuthenticated()) {
-  const token = client.getToken();
-}
-
-// Manually set token
-client.setToken("new-jwt-token");
-
-// Wait for user ID (useful after init)
-const userId = await client.waitForUserId({ timeoutMs: 5000 });
-```
+`baseUrl` must be a same-origin worker that forwards `/auth/*` and `/oauth/callback` to `/app/:appId/api/auth/*`. When configured, `magicLinkVerify`, `otpVerify`, `handleOAuthCallback`, `logout`, and the OAuth-code static helper all route through the proxy.
 
 ---
 
@@ -421,102 +360,131 @@ const userId = await client.waitForUserId({ timeoutMs: 5000 });
 
 ```typescript
 await client.logout();
-// Clears token, closes connections, emits auth:logout events
+
+// With options:
+await client.logout({
+  redirectTo: "/signed-out",
+  wipeLocal: true,         // delete all locally cached document data + KV cache
+  revokeOffline: true,     // also delete the persisted offline grant
+  clearOfflineIdentity: true, // default true — drop in-memory offline identity
+  waitForDisconnect: true, // wait for WS close before resolving
+});
 ```
+
+Logout fires `auth:logout` immediately and `auth:logout:complete` when finished.
+
+---
+
+## Auth State in Apps (Vue/template-aware)
+
+The [primitive-app-template](https://github.com/AnchorPal/primitive-app-template) provides a `userStore` (Pinia) and `AppLayout` that implement these patterns. If you're not using the template, replicate the same gates.
+
+### Two key flags
+
+- **`isInitialized`** — one-way. Becomes `true` once the store has wired listeners and loaded auth config. Does not mean the user is signed in. Used by router guards.
+- **`isAuthenticated`** — live reactive. Can flip in either direction at any time (token expiry, server invalidation, login).
+
+### Layout gate (recommended default)
+
+```vue
+<template v-if="!userStore.isAuthenticated">
+  <LoadingSpinner />
+</template>
+<div v-else>
+  <router-view />  <!-- currentUser guaranteed non-null inside here -->
+</div>
+```
+
+Components inside the gate **don't** need to null-check `currentUser` or watch `isAuthenticated`. If auth is lost, they unmount.
+
+### Reactive watchers (downstream stores)
+
+```typescript
+watch(
+  () => userStore.isAuthenticated,
+  async (isAuth, wasAuth) => {
+    if (isAuth && !wasAuth) await myStore.initialize();
+    else if (!isAuth && wasAuth) myStore.reset();
+  },
+  { immediate: true }
+);
+```
+
+### Initialization order
+
+1. Auth ready (`isAuthenticated === true` or `await client.waitForAuthReady()`)
+2. Open documents (`documents.open(...)`)
+3. Query data (e.g., `useJsBaoDataLoader` with `documentReady`)
+
+Don't open documents or hit data APIs before step 1.
 
 ---
 
 ## Deferred Grant Resolution at Signup
 
-Signing in also resolves any pending `DeferredDocumentPermission` and `DeferredGroupAdd` records for the user's email. This happens automatically inside `UserProvisioningService` on first provision, after cleanup-on-access runs.
+Sign-in resolves any pending `DeferredDocumentPermission` and `DeferredGroupAdd` records for the user's email automatically inside `UserProvisioningService`.
 
-**Implications for agent code:**
+Implications:
 
-1. **Don't duplicate permission logic after signup.** If someone shared a document with the user's email before they signed up, the document is already in their bookmarks and they already have access — do not re-check and re-grant.
-2. **Domain-mode apps re-validate at resolution time.** A deferred grant for an email outside the allowed domains is dropped silently, and the invitation is rejected.
-3. **The `invitation`/`accepted` WS event fires after resolution completes.** Subscribe to it if you want to refresh UI on another already-signed-in user's session (the inviter).
+1. **Don't re-grant after signup.** If a doc was shared with the email pre-signup, the new user already has the bookmark and access.
+2. **Domain-mode apps re-validate at resolution.** Deferred grants for emails outside allowed domains are silently dropped.
+3. **`invitation`/`accepted` WS events fire after resolution** — subscribe to refresh the inviter's UI.
 
-See the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md#deferred-grants) for the full flow.
+See the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md#deferred-grants).
 
 ---
 
-## Test User Sign-In for Automated Tests
+## Test User Sign-In (non-prod only)
 
-For integration tests and local development, Primitive supports a `+primitive` OTP bypass that issues short-lived tokens without going through the email flow.
-
-```bash
-# Creates/selects the user and returns a 30-minute token
-primitive test-users login alice+primitive@example.com
-```
+There is **no `primitive test-users` CLI command**. The bypass is server-side: an OTP request for an email containing `+primitive` accepts the magic code `"000000"` instead of the emailed code.
 
 ```typescript
-// In an integration test
-const token = await runCli("test-users login alice+primitive@example.com");
-client.auth.setToken(token);
+// In a non-production environment with ENABLE_TEST_FEATURES=true
+// (or ENVIRONMENT=local|test|dev):
+await client.otpRequest("alice+primitive@example.com");
+const { user } = await client.otpVerify("alice+primitive@example.com", "000000");
 ```
 
-**Guardrails:**
+Guardrails:
 
-- Env-gated. Production servers reject these requests.
-- 30-minute tokens. Regardless of normal session length.
-- Regular-user scope only — cannot mint admin tokens.
-- Requires a valid `AppInvitation` for the app.
+- Env-gated. Production servers reject `"000000"` and fall through to the normal OTP path (which fails).
+- The user must already exist as an `AppUser` in this app — bypass never auto-provisions.
+- Issued tokens are short-lived (~30 minutes), regardless of session length config.
+- Cannot mint admin tokens.
 
-**Do not use in production flows.** This path exists solely for automated tests and local dev.
+**Don't use this in production user flows.**
 
 ---
 
 ## Customizing Email Templates
 
-The emails Primitive sends for Magic Link, OTP, access requests, share notifications, and any custom workflow emails can be customized via the CLI:
+The Magic Link, OTP, and other emails Primitive sends can be customized via the CLI:
 
 ```bash
-# See all email types (built-in + custom) and their override status
-primitive email-templates list
-
-# View a template (shows subject, HTML/text body, and available variables)
-primitive email-templates get magic-link
-primitive email-templates get otp
-primitive email-templates get access-request-created
-
-# See what variables are available in a template
-primitive email-templates variables magic-link
-
-# Override a template with custom content
+primitive email-templates list                       # all types + override status
+primitive email-templates get magic-link             # subject + body + variables
+primitive email-templates variables magic-link       # available {{vars}}
 primitive email-templates set magic-link \
   --subject "Sign in to MyApp" \
   --html-file ./emails/magic-link.html \
   --text-file ./emails/magic-link.txt
-
-# Register a custom template type (any kebab-case name)
-primitive email-templates set order-confirmation \
-  --subject "Order {{orderId}}" \
-  --html-file ./emails/order.html
-
-# Send a test email to verify your template
-primitive email-templates test magic-link
-
-# Revert to the default template
-primitive email-templates delete magic-link
+primitive email-templates test magic-link            # send test email
+primitive email-templates delete magic-link          # revert to default
 ```
 
-Email template overrides are tracked as part of `primitive sync`, stored as TOML files in `email-templates/`. This lets you version-control your email customizations alongside other app configuration.
-
-Custom template types can be referenced from the `email.send` workflow step. See the [Workflows guide](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md) for the step reference.
+Overrides are tracked by `primitive sync` (TOML in `email-templates/`). Custom templates can be triggered from `email.send` workflow steps — see the [Workflows guide](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md).
 
 ---
 
 ## Implementation Checklist
 
-When implementing auth in a Primitive app:
-
-1. **Check available methods** with `getAuthConfig()`
-2. **Implement at least one primary method** (OAuth or Magic Link)
-3. **Handle the callback route** for OAuth/Magic Link
-4. **Listen to auth events** for state changes
-5. **Consider passkeys** for returning users
-6. **Handle errors gracefully** with user-friendly messages
-7. **Customize email templates** if the default magic-link/OTP emails need branding
-8. **Gate your app layout on `isAuthenticated`** so child components can assume `currentUser` is always available
-9. **Watch `isAuthenticated` reactively** in downstream stores — it can change in both directions at any time
-10. **Sequence initialization correctly**: auth ready → open documents → query data
+1. Call `getAuthConfig()` to discover enabled methods before rendering UI.
+2. Implement at least one primary method (OAuth or Magic Link).
+3. Build a callback route for OAuth (`?code=&state=`) and Magic Link (`?magic_token=`).
+4. Listen to `auth-failed` and `auth:onlineAuthRequired` (minimum) to prompt re-login.
+5. Catch `AuthError` and switch on `err.code` (use `AUTH_CODES` constants).
+6. Gate your app layout on `isAuthenticated` so child components can assume `currentUser`.
+7. Watch `isAuthenticated` reactively in downstream stores (it changes both directions).
+8. Sequence: auth ready → open documents → query data.
+9. Offer passkey registration when `promptAddPasskey` is true after magic-link/OTP verify.
+10. Customize email templates via CLI if you need branded auth emails.

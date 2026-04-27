@@ -1,258 +1,230 @@
 # Data Modeling and Storage Architecture in Primitive
 
-Guidelines for choosing between documents and databases, and designing your app's data architecture.
+How to choose between **documents** and **databases**, and how to combine them. Read this before designing the data layer of any new feature.
 
-## Overview
+## The two storage systems
 
-Primitive provides two storage systems that serve different needs:
+| | **Documents** (js-bao) | **Databases** (js-bao-wss) |
+|---|---|---|
+| Backed by | Yjs CRDT + IndexedDB cache, synced over WebSocket | Cloudflare Durable Object + SQLite, called over HTTPS |
+| Where data lives | On every client that has access, plus the server | Server only |
+| Reads | Local, synchronous after `documents.open()` | Network round-trip per call |
+| Writes | Local first, async sync to server, automatic CRDT merge | Network round-trip; last-write-wins per field |
+| Concurrent edits | Merge cleanly (Yjs) — true collaborative editing | No merge; concurrent writers race |
+| Real-time updates | Built in for everyone with the doc open | Opt-in via registered subscriptions (CEL filter per change) |
+| Offline | Yes — reads/writes work offline, sync resumes on reconnect (`offline: true` on the client) | No — every call requires the network |
+| Access control | Whole-document grant: `reader`, `read-write`, `owner` | Per-operation CEL on registered operations |
+| Per-record access for end users | Not possible — anyone with the doc gets everything | Yes — operation CEL + filters scope what each caller sees |
+| Practical size | ~10 MB per document (soft) | ~5 GB per database (one DO each) |
+| Server-enforced fields | No (client writes Yjs updates directly) | Yes — triggers (`createdAt`, `createdBy`, etc.) |
+| Aggregates / multi-step reads | Client-side over local data | `aggregate`, `pipeline`, `count` operations |
 
-- **Documents** — local-first, real-time collaborative storage synced to client devices
-- **Databases** — server-side storage with fine-grained access control via registered operations
+The corollaries that follow are what to use when picking sides.
 
-Most apps use one or both depending on the data. This guide helps you make the right choice and shows common patterns.
+## Decision rules
 
-## Decision Framework
+Apply these in order. Stop at the first one that fits.
 
-### When to ask clarifying questions
+1. **Different users need to see different records inside the same dataset?** → **Database**. Documents grant access to the whole document; you cannot project rows out per user.
+2. **Multiple users editing the same data live (Google-Docs style)?** → **Document**. Yjs is the only system here that merges concurrent edits without conflict.
+3. **Must work offline?** → **Document** (open the client with `offline: true`). Databases need the network for every call.
+4. **Dataset will exceed ~10 MB for a single sharing unit, or users only need a slice?** → **Database**. Documents replicate fully to every client.
+5. **Server must own a field (timestamps, audit fields, computed status, role assignments)?** → **Database**. Use triggers; documents have no equivalent.
+6. **Need aggregates, group-by, or one round-trip that touches several models?** → **Database** (`aggregate`, `pipeline`).
+7. **None of the above and the data is per-user or per-shared-workspace?** → **Document**. Cheaper, lower latency, simpler.
 
-If the user's requirements clearly match one storage system based on the decision table below, proceed without asking. But if any of the following are ambiguous, **ask the user before choosing**:
+If after running through these the answer is still ambiguous, ask the user before designing the data layer. Migrating between the two systems later is expensive.
 
-- **Sharing model unclear**: Will data be private, shared with specific people, or visible to different roles with different access? If the user hasn't mentioned sharing or collaboration, ask: *"Will this data be private to each user, or do you need to share it — and if shared, does everyone see the same thing or do different users need different access?"*
-- **Data size unclear**: Could the dataset grow beyond ~10MB per logical unit? If you can't estimate from context, ask: *"How much data do you expect per user/workspace/tenant? A rough order of magnitude helps — hundreds of records, thousands, millions?"*
-- **Access control unclear**: Are there distinct roles that need different visibility into the same data? If the user describes multiple user types but hasn't specified access patterns, ask: *"Do all users see the same data, or do different roles (e.g., admin vs. member) need to see or edit different subsets?"*
-- **Offline / real-time unclear**: If the app context doesn't make it obvious whether offline support or real-time collaboration matters, ask rather than assume.
+### Common false signals
 
-The goal is to avoid choosing the wrong storage system and having to migrate later. A quick clarifying question is much cheaper than a redesign.
+- "Real-time" alone does **not** mean documents. Databases push live changes via registered subscriptions; the difference is that documents also merge concurrent **edits**.
+- "Shared with a team" alone does **not** mean databases. Documents share cleanly with groups when every member should see everything in the document.
+- "Has a server" does not mean databases. Documents are also synced through a server — but the server treats the doc as opaque Yjs state and cannot enforce per-record rules.
 
-### Quick decision table
+### When to ask the user
 
-| Question | Documents | Databases |
-|----------|-----------|-----------|
-| Does every user with access need the full dataset? | Yes | No — users need filtered subsets |
-| Do you need real-time collaborative editing? | Yes | No |
-| Do you need offline access? | Yes | No — requires network |
-| Is the dataset small enough that users typically want all of it? | Yes — data is <10MB or splits naturally into <10MB chunks | No — dataset is large or users only need a subset |
-| Do different users need different access to records within the same collection? | No — all-or-nothing per document | Yes — per-operation CEL rules |
+If you cannot answer one of these from context, ask before building:
 
-### Use documents when
+- **Sharing model**: private per user, shared identically with a group, or per-record visibility?
+- **Volume**: order of magnitude of records and total bytes per sharing unit?
+- **Roles**: do different roles see different subsets of the same data?
+- **Offline / collaborative editing**: required, nice-to-have, or irrelevant?
 
-- **Uniform access**: All users with access see the same data and have the same capabilities (reader or read-write)
-- **Small or naturally partitioned data**: Dataset is <10MB, or splits cleanly into <10MB chunks where users typically want all the data in their chunk
-- **Collaborative editing**: Multiple users editing the same data in real-time (like Google Docs)
-- **Offline-first**: Apps that must work without network connectivity
+## Canonical patterns
 
-### Use databases when
+### Document — single per-user document (personal apps)
 
-- **Fine-grained access**: Different users need to see or modify different records within the same dataset
-- **Large or partial-access data**: Dataset is large (up to 5GB per database) or users only need a filtered subset
-- **Server-enforced rules**: Timestamps, audit trails, computed fields that must not be client-editable
-- **Analytics and aggregation**: Counting, summing, grouping data across many records
-- **Multi-step operations**: Dashboard views combining data from multiple collections in one request
+```typescript
+// On app load, after sign-in
+const { documentId } = await jsBaoClient.documents.getOrCreateWithAlias({
+  title: "My Data",
+  alias: { scope: "user", aliasKey: "default" },
+});
+await jsBaoClient.documents.open(documentId);
 
-## Example App Architectures
-
-### Personal productivity app (documents only)
-
-**Example:** Task manager, habit tracker, budgeting tool
-
-All data is personal. One document per user holds everything.
-
-```
-Storage: Documents only
-├── Root document → user preferences, settings
-└── Default document (via alias) → all tasks, lists, categories
-```
-
-**Why documents:** Data is personal, fits on-device, benefits from offline access and instant local reads. No need for server-side access control.
-
-See: [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md) — Pattern 1: Single Document
-
-### Collaborative workspace (documents only)
-
-**Example:** Shared shopping lists, project boards, collaborative notes
-
-Users create workspaces and share them with teammates. Everyone in a workspace has the same access.
-
-```
-Storage: Documents only
-├── Root document → user preferences
-└── One document per workspace → all workspace data
-    ├── Shared with team at read-write level
-    └── Owner manages sharing
+// Reads are local and synchronous after open()
+const tasks = await Task.query({ completed: false });
 ```
 
-**Why documents:** Real-time collaboration is key. Access is all-or-nothing per workspace, which maps cleanly to document sharing. Each workspace stays under ~10MB.
+Use for: task managers, journals, settings, preferences. Root document also works for a single per-user doc with no sharing.
 
-See: [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md) — Pattern 2: One Document at a Time
+### Document — one per workspace (shared collaboratively)
 
-### Classroom / LMS app (databases + documents)
+```typescript
+const { metadata } = await jsBaoClient.documents.create({
+  title: "Project Alpha",
+  tags: ["workspace"],
+});
+await jsBaoClient.documents.open(metadata.documentId);
 
-**Example:** Teachers create classes, students submit work, parents view progress
-
-Different roles need different access. Teachers see all students. Students see only their own work. Parents see only their children's data.
-
-```
-Storage: Both
-├── Documents
-│   └── Per-submission document → student work (rich content, collaborative editing, real-time)
-│       ├── One document per assignment submission
-│       └── Shared with teacher at read-write for feedback/grading
-│
-└── Databases (type: "classroom")
-    ├── Per-class database → assignments, grades, roster, submission metadata
-    │   ├── Operations:
-    │   │   ├── "listAssignments" → access: "true" (all class members)
-    │   │   ├── "submitWork" → access: "params.studentId == userId"
-    │   │   ├── "gradeSubmission" → access: "isMemberOf('teacher')"
-    │   │   └── "myGrades" → access: "params.studentId == userId"
-    │   └── Triggers: createdAt, modifiedAt on all models
-    └── Groups: teacher, student, parent-of (for group-based access)
+await jsBaoClient.documents.setPermissions(metadata.documentId, [
+  { email: "alice@example.com", permission: "read-write" },
+]);
 ```
 
-**Why both:**
-- **Documents** for student submissions — rich content editing, real-time collaboration (student writes, teacher comments), offline drafting
-- **Databases** for everything else — assignments, grades, rosters need fine-grained access (students see only their own grades, teachers see all, parents see only their children's), server-enforced grade integrity, aggregations for teacher dashboards
+Use when each workspace is a sharing unit and every member of that workspace needs the full contents. Stays under ~10 MB per workspace.
 
-### E-commerce / marketplace (databases + documents)
+### Database — registered operation with CEL access
 
-**Example:** Product catalog, orders, inventory with seller and buyer roles
-
-```
-Storage: Both
-├── Documents
-│   └── Per-user document → shopping cart, wishlists, preferences (offline, instant access)
-│
-└── Databases
-    ├── App-wide database (type: "catalog")
-    │   ├── Products, categories, reviews
-    │   ├── Operations:
-    │   │   ├── "searchProducts" → access: "true"
-    │   │   ├── "addProduct" → access: "isMemberOf('admin') || isMemberOf('verified-seller')"
-    │   │   └── "productStats" → pipeline with aggregates (admin only)
-    │   └── Triggers: createdAt, modifiedAt, searchIndex fields
-    │
-    └── Per-seller database (type: "seller_store")
-        ├── Orders, inventory, analytics
-        ├── Operations:
-        │   ├── "myOrders" → access: "params.buyerId == userId"
-        │   ├── "sellerOrders" → access: "isMemberOf('seller')"
-        │   └── "salesDashboard" → pipeline, seller access only
+```toml
+# config/database-types/project.toml
+[[operations]]
+name = "listMyTasks"
+type = "query"
+modelName = "tasks"
+access = "isMemberOf('team', database.metadata.teamId)"
+definition = '{"filter":{"assigneeId":"$user.userId"},"sort":{"createdAt":-1},"limit":50}'
 ```
 
-**Why both:**
-- **Documents** for cart/wishlist — must work offline, personal data, instant updates
-- **Databases** for catalog — large dataset, server-side search/filter, role-based CRUD
-- **Separate databases per seller** — Durable Object isolation gives per-seller scaling
+```typescript
+const db = await client.databases.create({
+  title: "Alpha",
+  databaseType: "project",
+});
+await client.databases.updateMetadata(db.databaseId, { teamId: "team-1" });
 
-### Multi-tenant SaaS (databases + documents)
-
-**Example:** Project management tool with organizations, teams, and projects
-
-```
-Storage: Both
-├── Documents
-│   └── Per-user document → personal dashboard layout, notification preferences
-│
-└── Databases
-    ├── Per-organization database (type: "org")
-    │   ├── Teams, members, settings
-    │   └── Operations gated by org membership
-    │
-    └── Per-project database (type: "project")
-        ├── Tasks, milestones, comments, files
-        ├── Operations:
-        │   ├── "listTasks" → access: "isMemberOf('team')"
-        │   ├── "createTask" → access: "isMemberOf('team')"
-        │   ├── "projectDashboard" → pipeline with task stats, milestone progress
-        │   └── "adminReport" → access: "isMemberOf('admin')"
-        └── Triggers: audit timestamps, status transition tracking
+const result = await client.databases.executeOperation(
+  db.databaseId,
+  "listMyTasks",
+  {},
+);
 ```
 
-**Why both:**
-- **Documents** for personal preferences — simple, offline, no sharing complexity
-- **Per-org and per-project databases** — each is a separate Durable Object for isolation and scaling. Team-based CEL access. Server-side dashboards and analytics.
+Use for: any data where access scopes change per record or per caller. The operation's CEL gate plus `$user.userId` / `$params.*` substitution does the per-row scoping for you.
 
-### Chat / messaging app (documents + databases)
+### Database — server-enforced fields via triggers
 
-**Example:** Channels with messages, direct messages, presence
-
-```
-Storage: Both
-├── Documents
-│   ├── Per-channel document → messages, reactions (real-time sync, collaboration)
-│   └── Per-DM document → direct message threads
-│
-└── Databases (type: "app_data")
-    ├── App-wide database → channel directory, user profiles, settings
-    ├── Operations:
-    │   ├── "listChannels" → access: "true"
-    │   ├── "createChannel" → access: "isMemberOf('admin')"
-    │   └── "searchUsers" → access: "true"
-    └── Triggers: createdAt on channels
+```toml
+[triggers.tasks]
+triggers = [
+  { on = "create", set = { createdAt = "now()", createdBy = "user.userId" } },
+  { on = "update", set = { modifiedAt = "now()" } },
+]
 ```
 
-**Why both:**
-- **Documents** for messages — real-time sync is critical, all channel members see everything, offline access
-- **Databases** for channel directory — app-wide, searchable, admin-controlled creation
+Triggers fire in the DO before save. Clients cannot bypass them, even if they call a mutation operation that doesn't include those fields.
 
-## Design Principles
+### Database — real-time subscription
 
-### 1. One Durable Object per logical boundary
+```toml
+[[subscriptions]]
+name = "my-open-tickets"
+modelName = "ticket"
+access = "user.userId != ''"
+filter = "record.assigneeId == user.userId && record.status == 'open'"
+```
 
-Each database is a separate Durable Object. Design boundaries around:
-- **Tenants** (one database per org/team/customer)
-- **Data domains** (one database for catalog, another for orders)
-- **Scale units** (if one collection could grow very large, give it its own database)
+```typescript
+const initial = await client.databases.executeOperation(dbId, "listMyTickets", {});
+const unsub = client.databases.subscribe(dbId, "my-open-tickets", {
+  onChange: (event) => applyChanges(event.changes),
+});
+```
 
-Don't put everything in one giant database. Multiple smaller databases scale better and provide natural isolation.
+Subscriptions deliver deltas only — always pair with an operation call for the initial state, and use semantically equivalent filters.
 
-### 2. Operations are your API
+## Worked architectures
 
-Registered operations are the interface between your app and its data. Design them like API endpoints:
-- **Name them clearly**: `listTasks`, `createTask`, `tasksByStatus`
-- **Keep access rules tight**: Start restrictive, widen as needed
-- **Use CEL variables**: `userId` for the authenticated user, `params.*` for operation parameters, `isMemberOf()` and `hasGroupRole()` for group-based access
-- **Declare parameters explicitly**: Type and require them properly
+### Personal productivity app
 
-### 3. Partition databases by context
+All data is per user. Documents only. One per-user document via `getOrCreateWithAlias`. Settings can sit in the root document via `userStore`.
 
-Create separate databases per tenant, project, or team rather than storing everything in one database. Each database is an isolated Durable Object. Use groups and `isMemberOf()` in CEL access expressions to control who can execute operations on each database.
+### Collaborative workspace (shopping lists, project boards)
 
-### 4. Use triggers for server-enforced invariants
+Documents only. One document per workspace. Owner shares with teammates via group or email. Real-time edits are free.
 
-If a field should always be set by the server (timestamps, creator ID, computed status), use triggers — don't trust client-provided values.
+### Classroom / LMS (mixed)
 
-### 5. Use groups for flexible access control
+- **Documents** for student work being actively drafted with teacher feedback (collaborative editing, offline drafting).
+- **Database** (`type: "classroom"`, one per class) for assignments, grades, roster. Operations like `submitWork` (`access: "params.studentId == userId"`) and `gradeSubmission` (`access: "isMemberOf('teacher')"`) enforce per-role visibility. Triggers stamp `submittedAt`, `gradedBy`.
 
-CEL functions (`isMemberOf(groupId)`, `hasGroupRole(groupId, role)`, `memberGroups(groupTypeId)`) enable access patterns like:
-- Team membership → can view/edit team data
-- Role-based access → managers vs. members within a group
-- Seller → can manage their own store
+### Multi-tenant SaaS / project management
 
-Groups are more flexible than hardcoded user ID checks for multi-tenant patterns where users have different access in different contexts. See the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) for full group management API and CEL patterns.
+- **Document** per user for personal preferences, dashboard layout.
+- **Database** per organization (`type: "org"`) and **per project** (`type: "project"`). Per-project DOs scale and isolate independently. Group membership (`team`, `admin`) gates operations.
 
-### 6. Documents for collaboration, databases for control
+### E-commerce
 
-If you're torn:
-- Will multiple people edit the same data simultaneously? → **Documents**
-- Do you need the server to enforce who sees what? → **Databases**
-- Both? → Use documents for the collaborative editing surface, databases for the structured data layer
+- **Document** per user for cart and wishlist (offline, instant).
+- **Database** (`type: "catalog"`, app-wide) for products, search, reviews. Per-seller `type: "seller_store"` databases for orders/inventory.
 
-## Common Mistakes
+### Chat / messaging
 
-| Mistake | Better approach |
-|---------|----------------|
-| Putting all app data in one database | Split by tenant/domain for isolation and scaling |
-| Using direct record access for end users | Use registered operations with CEL access control |
-| Granting database permissions to end users | `grantPermission` is for administrative control — use operations with CEL for end-user access |
-| Hardcoding values in operation definitions | Use `params.*` for operation parameters and `userId` for the authenticated user in CEL expressions |
-| Using documents for large shared datasets | Use databases with server-side filtering |
-| Using databases when you need real-time collaboration | Use documents — they handle sync and conflict resolution |
-| Trusting client-provided timestamps/IDs | Use triggers to set server-side values |
-| Making all operations `access: "true"` | Start restrictive — use `isMemberOf()` and `hasGroupRole()` for group-based access |
+- **Documents** per channel for messages — real-time CRDT sync handles concurrent posting and edits, full history available offline.
+- **Database** (app-wide) for the channel directory and user profiles, with `searchUsers`/`createChannel` operations.
 
-## Further Reading
+## Design principles
 
-- [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md) — full documentation on local-first document storage
-- [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) — full documentation on server-side database storage
-- [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) — user model, groups, and access control patterns
+### One Durable Object per logical boundary
+
+Each database is one DO. Split by tenant, project, or domain. Don't put everything in one giant database — multiple smaller databases scale better and isolate failures.
+
+### Operations are your API
+
+Registered operations are the only sane way to expose database data to end users:
+
+- Name them like API endpoints (`listTasks`, `createTask`, `tasksByStatus`).
+- Start `access` restrictive (`isMemberOf('team', database.metadata.teamId)`), widen as needed.
+- Use `$user.userId`, `$params.*`, `$database.metadata.*` for substitution; never hardcode user IDs.
+- Use `params: { ..., required: false }` to make a single operation accept optional filters instead of declaring `listX` and `listXByY` separately.
+
+### Use triggers, not client-supplied values, for invariants
+
+`createdAt`, `createdBy`, `modifiedAt`, computed status — all of these belong in `[triggers]`. Even if your client always sets them correctly, a future client (or a malicious one) won't.
+
+### Keep `database.metadata` small and mostly static
+
+Metadata is capped (~4 KB total, 1 KB per value, 20 keys). Use it as a lookup key — typically a `teamId` or `projectId` — that CEL access rules reference (`isMemberOf('team', database.metadata.teamId)`). For mutable settings users toggle at runtime, store them as a record and read them inside a pipeline (see the settings-record pattern in the Databases guide).
+
+### Use groups for access control, not user-ID checks
+
+`isMemberOf(groupType, groupId)` and `hasGroupRole(groupType, groupId, role)` scale better than per-user CEL conditions and let membership change without rewriting operations. Reach for a group whenever the same access pattern applies to more than one user.
+
+### When in doubt
+
+- Concurrent editing of the same content? → **Documents**.
+- Server must enforce who sees what? → **Databases**.
+- Both? → Documents for the editing surface, databases for the structured/queryable layer (see Classroom and E-commerce above).
+
+## Anti-patterns
+
+| Don't | Do |
+|---|---|
+| Iterate documents to query (`for (doc of docs) Model.query(...)`) | Open all needed documents and let `.query()` run across them; filter by `documentId` if needed |
+| Grant `manager` to end users so they can read records | Define registered operations with CEL `access`; `manager`/`owner` are administrative roles only |
+| Use direct record access (`db.connect(...).query(...)`) from end-user clients | Use `client.databases.executeOperation(...)`; direct access requires owner/manager |
+| Switch `setDefaultDocumentId()` repeatedly when the user changes context | Pass `targetDocument` explicitly on each `.save()` |
+| Stash mutable feature flags in `database.metadata` | Store as a record; read via a pipeline `$steps.*` reference |
+| Put one giant database for the whole app | One DO per tenant/project/domain |
+| Hardcode IDs in operation `definition` | Use `$user.userId`, `$params.*`, `$database.metadata.*` |
+| Trust client-provided `createdAt`, `createdBy`, role fields | Set them with `[triggers]` |
+| One operation per filter combination (`listPosts`, `listPostsByAuthor`, `listPostsByStatus`...) | One operation with `params` declared `required: false` |
+| Make every operation `access: "true"` | Start restrictive (`isMemberOf(...)`, `hasRole(...)`) and widen explicitly |
+| Use a database for real-time collaborative editing | Use a document — Yjs handles merge; databases will lose concurrent edits |
+| Use a document for a 100k-row dataset where each user only needs 50 rows | Use a database with a filtered registered operation |
+
+## Further reading
+
+- [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md) — full document API, sharing, sync, patterns
+- [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) — full database API, operations, triggers, subscriptions, pipelines
+- [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) — group membership, CEL functions, role-based access

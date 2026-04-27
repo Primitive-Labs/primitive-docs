@@ -1,203 +1,223 @@
 # Prompt Feature Guide for Coding Agents
 
-This guide explains the Primitive CLI prompt system—how to create, configure, test, and manage LLM prompts using the `primitive` CLI.
+How to author, test, and execute LLM prompts on Primitive using the `primitive` CLI, TOML files, and the client SDK.
 
-## Overview
+## Quick Mental Model
 
-The prompt feature provides:
+A **prompt** is a named template (e.g. `summarizer`) plus 1+ **configs**. Each config is a `(provider, model, systemPrompt, userPromptTemplate, ...)` tuple. One config is the **active** config — that's what gets used when you don't pass `--config` / `configId`. Test cases are attached to the prompt and verify outputs (regex / contains / JSON subset / LLM evaluator).
 
-- **Prompt definitions** with multiple configurations (different models, providers, parameters)
-- **Template-based prompts** with variable substitution using `{{ }}` syntax
-- **Test cases** with verification (pattern matching, contains checks, JSON subset matching, LLM-based evaluation)
-- **Versioning** via multiple configs per prompt
-- **TOML file sync** for version-controlled prompt management
+Templates use `{{ }}` interpolation. Inputs are passed as `variables: { foo }` at execution time and read as `{{ input.foo }}`.
 
-## Publishing Prompts
+---
 
-**Important:** Prompts must be set to `active` status before they can be called from workflows or the client.
+## Status Lifecycle (matters less than you'd think)
 
-By default, new prompts are created with `status = "draft"`. Draft prompts can be tested using the CLI but cannot be executed in production workflows.
+| Status     | Executable from workflow | Executable from client SDK / CLI | Executable from server REST |
+| ---------- | ------------------------ | -------------------------------- | --------------------------- |
+| `draft`    | Yes                      | Yes                              | Yes                         |
+| `active`   | Yes                      | Yes                              | Yes                         |
+| `archived` | No                       | No                               | No                          |
 
-### Prompt Status Lifecycle
+Default for new prompts is `draft`. **Both `draft` and `active` execute** — there's no "publish" gate for prompts (verified in `src/workflows/steps/prompt-step.ts:66`). The status is mostly a label.
 
-| Status     | Can Execute from Workflow | Can Test via CLI | Editable |
-| ---------- | ------------------------- | ---------------- | -------- |
-| `draft`    | No                        | Yes              | Yes      |
-| `active`   | Yes                       | Yes              | Yes      |
-| `archived` | No                        | No               | No       |
+The config `status` field is separate. A config must be `status = "active"` (the default) to execute. Archived configs throw "not executable".
 
-### Activating a Prompt
+> If you see `HTTP 404` calling a prompt: the prompt key is wrong, the prompt is `archived`, or the active config has been archived. It is not a status-publishing issue.
 
-**Option 1: Via TOML file**
-
-```toml
-[prompt]
-key = "my-prompt"
-status = "active"  # Change from "draft" to "active"
-```
-
-Then push with `primitive sync push --dir ./config`
-
-**Option 2: Via CLI**
-
-```bash
-primitive prompts update <prompt-id> --status active
-```
-
-### Common Error
-
-If you see `HTTP 404: Workflow not found` when running a workflow that uses a prompt, check:
-
-1. The prompt exists and has `status = "active"` (not `draft`)
-2. The workflow exists and has `status = "active"` (not `draft`)
-3. The workflow has been published (use `primitive workflows publish <workflow-id>`)
+---
 
 ## Template Syntax
 
-Prompts use `{{ }}` double-brace syntax for variable interpolation.
+Implemented in `src/workflows/runner/templates.ts`. Single source of truth — same engine for prompts and workflow steps.
 
-### Basic Variable Access
-
-```
-{{ input.variableName }}
-```
-
-### Nested Properties
+### Variable access
 
 ```
-{{ input.user.name }}
-{{ input.data.nested.value }}
+{{ input.foo }}              # input.foo
+{{ input.user.name }}        # nested
+{{ input.items[0] }}         # array index
+{{ input.items[0].name }}    # mixed
 ```
 
-### Array Access
-
-```
-{{ input.items[0] }}
-{{ input.attachments[0].name }}
-{{ input.users[2].email }}
-```
-
-### Fallback Values
-
-Use `||` to provide fallback values when a variable is empty or undefined:
-
-```
-{{ input.text || "default value" }}
-{{ input.name || input.username || "Anonymous" }}
-{{ input.count || 0 }}
-```
-
-### Template Context
-
-When templates are rendered, they have access to this context structure:
+### Template context
 
 ```typescript
 {
-  input: Record<string, any>,     // User-provided variables
-  selected: any,                  // Alias for input
-  steps: Record<string, any>,     // Workflow step outputs (when used in workflows)
-  outputs: Record<string, any>,   // Workflow outputs
-  meta: Record<string, any>,      // Metadata
-  output?: any,                   // The generated output (available in evaluator prompts)
+  input: Record<string, any>,    // your variables, e.g. variables: { x } → input.x
+  selected: any,                 // alias for input
+  steps: Record<string, any>,    // workflow step outputs (in workflow context only)
+  outputs: Record<string, any>,  // workflow outputs
+  meta: Record<string, any>,
+  output?: any,                  // ONLY in evaluator prompts (see below)
 }
 ```
 
-Most prompts access variables via `input.*`:
+### Missing variables fail silent
+
+Missing paths render as **empty string** and emit a warning to logs. They do NOT throw.
 
 ```
-User request: {{ input.userMessage }}
-Document content: {{ input.documentText }}
+template:  "Hello {{ input.name }}"
+vars:      {}
+output:    "Hello "
 ```
 
-### Filters
-
-Template expressions support filters using the `|` (pipe) syntax. Filters transform values inline:
+Use `||` chained fallbacks or the `default` filter to handle this:
 
 ```
-{{ input.data | json }}             // Pretty-print as JSON
-{{ input.name | upper }}            // Convert to uppercase (alias: uppercase)
-{{ input.name | lower }}            // Convert to lowercase (alias: lowercase)
-{{ input.text | trim }}             // Trim whitespace
-{{ input.items | length }}          // Array/string length or object key count (alias: size)
-{{ input.items | first }}           // First element of array or string
-{{ input.items | last }}            // Last element of array or string
-{{ input.obj | keys }}              // Object keys as array
-{{ input.obj | values }}            // Object values as array
-{{ input.val | string }}            // Convert to string
-{{ input.val | number }}            // Convert to number
-{{ input.items | join:", " }}       // Join array with separator (default: ",")
-{{ input.name | default:"Anonymous" }}  // Fallback if null/undefined/empty
+{{ input.name || "Anonymous" }}
+{{ input.name || input.username || "Anonymous" }}
+{{ input.name | default: "Anonymous" }}
 ```
 
-**Note:** The `||` fallback syntax and the `| default:` filter both provide fallback values, but work differently. Use `||` for chaining multiple variable paths; use `| default:` for providing a literal default.
+Note `||` only falls back when the value is null/undefined/empty-string. Numeric `0` and `false` count as truthy for filter resolution but `0` falls through to the next variant in `||` chains (verified in templates.ts:347).
 
-### Raw Value Preservation
-
-If the entire template is a single expression, arrays and objects are preserved (not stringified):
+### Filters (pipe syntax)
 
 ```
-{{ input.items }}       // Returns the actual array
-{{ input.config }}      // Returns the actual object
+{{ input.data | json }}                   # JSON.stringify with 2-space indent
+{{ input.name | upper }}                  # uppercase (alias: uppercase)
+{{ input.name | lower }}                  # lowercase (alias: lowercase)
+{{ input.text | trim }}
+{{ input.items | length }}                # array/string len, object key count (alias: size)
+{{ input.items | first }}
+{{ input.items | last }}
+{{ input.obj | keys }}
+{{ input.obj | values }}
+{{ input.val | string }}
+{{ input.val | number }}
+{{ input.items | join: ", " }}            # default sep is ","
+{{ input.name | default: "Anonymous" }}
+
+# String
+{{ input.text | split: "," }}
+{{ input.text | replace: "old", "new" }}
+{{ input.text | truncate: "100" }}        # appends "..."
+{{ input.text | startsWith: "foo" }}
+{{ input.text | endsWith: "bar" }}
+{{ input.text | contains: "baz" }}
+
+# Number
+{{ input.n | round }} | floor | ceil | abs
+{{ input.n | toFixed: "2" }}
+
+# Date
+{{ "" | now }}                            # current ISO timestamp
+{{ input.ts | toISOString }}
+
+# Array
+{{ input.items | pluck: "name" }}         # [{name:"a"},{name:"b"}] → ["a","b"]
+{{ input.items | where: "type", "user" }}
+{{ input.items | sort: "name" }}          # or no arg for primitives
+{{ input.items | reverse }}
+{{ input.items | flatten }}
+{{ input.items | uniq }}
+{{ input.items | compact }}               # remove null/empty/false
+{{ input.items | slice: "0", "5" }}
+{{ input.items | concat: '["x","y"]' }}   # concat with JSON-encoded array
+
+# Validation — THROWS on mismatch (non-retryable)
+{{ input.items | expect: "array" }}       # array | object | string | number | boolean
 ```
 
-If mixed with other text, values are converted to strings:
+Filter arguments are quoted: `| filter: "arg1", "arg2"`. Unquoted bare words also work (`| join: ,`) but quoting is safer.
+
+Unknown filter names log a warning and pass the value through unchanged.
+
+### Raw value vs string interpolation
+
+If the entire template is exactly one expression, the raw value is preserved (arrays/objects not stringified). Otherwise everything becomes a string.
 
 ```
-Items: {{ input.items }}  // Converts array to string
+template:  "{{ input.items }}"
+vars:      { items: [1,2,3] }
+result:    [1,2,3]   # actual array
+
+template:  "Items: {{ input.items }}"
+vars:      { items: [1,2,3] }
+result:    "Items: 1,2,3"   # string
+```
+
+Use `| json` when you need to embed objects in larger strings:
+
+```
+Data: {{ input.config | json }}
+```
+
+### Don't do this
+
+```
+# WRONG — assumes missing var throws. It doesn't.
+"Hello {{ input.name }}!"   →  "Hello !"  (silent)
+
+# WRONG — using {{}} inside JSON without escaping breaks parsing.
+"Reply with {\"name\": \"{{ input.name }}\"}"
+# If input.name is `Bob"; DROP TABLE users; --`, you get malformed JSON.
+# Prefer outputSchema with structured output instead, or | json the whole object.
+
+# WRONG — base64 attachment data in template context bloats prompts.
+# Attachments under variables.attachments[] are auto-stripped from templates
+# and sent as file parts. Don't reference them in {{ }}.
 ```
 
 ---
 
 ## TOML File Format
 
-Prompts can be defined in TOML files for version control and batch sync.
+Used by `primitive sync push/pull` and `primitive prompts create --from-file`.
 
-### Basic Structure
+### Basic structure
 
 ```toml
 [prompt]
-key = "my-prompt-key"
-displayName = "Human Readable Name"
-description = "What this prompt does"
-status = "draft"  # draft | active | archived
-inputSchema = '{"type": "object", "properties": {"text": {"type": "string"}}}'  # Optional
+key = "my-prompt"                # required, unique per app, kebab-case
+displayName = "My Prompt"        # required
+description = "What it does"     # optional
+status = "draft"                 # optional: draft (default) | active | archived
+inputSchema = '''{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}'''
 
 [[configs]]
-name = "default"
-description = "Default configuration"
-provider = "gemini"  # gemini | openrouter
-model = "models/gemini-3-flash-preview"
-temperature = 0.7
-systemPrompt = "You are a helpful assistant."
-userPromptTemplate = "Respond to: {{ input.text }}"
+name = "default"                 # required, unique per prompt
+description = "..."              # optional
+provider = "gemini"              # required: gemini | openrouter
+model = "models/gemini-3-flash-preview"   # required
+userPromptTemplate = "Summarize: {{ input.text }}"   # required
+systemPrompt = "You are concise."        # optional
+temperature = 0.3                # optional, number or string ("0.3"); stored as string
+maxTokens = 1000                 # optional integer
+outputFormat = "text"            # optional: text (default) | json
 ```
 
-### Prompt Section Fields
+### Field reference (verified against `src/models/app-prompt.js` and `app-prompt-config.js`)
 
-| Field          | Required | Description                                       |
-| -------------- | -------- | ------------------------------------------------- |
-| `key`          | Yes      | Unique identifier within the app (use kebab-case) |
-| `displayName`  | Yes      | Human-readable name                               |
-| `description`  | No       | Description of what the prompt does               |
-| `status`       | No       | `draft` (default), `active`, or `archived`        |
-| `inputSchema`  | No       | JSON Schema string for input validation           |
-| `outputSchema` | No       | JSON Schema string for structured output (supported via CLI `--output-schema` but not included in `sync pull` output) |
+**`[prompt]`:**
 
-### Config Section Fields
+| Key            | Required | Notes                                                                                |
+| -------------- | -------- | ------------------------------------------------------------------------------------ |
+| `key`          | Yes      | Unique per app                                                                       |
+| `displayName`  | Yes      |                                                                                      |
+| `description`  | No       |                                                                                      |
+| `status`       | No       | `draft` (default) \| `active` \| `archived`                                          |
+| `inputSchema`  | No       | JSON Schema as a string (parsed server-side)                                         |
+| `outputSchema` | No       | JSON Schema as a string. **Read by `sync push` / `prompts create --from-file`, but `sync pull` does NOT write it back** |
 
-| Field                | Required | Description                              |
-| -------------------- | -------- | ---------------------------------------- |
-| `name`               | Yes      | Config name (unique within prompt)       |
-| `description`        | No       | Description of this configuration        |
-| `provider`           | Yes      | `gemini` or `openrouter`                 |
-| `model`              | Yes      | Model identifier                         |
-| `userPromptTemplate` | Yes      | User prompt with `{{ }}` variables       |
-| `systemPrompt`       | No       | System prompt                            |
-| `temperature`        | No       | Temperature (e.g., `0.7`)                |
-| `maxTokens`          | No       | Max output tokens (integer)              |
-| `outputFormat`       | No       | `text` (default) or `json`               |
+**`[[configs]]`:**
 
-### Multiple Configs Example
+| Key                  | Required | Notes                                              |
+| -------------------- | -------- | -------------------------------------------------- |
+| `name`               | Yes      | Unique per prompt                                  |
+| `description`        | No       |                                                    |
+| `provider`           | Yes      | `gemini` \| `openrouter` (CLI default: `openrouter`) |
+| `model`              | Yes      | Provider-specific identifier                       |
+| `userPromptTemplate` | Yes      |                                                    |
+| `systemPrompt`       | No       |                                                    |
+| `temperature`        | No       | Stored as string; numbers in TOML are accepted     |
+| `maxTokens`          | No       | Integer                                            |
+| `outputFormat`       | No       | `text` (default) \| `json`                         |
+
+**Not exposed in TOML** (model fields that exist but aren't read by sync): `topP`, `outputSchema` on the config (prompt-level outputSchema is read on push only). Set these via `primitive prompts configs update` or the API client if needed.
+
+### Multiple configs
 
 ```toml
 [prompt]
@@ -219,453 +239,361 @@ temperature = 0.8
 userPromptTemplate = "Write an engaging summary of: {{ input.text }}"
 
 [[configs]]
-name = "openrouter-claude"
+name = "claude"
 provider = "openrouter"
 model = "anthropic/claude-3-5-sonnet"
 temperature = 0.5
 userPromptTemplate = "Provide a concise summary: {{ input.text }}"
 ```
 
-### Evaluator Prompt Example
+The first `[[configs]]` becomes the active config when the prompt is created. To activate a different one later: `primitive prompts configs activate <prompt-id> <config-id>`.
 
-Evaluator prompts judge other prompt outputs:
+### Evaluator prompts
+
+Evaluators judge another prompt's output. They get TWO context entries:
+
+- `{{ input.* }}` — the **original input variables** that were passed to the prompt being evaluated
+- `{{ output }}` — the **output text** from that prompt (top-level, NOT under `input`)
 
 ```toml
 [prompt]
-key = "output-evaluator"
-displayName = "Output Evaluator"
+key = "haiku-evaluator"
+displayName = "Haiku Evaluator"
 
 [[configs]]
 name = "default"
 provider = "gemini"
 model = "models/gemini-3-flash-preview"
-temperature = 1
-systemPrompt = "You are an evaluator that judges the quality of LLM outputs."
+temperature = 0
+systemPrompt = "You judge LLM outputs. Respond ONLY with valid JSON."
 userPromptTemplate = """
-**Output to Evaluate:**
-{{ input.output }}
+Original input topic: {{ input.text }}
+
+Output to evaluate:
+{{ output }}
 
 Respond with JSON:
 {
   "passed": true,
   "reasoning": "Brief overall assessment",
   "checks": [
-    {"name": "Check Name", "passed": true, "message": "Explanation"}
+    {"name": "Proper Haiku Form", "passed": true, "message": "Follows 5-7-5"},
+    {"name": "Relevant to Subject", "passed": true, "message": "On topic"}
   ]
 }
 """
 ```
 
+> **Footgun:** `{{ input.output }}` does NOT give you the output to evaluate — it would only resolve if your variables happened to have an `output` key. Use bare `{{ output }}`.
+
+The evaluator output is parsed for `{ passed, reasoning, checks: [{name, passed, message}] }`. If JSON parsing fails, only the overall `passed` count is used.
+
 ---
 
-## CLI Commands Reference
+## CLI Reference
 
-All commands are under `primitive prompts`. Most commands require an app context—set it with `primitive use <app-id>` or pass `--app <app-id>`.
+Set the active app once: `primitive use <app-id>`. All commands accept `--app <app-id>` or a positional `[app-id]` to override.
 
-### Prompt CRUD Operations
+Use `--json` for machine-readable output.
 
-#### List Prompts
+### Prompt CRUD
 
 ```bash
 primitive prompts list [app-id] [--status draft|active|archived] [--json]
+primitive prompts get <prompt-id> [--json]
+primitive prompts update <prompt-id> [--name X] [--description X] [--status X] [--input-schema JSON] [--output-schema JSON]
+primitive prompts delete <prompt-id> [-y]          # archive (soft)
+primitive prompts delete <prompt-id> --hard [-y]   # permanent
 ```
 
-#### Create Prompt
-
-From CLI flags:
+#### Create from CLI flags
 
 ```bash
-primitive prompts create [app-id] \
-  --key "my-prompt" \
+primitive prompts create \
+  --key my-prompt \
   --name "My Prompt" \
   --provider gemini \
   --model "models/gemini-3-flash-preview" \
   --user-template "Generate: {{ input.text }}" \
-  [--system-prompt "You are helpful."] \
-  [--temperature "0.7"] \
+  [--system-prompt "..."] \
+  [--temperature 0.7] \
   [--max-tokens 1000] \
   [--output-format text|json] \
-  [--input-schema '{"type": "object", ...}'] \
-  [--output-schema '{"type": "object", ...}']
+  [--input-schema '{...}'] \
+  [--output-schema '{...}']
 ```
 
-From TOML file:
+Required: `--key`, `--name`, `--model`, `--user-template`. Default `--provider` is `openrouter`.
+
+#### Create from TOML
 
 ```bash
-primitive prompts create [app-id] --from-file ./my-prompt.toml
+primitive prompts create --from-file ./summarizer.toml
 ```
 
-#### Get Prompt Details
+Reads `[prompt]` + the FIRST `[[configs]]` entry. Additional configs are NOT created — for multi-config use `sync push` instead.
+
+### Execute & preview
 
 ```bash
-primitive prompts get <prompt-id> [--json]
+primitive prompts execute <prompt-id> --vars '{"text":"Hello"}' [--config <config-id>] [--json]
+primitive prompts preview <prompt-id> --vars '{"text":"Hello"}' [--config <config-id>] [--json]
+primitive prompts schema  <prompt-id> [--json]
 ```
 
-#### Update Prompt Metadata
+`preview` renders the template without calling the LLM — fast for verifying interpolation.
+`schema` returns `{ inputSchema, outputSchema, inputVariables, activeConfigId, ... }`. `inputVariables` is derived from `inputSchema.properties`, NOT from `{{ }}` references in the template.
+
+### Configs
 
 ```bash
-primitive prompts update <prompt-id> \
-  [--name "New Name"] \
-  [--description "New description"] \
-  [--status draft|active|archived] \
-  [--input-schema '{"type": "object", ...}'] \
-  [--output-schema '{"type": "object", ...}']
-```
-
-#### Delete/Archive Prompt
-
-```bash
-primitive prompts delete <prompt-id> [-y]        # Archive (soft delete)
-primitive prompts delete <prompt-id> --hard [-y]  # Permanent delete
-```
-
-### Prompt Execution
-
-#### Execute a Prompt
-
-```bash
-primitive prompts execute <prompt-id> \
-  --vars '{"text": "Hello world"}' \
-  [--config <config-id>] \
-  [--json]
-```
-
-#### Preview Rendered Prompt (Without Executing)
-
-```bash
-primitive prompts preview <prompt-id> \
-  --vars '{"text": "Hello world"}' \
-  [--config <config-id>] \
-  [--json]
-```
-
-#### Get Prompt Schema
-
-```bash
-primitive prompts schema <prompt-id> [--json]
-```
-
-### Config Management
-
-#### List Configs
-
-```bash
-primitive prompts configs list <prompt-id> [--json]
-```
-
-#### Create Config
-
-```bash
-primitive prompts configs create <prompt-id> \
-  --name "config-name" \
-  --provider gemini \
-  --model "models/gemini-3-flash-preview" \
-  --user-template "Template: {{ input.text }}" \
-  [--system-prompt "System prompt"] \
-  [--temperature "0.7"] \
-  [--max-tokens 1000] \
-  [--output-format text|json]
-```
-
-#### Update Config
-
-```bash
-primitive prompts configs update <prompt-id> <config-id> \
-  [--name "new-name"] \
-  [--model "new-model"] \
-  [--temperature "0.5"] \
-  [--system-prompt "New system prompt"] \
-  [--user-template "New template: {{ input.text }}"] \
-  [--status active|archived]
-```
-
-#### Activate a Config
-
-Sets a config as the default for prompt execution:
-
-```bash
+primitive prompts configs list <prompt-id>
+primitive prompts configs create <prompt-id> --name X --provider X --model X --user-template X [...]
+primitive prompts configs update <prompt-id> <config-id> [--name X] [--model X] [--temperature X] [--system-prompt X] [--user-template X] [--status active|archived]
 primitive prompts configs activate <prompt-id> <config-id>
+primitive prompts configs duplicate <prompt-id> <config-id> [--name X]
 ```
 
-#### Duplicate a Config
+`configs create` requires `--name`, `--model`, `--user-template`. Default provider is `openrouter`.
+
+### Test cases
 
 ```bash
-primitive prompts configs duplicate <prompt-id> <config-id> [--name "new-name"]
-```
+primitive prompts tests list <prompt-id>
+primitive prompts tests get  <prompt-id> <test-case-id>
+primitive prompts tests delete <prompt-id> <test-case-id> [-y]
 
-### Test Case Management
-
-#### List Test Cases
-
-```bash
-primitive prompts tests list <prompt-id> [--json]
-```
-
-#### Create Test Case
-
-```bash
 primitive prompts tests create <prompt-id> \
-  --name "Test Name" \
-  --vars '{"text": "test input"}' \
-  [--pattern "regex-pattern"] \
-  [--contains '["expected", "strings"]'] \
-  [--json-subset '{"key": "value"}'] \
+  --name "Basic test" \
+  --vars '{"text":"hello"}' \
+  [--pattern "regex"] \
+  [--contains '["substr1","substr2"]'] \
+  [--json-subset '{"key":"value"}'] \
   [--config <config-id>] \
   [--evaluator-prompt <prompt-id>] \
   [--evaluator-config <config-id>]
-```
 
-#### Get Test Case
-
-```bash
-primitive prompts tests get <prompt-id> <test-case-id> [--json]
-```
-
-#### Update Test Case
-
-```bash
 primitive prompts tests update <prompt-id> <test-case-id> \
-  [--name "Updated Name"] \
-  [--vars '{"text": "new input"}'] \
-  [--pattern "new-regex"] \
-  [--contains '["new", "strings"]'] \
-  [--json-subset '{"new": "value"}'] \
-  [--config <config-id>] \
-  [--clear-pattern] \
-  [--clear-contains] \
-  [--clear-json-subset]
+  [--name X] [--vars X] [--pattern X] [--contains X] [--json-subset X] [--config X] \
+  [--clear-pattern] [--clear-contains] [--clear-json-subset]
 ```
 
-#### Delete Test Case
+Required for `create`: `--name`, `--vars`. `--vars` MUST be valid JSON (the CLI parses it).
 
-```bash
-primitive prompts tests delete <prompt-id> <test-case-id> [-y]
-```
-
-### Running Tests
-
-#### Run Single Test
+### Running tests
 
 ```bash
 primitive prompts tests run <prompt-id> <test-case-id> [--config <config-id>] [--json]
-```
-
-#### Run All Tests
-
-```bash
-primitive prompts tests run-all <prompt-id> \
-  [--config <config-id>] \
-  [--test-cases "id1,id2,id3"] \
-  [--json]
-```
-
-#### List Test Run History
-
-```bash
+primitive prompts tests run-all <prompt-id> [--config <config-id>] [--test-cases "id1,id2,id3"] [--json]
 primitive prompts tests runs <prompt-id> [--limit 20] [--group <comparison-group>] [--json]
 ```
 
-### Batch Test Execution
+`run-all` exits with code `1` if any test fails. Useful for CI.
 
-Run tests in parallel using workflow-based execution:
+### Batch (parallel) test execution
+
+Runs tests in parallel via the workflow engine — much faster for large suites.
 
 ```bash
-# Start batch test execution
-primitive prompts tests batch start <prompt-id> \
-  [--config <config-id>] \
-  [--test-cases "id1,id2,id3"] \
-  [--json]
-
-# Check batch status (optionally wait for completion)
+primitive prompts tests batch start  <prompt-id> [--config <config-id>] [--test-cases "id1,id2"] [--json]
 primitive prompts tests batch status <prompt-id> <batch-id> [--wait] [--json]
-
-# Cancel a running batch
-primitive prompts tests batch cancel <prompt-id> <batch-id> [-y] [--json]
+primitive prompts tests batch cancel <prompt-id> <batch-id> [-y]
 ```
 
-### Test Case Attachments
+`status --wait` polls every 2s until completion. Exits `1` if any test failed.
 
-For prompts that process files (e.g., PDF summarizer):
+### Test case attachments (PDFs, images, etc.)
 
 ```bash
-# List attachments
-primitive prompts tests attachments list <prompt-id> <test-case-id>
-
-# Upload attachment
-primitive prompts tests attachments upload <prompt-id> <test-case-id> ./document.pdf [--name "custom.pdf"]
-
-# Download attachment
-primitive prompts tests attachments download <prompt-id> <test-case-id> document.pdf [output-path]
-
-# Delete attachment
-primitive prompts tests attachments delete <prompt-id> <test-case-id> document.pdf [-y]
+primitive prompts tests attachments list     <prompt-id> <test-case-id>
+primitive prompts tests attachments upload   <prompt-id> <test-case-id> ./doc.pdf [--name custom.pdf]
+primitive prompts tests attachments download <prompt-id> <test-case-id> doc.pdf [output-path]
+primitive prompts tests attachments delete   <prompt-id> <test-case-id> doc.pdf [-y]
 ```
+
+Upload size limit: **10 MB**. Attachments are sent to the model as file parts (`gemini`) or vision parts (`openrouter`) and are NOT visible in template context.
+
+> Pass attachments at runtime by including `attachments: [{name, type, data}]` in `variables`. The base64 `data` is stripped from the template context automatically and forwarded as a file part.
 
 ---
 
-## Sync Commands
-
-Sync prompts from TOML files in a config directory.
-
-### Directory Structure
-
-```
-config/
-├── prompts/
-│   ├── summarizer.toml
-│   ├── translator.toml
-│   └── evaluator.toml
-├── workflows/
-│   └── ...
-└── .primitive-sync.json  # Auto-generated sync state
-```
-
-### Pull Configuration from Server
+## Sync (TOML version control)
 
 ```bash
 primitive sync pull [app-id] [--dir ./config]
-```
-
-Downloads prompts, workflows, and integrations to TOML files.
-
-### Push Configuration to Server
-
-```bash
 primitive sync push [app-id] [--dir ./config] [--dry-run]
 ```
 
-Creates or updates prompts from TOML files. Use `--dry-run` to preview changes.
+### Directory layout (verified in `cli/src/commands/sync.ts:537`)
+
+```
+config/
+  prompts/
+    summarizer.toml
+    summarizer.tests/                # NOTE: dir name is `<key>.tests`
+      basic.toml
+      edge-case.toml
+      basic/                         # attachments dir (one per test case slug)
+        document.pdf
+    evaluator.toml
+  workflows/
+    ...
+  .primitive-sync.json               # auto-generated state — commit this
+```
+
+### Test case TOML schema
+
+Test case TOMLs use a `[test]` table with **JSON-encoded strings** for structured fields (verified in `cli/tests/unit/sync-helpers.test.ts`):
+
+```toml
+[test]
+name = "Basic greeting"
+description = "Optional"
+inputVariables = '{"name":"Bob","occupation":"teacher"}'   # JSON string
+configName = "default"                                     # key-based ref to a config
+evaluatorPromptKey = "output-evaluator"                    # key-based ref to evaluator prompt
+evaluatorConfigName = "default"
+expectedOutputPattern = "^Hello.*"                          # regex
+expectedOutputContains = '["Bob","teacher"]'                # JSON array string
+expectedJsonSubset = '{"status":"ok"}'                      # JSON string
+```
+
+Key-based refs (`configName`, `evaluatorPromptKey`, `evaluatorConfigName`) are portable across apps. Legacy ID-based refs (`configId`, `evaluatorPromptId`, `evaluatorConfigId`) are still accepted but tied to a specific app.
+
+### What `sync pull` actually writes
+
+`serializePrompt` (sync.ts:210) writes:
+
+- `[prompt]`: `key, displayName, description, status, inputSchema`
+- `[[configs]]`: `name, description, provider, model, temperature, maxTokens, outputFormat, systemPrompt, userPromptTemplate`
+
+It does NOT write: `outputSchema` (prompt or config), `topP`. If you set these and run `pull`, they will be missing from the TOML — round-trip is lossy for those fields.
+
+### What `sync push` does
+
+- Updates existing prompts (matched by `key`) and reconciles configs (matched by `name`).
+- Creates new prompts and additional configs that don't exist on the server.
+- For new prompts, the FIRST `[[configs]]` entry becomes the active config.
+- Test case TOMLs in `<key>.tests/` are pushed and matched by filename slug.
+- Skips files unchanged since the last sync (use `--force` to bypass).
+- Conflict detection: if a prompt was modified on the server since the last pull, push fails — pull and re-merge.
 
 ---
 
-## Test Case Verification Types
+## Verification Types
 
-### Pattern Matching (Regex)
+### Pattern (regex)
 
 ```bash
 --pattern "^Hello.*world$"
 ```
 
-### Contains Check
+### Contains (substring AND)
 
 ```bash
---contains '["expected phrase", "another phrase"]'
+--contains '["expected", "phrase", "another"]'
 ```
 
-All strings must appear in the output.
+All strings must appear in output. JSON array of strings.
 
-### JSON Subset Matching
+### JSON subset
 
 ```bash
---json-subset '{"status": "success", "data": {"valid": true}}'
+--json-subset '{"status":"success","data":{"valid":true}}'
 ```
 
-Output JSON must contain matching keys/values.
+Output must be valid JSON containing all key/value pairs (deep). Extra fields in output are fine.
 
-### LLM-Based Evaluation
-
-Use an evaluator prompt to judge output quality:
+### LLM evaluator
 
 ```bash
 --evaluator-prompt <evaluator-prompt-id> [--evaluator-config <config-id>]
 ```
 
-The evaluator prompt receives `{{ input.output }}` containing the generated output.
+The evaluator prompt receives `{{ input.* }}` (original input vars) and `{{ output }}` (the generated output). See [Evaluator prompts](#evaluator-prompts) above.
+
+Multiple verification types can stack on a single test case. All must pass for the test to pass.
 
 ---
 
 ## Common Workflows
 
-### Create a New Prompt from Scratch
+### Create from scratch
 
 ```bash
-# Create TOML file
 cat > my-prompt.toml << 'EOF'
 [prompt]
 key = "greeting-generator"
 displayName = "Greeting Generator"
-description = "Generates personalized greetings"
 
 [[configs]]
 name = "default"
 provider = "gemini"
 model = "models/gemini-3-flash-preview"
 temperature = 0.7
-userPromptTemplate = "Generate a friendly greeting for {{ input.name }} who works as a {{ input.occupation }}."
+userPromptTemplate = "Generate a friendly greeting for {{ input.name || 'friend' }} who works as a {{ input.occupation || 'professional' }}."
 EOF
 
-# Create in Primitive
 primitive prompts create --from-file my-prompt.toml
 ```
 
-### Test a Prompt
+### Test it
 
 ```bash
-# Execute directly
-primitive prompts execute <prompt-id> --vars '{"name": "Alice", "occupation": "engineer"}'
-
-# Preview without executing
-primitive prompts preview <prompt-id> --vars '{"name": "Alice", "occupation": "engineer"}'
+primitive prompts preview <prompt-id> --vars '{"name":"Alice","occupation":"engineer"}'
+primitive prompts execute <prompt-id> --vars '{"name":"Alice","occupation":"engineer"}'
 ```
 
-### Set Up Automated Testing
+### Add a regression test
 
 ```bash
-# Create test case
 primitive prompts tests create <prompt-id> \
-  --name "Basic greeting test" \
-  --vars '{"name": "Bob", "occupation": "teacher"}' \
-  --contains '["Bob", "teacher"]'
+  --name "Mentions name and occupation" \
+  --vars '{"name":"Bob","occupation":"teacher"}' \
+  --contains '["Bob","teacher"]'
 
-# Run test
-primitive prompts tests run <prompt-id> <test-case-id>
-
-# Run all tests
 primitive prompts tests run-all <prompt-id>
 ```
 
-### Compare Different Configurations
+### Compare configs
 
 ```bash
-# Create alternative config
 primitive prompts configs create <prompt-id> \
-  --name "high-creativity" \
+  --name "creative" \
   --provider gemini \
   --model "models/gemini-3-pro-preview" \
-  --temperature "0.9" \
-  --user-template "Generate a creative, unique greeting for {{ input.name }} ({{ input.occupation }})."
+  --temperature 0.9 \
+  --user-template "Generate a unique greeting for {{ input.name }} ({{ input.occupation }})."
 
-# Test with specific config
 primitive prompts tests run-all <prompt-id> --config <new-config-id>
+primitive prompts tests runs <prompt-id> --json     # compare runs across configs
 ```
 
-### Version Control with Sync
+### Version control
 
 ```bash
-# Pull current state
 primitive sync pull --dir ./config
+git add ./config && git commit -m "Snapshot prompts"
 
-# Edit TOML files
-vim ./config/prompts/my-prompt.toml
+# edit ./config/prompts/*.toml
 
-# Push changes
-primitive sync push --dir ./config --dry-run  # Preview
-primitive sync push --dir ./config            # Apply
+primitive sync push --dir ./config --dry-run        # preview
+primitive sync push --dir ./config                  # apply
 ```
 
 ---
 
-## Provider and Model Reference
+## Provider & Model Cheat Sheet
 
-### Gemini Provider
+### Gemini
 
 ```toml
 provider = "gemini"
-model = "models/gemini-3-flash-preview"  # Fast, efficient
-model = "models/gemini-3-pro-preview"    # More capable
+model = "models/gemini-3-flash-preview"   # fast/cheap
+model = "models/gemini-3-pro-preview"     # higher quality
 ```
 
-### OpenRouter Provider
+### OpenRouter (everything else)
 
 ```toml
 provider = "openrouter"
@@ -674,38 +602,60 @@ model = "openai/gpt-4o"
 model = "google/gemini-2.0-flash-001"
 ```
 
+Pick `gemini` provider for native Gemini features (file parts, structured output via `outputSchema`). Use `openrouter` for non-Google models or OpenRouter-specific routing.
+
+`outputSchema` (structured JSON output) is **only honored by the gemini provider** in `block-executor.ts:563`. With openrouter, set `outputFormat = "json"` and instruct the model in the system prompt instead.
+
 ---
 
-## Client SDK API
-
-The `JsBaoClient` exposes a `prompts` sub-API for executing prompts from application code:
+## Client SDK
 
 ```typescript
+import { JsBaoClient } from "@primitive/js-bao";
+
 const result = await client.prompts.execute("my-prompt-key", {
-  variables: { text: "Hello world" },  // Maps to template {{ input.text }}
-  configId: "01ABC...",                 // Optional: specific config ID
-  modelOverride: "other-model",        // Optional: override the config's model
+  variables: { text: "Hello world" },     // → {{ input.text }}
+  configId: "01ABC...",                   // optional; defaults to activeConfigId
+  modelOverride: "anthropic/claude-3-5-sonnet",  // optional; overrides config.model
 });
 
-// Result shape:
-result.success;        // boolean
-result.output;         // string - the generated text
-result.configId;       // string - which config was used
-result.error;          // string | undefined
-result.rawResponse;    // any - raw provider response
-result.metrics;        // { durationMs, inputTokens?, outputTokens?, totalTokens? }
+// ExecutePromptResult
+result.success;     // boolean
+result.output;      // string — generated text
+result.error;       // string | undefined
+result.configId;    // string — which config was used
+result.metrics;     // { durationMs, inputTokens?, outputTokens?, totalTokens? }
+result.rawResponse; // any — raw provider response (don't depend on shape)
 ```
 
-**Note:** The `variables` property maps to the `input` namespace in templates. So `variables: { text: "Hello" }` is accessed as `{{ input.text }}` in the prompt template.
+The first arg is the `promptKey`, NOT the `promptId`. The endpoint is `POST /prompts/:promptKey/execute`.
+
+`variables` becomes the `input` namespace in templates. `variables: { x: 1 }` → `{{ input.x }}`. There is no top-level access to your variables (e.g. `{{ x }}` won't resolve).
+
+### Don't do this
+
+```typescript
+// WRONG — passing promptId instead of promptKey
+await client.prompts.execute("01HXY...PROMPT_ID", { variables: {} });
+// → 404. Use the key from the TOML.
+
+// WRONG — expecting a top-level variable
+await client.prompts.execute("p", { variables: { name: "Alice" } });
+// template: "Hi {{ name }}"   ← won't resolve, renders as "Hi "
+// Fix: template: "Hi {{ input.name }}"
+```
 
 ---
 
 ## Tips for Coding Agents
 
-1. **Always use `--json` flag** when parsing output programmatically
-2. **Set app context first** with `primitive use <app-id>` to avoid passing `--app` repeatedly
-3. **Use TOML files** for complex prompts—easier to edit and version control
-4. **Preview before execute** to verify template rendering
-5. **Create test cases** for critical prompts to catch regressions
-6. **Use evaluator prompts** for subjective quality checks that simple pattern matching can't handle
-7. **Duplicate configs** when experimenting—preserve working configurations
+1. Use `--json` whenever piping output to other tools.
+2. `primitive use <app-id>` once per session beats `--app` everywhere.
+3. Prefer TOML + `sync push` over CLI flags for anything with multiple configs or test cases.
+4. Always `preview` before `execute` when debugging templates — much faster.
+5. Missing variables silently render as empty. Use `||` fallbacks or `inputSchema` validation.
+6. Evaluator prompts use `{{ output }}` (top-level), NOT `{{ input.output }}`.
+7. `outputSchema` only works with `provider = "gemini"`. With openrouter, use `outputFormat = "json"` + prompt the model.
+8. Test case `--vars` MUST be valid JSON — single-quote in shell, double-quote inside.
+9. `sync pull` is lossy for `outputSchema` and `topP` — set those via the API client/CLI.
+10. Both `draft` and `active` prompts execute. `archived` does not. There is no separate "publish" step.

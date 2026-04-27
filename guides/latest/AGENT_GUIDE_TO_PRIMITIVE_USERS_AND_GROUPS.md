@@ -8,25 +8,25 @@ Primitive provides a built-in user model that every app should leverage. **Do no
 
 ### What the platform provides
 
-Every authenticated user has:
+`client.users.getBasic(userId)` returns a `BasicUserInfo`:
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `userId` | string | Globally unique identifier (ULID) |
 | `email` | string | Unique email address |
 | `name` | string | Display name |
-| `avatarUrl` | string | Profile picture URL |
+| `avatarUrl` | string \| undefined | Profile picture URL |
 | `appRole` | string | Role in the current app: `"owner"`, `"admin"`, or `"member"` |
-| `addedAt` | string | When the user joined the app |
-
-Access this via the client:
+| `appId` | string | The app the user belongs to |
+| `addedAt` | string \| undefined | When the user joined the app |
 
 ```typescript
 const user = await client.users.getBasic(userId);
-// { userId, email, name, avatarUrl, appRole, appId, addedAt }
+// Cached with 5-minute default TTL. Override via options:
+const fresh = await client.users.getBasic(userId, { refreshNetwork: true });
 ```
 
-The result is cached (5-minute default TTL) to avoid redundant network calls.
+`GetUserOptions` knobs: `refreshIfOlderThanMs`, `waitForLoad` (`"local" | "network" | "localIfAvailableElseNetwork"`), `refreshNetwork`, `serverTimeoutMs`.
 
 ### Supplementing user data — not replacing it
 
@@ -70,27 +70,33 @@ user.id = generateNewId();        // Use platform userId instead
 ### Looking up users
 
 ```typescript
-// Get a specific user's basic info (cached with 5-minute default TTL)
+// Single user — cached
 const info = await client.users.getBasic(userId);
-// { userId, email, name, avatarUrl, appRole, appId, addedAt }
+
+// Many users in one call (max 100). Returns only users that exist + belong to the app.
+const profiles = await client.users.getProfiles([userIdA, userIdB]);
+// [{ userId, email, name, avatarUrl }]
+
+// Look up a user by email in the current app.
+const result = await client.users.lookup("alice@example.com");
+// { exists: true, user: { userId, name, email } } | { exists: false }
 ```
 
-The `UsersAPI` only exposes `getBasic(userId)`. There is no `list()`, `get()`, or `me()` method on the client. To list users or look up by email, use the CLI:
+There is no `list()`, `get()`, or `me()` method. The current authenticated user comes from auth state, not a client method. To enumerate every user in the app, use the CLI:
 
 ```bash
 primitive users list
 primitive users get --user-id <userId>
 ```
 
-### App roles (legacy)
+### App roles
 
-Every user has one of three built-in roles: `owner`, `admin`, or `member`. However, **prefer groups over app roles** for modeling access in your application. Groups are more flexible (a user can belong to many groups in different contexts) and map cleanly to your domain (e.g., `team/engineering`, `role/reviewer`).
+Every user has one of three built-in roles: `"owner"`, `"admin"`, or `"member"` (default). **Prefer groups over app roles** for application-level role modeling — groups are multi-tenant by context (a user can be `editor` in one project, `viewer` in another) while app roles are global per-app.
 
-The main effect of app roles today:
-- **`owner`** and **`admin`** users bypass group rule evaluation and have full management access
-- **`member`** is the default — access is determined by group memberships
-
-Use groups for all application-level role modeling (editor, viewer, moderator, etc.) rather than relying on the `admin`/`member` distinction.
+Behavior:
+- **`owner`** and **`admin`** users **bypass all rule-set evaluation** for groups, collections, and database type rules (see `evaluateRule` in `cel-resource-registry.ts`). Do not try to restrict them via rules.
+- **`member`** is the default — access is determined by direct permissions and group memberships.
+- In CEL rule contexts the field is `user.role` (NOT `user.appRole`). See [Rule CEL context](#rule-cel-context) below.
 
 ## Core Concept: Groups
 
@@ -164,9 +170,13 @@ const page2 = await client.groups.list({ type: "team", limit: 10, cursor: page1.
 
 ```typescript
 const group = await client.groups.get("team", "engineering");
+// { appId, groupType, groupId, name, description?, memberCount,
+//   createdAt, createdBy, modifiedAt }
 
+// Update name and/or description (both optional)
 await client.groups.update("team", "engineering", {
   name: "Platform Engineering",
+  description: "Owns the platform stack",
 });
 
 // Cascade-deletes all memberships and group permissions
@@ -178,46 +188,69 @@ await client.groups.delete("team", "engineering");
 ### Add members
 
 ```typescript
-// By user ID — immediate
+// By user ID — always direct
 await client.groups.addMember("team", "engineering", { userId: "user-456" });
 
-// By email — immediate if the user exists, deferred if they don't
+// By email — direct if the email maps to an app user, deferred otherwise
 const result = await client.groups.addMember("team", "engineering", {
   email: "alice@example.com",
 });
 ```
 
-The result is a discriminated union — `DirectGroupAdd | DeferredGroupAdd`:
+`AddGroupMemberParams` is a discriminated union — pass **either** `userId` or `email`, never both. The TS types enforce this.
+
+`addMember` returns `DirectGroupAdd | DeferredGroupAdd` — branch on `status`:
 
 ```typescript
-// DirectGroupAdd
-// { status: "added" | "already_member",
-//   userId, userName?, userEmail?, addedAt, addedBy }
+const result = await client.groups.addMember("team", "engineering", { email });
 
-// DeferredGroupAdd
-// { status: "pending_signup",
-//   email, appInvitationCreated, deferredId, expiresAt,
-//   groupType, groupId,
-//   invitationId, inviteToken }
+if (result.status === "added") {
+  // New membership created. result: { userId, userName?, userEmail?, addedAt, addedBy }
+} else if (result.status === "already_member") {
+  // Idempotent no-op. addedAt/addedBy reflect the pre-existing row.
+  // Replaces the old HTTP 409 response.
+} else if (result.status === "pending_signup") {
+  // Email not yet an app user. Server created an AppInvitation +
+  // DeferredGroupAdd. result: { email, appInvitationCreated, deferredId,
+  //   expiresAt, groupType, groupId, invitationId, inviteToken }
+  // Use inviteToken to build your own accept URL; the platform's default
+  // email is sent unless the underlying invitation was created with sendEmail: false.
+  // Cancel a pending add via:
+  //   client.invitations.revokeDeferredGrant(result.deferredId, "group")
+}
 ```
 
-Branch on `status`:
+Until a deferred add resolves, `isMemberOf` returns false for that email's user — do not assume membership before sign-up/accept.
 
-- `"added"` — new membership row created.
-- `"already_member"` — idempotent no-op; the response carries the existing row's `addedAt` / `addedBy`. **Replaces the old `409` error**.
-- `"pending_signup"` — email is not yet an app user. The server created an `AppInvitation` + `DeferredGroupAdd`. Use `invitationId` + `inviteToken` to send a custom invitation email; the platform-default email is sent automatically unless the original invitation was created with `sendEmail: false`.
+**Don't do this:**
 
-Until a deferred add resolves, `isMemberOf` returns false for that email's user — do not assume membership before the acceptance event.
+```typescript
+// BAD — mixing userId and email is rejected by the type system AND the server
+await client.groups.addMember("team", "engineering", {
+  userId: "user-456",
+  email: "alice@example.com",
+});
 
-Provide either `userId` or `email`, not both.
+// BAD — assuming the result is always direct. If the email isn't an app user
+// yet, result.userId is undefined.
+const r = await client.groups.addMember("team", "engineering", { email });
+console.log(r.userId); // TypeError when r.status === "pending_signup"
+```
 
 See the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md) for the full deferred-grant lifecycle and the token-based acceptance path.
 
 ### List members
 
 ```typescript
-const members = await client.groups.listMembers("team", "engineering");
-// [{ userId, userName, userEmail, addedAt, addedBy }]
+// Paginated — { items, cursor? }
+const page = await client.groups.listMembers("team", "engineering");
+// page.items: [{ userId, userName?, userEmail?, addedAt, addedBy }]
+
+// Pagination
+const next = await client.groups.listMembers("team", "engineering", {
+  limit: 50,
+  cursor: page.cursor,
+});
 ```
 
 ### Remove members
@@ -261,15 +294,15 @@ const teams = await client.groups.listUserMemberships("user-456", {
 
 ## Group Type Configuration
 
-Group types are configured via TOML config files and the `primitive sync` command. This keeps configuration version-controlled alongside your code.
+Group types are configured via TOML config files and the `primitive sync` command (version-controlled alongside your code).
 
 **File:** `config/group-type-configs/team.toml`
 
 ```toml
 [groupTypeConfig]
 groupType = "team"
-ruleSetName = "team-rules"     # optional — rule set for group management
-autoAddCreator = true          # auto-add creator as member (default: true)
+ruleSetName = "team-rules"     # optional — name of an attached rule set
+autoAddCreator = true          # auto-add creator as member when the config exists (default: true)
 ```
 
 Push to the server:
@@ -278,18 +311,22 @@ Push to the server:
 primitive sync push --dir ./config
 ```
 
-See the [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md#configuring-with-the-cli) for full details on the sync workflow (`init`, `pull`, `diff`, `push`).
+**Defaults & gotchas:**
+- `autoAddCreator` defaults to `true` **only when a `GroupTypeConfig` row exists** for the type. With **no config row at all**, no auto-add happens.
+- A group type with **no config** (or config with no `ruleSetName`) is **admin/owner-only** for non-admins — `groups.create`/`update`/`delete`/`addMember` all return 403, and `groups.list` filters that type out for member-role callers. Attach a rule set to make the type usable by regular members.
+
+See the [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md#configuring-with-the-cli) for the full sync workflow (`init`, `pull`, `diff`, `push`).
 
 ## Groups and Documents
 
 Grant a group access to a document. All members inherit the permission.
 
 ```typescript
-// Grant access
+// Grant access — permission is "read-write" or "reader" (NOT "write" or "view")
 await client.documents.grantGroupPermission(documentId, {
   groupType: "team",
   groupId: "engineering",
-  permission: "read-write", // or "reader"
+  permission: "read-write",
 });
 
 // List group permissions on a document
@@ -300,21 +337,40 @@ await client.documents.revokeGroupPermission(documentId, "team", "engineering");
 
 // List documents a group has access to
 const docs = await client.groups.listDocuments("team", "engineering");
+
+// And databases
+const dbs = await client.groups.listDatabases("team", "engineering");
 ```
 
-**Permission resolution:** A user's effective permission on a document is the **highest** across their direct permission and all group memberships. For example, if a user has `reader` direct access but their team has `read-write`, they get `read-write`.
+**Permission resolution:** A user's effective permission on a document is the **highest** across their direct permission and all group memberships. If a user has `reader` direct access but their team has `read-write`, they get `read-write`.
 
 ## Groups and Databases
 
 Databases don't have group permission grants. Instead, group memberships are checked in **CEL access expressions** on registered operations. See the [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) for how to register operations.
 
-**CEL functions for groups:**
+**CEL functions available in every context:**
 
 | Function | Returns | Description |
 |----------|---------|-------------|
-| `isMemberOf(groupType, groupId)` | bool | Whether the caller belongs to the group |
-| `memberGroups(groupType)` | string[] | All group IDs the caller belongs to for the type |
-| `hasRole(role)` | bool | Whether the caller's app role matches (e.g., `"owner"`, `"admin"`, `"member"`) |
+| `isMemberOf(groupType, groupId)` | bool | True if the caller has a membership matching exactly that `(groupType, groupId)` pair |
+| `memberGroups(groupType)` | string[] | All `groupId`s the caller belongs to for the given type. Empty array if none. |
+| `hasRole(role)` | bool | True if `user.role` equals the argument (`"owner"`, `"admin"`, or `"member"`) |
+| `now()` | string | Current ISO-8601 timestamp |
+| `fromWorkflow()` | bool | True if the call originates inside a workflow step |
+| `fromWorkflow(key)` | bool | True if inside a workflow whose `workflowKey` matches |
+
+**Database operation `access` CEL context:**
+
+| Variable | Notes |
+|----------|-------|
+| `user.userId` | Caller's userId |
+| `user.role` | `"owner"` / `"admin"` / `"member"` — NOT `user.appRole` |
+| `database.id` | The database ID |
+| `database.metadata.*` | The database's `metadata` JSON object |
+| `params.*` | The operation's caller-supplied params |
+| `secrets.*` | App secrets (only loaded if expression references `secrets.`) |
+| `now` | ISO-8601 timestamp |
+| `workflow` | Workflow context object when called from a workflow step (else `null`) |
 
 **Common CEL patterns for database operations:**
 
@@ -322,13 +378,13 @@ Databases don't have group permission grants. Instead, group memberships are che
 // Team members of the database's team
 access: "isMemberOf('team', database.metadata.teamId)"
 
-// Any team member (team ID passed as parameter)
+// Team ID passed as parameter — caller must belong to that team
 access: "isMemberOf('team', params.teamId)"
 
-// User can only query groups they belong to
+// User can only query groups they belong to (containment check)
 access: "params.teamId in memberGroups('team')"
 
-// Per-parameter access: parent can only view their child's data
+// Per-parameter access: parent can only view their own child's data
 params: {
   studentId: {
     type: "string",
@@ -336,11 +392,52 @@ params: {
     access: "value in memberGroups('parent-of')"
   }
 }
+
+// Allow only when called from a specific workflow
+access: "fromWorkflow('grade-import')"
+```
+
+**Don't do this — common CEL footguns:**
+
+```
+// BAD — `user.appRole` does not exist in CEL. Use `user.role` or hasRole().
+access: "user.appRole == 'admin'"
+
+// GOOD — checks the caller's app role.
+access: "hasRole('admin') || hasRole('owner')"
+// (Note: admins/owners bypass *rule-set* evaluation for groups/collections,
+// but database operation `access` CEL is NOT bypassed. You must allow them
+// explicitly if you want them in.)
+
+// BAD — isMemberOf returns bool, not the group. `==` is meaningless.
+access: "isMemberOf('team') == params.teamId"
+
+// GOOD
+access: "isMemberOf('team', params.teamId)"
+
+// BAD — memberGroups returns an array, can't compare with ==.
+access: "memberGroups('team') == params.teamId"
+
+// GOOD — use `in` for containment.
+access: "params.teamId in memberGroups('team')"
+
+// BAD — referencing fields not in the context (silently denies; runtime
+// errors are caught and turned into "deny").
+access: "user.email == 'admin@example.com'"   // user.email is not in context
+
+// BAD — assuming database.metadata.teamId exists when it doesn't.
+// Missing fields evaluate to null; `isMemberOf('team', null)` returns false.
+// Either guarantee metadata is set at create time, or guard:
+access: "has(database.metadata.teamId) && isMemberOf('team', database.metadata.teamId)"
 ```
 
 ## Rule Sets for Group Management
 
-Rule sets control who can create, edit, delete groups and manage members. They use CEL expressions evaluated against the requesting user and target group.
+Rule sets control who can manage groups (`category: "group"`) and group members (`category: "member"`). Each `(category, operation)` pair holds a CEL expression evaluated against the requesting user and the target group.
+
+**Valid operations** for both categories: `create`, `edit`, `delete`, `list`. There is no `read` or `update` — use `edit`. There is no `add` — use `create` (for member.create = "add member").
+
+**Important: a group type with NO rule set defaults to admin/owner-only.** For non-admins, `groups.list()` skips groups whose type has no `ruleSetId`, and all mutations are denied. To make a group type usable by regular members, attach a rule set.
 
 ### Defining a rule set
 
@@ -355,15 +452,15 @@ resourceType = "group"
 description = "Controls who can manage team groups and members"
 
 [rules.group]
-create = "false"                                              # only owners/admins (they bypass rules)
-edit = "isMemberOf(group.groupType, group.groupId)"
-delete = "false"                                              # only owners/admins
-list = "true"                                                 # everyone can list
+create = "true"                                               # any signed-in member can create a team
+edit   = "isMemberOf(group.groupType, group.groupId)"         # only members can rename
+delete = "user.userId == group.createdBy"                     # only the creator can delete
+list   = "isMemberOf(group.groupType, group.groupId)"         # only members see the team in list
 
 [rules.member]
-create = "isMemberOf(group.groupType, group.groupId)"         # members can add
-delete = "user.userId == target.userId"                       # members can remove themselves
-list = "true"
+create = "isMemberOf(group.groupType, group.groupId)"         # any member can invite
+delete = "user.userId == target.userId || user.userId == group.createdBy"  # self-leave or creator-kick
+list   = "isMemberOf(group.groupType, group.groupId)"
 ```
 
 ### Attaching to a group type
@@ -387,42 +484,82 @@ primitive sync push --dir ./config
 
 ### Rule CEL context
 
-| Variable | Description |
-|----------|-------------|
-| `user.userId` | The requesting user's ID |
-| `user.role` | The requesting user's app role |
-| `group.groupType` | The target group's type |
-| `group.groupId` | The target group's ID |
-| `group.name` | The target group's name |
-| `group.createdBy` | Who created the group |
-| `target.userId` | The target user (for member operations) |
+| Variable | Always present? | Description |
+|----------|-----------------|-------------|
+| `user.userId` | yes | Requesting user's ID |
+| `user.role` | yes | Requesting user's app role (`"owner"` / `"admin"` / `"member"`). NOT `user.appRole`. |
+| `group.groupType` | yes | Target group's type |
+| `group.groupId` | yes | Target group's ID (also present at `create` time — server passes the requested ID) |
+| `group.name` | yes | Target group's display name |
+| `group.createdBy` | yes (after create) | userId of the group creator |
+| `target.userId` | only `category: "member"`, ops `create`/`edit`/`delete` | Target user being added/removed. Absent for `member.list`. |
 
-App owners and admins always bypass rule evaluation.
+`group.description` is **NOT** in the rule context. Don't reference it.
+
+Plus all CEL functions: `isMemberOf`, `memberGroups`, `hasRole`, `now()`, `fromWorkflow()`.
+
+**Owners and admins always bypass rule evaluation.** Don't try to restrict them via rules.
+
+**Don't do this — rule CEL footguns:**
+
+```toml
+# BAD — `user.appRole` does not exist. Use user.role.
+create = "user.appRole == 'admin'"
+
+# BAD — admins bypass anyway, so this is dead code in practice.
+create = "hasRole('admin')"
+
+# BAD — referencing target on member.list (target is undefined there).
+list = "target.userId != user.userId"
+
+# BAD — referencing group.description (not in the context).
+edit = "group.description != ''"
+
+# BAD — typo: operations are `create/edit/delete/list`, not `update/read`.
+[rules.group]
+update = "true"
+read   = "true"
+
+# GOOD — same intent with valid operations.
+[rules.group]
+edit = "true"
+list = "true"
+```
 
 ### Testing rules
 
-You can test a rule set's evaluation at runtime:
+Test a rule set with a simulated request (returns `{ allowed, expression?, context?, trace?, error? }`):
 
 ```typescript
 const result = await client.ruleSets.test(ruleSetId, {
-  category: "group",
-  operation: "create",
+  category: "group",                    // "group" or "member" for resourceType: "group"
+  operation: "create",                  // "create" | "edit" | "delete" | "list"
   user: { userId: "user-123", role: "member" },
-  memberships: [{ groupType: "team", groupId: "engineering" }], // optional
-  group: { groupType: "team", groupId: "engineering", name: "Eng", createdBy: "user-456" }, // optional
+  memberships: [{ groupType: "team", groupId: "engineering" }],  // optional
+  group: {                                                       // required for non-create when group context is needed
+    groupType: "team",
+    groupId: "engineering",
+    name: "Eng",
+    createdBy: "user-456",
+  },
+  target: { userId: "user-456" },       // for member.create/edit/delete
 });
+// result.trace shows every isMemberOf/memberGroups/hasRole call and its result.
 ```
 
-You can also debug rule evaluation for a real user (returning the full evaluation trace):
+Debug evaluation against a real user (uses live memberships, returns full trace):
 
 ```typescript
-const debugResult = await client.ruleSets.debug({
+const debug = await client.ruleSets.debug({
   userId: "user-123",
   groupType: "team",
-  groupId: "engineering",
+  groupId: "engineering",       // optional — omit for create
   category: "member",
   operation: "create",
+  targetUserId: "user-456",     // optional
 });
+// debug: { allowed, expression?, reason?, ruleSetId?, ruleSetName?,
+//          user?, memberships?, context?, trace? }
 ```
 
 To update rule sets, edit the TOML file and run `primitive sync push --dir ./config`.
@@ -571,7 +708,8 @@ await client.groups.addMember("team", "backend", { userId });
 
 ### Access control
 
-- **App owners and admins bypass all group rules.** Design CEL expressions for regular members — don't try to restrict owners/admins via rules.
+- **App owners and admins bypass all group/collection rule-set evaluation.** Design rules for regular members — don't try to restrict owners/admins there.
+- **Database operation `access` CEL is NOT bypassed for admins.** If admins should be able to call an operation, include them explicitly: `hasRole('admin') || hasRole('owner') || isMemberOf(...)`.
 - **Use per-parameter access** for sensitive relationships (parent-child, manager-report).
 - **Keep rule sets simple.** Complex nested CEL expressions are hard to debug. Prefer multiple focused operations over one operation with complex access logic.
 - **Test rules** with `client.ruleSets.test()` before deploying, and use `client.ruleSets.debug()` to trace evaluation for real users.
@@ -580,10 +718,12 @@ await client.groups.addMember("team", "backend", { userId });
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| 409 on addMember | User is already a member | Check membership before adding, or handle the conflict |
-| `addMember` by email returns `status: "pending_signup"` | Email isn't an app user yet | Expected — membership resolves when they sign up or accept via token; show a pending UI |
-| `addMember` returns `status: "already_member"` | The user was already a member | Idempotent — no error; replaces the previous `409` response |
-| 403 on group create | Group type has a rule set that denied the operation | Check the `group.create` rule; admins/owners bypass rules |
-| Group permission not taking effect on document | User hasn't reopened the document | Close and reopen the document to pick up new group permissions |
-| CEL `isMemberOf` returns false | User not added to the group, or wrong groupType/groupId | Verify membership with `listUserMemberships` |
-| Can't restrict admin access via rules | By design — admins bypass rule evaluation | Use app roles for broad access, groups for fine-grained |
+| `addMember` returns `status: "pending_signup"` | Email isn't an app user yet | Expected. Membership resolves when they sign up or accept via `inviteToken`. Render a pending-members UI; cancel via `removeMember({ email })` or `invitations.revokeDeferredGrant(deferredId, "group")`. |
+| `addMember` returns `status: "already_member"` | User already in the group | Idempotent — no error. Replaces the previous HTTP 409 response. |
+| 409 on `groups.create` | A group with that `(groupType, groupId)` already exists | Use a different `groupId` or call `groups.get` first. |
+| 403 on `groups.create` (member role) | Group type has no `ruleSetName`, or the `group.create` rule denied it | Attach a rule set with a permissive `group.create` expression, or call as an owner/admin. |
+| 403 on `groups.create` with `groupType` starting with `_` | Reserved system group type | Pick a different prefix. |
+| Group permission not taking effect on document | User hasn't reopened the document | Close and reopen the document to pick up new group permissions. |
+| CEL `isMemberOf` returns false unexpectedly | Wrong `groupType`/`groupId` casing, user not yet added (deferred), or membership cache stale | Verify with `listUserMemberships(userId)`; remember email-based adds defer until sign-up. |
+| Rule evaluation always denies, no obvious reason | Expression references a field not in the context (e.g. `user.appRole`, `group.description`) — runtime errors are silently turned into deny | Run `client.ruleSets.debug({...})` and inspect `trace`/`expression`/`context`. |
+| Can't restrict admin/owner access via rules | By design — they bypass `evaluateRule` | Use group memberships for fine-grained access; don't try to gate admins. |
