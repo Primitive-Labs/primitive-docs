@@ -185,15 +185,33 @@ await client.groups.addMember("team", "engineering", { userId: "user-456" });
 const result = await client.groups.addMember("team", "engineering", {
   email: "alice@example.com",
 });
-// { status: "added", userId } — existing user
-// { status: "deferred", invitationId } — non-member; resolves at signup
 ```
 
-Provide either `userId` or `email`, not both. Returns `409` if already a member.
+The result is a discriminated union — `DirectGroupAdd | DeferredGroupAdd`:
 
-If the email does not match an existing app user, the server creates an `AppInvitation` plus a `DeferredGroupAdd`. When that user signs up with the matching email, the membership is added in the same transaction that creates their account. Until then, `isMemberOf` returns false for that user — do not assume membership before the acceptance event.
+```typescript
+// DirectGroupAdd
+// { status: "added" | "already_member",
+//   userId, userName?, userEmail?, addedAt, addedBy }
 
-See the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md) for the full deferred-grant lifecycle.
+// DeferredGroupAdd
+// { status: "pending_signup",
+//   email, appInvitationCreated, deferredId, expiresAt,
+//   groupType, groupId,
+//   invitationId, inviteToken }
+```
+
+Branch on `status`:
+
+- `"added"` — new membership row created.
+- `"already_member"` — idempotent no-op; the response carries the existing row's `addedAt` / `addedBy`. **Replaces the old `409` error**.
+- `"pending_signup"` — email is not yet an app user. The server created an `AppInvitation` + `DeferredGroupAdd`. Use `invitationId` + `inviteToken` to send a custom invitation email; the platform-default email is sent automatically unless the original invitation was created with `sendEmail: false`.
+
+Until a deferred add resolves, `isMemberOf` returns false for that email's user — do not assume membership before the acceptance event.
+
+Provide either `userId` or `email`, not both.
+
+See the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md) for the full deferred-grant lifecycle and the token-based acceptance path.
 
 ### List members
 
@@ -208,18 +226,37 @@ const members = await client.groups.listMembers("team", "engineering");
 // By user ID
 await client.groups.removeMember("team", "engineering", "user-456");
 
-// By email
+// By email — handles both "is currently a member" AND "was invited but
+// hasn't signed up yet". If a direct membership exists, it's removed.
+// Otherwise the pending DeferredGroupAdd for that email is canceled.
 await client.groups.removeMember("team", "engineering", { email: "alice@example.com" });
 ```
+
+The email form is the right call when you don't know — and don't want to branch on — whether the target has signed up yet. Revoke the whole `AppInvitation` only when you want to cancel **every** grant attached to it (group add, document share, app-join right) at once.
+
+### List pending invitations for a group
+
+```typescript
+const pending = await client.groups.listPendingInvitations("team", "engineering");
+// [{ email, role, invitationId, createdAt, expiresAt, addedBy? }]
+```
+
+Use this to render the "pending members" section of a group sharing UI without touching the internal `client.deferredGrants.*` surface.
 
 ### List a user's memberships
 
 ```typescript
 const memberships = await client.groups.listUserMemberships("user-456");
 // [{ groupType, groupId, name, description?, addedAt, addedBy }]
+//
+// `name` is joined from AppGroup at call time.
+// Orphan rows (membership pointing at a deleted group) are skipped.
 
-// Filter to a single group type (server-side push-down)
-const teamOnly = await client.groups.listUserMemberships("user-456", { groupType: "team" });
+// Filter to a single group type — server-side SK-range push-down,
+// not a post-query JS filter.
+const teams = await client.groups.listUserMemberships("user-456", {
+  groupType: "team",
+});
 ```
 
 ## Group Type Configuration
@@ -544,7 +581,8 @@ await client.groups.addMember("team", "backend", { userId });
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | 409 on addMember | User is already a member | Check membership before adding, or handle the conflict |
-| `addMember` by email returns `status: "deferred"` | Email isn't an app user yet | Expected — membership resolves when they sign up; show a pending UI |
+| `addMember` by email returns `status: "pending_signup"` | Email isn't an app user yet | Expected — membership resolves when they sign up or accept via token; show a pending UI |
+| `addMember` returns `status: "already_member"` | The user was already a member | Idempotent — no error; replaces the previous `409` response |
 | 403 on group create | Group type has a rule set that denied the operation | Check the `group.create` rule; admins/owners bypass rules |
 | Group permission not taking effect on document | User hasn't reopened the document | Close and reopen the document to pick up new group permissions |
 | CEL `isMemberOf` returns false | User not added to the group, or wrong groupType/groupId | Verify membership with `listUserMemberships` |

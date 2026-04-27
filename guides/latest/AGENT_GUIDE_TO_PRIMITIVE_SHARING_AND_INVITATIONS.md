@@ -98,36 +98,54 @@ await client.invitations.revoke(invitationId);
 
 Revoking an `AppInvitation` rescinds the right to join the app and cascades to every pending email-based share or group add linked to that invitation. If the invitee hasn't signed up yet, this is the single API call that fully undoes the invitation + any pending shares.
 
-### Custom Email CTAs — `getAcceptToken` and `accept`
+### Custom-Email Invitations (`inviteToken`)
 
-When your app sends its own invitation email (e.g. branded HTML via a workflow step), you need to embed a working accept link. The `inviteToken` is returned directly from `invitations.create()`:
+Every `AppInvitation` carries a tokenized `inviteToken`. Combine it with your own accept-page URL to build a working CTA when you're sending custom invitation emails (templated by your app, not by Primitive's default email path).
 
-```typescript
-const invitation = await client.invitations.create({
-  email: "alice@example.com",
-  role: "member",
-  sendEmail: false, // suppress the platform's default email
-});
+The token is returned **inline** on the response that creates the invitation — both `client.invitations.create()` (`AppInvitationInfo.inviteToken`) and the deferred branches of `client.documents.setPermissions({ email })` and `client.groups.addMember({ email })` (which return `DeferredGroupAdd.inviteToken` / `PendingInvitationEntry.invitationId` on the deferred entry).
 
-const acceptUrl = `https://app.example.com/invite/accept?inviteToken=${invitation.inviteToken}`;
-// Embed acceptUrl in your own branded email
-```
-
-To retrieve the token for an existing invitation (e.g. for a "resend" flow):
+For resend / lookup flows after the original create response is gone, fetch it explicitly:
 
 ```typescript
-const info = await client.invitations.getAcceptToken(invitationId);
-// { invitationId, inviteToken, email, expiresAt, status }
+const token = await client.invitations.getAcceptToken(invitationId);
+// {
+//   invitationId, inviteToken, email,
+//   expiresAt, accepted, acceptedAt,
+//   status: "pending" | "expired" | "accepted",
+// }
+
+const acceptUrl = `${myApp.baseUrl}/invite/accept?inviteToken=${token.inviteToken}`;
+await myEmailService.send({ to: token.email, link: acceptUrl });
 ```
 
-When the user lands on your accept page and is authenticated, consume the token:
+The platform deliberately does not compose the URL — apps own their own accept-page routing.
+
+**Permissions:** app admin/owner, the invitation's original inviter, or any member of an app with `memberInvitationsEnabled: true`. Legacy invitations created before tokens were introduced are lazily upgraded on first read.
+
+### Token-Based Acceptance (Authenticated Caller)
+
+If a caller is already signed in (e.g. they signed up under a different email than the one they were invited at, or were invited after they had an account), they can accept the invitation directly with the token:
 
 ```typescript
 const result = await client.invitations.accept(inviteToken);
-// { status: "accepted", invitationId, grantsResolved: { groups, documents } }
+// {
+//   status: "accepted",
+//   invitationId,
+//   grantsResolved: { groups: 2, documents: 1 },
+// }
 ```
 
-`accept` marks the invitation accepted (write-once) and resolves all pending deferred grants linked to it — even if the user's current account email differs from the invited email. Throws `INVITE_TOKEN_INVALID`, `INVITE_TOKEN_EXPIRED`, or `INVITE_ALREADY_ACCEPTED` on failure.
+The server marks the invitation accepted (write-once) and binds every pending deferred grant linked to it to the caller's `userId`. The new `AppInvitation.acceptedByUserId` field records the accepting user — it may differ from the user that owns the invited email.
+
+**This is independent from the signup-flow path.** Email-matched signup still resolves deferred grants automatically. Token acceptance exists for the *cross-identity* case ("invited at work@x.com, accepting on home@y.com").
+
+**Error codes (throws):**
+
+| Code | When |
+|------|------|
+| `INVITE_TOKEN_INVALID` | Token doesn't decode or has been mutated |
+| `INVITE_TOKEN_EXPIRED` | Invitation past its `expiresAt` |
+| `INVITE_ALREADY_ACCEPTED` | Token has already been redeemed |
 
 ---
 
@@ -158,14 +176,22 @@ await client.documents.setPermissions(documentId, [
 ]);
 ```
 
-Response includes a per-entry status so the caller can show which entries became deferred vs. immediate:
+Response includes a per-entry status so the caller can show which entries became deferred vs. immediate. Each entry is `DirectPermissionGrant | DeferredPermissionGrant`:
 
 ```typescript
 // {
+//   success: true,
+//   message: "...",
 //   results: [
-//     { userId: "user-abc", status: "granted" },
-//     { email: "alice@example.com", userId: "user-resolved", status: "granted" },
-//     { email: "bob@example.com", status: "deferred", invitationId: "inv-123" },
+//     // Direct (existing user):
+//     { status: "granted" | "updated", userId: "user-abc", permission: "read-write" },
+//
+//     // Deferred (email not yet an app user):
+//     { status: "pending_signup",
+//       email: "bob@example.com", permission: "read-write",
+//       appInvitationCreated: true,
+//       invitationId: "inv-123",
+//       inviteToken: "..." },   // ← combine with your accept-page URL for custom emails
 //   ]
 // }
 ```
@@ -203,14 +229,25 @@ await client.groups.addMember("team", "engineering", {
 });
 ```
 
-The return shape distinguishes the two paths:
+The return is a discriminated union — `DirectGroupAdd | DeferredGroupAdd`:
 
 ```typescript
-// { status: "added", userId: "user-abc" }
-// { status: "deferred", invitationId: "inv-123" }
+// DirectGroupAdd (email or userId mapped to an existing user):
+// { status: "added" | "already_member",
+//   userId, userName?, userEmail?, addedAt, addedBy }
+
+// DeferredGroupAdd (email is not yet an app user):
+// { status: "pending_signup",
+//   email, appInvitationCreated, deferredId, expiresAt,
+//   groupType, groupId,
+//   invitationId, inviteToken }   // ← use these to send a custom invite email
 ```
 
-Use `status` to drive UI — a "deferred" result should show "Will be added when Alice joins" rather than a completed checkmark.
+Branch on `status`:
+
+- `"added"` — new membership row was created.
+- `"already_member"` — idempotent no-op; the response carries the existing row's `addedAt`/`addedBy`. Replaces the previous `409` error on duplicate adds.
+- `"pending_signup"` — show "Will be added when Alice joins." Use `invitationId` + `inviteToken` if you need to compose a custom invitation email.
 
 ---
 
@@ -378,24 +415,29 @@ const members = await client.groups.listMembers(groupType, groupId);
 // [{ userId, userName, userEmail, addedAt, addedBy }, ...]
 ```
 
-### Pending Invitations (App-Level)
+### Pending Invitations — App-Level
 
 ```typescript
 const { items: invitations } = await client.invitations.list();
 const pending = invitations.filter(i => !i.accepted);
-// [{ invitationId, email, role, invitedAt, expiresAt, source, ... }, ...]
+// [{ invitationId, email, role, invitedAt, expiresAt, source, inviteToken, ... }]
 ```
 
-### Pending Invitations (Per-Group)
+### Pending Invitations — Per-Resource
 
-Use `listPendingInvitations` to get unresolved, non-expired invitations scoped to a specific group:
+Each shareable resource exposes a dedicated endpoint for the deferred grants that target *it*, so you don't have to filter the app-level list manually:
 
 ```typescript
-const pending = await client.groups.listPendingInvitations(groupType, groupId);
-// [{ email, role, invitationId, createdAt, expiresAt, addedBy }, ...]
+// Pending document shares for one document
+const docPending = await client.documents.listPendingInvitations(documentId);
+// [{ email, permission, invitationId, createdAt, expiresAt, grantedBy? }]
+
+// Pending group adds for one group
+const groupPending = await client.groups.listPendingInvitations(groupType, groupId);
+// [{ email, role, invitationId, createdAt, expiresAt, addedBy? }]
 ```
 
-This is the right call to build a per-group "Members + Pending" panel without approximating from the app-level list.
+Use these instead of `client.deferredGrants.*`, which is reserved for admin debugging.
 
 ### Canceling a Pending Invitation
 
@@ -419,11 +461,14 @@ Group:
 
 ```typescript
 await client.groups.removeMember(groupType, groupId, userId);
-// or by email — removes member AND cancels any pending deferred invitation:
+
+// By email — works whether the target is a current member OR a pending
+// deferred add. Removes the membership if one exists; if there's no direct
+// membership, cancels the pending DeferredGroupAdd for that email instead.
 await client.groups.removeMember(groupType, groupId, { email });
 ```
 
-When removing by email, the server handles both the "already a member" case and the "pending invite" case in one call. To cancel a pending invitation and all of its linked grants across resources, revoke the `AppInvitation` directly.
+The email-form `removeMember` is the single call that handles both "user is in the group" and "we invited the user but they haven't signed up yet" — you do not need to revoke the whole `AppInvitation` to cancel a pending group add anymore.
 
 ## Deferred Grants: Internal Detail
 

@@ -989,10 +989,34 @@ When sharing multiple documents as a unit, group them into a **collection** and 
 - Deleting a collection revokes the permissions it granted but **never deletes the documents** and preserves any direct grants
 - Individual member access is O(1) regardless of collection size (uses system-managed groups internally)
 
+**Per-context collections (`collectionType` + `contextId`):**
+
+`DocumentCollection` has two optional, immutable-after-create fields that mirror `AppGroup.groupType` + `groupId`:
+
+| Field | Purpose |
+|---|---|
+| `collectionType` | Selects which `CollectionTypeConfig` (and therefore which CEL rule set) applies. Defaults to `"default"` when omitted at create time. |
+| `contextId` | Per-instance identifier tying the collection to an external entity (e.g. a class ID, project ID). Exposed to CEL rules as `collection.contextId`. `null` when the collection isn't bound to anything. |
+
+This lets a collection's CEL rules express "caller is a member of the group this collection belongs to":
+
+```json
+// Rule set bound via CollectionTypeConfig with collectionType: "class-resources"
+{
+  "document": {
+    "add": "isMemberOf('class-teachers', collection.contextId)",
+    "list": "isMemberOf('class-students', collection.contextId)
+              || isMemberOf('class-teachers', collection.contextId)"
+  }
+}
+```
+
+Collection rule sets see a dedicated `collection.*` CEL namespace (separate from the shared `group.*` namespace used by group rule sets). Both fields are optional — collections created without them have `collectionType: null` / `contextId: null` and use the default ruleset behavior.
+
 **Creating and managing collections:**
 
 ```typescript
-// Create a collection
+// Create a default collection — collectionType defaults to "default"
 const collection = await client.collections.create({
   name: "Q1 Reports",
   description: "All quarterly report documents",
@@ -1002,6 +1026,14 @@ const collection = await client.collections.create({
   // Exposed to CEL rules as `collection.contextId`
   contextId: "math-101",
 });
+
+// Create a per-context collection — bind to an external entity
+const classCollection = await client.collections.create({
+  name: "Math 101 Resources",
+  collectionType: "class-resources",
+  contextId: classId, // exposed to CEL as collection.contextId
+});
+// collectionType and contextId are immutable after create
 
 // Add documents to a collection
 await client.collections.addDocument(collection.collectionId, documentId);

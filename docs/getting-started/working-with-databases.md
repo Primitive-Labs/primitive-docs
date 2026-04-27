@@ -419,11 +419,11 @@ If your app relies on `databases.list()` to populate a dashboard or workspace li
 // Only returns databases where the user is owner or manager
 const databases = await client.databases.list();
 
-// Filter to a specific database type
-const workspaceDbs = await client.databases.list({ databaseType: "workspace" });
+// Filter to one databaseType — wire shape: ?type=<databaseType>
+const projects = await client.databases.list({ databaseType: "project" });
 ```
 
-App-level admins (console admins) are an exception — they see all databases in the app.
+The same `{ databaseType }` filter applies for app-level admins, who otherwise see every database in the app.
 
 ### `databases.get()` — Any Authenticated User
 

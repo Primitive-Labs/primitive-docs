@@ -63,7 +63,7 @@ You can add members by **email** or by user ID. Most apps should use email — i
 
 ```typescript
 // Add a member by email (recommended for user-facing flows)
-await client.groups.addMember("team", "engineering", {
+const result = await client.groups.addMember("team", "engineering", {
   email: "alice@example.com",
 });
 
@@ -75,15 +75,28 @@ await client.groups.addMember("team", "engineering", {
 // List members
 const members = await client.groups.listMembers("team", "engineering");
 
-// List groups a user belongs to
+// List groups a user belongs to (each row includes `name` and optional `description`
+// joined from the group; orphan rows are skipped)
 const memberships = await client.groups.listUserMemberships(userId);
-// [{ groupType, groupId, name, description?, addedAt, addedBy }, ...]
+// [{ groupType, groupId, name, description?, addedAt, addedBy }]
 
-// Filter to a single group type (server-side push-down)
-const teamMemberships = await client.groups.listUserMemberships(userId, { groupType: "team" });
+// Filter to a single group type when you only need one slice
+const teamMemberships = await client.groups.listUserMemberships(userId, {
+  groupType: "team",
+});
 ```
 
 Provide **either** `email` or `userId`, not both.
+
+The `addMember` result is a discriminated union — branch on `status`:
+
+| `status` | Meaning |
+|---|---|
+| `"added"` | Email or userId mapped to an existing user; new membership row created |
+| `"already_member"` | Existing member (idempotent — no error) |
+| `"pending_signup"` | Email is not yet an app user; a deferred add was created. Carries `invitationId` and `inviteToken` for custom invitation emails |
+
+See [Sharing and Invitations](./sharing-and-invitations.md#sending-your-own-invitation-emails) for what to do with `inviteToken`.
 
 ### Email-Based Adds Work for Non-Members Too
 
@@ -109,8 +122,12 @@ primitive groups list-members --group-id <groupId>
 # Update a member's role
 primitive groups update-member --group-id <groupId> --user-id <userId> --role admin
 
-# Remove a member
+# Remove a member by user ID
 primitive groups remove-member --group-id <groupId> --user-id <userId>
+
+# Remove by email — also cancels a pending deferred add if the user
+# hasn't signed up yet
+primitive groups remove-member --group-id <groupId> --email alice@example.com
 ```
 
 ### Group Roles

@@ -35,7 +35,7 @@ await client.invitations.create({
 });
 ```
 
-The invitee receives an email. When they sign up with that email, the invitation is consumed and they join the app.
+The invitee receives an email. The invitation is consumed when they sign up with the invited email **or** when they accept it under a different account using the invitation's token (see [Accepting an Invitation with a Different Email](#accepting-an-invitation-with-a-different-email)).
 
 ### Member Invitations (with Quotas)
 
@@ -83,28 +83,40 @@ await client.invitations.revoke(invitationId);
 
 Revoking cascades — any pending email-based document shares or group adds attached to the invitation are removed in the same operation.
 
-### Custom Invitation Emails
+### Sending Your Own Invitation Emails
 
-If you send your own invitation emails instead of relying on the platform's default template, you need to embed a working accept link in your email. Use `getAcceptToken` to fetch the token for an existing invitation, then compose the URL yourself:
-
-```typescript
-const info = await client.invitations.getAcceptToken(invitationId);
-// info: { invitationId, inviteToken, email, expiresAt, status }
-
-const acceptUrl = `https://app.example.com/invite/accept?inviteToken=${info.inviteToken}`;
-// Embed acceptUrl in your custom email
-```
-
-The `inviteToken` is also returned directly from `invitations.create()`, so you can skip the `getAcceptToken` call when building the URL immediately after creating the invitation.
-
-When the recipient clicks the link, accept the invitation on their behalf once they're authenticated:
+By default the platform sends invitation emails. If you'd rather send branded emails from your own ESP, every invitation exposes a tokenized `inviteToken` that you can drop into a CTA URL:
 
 ```typescript
-await client.invitations.accept(inviteToken);
-// Returns: { status: "accepted", invitationId, grantsResolved: { groups, documents } }
+const invitation = await client.invitations.create({
+  email: "alice@example.com",
+  role: "member",
+  sendEmail: false, // suppress the platform email
+});
+
+const acceptUrl = `https://myapp.example/invite/accept?inviteToken=${invitation.inviteToken}`;
+await myEmailService.send({ to: invitation.email, link: acceptUrl });
 ```
 
-This resolves all pending deferred grants linked to the invitation (document shares, group adds) to the authenticated user — even if their signup email differs from the invited email.
+The same `inviteToken` is also surfaced inline on the deferred entries returned by `client.documents.setPermissions({ email })` and `client.groups.addMember({ email })`, so the same custom-email pattern works for share-by-email and add-to-group flows. To look up the token for an existing invitation later — e.g. on a "resend invite" button — use:
+
+```typescript
+const token = await client.invitations.getAcceptToken(invitationId);
+// { invitationId, inviteToken, email, expiresAt, accepted, acceptedAt, status }
+```
+
+### Accepting an Invitation with a Different Email
+
+A user who already has an account (or who signs up with a *different* email than the one they were invited at) can accept an invitation explicitly using the token:
+
+```typescript
+const result = await client.invitations.accept(inviteToken);
+// { status: "accepted", invitationId, grantsResolved: { groups, documents } }
+```
+
+This is the path for "I was invited at `work@x.com` but I want to accept on my existing `home@y.com` account." The invitation is marked accepted (write-once) and every deferred grant linked to it is bound to the *current* user. The `AppInvitation.acceptedByUserId` field records which user actually accepted, which may differ from the user that owns the invited email.
+
+The classic email-matched signup path still works — `client.invitations.accept(token)` is purely for the cross-identity case.
 
 
 ## Document Sharing
@@ -178,30 +190,39 @@ See [Working with Documents](./working-with-documents.md) for document fundament
 Groups support the same email-based pattern for invitations:
 
 ```typescript
-// Existing user → added immediately
-await client.groups.addMember("team", "engineering", {
+const result = await client.groups.addMember("team", "engineering", {
   email: "alice@example.com",
-});
-
-// Non-member → creates an invitation and remembers the pending add,
-// resolves when they sign up
-await client.groups.addMember("team", "engineering", {
-  email: "newhire@example.com",
 });
 ```
 
+The result is a discriminated union — branch on `result.status` to drive your UI:
+
+| `status` | Meaning |
+|---|---|
+| `"added"` | Email matched an existing user; new membership row was just created |
+| `"already_member"` | Email matched an existing user who was already in the group (idempotent — no error) |
+| `"pending_signup"` | Email is not yet an app user; a deferred add was created and will resolve at signup or token-acceptance |
+
+The `"pending_signup"` branch carries `invitationId` and `inviteToken` so you can plug them into a custom invitation email if you're not using the platform's default email path.
+
 See [Users and Groups](./users-and-groups.md) for more on groups.
 
-## How Email-Based Sharing Resolves at Signup
+## How Email-Based Sharing Resolves
 
-When you share by email to someone who isn't a user yet, Primitive internally records the pending grant and resolves it automatically when that person signs up. You don't interact with this machinery directly — the sharing APIs accept emails transparently and the platform handles the rest.
+When you share by email to someone who isn't a user yet, Primitive internally records the pending grant and resolves it as soon as the right person redeems the invitation. You don't interact with this machinery directly — the sharing APIs accept emails transparently and the platform handles the rest.
 
-### What the End User Sees
+There are two resolution paths, and the platform picks based on what happens first:
+
+### Path A — They sign up with the invited email
 
 1. You share a document with `newhire@example.com` at `read-write`.
 2. They receive an app-invitation email.
-3. They sign up (magic link, OTP, Google, passkey — any method).
+3. They sign up with `newhire@example.com` (magic link, OTP, Google, passkey — any method).
 4. On first load, the document is already in their bookmarks and they have `read-write` access. No additional click-through.
+
+### Path B — They accept on a different identity
+
+If the recipient already has an account under a different email — say their personal `newhire@gmail.com` — they can sign in there and accept the invitation explicitly with `client.invitations.accept(inviteToken)`. The pending grant binds to *their* userId, even though it was invited at a different email. See [Accepting an Invitation with a Different Email](#accepting-an-invitation-with-a-different-email).
 
 ### Domain-Mode Apps
 
@@ -366,24 +387,25 @@ const members = await client.groups.listMembers(groupType, groupId);
 // [{ userId, userName, userEmail, addedAt, addedBy }, ...]
 ```
 
-### Pending Invitations (App-Level)
+### Pending Invitations
+
+App-wide:
 
 ```typescript
 const { items: invitations } = await client.invitations.list();
 const pending = invitations.filter(i => !i.accepted);
-// [{ invitationId, email, role, invitedAt, expiresAt, source, ... }, ...]
+// [{ invitationId, email, role, invitedAt, expiresAt, source, inviteToken, ... }]
 ```
 
-::: tip Per-resource pending lists
-You can now list pending invitations scoped to a specific group:
+Per-resource — for "this specific document" or "this specific group" panels:
 
 ```typescript
-const pending = await client.groups.listPendingInvitations(groupType, groupId);
-// [{ email, role, invitationId, createdAt, expiresAt, addedBy }, ...]
-```
+const docPending = await client.documents.listPendingInvitations(documentId);
+// [{ email, permission, invitationId, createdAt, expiresAt, grantedBy? }]
 
-This returns only unresolved, non-expired invitations for that group. For app-level pending lists, use `client.invitations.list()` as before.
-:::
+const groupPending = await client.groups.listPendingInvitations(groupType, groupId);
+// [{ email, role, invitationId, createdAt, expiresAt, addedBy? }]
+```
 
 ### Canceling a Pending Invitation
 
@@ -393,11 +415,14 @@ To withdraw a pending invitation — and any pending document shares or group ad
 await client.invitations.revoke(invitationId);
 ```
 
-### Removing Someone Who Already Has Access
+### Removing Someone
+
+The removal APIs handle both "currently has access" and "was invited but hasn't signed up yet" through a single call.
 
 Document:
 
 ```typescript
+// Existing user — by userId
 await client.documents.setPermissions(documentId, [
   { userId, permission: null },
 ]);
@@ -406,12 +431,15 @@ await client.documents.setPermissions(documentId, [
 Group:
 
 ```typescript
+// Existing member — by userId
 await client.groups.removeMember(groupType, groupId, userId);
-// or by email if you don't have the userId
+
+// By email — removes the membership if one exists, OR cancels the
+// pending DeferredGroupAdd for that email if no direct membership does.
 await client.groups.removeMember(groupType, groupId, { email });
 ```
 
-When removing by email, the server also cancels any pending deferred invitation for that email if no direct membership exists — a single call handles both the "already a member" and "pending invite" cases. To cancel a pending invitation and all shares/group adds attached to it (not just for one group), revoke the `AppInvitation` directly.
+Use the email form whenever you don't want to think about whether the target has signed up yet — it does the right thing in either case. Revoking the whole `AppInvitation` is only needed when you want to cancel **every** grant attached to that invitation (the document share *and* the group add *and* the right to join the app).
 
 ## A Worked Example
 

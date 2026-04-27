@@ -553,6 +553,13 @@ const db = await client.databases.create({
 // CEL-gated registered operations are not included.
 const databases = await client.databases.list();
 
+// Filter to one databaseType. Wire shape: `?type=<databaseType>`.
+// Server-side post-join JS filter (not an SK push-down — the access
+// join runs first, then the type filter narrows the result).
+// App admins making the same call get the filter applied to the
+// full app-wide set.
+const projects = await client.databases.list({ databaseType: "project" });
+
 // Get a specific database
 const db = await client.databases.get(databaseId);
 

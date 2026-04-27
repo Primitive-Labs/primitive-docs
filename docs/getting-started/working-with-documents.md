@@ -387,7 +387,7 @@ See [Sharing and Invitations](./sharing-and-invitations.md#bookmarks) for the fu
 
 ## Document Access Requests
 
-A `403` from `client.documents.get(documentId)` can now include a `canRequestAccess` hint. Users with a document link can submit a request, and document owners can approve or deny it. See [Sharing and Invitations](./sharing-and-invitations.md#document-access-requests).
+A `403` from `client.documents.get(documentId)` can include a `canRequestAccess` hint. Users with a document link can submit a request, and document owners can approve or deny it. See [Sharing and Invitations](./sharing-and-invitations.md#document-access-requests).
 
 ## Next Steps
 

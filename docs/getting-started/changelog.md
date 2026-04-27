@@ -4,24 +4,27 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
-## js-bao-wss v1.0.0 — 2026-04-24
+## js-bao-wss-client v1.4.3 — 2026-04-24
 
-- You can now build custom invitation email CTAs: `invitations.create()` (and deferred group/document branches) return `invitationId` + `inviteToken`, and a new `invitations.getAcceptToken(id)` method lets you retrieve the token for any existing invitation.
-- Authenticated users can accept an invitation by token via `invitations.accept(inviteToken)`, resolving all pending deferred grants to their account — even when the signup email differs from the invited email.
-- `groups.listUserMemberships(userId, { groupType })` now accepts an optional `groupType` filter for server-side push-down (no post-query filtering needed).
-- `databases.list({ databaseType })` now accepts an optional `databaseType` filter to narrow results to a single database type.
-- `DocumentCollection` gains `collectionType` and `contextId` fields. Set `contextId` at create time to tie a collection to an external entity (class, project, etc.); CEL collection rules can then reference `collection.contextId` (e.g. `isMemberOf('class', collection.contextId)`).
-- `groups.removeMember({ email })` now also cancels any pending deferred invitation for that email when no direct membership exists — a single call handles both the "already a member" and "pending" cases.
-- `groups.listUserMemberships()` results now include a `name` field (and optional `description`) for each group, joined at query time.
+A large cumulative release across invitations, sharing, server-side automation, databases, storage, and CLI. Highlights:
 
-## Latest (unreleased)
+**Invitations and group membership**
 
-Covers the current `js-bao-wss` server and `js-bao-wss-client` changes that will ship in the next release. A large set of changes across sharing, server-side automation, and storage:
-
-**Sharing and invitations**
-
+- Custom invitation email CTAs — `invitations.create()` (and the deferred branches of `documents.setPermissions({ email })` and `groups.addMember({ email })`) return `invitationId` + `inviteToken`. `invitations.getAcceptToken(id)` retrieves the token for any existing invitation.
+- Token-based acceptance — `invitations.accept(inviteToken)` lets an authenticated caller redeem an invitation under a different identity than the email it was sent to. Resolves all linked deferred grants to the caller. `AppInvitation.acceptedByUserId` records the accepting user.
+- `groups.addMember` returns a discriminated union — `DirectGroupAdd | DeferredGroupAdd`. Branch on `status: "added" | "already_member" | "pending_signup"`. `"already_member"` replaces the prior `409`. The `"pending_signup"` branch carries `invitationId` + `inviteToken`.
+- `groups.removeMember(groupType, groupId, { email })` removes the membership if one exists, or cancels the pending `DeferredGroupAdd` if not — a single call handles both the "already a member" and "pending invite" cases.
+- `documents.listPendingInvitations(documentId)` and `groups.listPendingInvitations(groupType, groupId)` return the deferred grants scoped to one resource.
+- `groups.listUserMemberships(userId)` results include `name` (joined from `AppGroup`) and optional `description`; orphan rows are skipped. Accepts `{ groupType }` for server-side push-down filtering.
+- Member invitations with quota — set `memberInvitationsEnabled: true` on an app to let regular members invite others, capped by `memberInvitationLimit`. Admins and owners are exempt. New `GET /invitations/quota` endpoint.
+- Document access requests — Google-Docs-style "request access" flow. A 403 on `documents.get` returns a `canRequestAccess` hint when applicable. Client methods: `documents.requestAccess`, `listAccessRequests`, `approveAccessRequest`, `denyAccessRequest`. Owners receive WS + email notifications.
+- Bookmarks — generic bookmark model for organizing references to documents, databases, or any target type. `client.me.bookmarks.add/remove/rename/list` with prefix queries. Documents are auto-bookmarked on creation.
 - Email-based document sharing — pass `email` to `client.documents.setPermissions` (or `setGroupPermission`) and the grant resolves automatically when the recipient signs up. Non-members receive an invitation email.
-- Email-based group membership — `groups.addMember` now accepts `email` in addition to `userId`. Pending adds resolve at signup.
+- Invitation acceptance WebSocket event — the `invitation`/`accepted` event fires reliably from the GET document path (previously silently dropped on that branch).
+
+**Collections**
+
+- `DocumentCollection` exposes `collectionType` and `contextId` (both nullable, immutable after create), mirroring `AppGroup.groupType` + `groupId`. Collection rule sets reference `collection.contextId` to express "caller is a member of the group this collection belongs to." Collection rule sets see a dedicated `collection.*` CEL namespace, separate from the `group.*` namespace used by group rule sets.
 - Member invitations with quota — set `memberInvitationsEnabled: true` on an app to let regular members invite others, capped by `memberInvitationLimit`. Admins and owners are exempt from the quota. New `GET /invitations/quota` endpoint.
 - Document access requests — Google Docs-style "request access" flow. A 403 on `documents.get` now returns a `canRequestAccess` hint. New client methods: `documents.requestAccess`, `listAccessRequests`, `approveAccessRequest`, `denyAccessRequest`. Owners receive WS + email notifications.
 - Bookmarks — new generic bookmark model for organizing references to documents, databases, or any target type. `client.me.bookmarks.add/remove/rename/list` with prefix queries. Documents are auto-bookmarked on creation.
