@@ -4,6 +4,11 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao v0.4.0 — 2026-04-28
+
+- Decorator support (`@Field`, `@Model`) has been removed — models must now be defined with `defineModelSchema` (or `createModelClass` / `attachAndRegisterModel`). If you have models using the old decorator syntax, migrate them to `defineModelSchema` before upgrading.
+- `Field` and `Model` are no longer exported from any bundle entry point (`js-bao`, `js-bao/node`, `js-bao/browser`).
+
 ## js-bao-wss-client v1.4.3 — 2026-04-24
 
 A large cumulative release across invitations, sharing, server-side automation, databases, storage, and CLI. Highlights:

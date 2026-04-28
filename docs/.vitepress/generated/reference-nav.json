@@ -109,10 +109,6 @@
                   "link": "/reference/js-bao/api/functions/dumpYDocToPlain"
                 },
                 {
-                  "text": "Field",
-                  "link": "/reference/js-bao/api/functions/Field"
-                },
-                {
                   "text": "generateULID",
                   "link": "/reference/js-bao/api/functions/generateULID"
                 },
@@ -131,10 +127,6 @@
                 {
                   "text": "loadSchemaFromTomlString",
                   "link": "/reference/js-bao/api/functions/loadSchemaFromTomlString"
-                },
-                {
-                  "text": "Model",
-                  "link": "/reference/js-bao/api/functions/Model"
                 },
                 {
                   "text": "registerFunctionDefault",
