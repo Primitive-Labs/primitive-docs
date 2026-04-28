@@ -4,6 +4,13 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## primitive-app v2.1.7 — 2026-04-28
+
+- Models are now defined in `src/models/models.toml` and generated into TypeScript via `pnpm models:gen` — you no longer write `defineModelSchema()` by hand; the generated `.generated.ts` files produce the attribute interface, class declaration, and model-name constant automatically
+- Model classes are now pure data containers (no instance methods or getters); business logic belongs in a controller module in `src/lib/` as free functions — call sites use `isOverdue(task)` instead of `task.isOverdue`
+- The `src/models/index.ts` barrel is now also auto-generated and handles `attachAndRegisterModel` registration for all models; always import models from `@/models` so registration runs exactly once
+- `pnpm models:gen` replaces `pnpm codegen` for model generation; re-run it after any change to `models.toml`
+
 ## js-bao-wss-client v1.4.3 — 2026-04-24
 
 A large cumulative release across invitations, sharing, server-side automation, databases, storage, and CLI. Highlights:
