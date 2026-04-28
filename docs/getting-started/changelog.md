@@ -4,6 +4,13 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## primitive-app v2.1.7 — 2026-04-28
+
+*Patch update at the same version as the previous primitive-app entry.*
+
+- Invite tokens are now automatically applied during OAuth and other sign-in flows — when a user follows an invite link while signed out, the token is preserved in sessionStorage and forwarded to the auth request so the invite resolves in the same round-trip, with no extra code required in template apps.
+- Stale `UserPref` records with missing or `"undefined"` keys are now cleaned up automatically on sign-in, preventing accumulation of malformed entries from older code paths.
+
 ## js-bao-wss-client v1.4.3 — 2026-04-24
 
 A large cumulative release across invitations, sharing, server-side automation, databases, storage, and CLI. Highlights:
