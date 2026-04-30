@@ -40,7 +40,7 @@ See the [Data Modeling guide](AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.md) for a f
 
 3. **NEVER remove fields from models.** Add a deprecation comment instead.
 
-4. **ALWAYS add new models to `getJsBaoConfig`.** Run `pnpm codegen` after creating models.
+4. **Run `pnpm codegen` after editing `models.toml`.** Codegen regenerates `*.generated.ts` files and updates the models barrel so every new model is automatically included in `allModels` (passed to `getJsBaoConfig`).
 
 5. **Load data in pages, not sub-components.** Pass data into sub-components as props.
 
@@ -277,116 +277,117 @@ await jsBaoClient.documents.removeTag(documentId, "archived");
 
 ### Creating New Model Files
 
-When creating a new js-bao model file, follow this exact workflow:
+Models are defined in **`src/models/models.toml`** and TypeScript classes are auto-generated from it. Follow this workflow:
 
-**Step 1: Create the minimal model file** with only the schema and class declaration. Do NOT write the auto-generated sections yourself — codegen produces them.
+**Step 1: Add the model to `src/models/models.toml`** using TOML syntax. Use snake_case for option names — the loader maps them to camelCase at runtime.
 
-```typescript
-import { BaseModel, defineModelSchema } from "js-bao";
+```toml
+[models.todos.fields.id]
+type = "id"
+auto_assign = true
+indexed = true
 
-const todoSchema = defineModelSchema({
-  name: "todos",
-  fields: {
-    id: { type: "id", autoAssign: true, indexed: true },
-    title: { type: "string", indexed: true },
-    completed: { type: "boolean", default: false },
-  },
-});
+[models.todos.fields.title]
+type = "string"
+indexed = true
 
-export class Todo extends BaseModel {}
+[models.todos.fields.completed]
+type = "boolean"
+default = false
 ```
 
-**Step 2: Add the model to `getJsBaoConfig`** in your config file so js-bao knows about it.
+**Step 2: Run `pnpm codegen`** to generate `src/models/Todo.generated.ts`. Codegen creates a TypeScript interface, a class extending `BaseModel`, and a model-name constant. It also updates `src/models/index.ts` so the new model is registered automatically.
 
-**Step 3: Run `pnpm codegen`** to generate the auto-generated sections. Codegen inserts a header (`InferAttrs` type alias and a merged interface) and a footer that calls `attachAndRegisterModel(Todo, todoSchema)`. The class itself stays untouched, so add custom methods/getters there freely.
-
-**Step 4: Make any additional edits** to the schema (adding fields, constraints, etc.) and run `pnpm codegen` again.
-
-**CRITICAL: NEVER edit the auto-generated header/footer.** They are bracketed by `BEGIN AUTO-GENERATED` / `END AUTO-GENERATED` markers and will be overwritten on the next codegen run.
-
-**Wrong** — manually attaching `static schema` skips the registry hook that wires up field accessors and unique-constraint indexes:
+Generated output (`Todo.generated.ts`):
 
 ```typescript
-// DON'T DO THIS — model never gets registered with ModelRegistry,
-// queries/saves will throw "Model not properly initialized".
-export class Todo extends BaseModel {
-  static schema = todoSchema;
+// 🔥 AUTO-GENERATED FROM models.toml — DO NOT EDIT. 🔥
+import type { BaseModel } from "js-bao";
+import { BaseModel as BaseModelImpl } from "js-bao";
+
+export interface TodoAttrs {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+export interface Todo extends TodoAttrs, BaseModel {}
+export class Todo extends BaseModelImpl {}
+
+export const Todo_modelName = "todos";
+```
+
+**Step 3: Import from `@/models`** as usual — codegen keeps `src/models/index.ts` in sync.
+
+```typescript
+import { Todo } from "@/models";
+```
+
+**CRITICAL: NEVER edit `*.generated.ts` files or `src/models/index.ts`.** They are overwritten on every `pnpm codegen` run.
+
+**For custom methods/getters:** Create a separate file (e.g., `src/models/Todo.ts`) that re-exports the generated class with methods added. Do not modify the generated file:
+
+```typescript
+// src/models/Todo.ts — extend the generated class with business logic
+import { Todo as GeneratedTodo } from "./Todo.generated";
+
+export class Todo extends GeneratedTodo {
+  get isOverdue(): boolean {
+    return !!this.dueDate && new Date(this.dueDate) < new Date();
+  }
 }
 ```
 
 ### Field Types
 
-| Type        | Description                  | Common Options                 |
-| ----------- | ---------------------------- | ------------------------------ |
-| `id`        | Unique identifier            | `autoAssign: true`             |
-| `string`    | Text values                  | `indexed: true`, `default: ""` |
-| `number`    | Numeric values               | `indexed: true`, `default: 0`  |
-| `boolean`   | True/false                   | `default: false`               |
-| `date`      | ISO-8601 strings             | `indexed: true`                |
-| `stringset` | Collection of strings (tags) | `maxCount: 20`                 |
+| Type        | Description                  | Common TOML Options                     |
+| ----------- | ---------------------------- | --------------------------------------- |
+| `id`        | Unique identifier            | `auto_assign = true`                    |
+| `string`    | Text values                  | `indexed = true`, `default = ""`        |
+| `number`    | Numeric values               | `indexed = true`, `default = 0`         |
+| `boolean`   | True/false                   | `default = false`                       |
+| `date`      | ISO-8601 strings             | `indexed = true`                        |
+| `stringset` | Collection of strings (tags) | `max_count = 20`                        |
+
+All field options: `indexed`, `unique`, `required`, `auto_assign`, `max_length`, `max_count`, `default`. TOML uses snake_case; the runtime maps them to camelCase.
 
 ### Field Options
 
-```typescript
-const schema = defineModelSchema({
-  name: "tasks",
-  fields: {
-    id: { type: "id", autoAssign: true, indexed: true },
-    title: { type: "string", indexed: true },
-    priority: { type: "number", default: 0 },
-    dueDate: { type: "date" },
-    tags: { type: "stringset", maxCount: 10 },
-    archived: { type: "boolean", default: false },
-  },
-});
+```toml
+[models.tasks.fields.id]
+type = "id"
+auto_assign = true
+indexed = true
+
+[models.tasks.fields.title]
+type = "string"
+indexed = true
+
+[models.tasks.fields.priority]
+type = "number"
+default = 0
+
+[models.tasks.fields.due_date]
+type = "date"
+
+[models.tasks.fields.tags]
+type = "stringset"
+max_count = 10
+
+[models.tasks.fields.archived]
+type = "boolean"
+default = false
 ```
 
 ### Unique Constraints
 
-Two ways to enforce uniqueness:
+Single-field uniqueness: add `unique = true` to the field in `models.toml`. This also enables `upsertOn` on save.
 
-```typescript
-// 1. Single-field uniqueness via field option (use this when possible —
-//    enables `upsertOn` on save).
-const userSchema = defineModelSchema({
-  name: "users",
-  fields: {
-    id: { type: "id", autoAssign: true },
-    email: { type: "string", unique: true, indexed: true },
-  },
-});
-
-// 2. Multi-field (composite) uniqueness via options.uniqueConstraints.
-//    Each entry is a NAMED constraint — the name is what you pass to
-//    upsertByUnique / findByUnique.
-const categorySchema = defineModelSchema({
-  name: "categories",
-  fields: {
-    id: { type: "id", autoAssign: true },
-    name: { type: "string" },
-    parentId: { type: "string" },
-  },
-  options: {
-    uniqueConstraints: [
-      { name: "name_parent_unique", fields: ["name", "parentId"] },
-    ],
-  },
-});
-```
-
-**Wrong** — these forms compile but the constraint will be silently dropped or wrongly typed:
-
-```typescript
-// DON'T: top-level uniqueConstraints (must be inside `options`)
-defineModelSchema({ name: "...", fields: {...}, uniqueConstraints: [...] });
-
-// DON'T: array-of-arrays shorthand — not supported. Each entry must be
-// { name, fields }.
-defineModelSchema({
-  name: "...",
-  fields: {...},
-  options: { uniqueConstraints: [["name", "parentId"]] as any },
-});
+```toml
+[models.users.fields.email]
+type = "string"
+unique = true
+indexed = true
 ```
 
 ### Working with StringSets

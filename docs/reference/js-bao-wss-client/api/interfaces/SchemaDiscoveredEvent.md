@@ -22,4 +22,4 @@
 
 ### schema
 
-> **schema**: `DiscoveredSchema`
+> **schema**: [`DiscoveredSchema`](DiscoveredSchema.md)
