@@ -936,9 +936,15 @@ The unique identifier of the document whose access requests to list
 
 ### listGroupPermissions()
 
-> **listGroupPermissions**(`documentId`): `Promise`\<[`DocumentGroupPermissionEntry`](DocumentGroupPermissionEntry.md)[]\>
+> **listGroupPermissions**(`documentId`, `options?`): `Promise`\<[`DocumentGroupPermissionEntry`](DocumentGroupPermissionEntry.md)[]\>
 
 List all group-based permissions for a document.
+
+By default, platform-managed internal groups (those whose `groupType` is
+prefixed with `_`, e.g. `_col-reader` / `_col-writer` backing collection
+sharing) are excluded — they are not user-meaningful. Pass
+`{ includeSystem: true }` to include them (typically only useful for
+admin tooling).
 
 #### Parameters
 
@@ -946,7 +952,17 @@ List all group-based permissions for a document.
 
 `string`
 
-The unique identifier of the document whose group permissions to list
+The unique identifier of the document whose group
+  permissions to list
+
+##### options?
+
+Optional list options. Set `includeSystem` to `true` to
+  include platform-managed internal groups in the result.
+
+###### includeSystem?
+
+`boolean`
 
 #### Returns
 

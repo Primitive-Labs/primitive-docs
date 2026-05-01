@@ -4,6 +4,13 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao v0.4.0 — 2026-05-01
+
+- **New `js-bao-codegen-v2` CLI** — TOML-based code generation. Define models in `models.toml` and run `js-bao-codegen-v2 generate` to produce strongly-typed TypeScript classes with auto-registration. Replaces the marker-comment approach of v1 codegen.
+- **`js-bao-codegen-v2 migrate`** — one-shot migration tool that scans a v1-codegen project, generates `models.toml`, and produces a migration report classifying each model as `safe-to-delete` or `needs-manual-migration` (custom methods, function defaults, etc.).
+- **`upsertOn` in registered database operations** — pass `"upsertOn": "$params.fieldName"` in a `save` operation definition to create-or-update a record by a unique field value instead of requiring an explicit `id`. Enables idempotent write patterns without client-side lookup.
+- **`database.celContext.*` CEL alias** — the database CEL context (formerly called "metadata") is now also accessible as `database.celContext.*` in access expressions, triggers, and filters. `database.metadata.*` continues to work as a legacy alias. The TOML field is now `celContextAccess` (`metadataAccess` still accepted). The CLI command is now `primitive databases cel-context get/update` (`primitive databases metadata` still works).
+
 ## js-bao-wss-client v1.4.3 — 2026-04-24
 
 A large cumulative release across invitations, sharing, server-side automation, databases, storage, and CLI. Highlights:

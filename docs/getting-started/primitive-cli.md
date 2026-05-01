@@ -199,32 +199,47 @@ When working with an AI coding assistant, point it to these guides before asking
 
 ## Configuration Sync
 
-The CLI supports exporting and importing app configuration as TOML files, enabling version control for your app settings:
+The CLI supports exporting and importing app configuration as TOML files, enabling version control for your app settings.
+
+When using **project-scoped environments** (set up via `primitive env create`), the sync directory is resolved automatically as `.primitive/sync/<env>/<appId>/` — each environment gets its own isolated slot so a `pull --env staging` never touches production state:
 
 ```bash
-# Initialize a config directory
-primitive sync init --dir ./config
+# Initialize (auto-resolves .primitive/sync/<env>/<appId>/)
+primitive sync init
 
 # Pull current configuration from server
-primitive sync pull --dir ./config
+primitive sync pull
 
 # See what's changed
-primitive sync diff --dir ./config
+primitive sync diff
 
 # Push local changes to server
+primitive sync push
+```
+
+Pass `--dir <path>` to override and use a fixed directory (legacy behavior, still supported):
+
+```bash
+primitive sync init --dir ./config
+primitive sync pull --dir ./config
 primitive sync push --dir ./config
 ```
 
 This creates a directory structure like:
 
 ```
-config/
+.primitive/sync/<env>/<appId>/
   app.toml                    # App settings
   integrations/*.toml         # Integration configs
   prompts/*.toml              # Prompt configs
   workflows/*.toml            # Workflow definitions
+  database-types/*.toml       # Database type configs + operations
   email-templates/*.toml      # Email template overrides
 ```
+
+:::tip
+If you previously used `--dir ./config` and are switching to project environments, the CLI will print a migration hint pointing you to the new location. Run `primitive sync pull` once to re-sync into the new per-environment path.
+:::
 
 ## Claude Code Skill
 

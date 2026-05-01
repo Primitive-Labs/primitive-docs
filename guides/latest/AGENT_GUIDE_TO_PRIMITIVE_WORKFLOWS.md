@@ -44,6 +44,7 @@ All steps support these in addition to their own:
 | `forEach` | Iterate over a list expression (path to array, or to `{items: [...]}`) |
 | `as` | Loop variable name (default exposes `selected`) |
 | `maxItems` | forEach cap (default 200) |
+| `concurrency` | Parallel forEach lanes (integer ≥ 1; default 1 = sequential). Results preserve insertion order. |
 | `continueOnError` | Capture errors as `{ error, errorDetails }` instead of failing the workflow |
 | `strict` | Throw if any template expression in this step is unresolved |
 
@@ -443,7 +444,24 @@ subject = "Update"
 htmlBody = "<p>Hi {{ member.name }}</p>"
 ```
 
-Output is always `{ items: [...per-iter results], errors: [{index, error}], totalSucceeded, totalFailed }` — even when there are no errors. Iterations are sequential. For parallelism, use `workflow.start` + `workflow.await`.
+Output is always `{ items: [...per-iter results], errors: [{index, error}], totalSucceeded, totalFailed }` — even when there are no errors. Results are ordered by input index regardless of completion order.
+
+**Parallel forEach** — add `concurrency` to fan out iterations across multiple lanes:
+
+```toml
+[[steps]]
+id = "notify"
+kind = "email.send"
+forEach = "steps.team.items"
+as = "member"
+concurrency = 5           # run up to 5 iterations at once
+maxItems = 500
+to = "{{ member.email }}"
+subject = "Update"
+htmlBody = "<p>Hi {{ member.name }}</p>"
+```
+
+When `concurrency = 1` (the default), iterations are sequential. When `concurrency > 1`, the engine fans them out in parallel batches — durable mode uses child workflow instances so restarts don't re-run completed items. For very large fan-outs, `workflow.start` + `workflow.await` gives finer control.
 
 ## Error handling
 

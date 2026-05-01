@@ -1,12 +1,12 @@
-[**js-bao**](../README.md)
+[**js-bao-wss-client**](../README.md)
 
 ***
 
-[js-bao](../globals.md) / loadSchemaFromTomlString
+[js-bao-wss-client](../globals.md) / loadSchemaFromTomlString
 
 # Function: loadSchemaFromTomlString()
 
-> **loadSchemaFromTomlString**(`tomlString`, `options`): `DefinedModelSchema`\<`Record`\<`string`, [`FieldOptions`](../interfaces/FieldOptions.md)\>\>[]
+> **loadSchemaFromTomlString**(`tomlString`, `options?`): `DefinedModelSchema`\<`Record`\<`string`, `FieldOptions`\>\>[]
 
 Parse a TOML string and return an array of DefinedModelSchema objects.
 
@@ -20,10 +20,10 @@ relationship, or unique-constraint level cause an error. Pass
 
 `string`
 
-### options
+### options?
 
-`LoadSchemaOptions` = `{}`
+`LoadSchemaOptions`
 
 ## Returns
 
-`DefinedModelSchema`\<`Record`\<`string`, [`FieldOptions`](../interfaces/FieldOptions.md)\>\>[]
+`DefinedModelSchema`\<`Record`\<`string`, `FieldOptions`\>\>[]

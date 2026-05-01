@@ -65,7 +65,7 @@ params = '{"id":{"type":"string","required":true}}'
 name = "create-product"
 type = "mutation"
 modelName = "product"
-access = "isMemberOf('admin', database.metadata.adminGroupId)"
+access = "isMemberOf('admin', database.celContext.adminGroupId)"
 definition = '{"operations":[{"op":"save","data":{"name":"$params.name","price":"$params.price","createdBy":"$user.userId"}}]}'
 params = '{"name":{"type":"string","required":true},"price":{"type":"number","required":true}}'
 
@@ -227,13 +227,13 @@ access = "user.userId != ''"
 access = "hasRole('admin')"
 
 # Only members of a specific group
-access = "isMemberOf('team', database.metadata.teamId)"
+access = "isMemberOf('team', database.celContext.teamId)"
 
 # Only the record owner
 access = "params.createdBy == user.userId"
 
 # Members of any of these groups
-access = """isMemberOf('admin', 'admins') || isMemberOf('team', database.metadata.teamId)"""
+access = """isMemberOf('admin', 'admins') || isMemberOf('team', database.celContext.teamId)"""
 ```
 
 ### Available CEL Variables
@@ -243,7 +243,7 @@ access = """isMemberOf('admin', 'admins') || isMemberOf('team', database.metadat
 | `user.userId` | The authenticated user's ID |
 | `user.role` | The user's app role |
 | `database.id` | The database instance ID |
-| `database.metadata` | The database's metadata object |
+| `database.celContext` | The database's CEL context object (also accessible as `database.metadata`) |
 | `params.*` | Operation parameters |
 | `isMemberOf(groupType, groupId)` | Check group membership |
 | `memberGroups(groupType)` | List groups of a type the user belongs to |
@@ -282,7 +282,7 @@ triggers = [
 | `when` | Optional CEL condition — trigger only fires if true |
 | `set` | Map of field name to CEL expression value |
 
-**Available in trigger expressions:** `user.userId`, `user.role`, `record.*`, `database.id`, `database.metadata`, `now()`
+**Available in trigger expressions:** `user.userId`, `user.role`, `record.*`, `database.id`, `database.celContext` (also `database.metadata`), `now()`
 
 ## Pipelines
 
@@ -333,7 +333,7 @@ params = '{"authorId":{"type":"string","required":false}}'
 | `{authorId: "user-123"}` | `{"status":"approved","authorId":"user-123"}` | Approved posts by that author |
 | `{authorId: ""}` | `{"status":"approved","authorId":""}` | Approved posts where `authorId` is literally `""` |
 
-The same rule applies to pipeline step filters, and to `$database.metadata.*` and `$steps.*` references — anywhere a substitution variable can appear, a missing value drops the key and a provided value is passed through as-is.
+The same rule applies to pipeline step filters, and to `$database.celContext.*` and `$steps.*` references — anywhere a substitution variable can appear, a missing value drops the key and a provided value is passed through as-is. (`$database.metadata.*` is accepted as a legacy alias.)
 
 ::: tip
 Reach for one operation with optional filter params before declaring a separate operation for each filter combination. `"required": false` scales cleanly as filter options grow.
@@ -345,7 +345,7 @@ If a filter references `$params.X` but `X` isn't declared in the operation's `pa
 
 ## Conditional Filters (Boolean Gates)
 
-Substitution variables like `$database.metadata.*`, `$params.*`, or `$steps.*` can be placed **directly as elements** inside `$and` or `$or` filter arrays. When a variable resolves to a boolean, `null`, or is missing, it controls whether that branch executes — without touching the database:
+Substitution variables like `$database.celContext.*`, `$params.*`, or `$steps.*` can be placed **directly as elements** inside `$and` or `$or` filter arrays. When a variable resolves to a boolean, `null`, or is missing, it controls whether that branch executes — without touching the database:
 
 | Value in array | In `$and` | In `$or` |
 |---|---|---|
@@ -360,10 +360,10 @@ name = "list-posts"
 type = "query"
 modelName = "posts"
 access = "isMemberOf('class-students', database.id)"
-definition = '{"filter":{"$or":[{"authorId":"$user.userId"},{"$and":["$database.metadata.peerVisibility",{"status":"approved"}]}]}}'
+definition = '{"filter":{"$or":[{"authorId":"$user.userId"},{"$and":["$database.celContext.peerVisibility",{"status":"approved"}]}]}}'
 ```
 
-When `database.metadata.peerVisibility` is `true`, students see their own posts plus all approved posts. When it's `false` or not set, the `$and` branch short-circuits to no-match — students only see their own posts.
+When `database.celContext.peerVisibility` is `true`, students see their own posts plus all approved posts. When it's `false` or not set, the `$and` branch short-circuits to no-match — students only see their own posts.
 
 Combined with the settings record pattern, you can make this dynamic without redeploying. Gate on a pipeline step result:
 
@@ -374,7 +374,7 @@ definition = '{"steps":[{"name":"settings","type":"query","modelName":"settings"
 When the settings record has `peerVisible: true`, the gate opens. When missing or `false`, the gate closes and students only see their own posts.
 
 ::: tip
-A missing metadata key (`$database.metadata.nonExistent` → `null`) naturally closes the gate. This makes the default safe — no content is exposed before the flag is explicitly set.
+A missing CEL context key (`$database.celContext.nonExistent` → `null`) naturally closes the gate. This makes the default safe — no content is exposed before the flag is explicitly set.
 :::
 
 ## Real-Time Subscriptions
