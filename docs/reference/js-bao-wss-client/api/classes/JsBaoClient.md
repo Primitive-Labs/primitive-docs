@@ -341,7 +341,7 @@ The document to check permissions for
 
 ### getDocumentSchema()
 
-> **getDocumentSchema**(`documentId`): `any`
+> **getDocumentSchema**(`documentId`): [`DiscoveredSchema`](../interfaces/DiscoveredSchema.md) \| `null`
 
 Get the discovered schema for a document.
 Returns null if no schema has been discovered yet (document not synced, or explicit models were provided).
@@ -356,7 +356,7 @@ The document to get the schema for
 
 #### Returns
 
-`any`
+[`DiscoveredSchema`](../interfaces/DiscoveredSchema.md) \| `null`
 
 ***
 

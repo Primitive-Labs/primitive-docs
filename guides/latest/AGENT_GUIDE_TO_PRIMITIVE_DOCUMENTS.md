@@ -40,7 +40,7 @@ See the [Data Modeling guide](AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.md) for a f
 
 3. **NEVER remove fields from models.** Add a deprecation comment instead.
 
-4. **ALWAYS add new models to `models.toml`.** Run `pnpm models:gen` after adding or changing model definitions.
+4. **Run `pnpm codegen` after editing `models.toml`.** Codegen regenerates `*.generated.ts` files and updates the models barrel so every new model is automatically included in `allModels` (passed to `getJsBaoConfig`).
 
 5. **Load data in pages, not sub-components.** Pass data into sub-components as props.
 
@@ -277,11 +277,9 @@ await jsBaoClient.documents.removeTag(documentId, "archived");
 
 ### Creating New Model Files
 
-Models are defined in `src/models/models.toml` and generated into TypeScript by running `pnpm models:gen`. Generated files are pure data containers — business logic belongs in a controller module in `src/lib/`.
+Models are defined in **`src/models/models.toml`** and TypeScript classes are auto-generated from it. Follow this workflow:
 
-**Step 1: Add your model to `src/models/models.toml`**
-
-Use snake_case keys (`auto_assign`, `max_length`, `max_count`); the loader maps them to camelCase at runtime:
+**Step 1: Add the model to `src/models/models.toml`** using TOML syntax. Use snake_case for option names — the loader maps them to camelCase at runtime.
 
 ```toml
 [models.todos.fields.id]
@@ -298,53 +296,60 @@ type = "boolean"
 default = false
 ```
 
-**Step 2: Run `pnpm models:gen`** to regenerate `Todo.generated.ts` (attribute interface + empty class) and update the `index.ts` barrel that registers all models. Do not edit generated files.
+**Step 2: Run `pnpm codegen`** to generate `src/models/Todo.generated.ts`. Codegen creates a TypeScript interface, a class extending `BaseModel`, and a model-name constant. It also updates `src/models/index.ts` so the new model is registered automatically.
 
-**Step 3: Import from `@/models`** — not from `.generated` files directly. The barrel registers all models as a side effect on first import:
+Generated output (`Todo.generated.ts`):
+
+```typescript
+// 🔥 AUTO-GENERATED FROM models.toml — DO NOT EDIT. 🔥
+import type { BaseModel } from "js-bao";
+import { BaseModel as BaseModelImpl } from "js-bao";
+
+export interface TodoAttrs {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+export interface Todo extends TodoAttrs, BaseModel {}
+export class Todo extends BaseModelImpl {}
+
+export const Todo_modelName = "todos";
+```
+
+**Step 3: Import from `@/models`** as usual — codegen keeps `src/models/index.ts` in sync.
 
 ```typescript
 import { Todo } from "@/models";
 ```
 
-**Step 4: Add business logic to a controller in `src/lib/`** as free functions. Keep the model class as a pure data container with no instance methods:
+**CRITICAL: NEVER edit `*.generated.ts` files or `src/models/index.ts`.** They are overwritten on every `pnpm codegen` run.
+
+**For custom methods/getters:** Create a separate file (e.g., `src/models/Todo.ts`) that re-exports the generated class with methods added. Do not modify the generated file:
 
 ```typescript
-// src/lib/todoController.ts
-import type { Todo } from "@/models";
+// src/models/Todo.ts — extend the generated class with business logic
+import { Todo as GeneratedTodo } from "./Todo.generated";
 
-export function isComplete(todo: Todo): boolean {
-  return todo.completed === true;
-}
-
-export function pendingCount(todos: Todo[]): number {
-  return todos.filter((t) => !t.completed).length;
-}
-```
-
-Call sites use `isComplete(todo)` rather than `todo.isComplete()`. This pattern keeps models as plain data objects and makes business logic easy to test without Vue dependencies.
-
-**CRITICAL: NEVER edit `.generated.ts` files or the generated `index.ts`** — they are overwritten on every `pnpm models:gen` run.
-
-**Wrong** — manually attaching a schema skips the registry hook that wires up field accessors and unique-constraint indexes:
-
-```typescript
-// DON'T DO THIS — model never gets registered with ModelRegistry,
-// queries/saves will throw "Model not properly initialized".
-export class Todo extends BaseModelImpl {
-  static schema = todoSchema;
+export class Todo extends GeneratedTodo {
+  get isOverdue(): boolean {
+    return !!this.dueDate && new Date(this.dueDate) < new Date();
+  }
 }
 ```
 
 ### Field Types
 
-| Type        | Description                  | Common TOML Options                  |
-| ----------- | ---------------------------- | ------------------------------------ |
-| `id`        | Unique identifier            | `auto_assign = true`                 |
-| `string`    | Text values                  | `indexed = true`, `default = ""`     |
-| `number`    | Numeric values               | `indexed = true`, `default = 0`      |
-| `boolean`   | True/false                   | `default = false`                    |
-| `date`      | ISO-8601 strings             | `indexed = true`                     |
-| `stringset` | Collection of strings (tags) | `max_count = 20`                     |
+| Type        | Description                  | Common TOML Options                     |
+| ----------- | ---------------------------- | --------------------------------------- |
+| `id`        | Unique identifier            | `auto_assign = true`                    |
+| `string`    | Text values                  | `indexed = true`, `default = ""`        |
+| `number`    | Numeric values               | `indexed = true`, `default = 0`         |
+| `boolean`   | True/false                   | `default = false`                       |
+| `date`      | ISO-8601 strings             | `indexed = true`                        |
+| `stringset` | Collection of strings (tags) | `max_count = 20`                        |
+
+All field options: `indexed`, `unique`, `required`, `auto_assign`, `max_length`, `max_count`, `default`. TOML uses snake_case; the runtime maps them to camelCase.
 
 ### Field Options
 
@@ -362,7 +367,7 @@ indexed = true
 type = "number"
 default = 0
 
-[models.tasks.fields.dueDate]
+[models.tasks.fields.due_date]
 type = "date"
 
 [models.tasks.fields.tags]
@@ -376,15 +381,14 @@ default = false
 
 ### Unique Constraints
 
+Single-field uniqueness: add `unique = true` to the field in `models.toml`. This also enables `upsertOn` on save.
+
 ```toml
-# Single-field uniqueness — enables `upsertOn` on save.
 [models.users.fields.email]
 type = "string"
 unique = true
 indexed = true
 ```
-
-Single-field constraints declared with `unique = true` get an auto-generated constraint name of `<modelName>_<fieldName>_unique` (e.g. `users_email_unique`). Pass this name to `upsertByUnique` or `upsertOn`.
 
 ### Working with StringSets
 
@@ -803,38 +807,28 @@ This applies both to new saves and updates, and is consistent across single save
 
 Create a singleton model per document for metadata. Child models reference by model ID, not document ID:
 
-```toml
-# TodoList - one per document
-[models.todo_lists.fields.id]
-type = "id"
-auto_assign = true
-indexed = true
+```typescript
+// TodoList - one per document
+const todoListSchema = defineModelSchema({
+  name: "todo_lists",
+  fields: {
+    id: { type: "id", autoAssign: true, indexed: true },
+    title: { type: "string" },
+    createdAt: { type: "number" },
+    createdBy: { type: "string" },
+  },
+});
 
-[models.todo_lists.fields.title]
-type = "string"
-
-[models.todo_lists.fields.createdAt]
-type = "number"
-
-[models.todo_lists.fields.createdBy]
-type = "string"
-
-# TodoItem references TodoList by MODEL ID (not document ID)
-[models.todo_items.fields.id]
-type = "id"
-auto_assign = true
-indexed = true
-
-[models.todo_items.fields.listId]
-type = "string"
-indexed = true
-
-[models.todo_items.fields.title]
-type = "string"
-
-[models.todo_items.fields.completed]
-type = "boolean"
-default = false
+// TodoItem references TodoList by MODEL ID
+const todoItemSchema = defineModelSchema({
+  name: "todo_items",
+  fields: {
+    id: { type: "id", autoAssign: true, indexed: true },
+    listId: { type: "string", indexed: true }, // Model ID, not document ID
+    title: { type: "string" },
+    completed: { type: "boolean" },
+  },
+});
 ```
 
 **Use this pattern when:**
@@ -1198,7 +1192,7 @@ Export creates a directory per document containing `metadata.json`, `document.yj
 | New document not queryable immediately          | Document not opened after creation                                        | Use `multiDocStore.createDocument()` which handles opening automatically                             |
 | `setPermissions is not a function`              | Method doesn't exist                                                      | Use `updatePermissions(documentId, { userId, permission })`                                          |
 | `setGroupPermission is not a function`          | Method doesn't exist                                                      | Use `grantGroupPermission(documentId, { groupType, groupId, permission })`                           |
-| "Model not properly initialized" on save/query  | Schema attached manually instead of via `attachAndRegisterModel`          | Re-run `pnpm models:gen`; never set `static schema = ...` by hand                                    |
+| "Model not properly initialized" on save/query  | Schema attached manually instead of via `attachAndRegisterModel`          | Re-run `pnpm codegen`; never set `static schema = ...` by hand                                       |
 | `upsertByUnique`: "constraint not found"        | Passed field array instead of constraint name                             | Pass the named constraint string (e.g. `"users_email_unique"`)                                       |
 | `upsertByUnique`: "targetDocument is required"  | Creating a new record without specifying its document                     | Pass `{ targetDocument: docId }` as the 4th argument                                                 |
 | `query()` result missing `.map`/`.filter`       | Forgot result is a `PaginatedResult`                                      | Use `result.data` (also has `.nextCursor`, `.hasMore`)                                               |

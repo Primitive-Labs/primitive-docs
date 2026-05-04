@@ -4,6 +4,13 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## primitive-app v2.1.7 — 2026-04-30
+
+- Models are now defined in `src/models/models.toml` (TOML schema) and auto-generated into `*.generated.ts` TypeScript classes — run `pnpm codegen` after editing the TOML to regenerate
+- The `allModels` barrel in `src/models/index.ts` is fully auto-generated; adding a model to `models.toml` and running codegen is all that's needed to register it with js-bao
+- Demo app playground pages have been reorganized under a unified `playground/` route structure, making it easier to see all API features in one place
+- `useApiLog` composable and `ApiPlayground` wrapper component extracted for consistent API call logging across playground pages
+
 ## primitive-app v2.1.7 — 2026-04-28
 
 - Models are now defined in `src/models/models.toml` and generated into TypeScript via `pnpm models:gen` — you no longer write `defineModelSchema()` by hand; the generated `.generated.ts` files produce the attribute interface, class declaration, and model-name constant automatically
