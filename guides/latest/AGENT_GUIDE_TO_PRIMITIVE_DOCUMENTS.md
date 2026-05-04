@@ -40,7 +40,7 @@ See the [Data Modeling guide](AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.md) for a f
 
 3. **NEVER remove fields from models.** Add a deprecation comment instead.
 
-4. **Run `pnpm codegen` after editing `models.toml`.** Codegen regenerates `*.generated.ts` files and updates the models barrel so every new model is automatically included in `allModels` (passed to `getJsBaoConfig`).
+4. **ALWAYS add new models to `models.toml`.** Run `npx js-bao-codegen-v2` after editing `models.toml`.
 
 5. **Load data in pages, not sub-components.** Pass data into sub-components as props.
 
@@ -277,9 +277,9 @@ await jsBaoClient.documents.removeTag(documentId, "archived");
 
 ### Creating New Model Files
 
-Models are defined in **`src/models/models.toml`** and TypeScript classes are auto-generated from it. Follow this workflow:
+Models are defined in `src/models/models.toml` and TypeScript classes are generated from that file. Follow this workflow:
 
-**Step 1: Add the model to `src/models/models.toml`** using TOML syntax. Use snake_case for option names — the loader maps them to camelCase at runtime.
+**Step 1: Add the model to `src/models/models.toml`** using TOML syntax. Use snake_case for option names (`auto_assign`, `max_length`, etc.) — the loader maps them to camelCase at runtime.
 
 ```toml
 [models.todos.fields.id]
@@ -296,60 +296,28 @@ type = "boolean"
 default = false
 ```
 
-**Step 2: Run `pnpm codegen`** to generate `src/models/Todo.generated.ts`. Codegen creates a TypeScript interface, a class extending `BaseModel`, and a model-name constant. It also updates `src/models/index.ts` so the new model is registered automatically.
+**Step 2: Run `npx js-bao-codegen-v2`** to generate `Todo.generated.ts` and regenerate the barrel `src/models/index.ts`. Codegen emits a typed `TodoAttrs` interface, a merged `Todo` interface extending `BaseModel`, and a `Todo` class extending `BaseModelImpl`. The barrel auto-registers every model at app startup.
 
-Generated output (`Todo.generated.ts`):
-
-```typescript
-// 🔥 AUTO-GENERATED FROM models.toml — DO NOT EDIT. 🔥
-import type { BaseModel } from "js-bao";
-import { BaseModel as BaseModelImpl } from "js-bao";
-
-export interface TodoAttrs {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
-export interface Todo extends TodoAttrs, BaseModel {}
-export class Todo extends BaseModelImpl {}
-
-export const Todo_modelName = "todos";
-```
-
-**Step 3: Import from `@/models`** as usual — codegen keeps `src/models/index.ts` in sync.
+**Step 3: Import models from the barrel** (`src/models/index.ts`), never directly from `*.generated.ts` files. The barrel ensures every model is registered exactly once.
 
 ```typescript
 import { Todo } from "@/models";
 ```
 
-**CRITICAL: NEVER edit `*.generated.ts` files or `src/models/index.ts`.** They are overwritten on every `pnpm codegen` run.
+**Step 4: Make additional edits** to the schema in `models.toml` and run `npx js-bao-codegen-v2` again.
 
-**For custom methods/getters:** Create a separate file (e.g., `src/models/Todo.ts`) that re-exports the generated class with methods added. Do not modify the generated file:
-
-```typescript
-// src/models/Todo.ts — extend the generated class with business logic
-import { Todo as GeneratedTodo } from "./Todo.generated";
-
-export class Todo extends GeneratedTodo {
-  get isOverdue(): boolean {
-    return !!this.dueDate && new Date(this.dueDate) < new Date();
-  }
-}
-```
+**CRITICAL: NEVER edit `*.generated.ts` files or `src/models/index.ts`.** Both are overwritten on every codegen run.
 
 ### Field Types
 
-| Type        | Description                  | Common TOML Options                     |
-| ----------- | ---------------------------- | --------------------------------------- |
-| `id`        | Unique identifier            | `auto_assign = true`                    |
-| `string`    | Text values                  | `indexed = true`, `default = ""`        |
-| `number`    | Numeric values               | `indexed = true`, `default = 0`         |
-| `boolean`   | True/false                   | `default = false`                       |
-| `date`      | ISO-8601 strings             | `indexed = true`                        |
-| `stringset` | Collection of strings (tags) | `max_count = 20`                        |
-
-All field options: `indexed`, `unique`, `required`, `auto_assign`, `max_length`, `max_count`, `default`. TOML uses snake_case; the runtime maps them to camelCase.
+| Type        | Description                  | Common Options                 |
+| ----------- | ---------------------------- | ------------------------------ |
+| `id`        | Unique identifier            | `autoAssign: true`             |
+| `string`    | Text values                  | `indexed: true`, `default: ""` |
+| `number`    | Numeric values               | `indexed: true`, `default: 0`  |
+| `boolean`   | True/false                   | `default: false`               |
+| `date`      | ISO-8601 strings             | `indexed: true`                |
+| `stringset` | Collection of strings (tags) | `maxCount: 20`                 |
 
 ### Field Options
 
@@ -367,7 +335,7 @@ indexed = true
 type = "number"
 default = 0
 
-[models.tasks.fields.due_date]
+[models.tasks.fields.dueDate]
 type = "date"
 
 [models.tasks.fields.tags]
@@ -379,15 +347,97 @@ type = "boolean"
 default = false
 ```
 
-### Unique Constraints
+### Defining Relationships in models.toml
 
-Single-field uniqueness: add `unique = true` to the field in `models.toml`. This also enables `upsertOn` on save.
+Declare relationships in `models.toml` using `[models.X.relationships.Y]` sections. Codegen emits typed traversal methods on the generated interfaces.
 
 ```toml
-[models.users.fields.email]
-type = "string"
-unique = true
-indexed = true
+# Author hasMany Posts
+[models.authors.relationships.posts]
+type = "hasMany"
+model = "posts"
+related_id_field = "authorId"
+order_by_field = "createdAt"
+order_direction = "DESC"
+
+# Post refersTo Author
+[models.posts.relationships.author]
+type = "refersTo"
+model = "authors"
+related_id_field = "authorId"
+```
+
+After running `npx js-bao-codegen-v2`, the generated interfaces include typed traversal methods:
+
+```typescript
+// Author.generated.ts
+export interface Author extends AuthorAttrs, BaseModel {
+  posts(options?: PaginationOptions): Promise<PaginatedResult<Post>>;
+}
+
+// Post.generated.ts
+export interface Post extends PostAttrs, BaseModel {
+  author(): Promise<Author | null>;
+}
+```
+
+Use these at runtime:
+
+```typescript
+const author = await Author.queryOne({ id: authorId });
+const posts = await author.posts(); // PaginatedResult<Post>
+const firstPost = posts.data[0];
+const backRef = await firstPost.author(); // Author | null
+```
+
+Relationship traversal uses the same engine as `Model.query(...)` with `include` specs — see [Loading Related Data](#loading-related-data-includes) for the lower-level query-level include syntax.
+
+### Unique Constraints
+
+Two ways to enforce uniqueness:
+
+```typescript
+// 1. Single-field uniqueness via field option (use this when possible —
+//    enables `upsertOn` on save).
+const userSchema = defineModelSchema({
+  name: "users",
+  fields: {
+    id: { type: "id", autoAssign: true },
+    email: { type: "string", unique: true, indexed: true },
+  },
+});
+
+// 2. Multi-field (composite) uniqueness via options.uniqueConstraints.
+//    Each entry is a NAMED constraint — the name is what you pass to
+//    upsertByUnique / findByUnique.
+const categorySchema = defineModelSchema({
+  name: "categories",
+  fields: {
+    id: { type: "id", autoAssign: true },
+    name: { type: "string" },
+    parentId: { type: "string" },
+  },
+  options: {
+    uniqueConstraints: [
+      { name: "name_parent_unique", fields: ["name", "parentId"] },
+    ],
+  },
+});
+```
+
+**Wrong** — these forms compile but the constraint will be silently dropped or wrongly typed:
+
+```typescript
+// DON'T: top-level uniqueConstraints (must be inside `options`)
+defineModelSchema({ name: "...", fields: {...}, uniqueConstraints: [...] });
+
+// DON'T: array-of-arrays shorthand — not supported. Each entry must be
+// { name, fields }.
+defineModelSchema({
+  name: "...",
+  fields: {...},
+  options: { uniqueConstraints: [["name", "parentId"]] as any },
+});
 ```
 
 ### Working with StringSets
@@ -1192,7 +1242,7 @@ Export creates a directory per document containing `metadata.json`, `document.yj
 | New document not queryable immediately          | Document not opened after creation                                        | Use `multiDocStore.createDocument()` which handles opening automatically                             |
 | `setPermissions is not a function`              | Method doesn't exist                                                      | Use `updatePermissions(documentId, { userId, permission })`                                          |
 | `setGroupPermission is not a function`          | Method doesn't exist                                                      | Use `grantGroupPermission(documentId, { groupType, groupId, permission })`                           |
-| "Model not properly initialized" on save/query  | Schema attached manually instead of via `attachAndRegisterModel`          | Re-run `pnpm codegen`; never set `static schema = ...` by hand                                       |
+| "Model not properly initialized" on save/query  | Schema not registered — `*.generated.ts` or `index.ts` is out of sync with `models.toml` | Re-run `npx js-bao-codegen-v2`; never manually attach a schema or edit generated files               |
 | `upsertByUnique`: "constraint not found"        | Passed field array instead of constraint name                             | Pass the named constraint string (e.g. `"users_email_unique"`)                                       |
 | `upsertByUnique`: "targetDocument is required"  | Creating a new record without specifying its document                     | Pass `{ targetDocument: docId }` as the 4th argument                                                 |
 | `query()` result missing `.map`/`.filter`       | Forgot result is a `PaginatedResult`                                      | Use `result.data` (also has `.nextCursor`, `.hasMore`)                                               |
