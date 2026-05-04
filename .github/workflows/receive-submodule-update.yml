@@ -1,5 +1,5 @@
 # Automated documentation update workflow
-# Triggered by repository_dispatch from submodule repos (js-bao, js-bao-wss, primitive-app-dev)
+# Triggered by repository_dispatch from submodule repos (js-bao-wss, primitive-app-dev)
 # Uses Claude Code Action to analyze changes and update docs, then creates a PR
 
 name: Update Docs from Submodule Changes
@@ -12,11 +12,10 @@ on:
   workflow_dispatch:
     inputs:
       submodule:
-        description: 'Submodule name (js-bao, js-bao-wss, or primitive-app-dev)'
+        description: 'Submodule name (js-bao-wss or primitive-app-dev)'
         required: true
         type: choice
         options:
-          - js-bao
           - js-bao-wss
           - primitive-app-dev
       test_mode:
@@ -131,13 +130,9 @@ jobs:
 
           # Map submodule to relevant guide files and source paths
           case "$SUBMODULE" in
-            "js-bao")
-              RELEVANT_GUIDES="docs/getting-started/working-with-data.md"
-              SOURCE_PATHS="library_repos/js-bao/src/"
-              ;;
             "js-bao-wss")
-              RELEVANT_GUIDES="docs/getting-started/understanding-documents.md docs/getting-started/other-services.md docs/getting-started/local-first-model.md"
-              SOURCE_PATHS="library_repos/js-bao-wss/src/"
+              RELEVANT_GUIDES="docs/getting-started/working-with-data.md docs/getting-started/understanding-documents.md docs/getting-started/other-services.md docs/getting-started/local-first-model.md"
+              SOURCE_PATHS="library_repos/js-bao-wss/src/ library_repos/js-bao-wss/packages/js-bao/src/"
               ;;
             "primitive-app-dev")
               RELEVANT_GUIDES="docs/getting-started/template-app.md docs/getting-started/document-explorer.md docs/getting-started/test-harness.md"
@@ -232,9 +227,11 @@ jobs:
 
                  | Submodule | Published `package.json` to read | Resulting `<package-name>` |
                  |---|---|---|
-                 | `library_repos/js-bao` | `library_repos/js-bao/package.json` | `js-bao` |
-                 | `library_repos/js-bao-wss` | `library_repos/js-bao-wss/src/client/package.json` | `js-bao-wss-client` |
+                 | `library_repos/js-bao-wss` (js-bao changes) | `library_repos/js-bao-wss/packages/js-bao/package.json` | `js-bao` |
+                 | `library_repos/js-bao-wss` (wss-client changes) | `library_repos/js-bao-wss/src/client/package.json` | `js-bao-wss-client` |
                  | `library_repos/primitive-app-dev` | `library_repos/primitive-app-dev/primitive-app/package.json` | `primitive-app` |
+
+                 The `js-bao-wss` submodule now contains both `js-bao` (at `packages/js-bao`) and `js-bao-wss-client` (at `src/client`). When updating the changelog for a `js-bao-wss` dispatch, determine which package(s) actually changed by inspecting the changed files, and add a separate changelog entry per affected published package.
 
                  Read `name` and `version` from that file verbatim — do not infer them from anywhere else.
                - Insert the new entry **immediately after** the `<!-- CHANGELOG:START -->` comment, so the newest entry is always first.

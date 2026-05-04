@@ -29,8 +29,7 @@ Each library monorepo is included as a **git submodule** under:
 
 ```
 library_repos/
-  js-bao/
-  js-bao-wss/
+  js-bao-wss/        (monorepo containing js-bao at packages/js-bao and the wss client at src/client)
   primitive-app-dev/
 ```
 
@@ -38,7 +37,7 @@ And `packages/**` contains **symlinks** into those submodules to preserve the pu
 
 ```
 packages/
-  js-bao/            -> ../library_repos/js-bao
+  js-bao/            -> ../library_repos/js-bao-wss/packages/js-bao
   js-bao-wss-client/ -> ../library_repos/js-bao-wss/src/client
   primitive-app/     -> ../library_repos/primitive-app-dev/primitive-app
 ```

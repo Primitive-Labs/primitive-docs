@@ -54,7 +54,7 @@
 
 ### documentYMaps
 
-> `protected` `static` **documentYMaps**: `Map`\<`string`, `YMap`\<`any`\>\>
+> `protected` `static` **documentYMaps**: `Map`\<`string`, `Map`\<`any`\>\>
 
 ***
 
@@ -966,7 +966,7 @@ Sets up deep observation on a nested YMap to sync field-level changes to the dat
 
 ##### recordYMap
 
-`YMap`\<`any`\>
+`Map`\<`any`\>
 
 #### Returns
 
@@ -988,7 +988,7 @@ Sets up deep observation on a nested YMap for a specific document to sync field-
 
 ##### recordYMap
 
-`YMap`\<`any`\>
+`Map`\<`any`\>
 
 ##### docId
 
