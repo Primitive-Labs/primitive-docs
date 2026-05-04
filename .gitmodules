@@ -6,7 +6,3 @@
 	path = library_repos/js-bao-wss
 	url = https://github.com/Primitive-Labs/js-bao-wss
 	branch = main
-[submodule "library_repos/js-bao"]
-	path = library_repos/js-bao
-	url = https://github.com/Primitive-Labs/js-bao
-	branch = main
