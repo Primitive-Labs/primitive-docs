@@ -228,6 +228,8 @@ All 16 analytics query types are available (overview, top-users, user-detail, ev
 
 Cache TTL overrides are available via `cacheTtlSeconds` — pass `0` or `null` to bypass the cache for a fresh read.
 
+For the full picture — what events are emitted, the client-side `logEvent` API, and the matching CLI/REST surface — see [Analytics](./analytics.md).
+
 ## Inbound Webhooks
 
 Inbound webhooks let external services (Stripe, GitHub, Slack, etc.) trigger workflows automatically. Each webhook has a public URL, signature verification, and automatic workflow triggering.

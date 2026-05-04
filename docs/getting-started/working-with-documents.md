@@ -74,71 +74,67 @@ Every user has a root document opened automatically by primitive-app. Use it onl
 
 ## Defining Models
 
-Models define the shape of your data. Each model corresponds to a record type — like `Task`, `Project`, or `Contact`.
+Models define the shape of your data. Each model corresponds to a record type — like `Task`, `Project`, or `Contact`. Models are authored in TOML and TypeScript classes are generated from that file.
 
-### Creating a Model
+The full authoring loop — field types, options, relationships, uniqueness, schema evolution, and the migration tool from older `defineModelSchema()`-based projects — is covered in [Defining Your Models](./defining-your-models.md). The summary below is enough to start using models in CRUD code on this page.
 
-**Step 1:** Create the model file:
+### Quick Reference
 
-```typescript
-// src/models/Task.ts
-import { BaseModel, defineModelSchema } from "js-bao";
+**Step 1:** Add the model to `src/models/models.toml`:
 
-const taskSchema = defineModelSchema({
-  name: "tasks",
-  fields: {
-    id: { type: "id", autoAssign: true, indexed: true },
-    title: { type: "string", indexed: true },
-    description: { type: "string", default: "" },
-    completed: { type: "boolean", default: false },
-    priority: { type: "number", default: 0 },
-    dueDate: { type: "date" },
-    tags: { type: "stringset", maxCount: 10 },
-  },
-});
+```toml
+[models.tasks.fields.id]
+type = "id"
+auto_assign = true
+indexed = true
 
-export class Task extends BaseModel {
-  static schema = taskSchema;
+[models.tasks.fields.title]
+type = "string"
+indexed = true
 
-  get isOverdue(): boolean {
-    if (!this.dueDate || this.completed) return false;
-    return new Date(this.dueDate) < new Date();
-  }
-}
+[models.tasks.fields.completed]
+type = "boolean"
+default = false
+
+[models.tasks.fields.priority]
+type = "number"
+default = 0
+
+[models.tasks.fields.due_date]
+type = "date"
+
+[models.tasks.fields.tags]
+type = "stringset"
+max_count = 10
 ```
 
-**Step 2:** Add the model to your config (`src/config/envConfig.ts`).
+**Step 2:** Run `pnpm codegen` to regenerate `src/models/Task.generated.ts` and the `src/models/index.ts` barrel.
 
-**Step 3:** Run `pnpm codegen` to generate TypeScript types and field accessors.
+**Step 3:** Import from the barrel and use the model:
+
+```typescript
+import { Task } from "@/models";
+
+const task = new Task({ title: "Review PR", priority: 2 });
+await task.save();
+```
 
 ::: warning
-Never edit auto-generated sections (marked with `// --- auto-generated ---`). They are overwritten by codegen.
+Never edit `*.generated.ts` files or `src/models/index.ts` — they are overwritten on every `pnpm codegen` run. Always import models from `@/models`, never directly from a generated file.
 :::
 
 ### Field Types
 
 | Type | TypeScript | Description |
 |---|---|---|
-| `id` | `string` | Unique identifier. Use `autoAssign: true` for auto-generated IDs |
+| `id` | `string` | Unique identifier. Use `auto_assign = true` for auto-generated IDs |
 | `string` | `string` | Text data |
 | `number` | `number` | Numeric data |
 | `boolean` | `boolean` | True/false |
 | `date` | `string` | Date/time as ISO-8601 string |
 | `stringset` | `StringSet` | Set of strings (tags, categories) |
 
-### Unique Constraints
-
-```typescript
-const categorySchema = defineModelSchema({
-  name: "categories",
-  fields: {
-    id: { type: "id", autoAssign: true, indexed: true },
-    name: { type: "string" },
-    parentId: { type: "string" },
-  },
-  uniqueConstraints: [["name", "parentId"]],
-});
-```
+See [Defining Your Models](./defining-your-models.md) for full field-option reference, unique constraints, and relationships.
 
 ## CRUD Operations
 
@@ -392,6 +388,7 @@ A `403` from `client.documents.get(documentId)` can include a `canRequestAccess`
 ## Next Steps
 
 - **[Choosing Your Data Model](./choosing-your-data-model.md)** — When to use documents vs. databases
+- **[Defining Your Models](./defining-your-models.md)** — TOML authoring, codegen, relationships, schema evolution
 - **[Sharing and Invitations](./sharing-and-invitations.md)** — Full sharing, invitations, and access requests
 - **[Working with Databases](./working-with-databases.md)** — Server-side structured storage
 - **[Blobs and Files](./blobs-and-files.md)** — File storage within documents
