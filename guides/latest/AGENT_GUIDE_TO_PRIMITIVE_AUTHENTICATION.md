@@ -434,6 +434,45 @@ See the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INV
 
 ---
 
+## Invite Token Persistence Across Auth Round-Trips (Template Pattern)
+
+When an invitation link carries an `inviteToken` query parameter and the recipient is not signed in, the token must survive the auth redirect so the server can resolve deferred grants atomically at verification time.
+
+The template implements this in `src/lib/inviteToken.ts`:
+
+```typescript
+import {
+  isPlausibleInviteToken,
+  setPendingInviteToken,
+  getPendingInviteToken,
+  clearPendingInviteToken,
+} from "@/lib/inviteToken";
+
+// Stash on the accept page when user is signed out:
+if (!user.isAuthenticated && isPlausibleInviteToken(rawToken)) {
+  setPendingInviteToken(rawToken);  // saved to sessionStorage
+}
+
+// Consume during auth (done automatically by userStore):
+const inviteToken = getPendingInviteToken() ?? undefined;
+await client.otpVerify(email, code, { inviteToken });
+if (inviteToken) clearPendingInviteToken();
+```
+
+The token is saved to `sessionStorage` under the key `"primitive:pendingInviteToken"`. The template's `userStore` automatically reads and forwards it through every auth path — `login()` (OAuth), `verifyOtp()`, the magic-link callback, and `registerPasskey()`. For magic links (which may open in a different tab), the token also rides in the OAuth `state` parameter so it survives cross-tab redirects.
+
+**`InviteAcceptPage` (template-provided):** The template ships a ready-made component at `src/pages/InviteAcceptPage.vue`, routed at `/invite/accept?inviteToken=...`. It handles:
+
+- **Signed-in user** — prompts "Accept with this account or sign out and use a different one." Calls `client.invitations.accept(token)` on confirm.
+- **Signed-out user** — stashes the token in `sessionStorage` and redirects to login. After sign-in the pending token is consumed inside the auth method.
+- **Error states** — `INVITE_TOKEN_EXPIRED`, `INVITE_ALREADY_ACCEPTED`, `INVITE_TOKEN_INVALID`, and generic server errors.
+
+If you're using the template, this route is already wired in `src/router/routes.ts`. Point your invitation emails at `${yourApp.baseUrl}/invite/accept?inviteToken=${token}`. You do **not** need to rebuild any of this.
+
+**When building on the raw API** (without the template): stash and restore the token manually, pass it to the auth method that completes sign-in, and clear it immediately afterward. The `isPlausibleInviteToken` helper (16–512 chars, URL-safe charset) guards against obviously invalid input before touching storage.
+
+---
+
 ## Test User Sign-In (non-prod only)
 
 There is **no `primitive test-users` CLI command**. The bypass is server-side: an OTP request for an email containing `+primitive` accepts the magic code `"000000"` instead of the emailed code.

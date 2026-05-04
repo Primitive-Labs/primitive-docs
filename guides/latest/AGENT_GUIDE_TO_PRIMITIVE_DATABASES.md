@@ -42,7 +42,7 @@ Create a database type config with operations in `config/database-types/project.
 ```toml
 [type]
 databaseType = "project"
-metadataAccess = "isMemberOf('team', database.metadata.teamId)"
+celContextAccess = "isMemberOf('team', database.celContext.teamId)"
 
 [triggers.tasks]
 triggers = [
@@ -99,11 +99,14 @@ const taskId = createResult.results[0].id; // server-assigned ULID
 All database configuration — types, operations, triggers, rule sets, group types — is managed through TOML config files and the `primitive sync` command. This keeps configuration version-controlled alongside your code.
 
 ```bash
-primitive sync init --dir ./config    # Initialize config directory
-primitive sync pull --dir ./config    # Pull current config from server
-primitive sync diff --dir ./config    # Preview changes
-primitive sync push --dir ./config    # Push local config to server
-primitive sync push --dir ./config --dry-run  # See what would change without applying
+primitive sync init            # Initialize config dir (auto-resolves .primitive/sync/<env>/<appId>/)
+primitive sync pull            # Pull current config from server
+primitive sync diff            # Preview changes
+primitive sync push            # Push local config to server
+primitive sync push --dry-run  # See what would change without applying
+# Override with a fixed path (legacy):
+primitive sync init --dir ./config
+primitive sync push --dir ./config
 ```
 
 The config directory structure:
@@ -140,7 +143,7 @@ Note: Double-quoted strings (`"..."`) also work for CEL with single quotes insid
 [type]
 databaseType = "project"
 ruleSetName = "project-admin-rules"    # optional — rule set for managing this type's config
-metadataAccess = "isMemberOf('team', database.metadata.teamId)"  # optional — CEL for metadata updates
+celContextAccess = "isMemberOf('team', database.celContext.teamId)"  # optional — CEL for CEL context updates
 
 [triggers.tasks]
 triggers = [
@@ -230,8 +233,8 @@ Beyond sync, the CLI exposes commands for one-off ops (use `--help` for full fla
 
 ```bash
 primitive database-types list | get <type> | operations list <type>
-primitive databases list | get <id> | create "Title" --type <type> [--metadata '{...}'] | delete <id>
-primitive databases metadata update <id> --metadata '{"teamId":"team-1"}'
+primitive databases list | get <id> | create "Title" --type <type> [--cel-context '{...}'] | delete <id>
+primitive databases cel-context update <id> --data '{"teamId":"team-1"}'
 
 # Admin record introspection
 primitive databases records models <id>
@@ -249,7 +252,7 @@ A **database type** is a named configuration shared across many databases. It pr
 
 - **Registered operations** (`type` is one of `query`, `mutation`, `count`, `aggregate`, `pipeline`, `applyToQuery`) with per-operation CEL `access`
 - **Triggers** — computed fields evaluated in the DO before each save
-- **`metadataAccess`** — CEL expression that lets non-owner/manager users **read and update** database metadata (defaults to deny when unset; owner/manager always have access)
+- **`celContextAccess`** (formerly `metadataAccess`) — CEL expression that lets non-owner/manager users **read and update** the database's CEL context (defaults to deny when unset; owner/manager always have access). Both names are accepted; `celContextAccess` is preferred.
 - **Rule set attachment** — controls who can edit the type config and its operations
 
 Real-time subscriptions are configured **per-database**, not on the type — see [Real-Time Subscriptions](#real-time-subscriptions).
@@ -274,14 +277,14 @@ Triggers are computed fields that run server-side in the Durable Object before a
 | `user.role` | The user's app role |
 | `record.*` | The record being saved (current field values) |
 | `database.id` | The database ID |
-| `database.metadata.*` | The database's metadata object |
+| `database.celContext.*` | The database's CEL context object (also accessible as `database.metadata.*`) |
 | `secrets.*` | App secrets (loaded only when expression references `secrets.`) |
 | `now()` | Current ISO 8601 timestamp |
 | `lookup(modelName, id)` | Load another record by ID; returns `null` if missing |
 | `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`, `hasRole(role)` | Membership/role checks |
 | `fromWorkflow()`, `fromWorkflow(key)` | True if the write was issued by a workflow step (or a specific workflow) |
 
-**Don't confuse trigger CEL with operation substitutions.** Triggers use bare CEL — `user.userId`, `now()`. Operation `definition` and `params` use `$user.userId`, `$now`, `$params.x`, `$database.metadata.x` substitutions, which are deep string-replacement on the JSON template, NOT CEL.
+**Don't confuse trigger CEL with operation substitutions.** Triggers use bare CEL — `user.userId`, `now()`. Operation `definition` and `params` use `$user.userId`, `$now`, `$params.x`, `$database.celContext.x` substitutions, which are deep string-replacement on the JSON template, NOT CEL. (`$database.metadata.x` is accepted as a legacy alias.)
 
 ## Registered Operations
 
@@ -298,15 +301,15 @@ Registered operations are named, parameterized database operations defined at th
 Each operation has an `access` field — a CEL expression evaluated at call time:
 
 ```
-"true"                                           // all authenticated users
-"hasRole('admin')"                               // app admins only
-"isMemberOf('team', database.metadata.teamId)"   // team members
-"user.userId == params.userId"                   // only your own data
+"true"                                             // all authenticated users
+"hasRole('admin')"                                 // app admins only
+"isMemberOf('team', database.celContext.teamId)"   // team members
+"user.userId == params.userId"                     // only your own data
 ```
 
-**CEL context variables:** `user.userId`, `user.role`, `database.id`, `database.metadata`, `params.*`
+**CEL context variables:** `user.userId`, `user.role`, `database.id`, `database.celContext`, `database.metadata`, `params.*`
 
-Only `database.id` and `database.metadata` are available in CEL — other database fields like `createdBy` are not exposed. To check ownership, store the creator's ID in metadata at creation time or use group membership.
+Only `database.id` and the CEL context object are available in CEL — other database fields like `createdBy` are not exposed. `database.celContext` and `database.metadata` are aliases for the same object; prefer `database.celContext` in new code. To check ownership, store the creator's ID in metadata at creation time or use group membership.
 
 **CEL functions:** `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`, `hasRole(role)`
 
@@ -352,7 +355,7 @@ Used **as string values inside operation definitions** (filter values, data fiel
 | `$user.userId` | Current user's ID |
 | `$now` | Current ISO 8601 timestamp |
 | `$database.id` | The database instance ID |
-| `$database.metadata.key` | Value from database metadata (`null` if key missing) |
+| `$database.celContext.key` | Value from database CEL context (`null` if key missing) — `$database.metadata.key` is a legacy alias |
 | `$params.fieldName` | Caller-provided parameter (`undefined` if not passed) |
 | `$steps.stepName.<accessor>` | Pipeline cross-step reference (see Pipelines) |
 
@@ -418,7 +421,7 @@ params = '{"title":{"type":"string","required":true}}'
 
 | Op | Description | Key fields |
 |----|-------------|------------|
-| `save` | Create or replace a record | `data`, optional `ifNotExists`, `condition`, `stringSets` |
+| `save` | Create or replace a record | `data`, optional `ifNotExists`, `condition`, `stringSets`, `upsertOn` |
 | `patch` | Partial update | `id`, `data` |
 | `delete` | Remove a record | `id` |
 | `increment` | Atomic numeric increment/decrement | `id`, `fields` |
@@ -426,6 +429,18 @@ params = '{"title":{"type":"string","required":true}}'
 | `removeFromSet` | Remove values from StringSet fields | `id`, `stringSets` |
 
 **Response:** `{ results: [{ success: true, id: "..." }] }`
+
+**`upsertOn`** — pass `"upsertOn": "$params.email"` in a `save` op to create-or-update by a unique field value instead of requiring an explicit `id`. The server looks up a record where that field equals the provided value; if found, it patches it; if not, it inserts a new record. Useful for "ensure this user exists with these attributes" patterns:
+
+```toml
+[[operations]]
+name = "ensureContact"
+type = "mutation"
+modelName = "contacts"
+access = "hasRole('admin')"
+definition = '{"operations":[{"op":"save","upsertOn":"$params.email","data":{"email":"$params.email","name":"$params.name","updatedAt":"$now"}}]}'
+params = '{"email":{"type":"string","required":true},"name":{"type":"string","required":true}}'
+```
 
 #### Count — count matching records
 
@@ -608,12 +623,23 @@ const result = await client.databases.executeBatch(databaseId, "createTask", [
 
 **Don't:** there is no per-item `itemAccess` field on registered operations. To restrict what params a caller can pass per item, put the rule on the operation's `access` (referencing `params.*`) or on individual `params.<name>.access` (referencing `value`) — both are re-evaluated for every batch item.
 
-### Managing database metadata
+### Managing database CEL context
 
-Store per-database context (team ID, project ID) that operations can reference via `$database.metadata.*`:
+The CEL context (formerly called "metadata") stores per-database values that operations and triggers can reference via `$database.celContext.*` (or the legacy alias `$database.metadata.*`):
 
 ```typescript
+await client.databases.updateCelContext(databaseId, { teamId: "team-alpha", projectId: "proj-1" });
+// Legacy alias also works:
 await client.databases.updateMetadata(databaseId, { teamId: "team-alpha", projectId: "proj-1" });
+```
+
+Via CLI (new preferred form):
+
+```bash
+primitive databases cel-context update <database-id> --data '{"teamId":"team-alpha"}'
+primitive databases cel-context get <database-id>
+# Legacy alias still works:
+primitive databases metadata update <database-id> --data '{"teamId":"team-alpha"}'
 ```
 
 ## Direct Record Operations
@@ -915,7 +941,7 @@ await db.syncAllIndexes();
 **Use registered operations with CEL access expressions** to control what end users can do. Do not use `addManager` to give application users access to a database — that grants administrative control over the database itself, not scoped data access.
 
 The correct pattern:
-1. Define operations with appropriate `access` CEL expressions (e.g., `isMemberOf('team', database.metadata.teamId)`)
+1. Define operations with appropriate `access` CEL expressions (e.g., `isMemberOf('team', database.celContext.teamId)`)
 2. Any authenticated user who satisfies the CEL expression can call the operation — no permission grant needed
 3. If no operations are registered, non-owner/manager users are denied access entirely
 
@@ -1002,7 +1028,7 @@ Field semantics:
 - `filter` (CEL) — evaluated per-change, per-subscriber against `record.*`. Only matches are delivered. Cannot grant access `accessRule` denies.
 - `params` — declared params bound to the subscriber and exposed as `params.*` inside `filter` and `accessRule`. Supported types: `string`, `number`, `boolean`.
 
-CEL context for both `accessRule` and `filter`: `user.*`, `record.*` (filter only — the changed row), `database.id`, `database.metadata.*`, `params.*`, plus the standard membership functions.
+CEL context for both `accessRule` and `filter`: `user.*`, `record.*` (filter only — the changed row), `database.id`, `database.celContext.*` (also `database.metadata.*`), `params.*`, plus the standard membership functions.
 
 ### Subscribing from the client
 
@@ -1091,7 +1117,7 @@ const result = await client.databases.importCsv(databaseId, {
 
 - **Create multiple databases for isolation.** Each database is a separate Durable Object. Use separate databases for separate tenants, projects, or data domains to leverage per-database scaling.
 - **Use database types** to share operation definitions and triggers across databases of the same kind.
-- **Keep metadata minimal — use groups for access control.** Metadata is meant for a few identifying fields (e.g. a `teamId`) used as lookup keys in CEL — `isMemberOf('team', database.metadata.teamId)`. Group membership controls access; metadata just provides the key. Don't replicate data into metadata for field-by-field CEL checks — model that with groups. For runtime-toggleable settings, store them as records and read them in a pipeline (see [Settings record pattern](#settings-record-pattern)).
+- **Keep CEL context minimal — use groups for access control.** The CEL context is meant for a few identifying fields (e.g. a `teamId`) used as lookup keys in CEL — `isMemberOf('team', database.celContext.teamId)`. Group membership controls access; the CEL context just provides the key. Don't replicate data into metadata for field-by-field CEL checks — model that with groups. For runtime-toggleable settings, store them as records and read them in a pipeline (see [Settings record pattern](#settings-record-pattern)).
 - **Use triggers** to enforce server-side invariants (created timestamps, audit fields) — don't trust client-provided values.
 
 ### Operations design
