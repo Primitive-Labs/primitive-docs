@@ -4,6 +4,13 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## primitive-app v2.1.7 — 2026-04-28
+
+- Models are now defined in `src/models/models.toml` and generated into TypeScript via `pnpm models:gen` — you no longer write `defineModelSchema()` by hand; the generated `.generated.ts` files produce the attribute interface, class declaration, and model-name constant automatically
+- Model classes are now pure data containers (no instance methods or getters); business logic belongs in a controller module in `src/lib/` as free functions — call sites use `isOverdue(task)` instead of `task.isOverdue`
+- The `src/models/index.ts` barrel is now also auto-generated and handles `attachAndRegisterModel` registration for all models; always import models from `@/models` so registration runs exactly once
+- `pnpm models:gen` replaces `pnpm codegen` for model generation; re-run it after any change to `models.toml`
+
 ## primitive-app v2.1.7 — 2026-04-27
 
 - New `InviteAcceptPage` component (`src/pages/InviteAcceptPage.vue`, routed at `/invite/accept`) handles the full invitation acceptance flow — signed-in confirmation, signed-out stash-and-redirect, and all error states (`INVITE_TOKEN_EXPIRED`, `INVITE_ALREADY_ACCEPTED`, `INVITE_TOKEN_INVALID`)
