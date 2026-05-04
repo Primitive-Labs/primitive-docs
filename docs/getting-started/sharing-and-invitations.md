@@ -105,6 +105,20 @@ const token = await client.invitations.getAcceptToken(invitationId);
 // { invitationId, inviteToken, email, expiresAt, accepted, acceptedAt, status }
 ```
 
+### The Invite Acceptance Landing Page
+
+When a recipient clicks an invitation link, your app needs a page at that URL to handle the token. The template ships `InviteAcceptPage.vue` (`src/pages/InviteAcceptPage.vue`), already routed at `/invite/accept?inviteToken=...`, which covers the full flow:
+
+- **Signed-in user** — prompts "Accept with this account or sign out and use a different one." Calls `client.invitations.accept(token)` on confirm, then shows a success screen with how many groups and documents were unlocked.
+- **Signed-out user** — stashes the token in `sessionStorage` and redirects to the login page. After sign-in completes (via any auth method), the pending token is automatically forwarded to the server to resolve deferred grants in the same round-trip. No second click-through needed.
+- **Error states** — expired tokens, already-accepted tokens, and invalid tokens each have their own UI with recovery options.
+
+If you're using the template, this is already wired up. Point your invitation emails at `${yourApp.baseUrl}/invite/accept?inviteToken=${invitation.inviteToken}`.
+
+::: tip Building it yourself
+If you're not using the template, the key is to carry the token across the auth redirect. Stash it in `sessionStorage` before redirecting to login, then pass it to the verification call (`magicLinkVerify`, `otpVerify`, or `passkeyRegisterFinish`) so grants resolve at sign-in. Alternatively, for the signed-in path, call `client.invitations.accept(token)` directly after confirming the user's identity.
+:::
+
 ### Accepting an Invitation with a Different Email
 
 A user who already has an account (or who signs up with a *different* email than the one they were invited at) can accept an invitation explicitly using the token:

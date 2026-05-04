@@ -104,7 +104,7 @@ my-app/
 │   ├── config/         # Environment configuration
 │   ├── layouts/        # Page layout components
 │   ├── lib/            # Business logic (pure TypeScript)
-│   ├── models/         # js-bao data models
+│   ├── models/         # js-bao data models (models.toml + auto-generated *.generated.ts)
 │   ├── pages/          # Route components
 │   ├── router/         # Vue Router setup
 │   └── tests/          # Test harness test files
@@ -117,7 +117,7 @@ my-app/
 Key configuration files:
 
 - **`src/config/envConfig.ts`** — API URLs, App ID, logging, js-bao configuration
-- **`src/models/`** — Your data models (start here!)
+- **`src/models/models.toml`** — Your data model schemas (start here! Run `pnpm codegen` after editing to regenerate the TypeScript classes in `*.generated.ts`)
 - **`docs/`** — Guides for AI coding assistants working on your project
 
 ## Next Steps

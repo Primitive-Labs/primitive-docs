@@ -11,6 +11,27 @@ New features, API changes, and important fixes in the Primitive platform librari
 - **`upsertOn` in registered database operations** — pass `"upsertOn": "$params.fieldName"` in a `save` operation definition to create-or-update a record by a unique field value instead of requiring an explicit `id`. Enables idempotent write patterns without client-side lookup.
 - **`database.celContext.*` CEL alias** — the database CEL context (formerly called "metadata") is now also accessible as `database.celContext.*` in access expressions, triggers, and filters. `database.metadata.*` continues to work as a legacy alias. The TOML field is now `celContextAccess` (`metadataAccess` still accepted). The CLI command is now `primitive databases cel-context get/update` (`primitive databases metadata` still works).
 
+## primitive-app v2.1.7 — 2026-04-30
+
+- Models are now defined in `src/models/models.toml` (TOML schema) and auto-generated into `*.generated.ts` TypeScript classes — run `pnpm codegen` after editing the TOML to regenerate
+- The `allModels` barrel in `src/models/index.ts` is fully auto-generated; adding a model to `models.toml` and running codegen is all that's needed to register it with js-bao
+- Demo app playground pages have been reorganized under a unified `playground/` route structure, making it easier to see all API features in one place
+- `useApiLog` composable and `ApiPlayground` wrapper component extracted for consistent API call logging across playground pages
+
+## primitive-app v2.1.7 — 2026-04-28
+
+- Models are now defined in `src/models/models.toml` and generated into TypeScript via `pnpm models:gen` — you no longer write `defineModelSchema()` by hand; the generated `.generated.ts` files produce the attribute interface, class declaration, and model-name constant automatically
+- Model classes are now pure data containers (no instance methods or getters); business logic belongs in a controller module in `src/lib/` as free functions — call sites use `isOverdue(task)` instead of `task.isOverdue`
+- The `src/models/index.ts` barrel is now also auto-generated and handles `attachAndRegisterModel` registration for all models; always import models from `@/models` so registration runs exactly once
+- `pnpm models:gen` replaces `pnpm codegen` for model generation; re-run it after any change to `models.toml`
+
+## primitive-app v2.1.7 — 2026-04-27
+
+- New `InviteAcceptPage` component (`src/pages/InviteAcceptPage.vue`, routed at `/invite/accept`) handles the full invitation acceptance flow — signed-in confirmation, signed-out stash-and-redirect, and all error states (`INVITE_TOKEN_EXPIRED`, `INVITE_ALREADY_ACCEPTED`, `INVITE_TOKEN_INVALID`)
+- New `inviteToken.ts` utility (`src/lib/inviteToken.ts`) persists invite tokens in `sessionStorage` across auth round-trips, including cross-tab magic-link flows where the token also rides the OAuth state parameter
+- All auth paths in `userStore` (`login`, `verifyOtp`, magic-link callback, `registerPasskey`) now automatically read and forward the pending invite token so deferred grants resolve in a single server round-trip at sign-in
+- Sidebar and user-menu components updated to support collapsible icon mode via `group-data-[collapsible=icon]` Tailwind classes
+
 ## js-bao-wss-client v1.4.3 — 2026-04-24
 
 A large cumulative release across invitations, sharing, server-side automation, databases, storage, and CLI. Highlights:
