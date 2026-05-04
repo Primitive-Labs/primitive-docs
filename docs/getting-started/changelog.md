@@ -4,6 +4,13 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## primitive-app v2.1.7 — 2026-04-27
+
+- New `InviteAcceptPage` component (`src/pages/InviteAcceptPage.vue`, routed at `/invite/accept`) handles the full invitation acceptance flow — signed-in confirmation, signed-out stash-and-redirect, and all error states (`INVITE_TOKEN_EXPIRED`, `INVITE_ALREADY_ACCEPTED`, `INVITE_TOKEN_INVALID`)
+- New `inviteToken.ts` utility (`src/lib/inviteToken.ts`) persists invite tokens in `sessionStorage` across auth round-trips, including cross-tab magic-link flows where the token also rides the OAuth state parameter
+- All auth paths in `userStore` (`login`, `verifyOtp`, magic-link callback, `registerPasskey`) now automatically read and forward the pending invite token so deferred grants resolve in a single server round-trip at sign-in
+- Sidebar and user-menu components updated to support collapsible icon mode via `group-data-[collapsible=icon]` Tailwind classes
+
 ## js-bao-wss-client v1.4.3 — 2026-04-24
 
 A large cumulative release across invitations, sharing, server-side automation, databases, storage, and CLI. Highlights:
