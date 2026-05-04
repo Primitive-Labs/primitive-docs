@@ -215,7 +215,6 @@ Generated reference documentation for each project.
   - [IntegrationCallRequest](/reference/js-bao-wss-client/api/interfaces/IntegrationCallRequest)
   - [IntegrationCallResponse](/reference/js-bao-wss-client/api/interfaces/IntegrationCallResponse)
   - [IntegrationsAPI](/reference/js-bao-wss-client/api/interfaces/IntegrationsAPI)
-  - [InvitationAcceptTokenInfo](/reference/js-bao-wss-client/api/interfaces/InvitationAcceptTokenInfo)
   - [InvitationEvent](/reference/js-bao-wss-client/api/interfaces/InvitationEvent)
   - [InvitationListResult](/reference/js-bao-wss-client/api/interfaces/InvitationListResult)
   - [InvitationQuota](/reference/js-bao-wss-client/api/interfaces/InvitationQuota)

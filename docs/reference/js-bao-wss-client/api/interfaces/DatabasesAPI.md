@@ -264,13 +264,17 @@ The unique identifier of the database to retrieve
 
 ***
 
-### getMetadata()
+### getCelContext()
 
-> **getMetadata**(`databaseId`): `Promise`\<\{ `databaseId`: `string`; `metadata`: `Record`\<`string`, `any`\> \| `null`; \}\>
+> **getCelContext**(`databaseId`): `Promise`\<\{ `celContext`: `Record`\<`string`, `any`\> \| `null`; `databaseId`: `string`; `metadata`: `Record`\<`string`, `any`\> \| `null`; \}\>
 
-Read a database's custom metadata.
-Owners and managers always have access. Non-owner/manager users
-need a `metadataAccess` CEL rule on the database type config.
+Read a database's CEL context dict.
+
+Owners and managers always have access. Non-owner/manager users need a
+`metadataAccess` CEL rule on the database type config.
+
+The returned payload includes the same dict under both `metadata` (legacy
+wire name) and `celContext` (new user-facing name).
 
 #### Parameters
 
@@ -278,11 +282,35 @@ need a `metadataAccess` CEL rule on the database type config.
 
 `string`
 
-The unique identifier of the database to read metadata from
+The unique identifier of the database to read
 
 #### Returns
 
-`Promise`\<\{ `databaseId`: `string`; `metadata`: `Record`\<`string`, `any`\> \| `null`; \}\>
+`Promise`\<\{ `celContext`: `Record`\<`string`, `any`\> \| `null`; `databaseId`: `string`; `metadata`: `Record`\<`string`, `any`\> \| `null`; \}\>
+
+***
+
+### ~~getMetadata()~~
+
+> **getMetadata**(`databaseId`): `Promise`\<\{ `celContext`: `Record`\<`string`, `any`\> \| `null`; `databaseId`: `string`; `metadata`: `Record`\<`string`, `any`\> \| `null`; \}\>
+
+Read a database's CEL context dict.
+
+#### Parameters
+
+##### databaseId
+
+`string`
+
+The unique identifier of the database to read
+
+#### Returns
+
+`Promise`\<\{ `celContext`: `Record`\<`string`, `any`\> \| `null`; `databaseId`: `string`; `metadata`: `Record`\<`string`, `any`\> \| `null`; \}\>
+
+#### Deprecated
+
+Use [getCelContext](#getcelcontext) instead.
 
 ***
 
@@ -454,9 +482,13 @@ Optional filters (e.g. `databaseType` to limit to one type)
 
 ### listGroupPermissions()
 
-> **listGroupPermissions**(`databaseId`): `Promise`\<[`DatabaseGroupPermissionEntry`](DatabaseGroupPermissionEntry.md)[]\>
+> **listGroupPermissions**(`databaseId`, `options?`): `Promise`\<[`DatabaseGroupPermissionEntry`](DatabaseGroupPermissionEntry.md)[]\>
 
 List all group-based permissions for a database.
+
+By default, platform-managed internal groups (those whose `groupType` is
+prefixed with `_`) are excluded. Pass `{ includeSystem: true }` to
+include them (typically only useful for admin tooling).
 
 #### Parameters
 
@@ -466,6 +498,15 @@ List all group-based permissions for a database.
 
 The unique identifier of the database whose group
   permissions to list
+
+##### options?
+
+Optional list options. Set `includeSystem` to `true` to
+  include platform-managed internal groups in the result.
+
+###### includeSystem?
+
+`boolean`
 
 #### Returns
 
@@ -716,11 +757,41 @@ Fields to update on the database
 
 ***
 
-### updateMetadata()
+### updateCelContext()
+
+> **updateCelContext**(`databaseId`, `celContext`): `Promise`\<[`DatabaseInfo`](DatabaseInfo.md)\>
+
+Update a database's CEL context dict (merge with existing).
+
+Values set here are referenced from CEL access rules as
+`database.celContext.<key>` (or legacy `database.metadata.<key>`) and
+from filter JSON as `$database.celContext.<key>`.
+
+#### Parameters
+
+##### databaseId
+
+`string`
+
+The unique identifier of the database to update
+
+##### celContext
+
+`Record`\<`string`, `any`\>
+
+Key-value pairs to merge into the database's existing CEL context
+
+#### Returns
+
+`Promise`\<[`DatabaseInfo`](DatabaseInfo.md)\>
+
+***
+
+### ~~updateMetadata()~~
 
 > **updateMetadata**(`databaseId`, `metadata`): `Promise`\<[`DatabaseInfo`](DatabaseInfo.md)\>
 
-Update a database's custom metadata.
+Update a database's CEL context dict (merge with existing).
 
 #### Parameters
 
@@ -734,11 +805,15 @@ The unique identifier of the database to update
 
 `Record`\<`string`, `any`\>
 
-Key-value pairs to merge into the database's existing metadata
+Key-value pairs to merge into the database's existing CEL context
 
 #### Returns
 
 `Promise`\<[`DatabaseInfo`](DatabaseInfo.md)\>
+
+#### Deprecated
+
+Use [updateCelContext](#updatecelcontext) instead.
 
 ***
 

@@ -130,7 +130,6 @@
 - [IntegrationCallRequest](interfaces/IntegrationCallRequest.md)
 - [IntegrationCallResponse](interfaces/IntegrationCallResponse.md)
 - [IntegrationsAPI](interfaces/IntegrationsAPI.md)
-- [InvitationAcceptTokenInfo](interfaces/InvitationAcceptTokenInfo.md)
 - [InvitationEvent](interfaces/InvitationEvent.md)
 - [InvitationListResult](interfaces/InvitationListResult.md)
 - [InvitationQuota](interfaces/InvitationQuota.md)

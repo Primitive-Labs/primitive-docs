@@ -6,7 +6,7 @@
 
 # Function: loadSchemaFromToml()
 
-> **loadSchemaFromToml**(`filePath`): `Promise`\<`DefinedModelSchema`\<`Record`\<`string`, [`FieldOptions`](../interfaces/FieldOptions.md)\>\>[]\>
+> **loadSchemaFromToml**(`filePath`, `options`): `Promise`\<`DefinedModelSchema`\<`Record`\<`string`, [`FieldOptions`](../interfaces/FieldOptions.md)\>\>[]\>
 
 Read a TOML file from disk and return an array of DefinedModelSchema objects.
 Only available in Node.js environments.
@@ -16,6 +16,10 @@ Only available in Node.js environments.
 ### filePath
 
 `string`
+
+### options
+
+`LoadSchemaOptions` = `{}`
 
 ## Returns
 

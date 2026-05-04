@@ -841,10 +841,6 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/IntegrationsAPI"
                 },
                 {
-                  "text": "InvitationAcceptTokenInfo",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/InvitationAcceptTokenInfo"
-                },
-                {
                   "text": "InvitationEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/InvitationEvent"
                 },
