@@ -4,8 +4,10 @@ A database is a server-side data store backed by a Cloudflare Durable Object wit
 
 ## Key Properties
 
-### Schemaless
+### Schemaless on the Server
 Save any JSON records without upfront schema definition. There's no `CREATE TABLE` step — collections are created implicitly when you first write to them, and you can add new fields at any time without migrations. This means you can iterate fast, ship changes without coordinating schema updates, and let your data model evolve naturally alongside your application.
+
+That said, registered operations refer to model collections by `modelName`. The recommended pattern is to declare those models once in `src/models/models.toml` so the same names — and the same field shapes — are typed end-to-end on the client, even though the server itself imposes no schema. See [Defining Your Models](./defining-your-models.md) for the TOML authoring loop.
 
 ### Organized by Type
 A **database type** is a named configuration (operations, triggers, access rules) shared across many database instances. Think of it as a template: if you have one database per tenant, project, or team, they all share the same type — update the type once, and every instance inherits the changes. When you create a database with a type that doesn't exist yet, the type is auto-created.
@@ -543,6 +545,7 @@ Timing is available on all operation types: query, mutation, count, aggregate, a
 ## Next Steps
 
 - **[Choosing Your Data Model](./choosing-your-data-model.md)** — When to use databases vs. documents
+- **[Defining Your Models](./defining-your-models.md)** — TOML model authoring shared with documents
 - **[Users and Groups](./users-and-groups.md)** — Set up groups for database access control
 - **[Scheduled and Real-Time Automation](./scheduled-and-realtime-automation.md)** — Subscriptions and cron-triggered workflows
 - **[Primitive CLI](./primitive-cli.md)** — Full CLI reference for database management

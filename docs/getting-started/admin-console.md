@@ -63,6 +63,7 @@ The Primitive Admin Console is a web-based dashboard for managing your apps, use
 - View usage metrics and event counts
 - Monitor daily active users
 - Track custom events
+- See [Analytics](./analytics.md) for the emit and query APIs that feed this view
 
 ## When to Use the Console vs. the CLI
 
@@ -83,3 +84,4 @@ In practice, many developers use the console for exploring and testing, and the 
 - **[Primitive CLI](./primitive-cli.md)** — Command-line alternative for all admin tasks
 - **[Workflows and Prompts](./workflows-and-prompts.md)** — Define the workflows you'll test in the console
 - **[API Integrations](./api-integrations.md)** — Configure the integrations you'll manage in the console
+- **[Analytics](./analytics.md)** — Emit and query the events that show up under Analytics
