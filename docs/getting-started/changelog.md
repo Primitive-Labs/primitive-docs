@@ -4,6 +4,13 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## primitive-app v2.1.7 (patch) — 2026-05-04
+
+- The project template now uses a TOML-based model definition approach: declare models in `src/models/models.toml` and run `npx js-bao-codegen-v2` to generate typed TypeScript classes — no manual `defineModelSchema` or `getJsBaoConfig` wiring needed.
+- TOML `[models.X.relationships.Y]` sections now generate typed traversal methods on model classes (e.g. `post.author()` returns `Promise<Author | null>`, `author.posts()` returns `Promise<PaginatedResult<Post>>`).
+- The generated barrel `src/models/index.ts` now validates bidirectional sync between `models.toml` and generated classes — a mismatch at startup throws with a clear error pointing to `npx js-bao-codegen-v2`.
+- Updated peer dependency to `js-bao-wss-client@^1.4.4`.
+
 ## js-bao-wss-client v1.4.3 — 2026-04-24
 
 A large cumulative release across invitations, sharing, server-side automation, databases, storage, and CLI. Highlights:

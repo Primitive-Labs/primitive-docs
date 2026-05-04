@@ -168,9 +168,20 @@ Check whether this document is the app's root document.
 
 ### listGroupPermissions()
 
-> **listGroupPermissions**(): `Promise`\<[`DocumentGroupPermissionEntry`](DocumentGroupPermissionEntry.md)[]\>
+> **listGroupPermissions**(`options?`): `Promise`\<[`DocumentGroupPermissionEntry`](DocumentGroupPermissionEntry.md)[]\>
 
 List all group-based permissions for this document.
+
+By default, platform-managed internal groups (`groupType` prefixed with
+`_`) are excluded. Pass `{ includeSystem: true }` to include them.
+
+#### Parameters
+
+##### options?
+
+###### includeSystem?
+
+`boolean`
 
 #### Returns
 

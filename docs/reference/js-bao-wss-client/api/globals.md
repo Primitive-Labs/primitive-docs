@@ -84,6 +84,11 @@
 - [DeferredPermissionGrant](interfaces/DeferredPermissionGrant.md)
 - [DirectGroupAdd](interfaces/DirectGroupAdd.md)
 - [DirectPermissionGrant](interfaces/DirectPermissionGrant.md)
+- [DiscoveredConstraint](interfaces/DiscoveredConstraint.md)
+- [DiscoveredField](interfaces/DiscoveredField.md)
+- [DiscoveredModel](interfaces/DiscoveredModel.md)
+- [DiscoveredRelationship](interfaces/DiscoveredRelationship.md)
+- [DiscoveredSchema](interfaces/DiscoveredSchema.md)
 - [DocumentAccessResult](interfaces/DocumentAccessResult.md)
 - [DocumentAliasesAPI](interfaces/DocumentAliasesAPI.md)
 - [DocumentAliasInfo](interfaces/DocumentAliasInfo.md)
@@ -125,7 +130,6 @@
 - [IntegrationCallRequest](interfaces/IntegrationCallRequest.md)
 - [IntegrationCallResponse](interfaces/IntegrationCallResponse.md)
 - [IntegrationsAPI](interfaces/IntegrationsAPI.md)
-- [InvitationAcceptTokenInfo](interfaces/InvitationAcceptTokenInfo.md)
 - [InvitationEvent](interfaces/InvitationEvent.md)
 - [InvitationListResult](interfaces/InvitationListResult.md)
 - [InvitationQuota](interfaces/InvitationQuota.md)
@@ -204,6 +208,7 @@
 - [BlobDisposition](type-aliases/BlobDisposition.md)
 - [DeferredGrant](type-aliases/DeferredGrant.md)
 - [DocumentAliasScope](type-aliases/DocumentAliasScope.md)
+- [DoDb](type-aliases/DoDb.md)
 - [GeminiContentPart](type-aliases/GeminiContentPart.md)
 - [GeminiGenerateOptions](type-aliases/GeminiGenerateOptions.md)
 - [GeminiRole](type-aliases/GeminiRole.md)
@@ -218,80 +223,39 @@
 
 - [ANALYTICS\_UNAUTHENTICATED\_USER](variables/ANALYTICS_UNAUTHENTICATED_USER.md)
 - [AUTH\_CODES](variables/AUTH_CODES.md)
-- [discoverSchema](variables/discoverSchema.md)
 
 ## Functions
 
 - [attachAndRegisterModel](functions/attachAndRegisterModel.md)
 - [~~createModelClass~~](functions/createModelClass.md)
 - [defineModelSchema](functions/defineModelSchema.md)
+- [discoverSchema](functions/discoverSchema.md)
 - [generateULID](functions/generateULID.md)
 - [initializeClient](functions/initializeClient.md)
 - [initJsBao](functions/initJsBao.md)
 - [isJsBaoError](functions/isJsBaoError.md)
+- [loadSchemaFromTomlString](functions/loadSchemaFromTomlString.md)
 
 ## References
 
-### DiscoveredConstraint
-
-Renames and re-exports [discoverSchema](variables/discoverSchema.md)
-
-***
-
-### DiscoveredField
-
-Renames and re-exports [discoverSchema](variables/discoverSchema.md)
-
-***
-
-### DiscoveredModel
-
-Renames and re-exports [discoverSchema](variables/discoverSchema.md)
-
-***
-
-### DiscoveredRelationship
-
-Renames and re-exports [discoverSchema](variables/discoverSchema.md)
-
-***
-
-### DiscoveredSchema
-
-Renames and re-exports [discoverSchema](variables/discoverSchema.md)
-
-***
-
 ### DOClientEngine
 
-Renames and re-exports [discoverSchema](variables/discoverSchema.md)
-
-***
-
-### DoDb
-
-Renames and re-exports [discoverSchema](variables/discoverSchema.md)
-
-***
-
-### loadSchemaFromTomlString
-
-Renames and re-exports [discoverSchema](variables/discoverSchema.md)
+Renames and re-exports [DoDb](type-aliases/DoDb.md)
 
 ***
 
 ### ModelFieldInfo
 
-Renames and re-exports [discoverSchema](variables/discoverSchema.md)
+Renames and re-exports [DoDb](type-aliases/DoDb.md)
 
 ***
 
 ### ModelIdentifier
 
-Renames and re-exports [discoverSchema](variables/discoverSchema.md)
+Renames and re-exports [DoDb](type-aliases/DoDb.md)
 
 ***
 
 ### SaveOptions
 
-Renames and re-exports [discoverSchema](variables/discoverSchema.md)
+Renames and re-exports [DoDb](type-aliases/DoDb.md)

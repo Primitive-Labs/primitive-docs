@@ -40,7 +40,7 @@ See the [Data Modeling guide](AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.md) for a f
 
 3. **NEVER remove fields from models.** Add a deprecation comment instead.
 
-4. **ALWAYS add new models to `getJsBaoConfig`.** Run `pnpm codegen` after creating models.
+4. **ALWAYS add new models to `models.toml`.** Run `npx js-bao-codegen-v2` after editing `models.toml`.
 
 5. **Load data in pages, not sub-components.** Pass data into sub-components as props.
 
@@ -277,42 +277,36 @@ await jsBaoClient.documents.removeTag(documentId, "archived");
 
 ### Creating New Model Files
 
-When creating a new js-bao model file, follow this exact workflow:
+Models are defined in `src/models/models.toml` and TypeScript classes are generated from that file. Follow this workflow:
 
-**Step 1: Create the minimal model file** with only the schema and class declaration. Do NOT write the auto-generated sections yourself — codegen produces them.
+**Step 1: Add the model to `src/models/models.toml`** using TOML syntax. Use snake_case for option names (`auto_assign`, `max_length`, etc.) — the loader maps them to camelCase at runtime.
 
-```typescript
-import { BaseModel, defineModelSchema } from "js-bao";
+```toml
+[models.todos.fields.id]
+type = "id"
+auto_assign = true
+indexed = true
 
-const todoSchema = defineModelSchema({
-  name: "todos",
-  fields: {
-    id: { type: "id", autoAssign: true, indexed: true },
-    title: { type: "string", indexed: true },
-    completed: { type: "boolean", default: false },
-  },
-});
+[models.todos.fields.title]
+type = "string"
+indexed = true
 
-export class Todo extends BaseModel {}
+[models.todos.fields.completed]
+type = "boolean"
+default = false
 ```
 
-**Step 2: Add the model to `getJsBaoConfig`** in your config file so js-bao knows about it.
+**Step 2: Run `npx js-bao-codegen-v2`** to generate `Todo.generated.ts` and regenerate the barrel `src/models/index.ts`. Codegen emits a typed `TodoAttrs` interface, a merged `Todo` interface extending `BaseModel`, and a `Todo` class extending `BaseModelImpl`. The barrel auto-registers every model at app startup.
 
-**Step 3: Run `pnpm codegen`** to generate the auto-generated sections. Codegen inserts a header (`InferAttrs` type alias and a merged interface) and a footer that calls `attachAndRegisterModel(Todo, todoSchema)`. The class itself stays untouched, so add custom methods/getters there freely.
-
-**Step 4: Make any additional edits** to the schema (adding fields, constraints, etc.) and run `pnpm codegen` again.
-
-**CRITICAL: NEVER edit the auto-generated header/footer.** They are bracketed by `BEGIN AUTO-GENERATED` / `END AUTO-GENERATED` markers and will be overwritten on the next codegen run.
-
-**Wrong** — manually attaching `static schema` skips the registry hook that wires up field accessors and unique-constraint indexes:
+**Step 3: Import models from the barrel** (`src/models/index.ts`), never directly from `*.generated.ts` files. The barrel ensures every model is registered exactly once.
 
 ```typescript
-// DON'T DO THIS — model never gets registered with ModelRegistry,
-// queries/saves will throw "Model not properly initialized".
-export class Todo extends BaseModel {
-  static schema = todoSchema;
-}
+import { Todo } from "@/models";
 ```
+
+**Step 4: Make additional edits** to the schema in `models.toml` and run `npx js-bao-codegen-v2` again.
+
+**CRITICAL: NEVER edit `*.generated.ts` files or `src/models/index.ts`.** Both are overwritten on every codegen run.
 
 ### Field Types
 
@@ -327,19 +321,76 @@ export class Todo extends BaseModel {
 
 ### Field Options
 
-```typescript
-const schema = defineModelSchema({
-  name: "tasks",
-  fields: {
-    id: { type: "id", autoAssign: true, indexed: true },
-    title: { type: "string", indexed: true },
-    priority: { type: "number", default: 0 },
-    dueDate: { type: "date" },
-    tags: { type: "stringset", maxCount: 10 },
-    archived: { type: "boolean", default: false },
-  },
-});
+```toml
+[models.tasks.fields.id]
+type = "id"
+auto_assign = true
+indexed = true
+
+[models.tasks.fields.title]
+type = "string"
+indexed = true
+
+[models.tasks.fields.priority]
+type = "number"
+default = 0
+
+[models.tasks.fields.dueDate]
+type = "date"
+
+[models.tasks.fields.tags]
+type = "stringset"
+max_count = 10
+
+[models.tasks.fields.archived]
+type = "boolean"
+default = false
 ```
+
+### Defining Relationships in models.toml
+
+Declare relationships in `models.toml` using `[models.X.relationships.Y]` sections. Codegen emits typed traversal methods on the generated interfaces.
+
+```toml
+# Author hasMany Posts
+[models.authors.relationships.posts]
+type = "hasMany"
+model = "posts"
+related_id_field = "authorId"
+order_by_field = "createdAt"
+order_direction = "DESC"
+
+# Post refersTo Author
+[models.posts.relationships.author]
+type = "refersTo"
+model = "authors"
+related_id_field = "authorId"
+```
+
+After running `npx js-bao-codegen-v2`, the generated interfaces include typed traversal methods:
+
+```typescript
+// Author.generated.ts
+export interface Author extends AuthorAttrs, BaseModel {
+  posts(options?: PaginationOptions): Promise<PaginatedResult<Post>>;
+}
+
+// Post.generated.ts
+export interface Post extends PostAttrs, BaseModel {
+  author(): Promise<Author | null>;
+}
+```
+
+Use these at runtime:
+
+```typescript
+const author = await Author.queryOne({ id: authorId });
+const posts = await author.posts(); // PaginatedResult<Post>
+const firstPost = posts.data[0];
+const backRef = await firstPost.author(); // Author | null
+```
+
+Relationship traversal uses the same engine as `Model.query(...)` with `include` specs — see [Loading Related Data](#loading-related-data-includes) for the lower-level query-level include syntax.
 
 ### Unique Constraints
 
@@ -1191,7 +1242,7 @@ Export creates a directory per document containing `metadata.json`, `document.yj
 | New document not queryable immediately          | Document not opened after creation                                        | Use `multiDocStore.createDocument()` which handles opening automatically                             |
 | `setPermissions is not a function`              | Method doesn't exist                                                      | Use `updatePermissions(documentId, { userId, permission })`                                          |
 | `setGroupPermission is not a function`          | Method doesn't exist                                                      | Use `grantGroupPermission(documentId, { groupType, groupId, permission })`                           |
-| "Model not properly initialized" on save/query  | Schema attached manually instead of via `attachAndRegisterModel`          | Re-run `pnpm codegen`; never set `static schema = ...` by hand                                       |
+| "Model not properly initialized" on save/query  | Schema not registered — `*.generated.ts` or `index.ts` is out of sync with `models.toml` | Re-run `npx js-bao-codegen-v2`; never manually attach a schema or edit generated files               |
 | `upsertByUnique`: "constraint not found"        | Passed field array instead of constraint name                             | Pass the named constraint string (e.g. `"users_email_unique"`)                                       |
 | `upsertByUnique`: "targetDocument is required"  | Creating a new record without specifying its document                     | Pass `{ targetDocument: docId }` as the 4th argument                                                 |
 | `query()` result missing `.map`/`.filter`       | Forgot result is a `PaginatedResult`                                      | Use `result.data` (also has `.nextCursor`, `.hasMore`)                                               |

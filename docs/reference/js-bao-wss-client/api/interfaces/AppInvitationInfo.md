@@ -82,3 +82,12 @@ Tokenized accept token — combine with your app's accept-page URL
 ### source?
 
 > `optional` **source**: `string` \| `null`
+
+***
+
+### status?
+
+> `optional` **status**: `"pending"` \| `"accepted"` \| `"expired"`
+
+Lifecycle status. Returned by `invitations.get()`. Not present on
+ list responses.
