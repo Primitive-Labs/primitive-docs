@@ -326,11 +326,13 @@ primitive integrations delete <id> -y         # skip confirm
 ### Test (admin only — bypasses status check)
 
 ```bash
-primitive integrations test <id>                                    # uses defaults
+primitive integrations test <id>                                    # CLI defaults: --method GET, no path
 primitive integrations test <id> --method POST --path /v1/responses
 primitive integrations test <id> --query '{"q":"hello","limit":10}'
 primitive integrations test <id> --method POST --body '{"foo":"bar"}'
 ```
+
+Note: `--method` defaults to `GET` regardless of the integration's `defaultMethod`. Pass `--method` explicitly when the integration only allows non-GET methods.
 
 The test endpoint runs with `allowInactive: true` and `allowMissingSecret: true`, includes a `requestPreview` (with secrets redacted), and works against `draft` integrations.
 

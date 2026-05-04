@@ -366,7 +366,7 @@ async function liveTickets(databaseId: string) {
 
 Make the initial-load operation's filter and the subscription's `filter` semantically equivalent. If they diverge, the UI will flicker (records the operation returned but the subscription never updates, or vice versa).
 
-There is no built-in "reconnected" callback. If you need to re-run the initial load after a disconnect, hook the WS reconnect via `client.events` (or whatever your client exposes) and call your loader again.
+There is no built-in "reconnected" callback. If you need to re-run the initial load after a disconnect, listen for status events on the client itself — `JsBaoClient` extends `Observable`, so `client.on("status", ({ status }) => { ... })` lets you trigger your loader when the WS comes back up.
 
 ---
 

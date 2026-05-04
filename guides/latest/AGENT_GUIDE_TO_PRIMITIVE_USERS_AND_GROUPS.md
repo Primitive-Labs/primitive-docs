@@ -75,18 +75,17 @@ const info = await client.users.getBasic(userId);
 
 // Many users in one call (max 100). Returns only users that exist + belong to the app.
 const profiles = await client.users.getProfiles([userIdA, userIdB]);
-// [{ userId, email, name, avatarUrl }]
+// [{ userId, email, name: string | null, avatarUrl: string | null }]
 
 // Look up a user by email in the current app.
 const result = await client.users.lookup("alice@example.com");
 // { exists: true, user: { userId, name, email } } | { exists: false }
 ```
 
-There is no `list()`, `get()`, or `me()` method. The current authenticated user comes from auth state, not a client method. To enumerate every user in the app, use the CLI:
+There is no `list()` or `get()` method on `client.users`. The current authenticated user lives on a separate namespace: `client.me.get()` returns the current user's profile (cached, with the same `GetUserOptions` knobs). To enumerate every user in the app, use the CLI:
 
 ```bash
 primitive users list
-primitive users get --user-id <userId>
 ```
 
 ### App roles
@@ -165,6 +164,8 @@ const teamResult = await client.groups.list({ type: "team" });
 const page1 = await client.groups.list({ type: "team", limit: 10 });
 const page2 = await client.groups.list({ type: "team", limit: 10, cursor: page1.cursor });
 ```
+
+`ListGroupsOptions` also supports `includeSystem: true` to include platform-managed internal groups whose `groupType` is prefixed with `_` (e.g. `_col-reader`/`_col-writer` backing collection sharing). These are filtered out by default — only set `includeSystem` for admin tooling.
 
 ### Get / Update / Delete
 
@@ -274,7 +275,7 @@ const pending = await client.groups.listPendingInvitations("team", "engineering"
 // [{ email, role, invitationId, createdAt, expiresAt, addedBy? }]
 ```
 
-Use this to render the "pending members" section of a group sharing UI without touching the internal `client.deferredGrants.*` surface.
+Use this to render the "pending members" section of a group sharing UI without having to filter the lower-level `client.invitations.listDeferredGrants()` surface.
 
 ### List a user's memberships
 
@@ -346,7 +347,7 @@ const dbs = await client.groups.listDatabases("team", "engineering");
 
 ## Groups and Databases
 
-Databases don't have group permission grants. Instead, group memberships are checked in **CEL access expressions** on registered operations. See the [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) for how to register operations.
+Databases support a coarse-grained group grant — `client.databases.grantGroupPermission(databaseId, { groupType, groupId, permission: "manager" })` — that gives every member of the group `manager`-level access (the database's admin permission, the only level supported for groups). For everything else — gating individual queries and mutations — group memberships are checked in **CEL access expressions** on registered operations. See the [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) for how to register operations.
 
 **CEL functions available in every context:**
 
@@ -547,7 +548,7 @@ const result = await client.ruleSets.test(ruleSetId, {
 // result.trace shows every isMemberOf/memberGroups/hasRole call and its result.
 ```
 
-Debug evaluation against a real user (uses live memberships, returns full trace):
+Debug evaluation against a real user (uses live memberships, returns full trace). **Requires console-admin auth** — regular app callers will get 403 from this endpoint:
 
 ```typescript
 const debug = await client.ruleSets.debug({

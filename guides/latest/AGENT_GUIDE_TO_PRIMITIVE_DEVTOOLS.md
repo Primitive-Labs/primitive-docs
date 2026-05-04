@@ -446,7 +446,7 @@ const t = new window.__primitiveAppModels.Task({ title: "x" });
 await t.save({ targetDocument: "some-doc-id" });
 
 // Underlying client (auth, documents, etc.)
-await window.__primitiveAppClient.auth.getCurrentUser();
+await window.__primitiveAppClient.me.get();
 await window.__primitiveAppClient.documents.list();
 ```
 

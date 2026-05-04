@@ -40,7 +40,13 @@ const data = new TextEncoder().encode("hello blob");
 const { blobId, numBytes, contentType } = await blobs.upload(data, {
   filename: "hello.txt",
   contentType: "text/plain",
-  disposition: "attachment", // or "inline"; affects Content-Disposition header on download
+  disposition: "attachment", // or "inline"; stored on the blob (sent as
+                              // X-Blob-Disposition). Note: the download
+                              // endpoint chooses Content-Disposition from the
+                              // ?disposition= query param (default "attachment"),
+                              // not from the upload-time value — pass
+                              // disposition explicitly to downloadUrl/proxyUrl
+                              // when serving inline.
   // retainLocal: true (default) — keep a local copy after upload completes
   // retainLocal: false — delete local bytes once the server confirms upload
 });
@@ -147,7 +153,8 @@ The upload queue is keyed by user identity. It hydrates from IndexedDB on sign-i
 await client.setNetworkMode("offline");
 
 // Bytes are written to the local Cache API immediately and queued.
-// upload() returns synchronously with bytesTransferred: 0.
+// upload() resolves without waiting for the network (the result includes
+// bytesTransferred: 0 to indicate nothing was transferred yet).
 const { blobId } = await blobs.upload(data, {
   filename: "draft.txt",
   contentType: "text/plain",

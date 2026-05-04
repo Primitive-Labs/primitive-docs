@@ -1016,19 +1016,24 @@ Databases push changes to connected clients over WebSocket. Subscriptions are **
   "subscriptionKey": "my-open-tickets",
   "displayName": "My open tickets",
   "description": "Tickets assigned to me",
-  "filter": "record.assigneeId == user.userId && record.status == 'open'",
+  "filter": "record.modelName == 'tickets' && record.data.assigneeId == user.userId && record.data.status == 'open'",
   "accessRule": "user.userId != ''",
   "params": { "teamId": { "type": "string", "required": false } }
 }
 ```
 
+**`record` shape inside `filter`:** `record.modelName`, `record.op` (one of `save | patch | delete | increment | addToSet | removeFromSet`), `record.id`, `record.data` (the new/written payload, or `null` for deletes), `record.previousData` (the prior row when subscribers exist; `null` otherwise). Field-level access is via `record.data.<field>` and `record.previousData.<field>` — fields are not spread onto `record` itself.
+
 Field semantics:
 
 - `accessRule` (CEL) — evaluated at subscribe time; false → subscribe is rejected.
 - `filter` (CEL) — evaluated per-change, per-subscriber against `record.*`. Only matches are delivered. Cannot grant access `accessRule` denies.
-- `params` — declared params bound to the subscriber and exposed as `params.*` inside `filter` and `accessRule`. Supported types: `string`, `number`, `boolean`.
+- `params` — declared params bound to the subscriber and exposed as `params.*` inside `filter` and `accessRule`. Supported types: `string`, `number`, `boolean`. Type checks at subscribe time are strict — no coercion (mismatched types are rejected with an error frame).
 
-CEL context for both `accessRule` and `filter`: `user.*`, `record.*` (filter only — the changed row), `database.id`, `database.celContext.*` (also `database.metadata.*`), `params.*`, plus the standard membership functions.
+CEL context differs between the two phases:
+
+- `accessRule` (subscribe time): `user.userId`, `user.role`, `params.*`, plus the standard membership functions (`isMemberOf`, `memberGroups`, `hasRole`).
+- `filter` (per-change broadcast): `user.userId` (with `user.role` empty), `record.*` (the changed row, including `record.op`, `record.id`, `record.previousData` when available), and `params.*`. Memberships and `database.*` are **not** bound at filter time, so put group-based authorization in `accessRule`, not `filter`.
 
 ### Subscribing from the client
 

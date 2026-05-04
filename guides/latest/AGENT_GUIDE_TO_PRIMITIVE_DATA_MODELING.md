@@ -77,9 +77,10 @@ const { metadata } = await jsBaoClient.documents.create({
 });
 await jsBaoClient.documents.open(metadata.documentId);
 
-await jsBaoClient.documents.setPermissions(metadata.documentId, [
-  { email: "alice@example.com", permission: "read-write" },
-]);
+await jsBaoClient.documents.updatePermissions(metadata.documentId, {
+  email: "alice@example.com",
+  permission: "read-write",
+});
 ```
 
 Use when each workspace is a sharing unit and every member of that workspace needs the full contents. Stays under ~10 MB per workspace.
@@ -126,12 +127,18 @@ Triggers fire in the DO before save. Clients cannot bypass them, even if they ca
 
 ### Database — real-time subscription
 
-```toml
-[[subscriptions]]
-name = "my-open-tickets"
-modelName = "ticket"
-access = "user.userId != ''"
-filter = "record.assigneeId == user.userId && record.status == 'open'"
+Subscriptions are registered per-database via the admin REST API (not via TOML / `primitive sync`):
+
+```http
+POST /app/{appId}/api/databases/{databaseId}/subscriptions
+```
+```json
+{
+  "subscriptionKey": "my-open-tickets",
+  "displayName": "My open tickets",
+  "filter": "record.assigneeId == user.userId && record.status == 'open'",
+  "accessRule": "user.userId != ''"
+}
 ```
 
 ```typescript
@@ -156,7 +163,7 @@ Documents only. One document per workspace. Owner shares with teammates via grou
 ### Classroom / LMS (mixed)
 
 - **Documents** for student work being actively drafted with teacher feedback (collaborative editing, offline drafting).
-- **Database** (`type: "classroom"`, one per class) for assignments, grades, roster. Operations like `submitWork` (`access: "params.studentId == userId"`) and `gradeSubmission` (`access: "isMemberOf('teacher')"`) enforce per-role visibility. Triggers stamp `submittedAt`, `gradedBy`.
+- **Database** (`type: "classroom"`, one per class) for assignments, grades, roster. Operations like `submitWork` (`access: "params.studentId == user.userId"`) and `gradeSubmission` (`access: "isMemberOf('teacher', database.metadata.classId)"`) enforce per-role visibility. Triggers stamp `submittedAt`, `gradedBy`.
 
 ### Multi-tenant SaaS / project management
 
@@ -198,7 +205,7 @@ Metadata is capped (~4 KB total, 1 KB per value, 20 keys). Use it as a lookup ke
 
 ### Use groups for access control, not user-ID checks
 
-`isMemberOf(groupType, groupId)` and `hasGroupRole(groupType, groupId, role)` scale better than per-user CEL conditions and let membership change without rewriting operations. Reach for a group whenever the same access pattern applies to more than one user.
+`isMemberOf(groupType, groupId)` and `memberGroups(groupType)` scale better than per-user CEL conditions and let membership change without rewriting operations. Reach for a group whenever the same access pattern applies to more than one user.
 
 ### When in doubt
 

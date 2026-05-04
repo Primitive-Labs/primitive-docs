@@ -22,6 +22,7 @@ const config = await client.getAuthConfig();
 //   googleOAuthEnabled, googleClientId, hasOAuth, redirectUris,
 //   passkeyEnabled, passkeyRpId, passkeyRpName, hasPasskey,
 //   magicLinkEnabled, otpEnabled
+//   // also: passkeyRpConfig (multi-RP map) returned by the server
 // }
 
 if (config.hasOAuth) showGoogleButton();
@@ -30,7 +31,7 @@ if (config.otpEnabled) showOtpForm();
 if (config.hasPasskey) showPasskeyButton();
 ```
 
-`hasOAuth` is true only when both `googleOAuthEnabled` and `googleClientId` are set. `hasPasskey` requires `passkeyEnabled` and a configured `passkeyRpId`.
+`hasOAuth` is true when Google OAuth is enabled (the flag defaults to enabled when both `googleClientId` and the server-side `googleClientSecret` are configured). `hasPasskey` requires `passkeyEnabled` plus either the new `passkeyRpConfig` map or both legacy `passkeyRpId` and `passkeyRpName`. `magicLinkEnabled` and `otpEnabled` default to `true` unless explicitly disabled in the Admin Console.
 
 ---
 
@@ -165,14 +166,27 @@ try {
 } catch (err) {
   if (err instanceof AuthError) {
     switch (err.code) {
-      case AUTH_CODES.OTP_NOT_ENABLED:        // OTP off in admin console
-      case AUTH_CODES.RATE_LIMITED:           // too many requests
-      case AUTH_CODES.OTP_MAX_ATTEMPTS:       // too many bad guesses; request new code
       case AUTH_CODES.INVALID_TOKEN:          // bad/expired code
+      case AUTH_CODES.TOKEN_EXPIRED:          // token expired
       case AUTH_CODES.INVITATION_REQUIRED:    // invite-only app, no invitation
       case AUTH_CODES.DOMAIN_NOT_ALLOWED:     // domain-mode app, email not in allowed domains
       case AUTH_CODES.ADDED_TO_WAITLIST:      // waitlist enabled, user added
-      case AUTH_CODES.RESERVED_EMAIL_FOR_ADMIN: // reserved domain
+      case AUTH_CODES.WAITLIST_ENTRY_UPDATED: // existing waitlist entry updated
+      case AUTH_CODES.PASSKEY_NOT_ENABLED:    // passkey off in admin console
+      case AUTH_CODES.MAGIC_LINK_NOT_ENABLED: // magic link off in admin console
+      case AUTH_CODES.INVITE_TOKEN_INVALID:   // bad invite token (#466)
+      case AUTH_CODES.INVITE_TOKEN_EXPIRED:   // invite token expired
+      case AUTH_CODES.INVITE_ALREADY_ACCEPTED: // invite already used
+        showUserMessage(err.message);
+        return;
+    }
+    // Server-only codes — not in the client's AUTH_CODES constant, so check
+    // the string directly:
+    switch (err.code) {
+      case "RATE_LIMITED":            // too many requests; err may include retryAfter
+      case "OTP_MAX_ATTEMPTS":        // too many bad guesses; request new code
+      case "OTP_NOT_ENABLED":         // OTP off in admin console
+      case "RESERVED_EMAIL_FOR_ADMIN": // +primitivetest emails can't hold admin/owner roles
         showUserMessage(err.message);
         return;
     }
@@ -180,6 +194,8 @@ try {
   throw err;
 }
 ```
+
+The exported `AUTH_CODES` constant covers: `ADDED_TO_WAITLIST`, `INVITATION_REQUIRED`, `DOMAIN_NOT_ALLOWED`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `PASSKEY_NOT_ENABLED`, `MAGIC_LINK_NOT_ENABLED`, `WAITLIST_ENTRY_UPDATED`, `INVITE_TOKEN_INVALID`, `INVITE_TOKEN_EXPIRED`, `INVITE_ALREADY_ACCEPTED`. The server may also return `RATE_LIMITED`, `OTP_MAX_ATTEMPTS`, `OTP_NOT_ENABLED`, and `RESERVED_EMAIL_FOR_ADMIN` — compare those as string literals.
 
 The same `AuthError` codes apply to `magicLinkRequest`/`magicLinkVerify` and `passkey*` methods.
 
@@ -459,7 +475,7 @@ await client.otpVerify(email, code, { inviteToken });
 if (inviteToken) clearPendingInviteToken();
 ```
 
-The token is saved to `sessionStorage` under the key `"primitive:pendingInviteToken"`. The template's `userStore` automatically reads and forwards it through every auth path — `login()` (OAuth), `verifyOtp()`, the magic-link callback, and `registerPasskey()`. For magic links (which may open in a different tab), the token also rides in the OAuth `state` parameter so it survives cross-tab redirects.
+The token is saved to `sessionStorage` under the key `"primitive:pendingInviteToken"`. The template's `userStore` automatically reads and forwards it through every auth path — `login()` (OAuth), `verifyOtp()`, the magic-link callback, and `registerPasskey()`. For OAuth (which round-trips through Google), the token also rides in the OAuth `state` parameter so the callback page can recover it even if the OAuth response opens in a tab without the original `sessionStorage`.
 
 **`InviteAcceptPage` (template-provided):** The template ships a ready-made component at `src/pages/InviteAcceptPage.vue`, routed at `/invite/accept?inviteToken=...`. It handles:
 
@@ -473,23 +489,28 @@ If you're using the template, this route is already wired in `src/router/routes.
 
 ---
 
-## Test User Sign-In (non-prod only)
+## Test User Sign-In (per-app whitelist)
 
-There is **no `primitive test-users` CLI command**. The bypass is server-side: an OTP request for an email containing `+primitive` accepts the magic code `"000000"` instead of the emailed code.
+There is **no `primitive test-users` CLI command**. The bypass is server-side: an OTP request for an email shaped like `<base-local>+primitivetest<suffix>@<base-domain>` accepts the magic code `"000000"` instead of the emailed code, but **only when the base address is on the app's `testAccountBaseEmails` whitelist**.
 
 ```typescript
-// In a non-production environment with ENABLE_TEST_FEATURES=true
-// (or ENVIRONMENT=local|test|dev):
-await client.otpRequest("alice+primitive@example.com");
-const { user } = await client.otpVerify("alice+primitive@example.com", "000000");
+// Requires the app owner to have added "alice@example.com" to the app's
+// testAccountBaseEmails whitelist. Then any `alice+primitivetest<suffix>@example.com`
+// derivative becomes a test account that accepts code "000000".
+await client.otpRequest("alice+primitivetest@example.com");
+const { user } = await client.otpVerify("alice+primitivetest@example.com", "000000");
+
+// Role-distinguished derivatives (Gmail/Workspace deliver them to the same inbox):
+await client.otpRequest("alice+primitivetest-teacher@example.com");
 ```
 
 Guardrails:
 
-- Env-gated. Production servers reject `"000000"` and fall through to the normal OTP path (which fails).
-- The user must already exist as an `AppUser` in this app — bypass never auto-provisions.
-- Issued tokens are short-lived (~30 minutes), regardless of session length config.
-- Cannot mint admin tokens.
+- Per-app whitelist. The base address (`alice@example.com`) must be on the app's `testAccountBaseEmails` list — explicit owner consent.
+- Only `+primitivetest<suffix>` derivatives are eligible. The bare base is never a test account, and the legacy `+primitive` form is no longer accepted.
+- The derived user must already exist as an `AppUser` in this app — bypass never auto-provisions.
+- Issued tokens are short-lived (~30 minutes) and carry a `primitiveBypass: true` claim that gets re-checked on every request, so removing the base from the whitelist revokes sessions immediately.
+- `+primitivetest*` accounts can sign in as ordinary members but are reserved at admin / owner / invitation boundaries — they cannot hold those roles.
 
 **Don't use this in production user flows.**
 

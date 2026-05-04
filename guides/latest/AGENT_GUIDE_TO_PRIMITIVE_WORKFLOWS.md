@@ -44,7 +44,7 @@ All steps support these in addition to their own:
 | `forEach` | Iterate over a list expression (path to array, or to `{items: [...]}`) |
 | `as` | Loop variable name (default exposes `selected`) |
 | `maxItems` | forEach cap (default 200) |
-| `concurrency` | Parallel forEach lanes (integer ≥ 1; default 1 = sequential). Results preserve insertion order. |
+| `concurrency` | Parallel forEach lanes (integer 1-100; default 1 = sequential). Results preserve insertion order. |
 | `continueOnError` | Capture errors as `{ error, errorDetails }` instead of failing the workflow |
 | `strict` | Throw if any template expression in this step is unresolved |
 
@@ -538,7 +538,7 @@ A workflow needs `status = "active"` AND one of (active configuration | publishe
 | `active` | yes (required) | yes | yes |
 | `archived` | – | no | no |
 
-Setting `status = "active"` without an active config or revision returns: `Cannot activate workflow without a revision or active configuration`.
+Setting `status = "active"` without an active config or revision returns: `Cannot activate workflow without a configuration`.
 
 `primitive sync push` creates a default configuration automatically when a workflow is first created and updates it on subsequent pushes. Each push of `[[steps]]` updates the active configuration's steps in place.
 
@@ -809,7 +809,7 @@ Use the dotted form. `top-users` → `users.top`. `events-grouped` → `events.g
 | Symptom | Likely cause |
 |---|---|
 | `Workflow not found` | Wrong app context, or `status != "active"`, or no active config/revision |
-| `Cannot activate workflow without a revision or active configuration` | Push steps before activating |
+| `Cannot activate workflow without a configuration` | Push steps before activating |
 | `Workflow has no draft or configuration to preview` | First `primitive sync push` to create a config, or use `primitive workflows draft update` |
 | Run stuck in `apply_pending` | `requiresClientApply = true` but no client running `define()` for that key. Set to `false` for server-only workflows. |
 | `existing: true` on `start()` | A run with the same `(contextDocId, runKey)` already exists. Use a different `runKey` or `forceRerun: true`. |

@@ -16,13 +16,13 @@ Templates use `{{ }}` interpolation. Inputs are passed as `variables: { foo }` a
 | ---------- | ------------------------ | -------------------------------- | --------------------------- |
 | `draft`    | Yes                      | Yes                              | Yes                         |
 | `active`   | Yes                      | Yes                              | Yes                         |
-| `archived` | No                       | No                               | No                          |
+| `archived` | No                       | Yes (no status check)            | Yes (no status check)       |
 
-Default for new prompts is `draft`. **Both `draft` and `active` execute** — there's no "publish" gate for prompts (verified in `src/workflows/steps/prompt-step.ts:66`). The status is mostly a label.
+Default for new prompts is `draft`. **Both `draft` and `active` execute from workflows** (verified in `src/workflows/steps/prompt-step.ts:66`); only the workflow path enforces the status gate. The user REST handler (`src/app-api/controllers/prompts-controller.ts`) and the admin/CLI execute endpoint do NOT filter by `status`, so `archived` prompts still execute via the SDK and CLI as long as the prompt and an active-config exist. Archive a prompt only to hide it from listings — it does not block direct execution outside workflows.
 
-The config `status` field is separate. A config must be `status = "active"` (the default) to execute. Archived configs throw "not executable".
+The config `status` field is separate. A config defaults to `status = "active"`. The workflow step checks this and refuses to execute archived configs ("not executable"); the SDK/REST/CLI paths do not check config status.
 
-> If you see `HTTP 404` calling a prompt: the prompt key is wrong, the prompt is `archived`, or the active config has been archived. It is not a status-publishing issue.
+> If you see `HTTP 404` calling a prompt via the SDK: the prompt key is wrong (no prompt with that key in the app). Archived prompts return 200 from the user REST endpoint, not 404. If the prompt has no `activeConfigId` and you didn't pass `configId`, you'll get a 400 ("No configuration found for this prompt"), not 404.
 
 ---
 
@@ -70,7 +70,7 @@ Use `||` chained fallbacks or the `default` filter to handle this:
 {{ input.name | default: "Anonymous" }}
 ```
 
-Note `||` only falls back when the value is null/undefined/empty-string. Numeric `0` and `false` count as truthy for filter resolution but `0` falls through to the next variant in `||` chains (verified in templates.ts:347).
+Note `||` only falls back when the resolved value is null/undefined/empty-string (`templates.ts:363`). A resolved variable equal to `0` or `false` is kept and does NOT fall through. The one exception: a literal numeric `0` written directly in the template (e.g. `{{ 0 || "x" }}`) falls through to the next variant because the literal-number branch checks `if (asNumber)` (`templates.ts:347`).
 
 ### Filters (pipe syntax)
 
@@ -342,7 +342,7 @@ primitive prompts schema  <prompt-id> [--json]
 ```
 
 `preview` renders the template without calling the LLM — fast for verifying interpolation.
-`schema` returns `{ inputSchema, outputSchema, inputVariables, activeConfigId, ... }`. `inputVariables` is derived from `inputSchema.properties`, NOT from `{{ }}` references in the template.
+`schema` returns `{ promptId, promptKey, displayName, inputSchema, outputSchema, inputVariables, activeConfigId, activeConfigName }`. `inputVariables` is an array of `{ name, type, description, required }` derived from `inputSchema.properties` (NOT from `{{ }}` references in the template). When no `inputSchema` is set, `inputVariables` is an empty array.
 
 ### Configs
 
@@ -424,7 +424,7 @@ primitive sync pull [app-id] [--dir ./config]
 primitive sync push [app-id] [--dir ./config] [--dry-run]
 ```
 
-### Directory layout (verified in `cli/src/commands/sync.ts:537`)
+### Directory layout (verified in `cli/src/commands/sync.ts` — see the layout block in the `sync` command's help text)
 
 ```
 config/
@@ -462,7 +462,7 @@ Key-based refs (`configName`, `evaluatorPromptKey`, `evaluatorConfigName`) are p
 
 ### What `sync pull` actually writes
 
-`serializePrompt` (sync.ts:210) writes:
+`serializePrompt` (`cli/src/commands/sync.ts:215`) writes:
 
 - `[prompt]`: `key, displayName, description, status, inputSchema`
 - `[[configs]]`: `name, description, provider, model, temperature, maxTokens, outputFormat, systemPrompt, userPromptTemplate`
@@ -604,7 +604,14 @@ model = "google/gemini-2.0-flash-001"
 
 Pick `gemini` provider for native Gemini features (file parts, structured output via `outputSchema`). Use `openrouter` for non-Google models or OpenRouter-specific routing.
 
-`outputSchema` (structured JSON output) is **only honored by the gemini provider** in `block-executor.ts:563`. With openrouter, set `outputFormat = "json"` and instruct the model in the system prompt instead.
+`outputSchema` (structured JSON output) is **only honored by the gemini provider** in `src/services/block-executor.ts:563`. With openrouter, set `outputFormat = "json"` and instruct the model in the system prompt instead.
+
+Both `AppPrompt` (prompt-level) and `AppPromptConfig` (config-level) have an `outputSchema` field, and which one is honored depends on the execution path:
+
+- SDK / user REST `POST /prompts/:promptKey/execute` and admin/CLI execute endpoint → use **`prompt.outputSchema`**.
+- Workflow `prompt.execute` step → uses **`config.outputSchema`**.
+
+The TOML `[prompt].outputSchema` field is read on push and applies to the prompt-level field. There is no TOML field that writes `config.outputSchema`; set it via `primitive prompts configs update` if you need it for the workflow path.
 
 ---
 
@@ -653,7 +660,7 @@ await client.prompts.execute("p", { variables: { name: "Alice" } });
 2. `primitive use <app-id>` once per session beats `--app` everywhere.
 3. Prefer TOML + `sync push` over CLI flags for anything with multiple configs or test cases.
 4. Always `preview` before `execute` when debugging templates — much faster.
-5. Missing variables silently render as empty. Use `||` fallbacks or `inputSchema` validation.
+5. Missing variables silently render as empty. Use `||` fallbacks or `| expect: "..."` to fail loudly. (Note: `inputSchema` is metadata only — it is NOT validated against `variables` at execute time.)
 6. Evaluator prompts use `{{ output }}` (top-level), NOT `{{ input.output }}`.
 7. `outputSchema` only works with `provider = "gemini"`. With openrouter, use `outputFormat = "json"` + prompt the model.
 8. Test case `--vars` MUST be valid JSON — single-quote in shell, double-quote inside.

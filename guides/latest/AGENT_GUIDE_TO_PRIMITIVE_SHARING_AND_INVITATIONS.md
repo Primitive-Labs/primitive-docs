@@ -62,10 +62,10 @@ The deferred types make email-based sharing work — the platform remembers the 
 
 ```typescript
 client.invitations.create({ email, role });            // -> AppInvitationInfo
-client.invitations.list({ limit?, cursor? });          // -> { items, cursor? }
+client.invitations.list({ limit?, cursor? });          // -> { items, cursor? }   (admin/owner only)
 client.invitations.delete(invitationId);               // CASCADES to deferred grants
 client.invitations.quota();                            // -> { used, limit, remaining, unlimited }
-client.invitations.getAcceptToken(invitationId);       // -> InvitationAcceptTokenInfo
+client.invitations.get(invitationId);                  // -> AppInvitationInfo (includes inviteToken + status)
 client.invitations.accept(inviteToken);                // authenticated cross-identity acceptance
 client.invitations.listDeferredGrants({ email?, type?, limit? });  // admin debug only
 client.invitations.revokeDeferredGrant(deferredId, "document" | "group");
@@ -116,18 +116,20 @@ The client surfaces server errors as `Error("HTTP <status>: <jsonBody>")`. Parse
 | `client.documents.updatePermissions(...)` deferred result | `DeferredPermissionGrant.inviteToken` |
 | `client.groups.addMember(...)` deferred result | `DeferredGroupAdd.inviteToken` |
 
-For resend / lookup after the initial response is gone:
+For resend / lookup after the initial response is gone, use `client.invitations.get(invitationId)`:
 
 ```typescript
-const tok = await client.invitations.getAcceptToken(invitationId);
-// { invitationId, inviteToken, email, expiresAt, accepted, acceptedAt,
+const inv = await client.invitations.get(invitationId);
+// AppInvitationInfo:
+// { invitationId, email, role, invitedBy, invitedAt, expiresAt,
+//   accepted, acceptedAt, source, note, inviteToken,
 //   status: "pending" | "expired" | "accepted" }
 
-const acceptUrl = `${myApp.baseUrl}/invite/accept?inviteToken=${tok.inviteToken}`;
-await myEmailService.send({ to: tok.email, link: acceptUrl });
+const acceptUrl = `${myApp.baseUrl}/invite/accept?inviteToken=${inv.inviteToken}`;
+await myEmailService.send({ to: inv.email, link: acceptUrl });
 ```
 
-Permissions for `getAcceptToken`: app admin/owner, the invitation's original inviter, or any member of an app with `memberInvitationsEnabled: true`. Legacy invitations are lazily upgraded on first read.
+Permissions for `invitations.get`: app admin/owner, OR the invitation's original inviter. Members who did not create the invitation receive 403 — `inviteToken` is a bearer credential, so read access is intentionally narrow. Legacy invitations without a token are lazily upgraded on first read.
 
 ### Token-based acceptance (authenticated caller)
 
@@ -219,7 +221,7 @@ await client.documents.updatePermissions(documentId, {
 // }
 ```
 
-`results` is only present when at least one entry was deferred or when the batch form was used. Branch on `status` per row.
+`results` is only present when at least one entry was deferred (i.e. the batch contained an email that didn't yet map to an app user). For all-direct grants — single-user or batch — the response is just `{ success: true, message }` with no `results` array. Branch on `status` per row when `results` is present.
 
 ### Group sharing
 
@@ -522,10 +524,13 @@ Don't reach into `client.invitations.listDeferredGrants(...)` for product UI —
 ```typescript
 const { items, cursor } = await client.invitations.list({ limit: 50 });
 const pending = items.filter((i) => !i.accepted);
-// [{ invitationId, email, role, invitedAt, expiresAt, source, inviteToken, ... }]
+// [{ invitationId, email, role, invitedAt, expiresAt, accepted, acceptedAt,
+//    source, note }, ...]
+// Note: list responses do NOT include `inviteToken` — fetch it per-row via
+// `client.invitations.get(invitationId)` if you need it.
 ```
 
-Use this for "all open invitations to this app" — admin tooling. For per-resource UI, use the per-resource endpoints above.
+Use this for "all open invitations to this app" — admin/owner only. For per-resource UI, use the per-resource endpoints above.
 
 ### Canonical "share + render" flow
 
@@ -535,9 +540,9 @@ async function shareAndReload(documentId: string, email: string) {
     email,
     permission: "read-write",
   });
-  // result.results is present when the row was deferred (or for batch form).
-  // For a single-user direct grant the response can omit results — that's
-  // success; refetch the panel.
+  // result.results is present only when at least one row was deferred
+  // (email didn't yet map to an app user). All-direct grants return just
+  // { success, message } — that's success; refetch the panel.
 
   const [members, pending] = await Promise.all([
     client.documents.getPermissions(documentId),

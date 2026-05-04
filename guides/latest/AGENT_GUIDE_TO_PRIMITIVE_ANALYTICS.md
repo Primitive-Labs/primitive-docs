@@ -23,7 +23,7 @@ All enabled by default. The client automatically emits these lifecycle events:
 | Action | Feature | Default | When it fires |
 |--------|---------|---------|---------------|
 | `user_active_daily` | `session` | on | First authenticated activity on a UTC day |
-| `user_returned` | `session` | on | Tab becomes visible after `minResumeMs` (default 5 min) hidden |
+| `user_returned` | `session` | on | Tab becomes visible (suppressed if a previous `user_returned` fired less than `minResumeMs` ago — default 5 min) |
 | `session_end` | `session` | on | `beforeunload` or `client.destroy()` (records `duration_ms`) |
 | `sync_error` | `sync` | on | Outbound sync fails (rate-limited, default min 30s between events) |
 | `blob_upload_started` | `blobs` | on | Blob upload begins |
@@ -52,6 +52,9 @@ The platform emits these from the server. No client code at all.
 | `document.deleted` | `documents` | Document deleted |
 | `document.tag_added` | `documents` | Tag added |
 | `document.tag_removed` | `documents` | Tag removed |
+| `access_request.created` | `documents` | User requested access to a document |
+| `access_request.approved` | `documents` | Access request approved |
+| `access_request.denied` | `documents` | Access request denied |
 | `permission.granted` | `permissions` | Permission granted |
 | `permission.revoked` | `permissions` | Permission revoked |
 | `permission.pending.cancelled` | `permissions` | Pending invite-permission cancelled |

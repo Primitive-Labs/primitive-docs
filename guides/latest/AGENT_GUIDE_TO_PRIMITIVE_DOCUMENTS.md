@@ -70,7 +70,7 @@ const result = await TodoItem.query({});         // throws DocumentClosedError o
                                                  // returns empty data for query
 ```
 
-**Note on `jsBaoDocumentStore.isReady`:** The template app provides `jsBaoDocumentStore` with an `isReady` property. This indicates that the **store itself** has finished initializing — it does NOT indicate that any particular document has been opened. You still need to track document-specific readiness separately (e.g., after calling `documents.open()`) before querying data in those documents.
+**Note on `jsBaoDocumentsStore.isReady`:** The demo app provides `jsBaoDocumentsStore` with an `isReady` property. This indicates that the **store itself** has finished initializing (the document list and invitation list have loaded) — it does NOT indicate that any particular document has been opened. You still need to track document-specific readiness separately (e.g., after calling `documents.open()`) before querying data in those documents.
 
 **Where in the Vue tree to open documents:**
 
@@ -111,7 +111,7 @@ const hasLocal = jsBaoClient.documents.hasLocalCopy(documentId);
 
 ## Common Document Usage Patterns
 
-**Helper Stores:** This project includes `singleDocumentStore` and `multiDocumentStore` in `/src/stores/` that implement the patterns described below. These stores handle document opening, closing, readiness tracking, and state management. They can be used as-is, customized to fit your needs, or ignored in favor of application-specific approaches.
+**Helper Stores:** The demo app includes `jsBaoDocumentsStore` (the underlying tracked-documents store) and `singleDocumentStore` (a higher-level wrapper for Pattern 1 / Pattern 2) in `/src/stores/`. These stores handle document opening, closing, readiness tracking, and state management. They can be used as-is, customized to fit your needs, or ignored in favor of application-specific approaches.
 
 ### Pattern 1: Single Document (Personal Apps)
 
@@ -173,63 +173,7 @@ await Promise.all(
 const messages = await Message.query({});
 ```
 
-**Using multiDocumentStore:** For Pattern 3, the `multiDocumentStore` Pinia store provides a higher-level abstraction that handles:
-- Registering collections by tag with automatic document opening (`autoOpen: true`)
-- Tracking which documents belong to which collection
-- Optional auto-acceptance of invitations (`autoAcceptInvites: true/false`)
-- Proper document creation that ensures documents are opened and tracked
-
-```typescript
-// Register a collection (typically in a domain store's initialize function)
-await multiDocStore.registerCollection({
-  name: "todolists",
-  tag: "todolist",
-  autoOpen: true,        // Automatically open documents with this tag
-  autoAcceptInvites: false, // Require manual invitation acceptance
-});
-
-// Create a document in the collection - ALWAYS use this, not documentsStore directly
-const trackedDoc = await multiDocStore.createDocument(
-  "todolists",  // collection name
-  "My List",    // title
-  { alias: { scope: "user", aliasKey: "default-list" } } // optional alias
-);
-
-// The document is automatically opened and tracked
-// Now you can save models to it
-const list = new TodoList();
-list.title = "My List";
-await list.save({ targetDocument: trackedDoc.documentId });
-```
-
-**Collection and document readiness:**
-
-- `multiDocStore.isCollectionReady('todolists')` returns a `ComputedRef<boolean>` that is `true` once the collection has finished opening all its documents. Pass this directly as `documentReady` to `useJsBaoDataLoader`:
-
-```typescript
-const { data, initialDataLoaded } = useJsBaoDataLoader({
-  subscribeTo: [TodoItem],
-  queryParams: ...,
-  documentReady: multiDocStore.isCollectionReady('todolists'), // ComputedRef<boolean>
-  async loadData(queryParams) { ... },
-});
-```
-
-- `multiDocStore.isDocumentReady(selectedDocIdRef)` returns a `ComputedRef<boolean>` that is `true` when a specific document is open. The argument must be a `Ref<string>` or `ComputedRef<string>` (not a plain string), so that readiness updates reactively when the selected document changes:
-
-```typescript
-const selectedDocId = ref('doc-abc123');
-const { data, initialDataLoaded } = useJsBaoDataLoader({
-  subscribeTo: [TodoItem],
-  queryParams: ...,
-  documentReady: multiDocStore.isDocumentReady(selectedDocId), // ComputedRef<boolean>
-  async loadData(queryParams) { ... },
-});
-```
-
-Always pass the `ComputedRef` directly — never call `.value` on it when passing to `useJsBaoDataLoader`.
-
-**Critical:** When working with multiDocumentStore collections, ALWAYS use `multiDocStore.createDocument()` to create new documents. Using `documentsStore.createDocumentWithAlias()` or other low-level methods bypasses the collection's auto-open and tracking logic, causing documents to not appear in reactive lists.
+**Implementation tips for Pattern 3:** The demo app does not ship a built-in "multi-document" Pinia store. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over a local store. For per-tag in-memory tracking, build directly on `jsBaoClient.documents.list({ tag })` and `jsBaoClient.documents.open()`, and track per-document readiness yourself (e.g., a `ref<Set<string>>` of opened IDs, derived into a `computed` boolean for `useJsBaoDataLoader`'s `documentReady`).
 
 ## Data Modeling Decisions
 
@@ -1183,7 +1127,9 @@ primitive collections create "Q1 Reports" --description "Quarterly reports"
 primitive collections list
 primitive collections docs {add|remove|list} <collection-id> [<document-id>]
 primitive collections share <collection-id> --group team/engineering --permission read-write
-primitive collections members {add|remove} <collection-id> <user-id> [--permission reader]
+primitive collections unshare <collection-id> --group team/engineering
+primitive collections members add <collection-id> <user-id> --permission reader
+primitive collections members remove <collection-id> <user-id>
 primitive collections access <collection-id>
 ```
 
@@ -1237,9 +1183,9 @@ Export creates a directory per document containing `metadata.json`, `document.yj
 | Data doesn't update when route param changes    | Vue reuses components; `useJsBaoDataLoader` doesn't see the change       | Add the route param to `queryParams` in the data loader, OR use `:key="routeParam"` on the component |
 | Spread object missing data or reactivity broken | js-bao model objects don't support JavaScript spreading (`{ ...model }`) | Access properties directly or use explicit property copying: `{ id: model.id, title: model.title }`  |
 | Query `field: false` misses items               | Items with `field: undefined` don't match `field: false`                 | Use a default value in schema, OR filter in JavaScript with `item.field ?? false`                    |
-| Document created but not in sidebar/list        | Used `documentsStore` directly instead of `multiDocStore`                | Always use `multiDocStore.createDocument()` when working with collections                            |
+| Document created but not in sidebar/list        | Created via `documents.create()` directly without updating tracked state | Use the demo `jsBaoDocumentsStore.createDocument()` (or your own tracker) so reactive lists update   |
 | HTTP 400 when sharing with email                | Missing `documentUrl` in invitation                                       | Pass `invite-url-template` prop to `PrimitiveShareDocumentDialog`                                    |
-| New document not queryable immediately          | Document not opened after creation                                        | Use `multiDocStore.createDocument()` which handles opening automatically                             |
+| New document not queryable immediately          | Document not opened after creation                                        | After `documents.create()`, call `documents.open(metadata.documentId)` before querying              |
 | `setPermissions is not a function`              | Method doesn't exist                                                      | Use `updatePermissions(documentId, { userId, permission })`                                          |
 | `setGroupPermission is not a function`          | Method doesn't exist                                                      | Use `grantGroupPermission(documentId, { groupType, groupId, permission })`                           |
 | "Model not properly initialized" on save/query  | Schema not registered — `*.generated.ts` or `index.ts` is out of sync with `models.toml` | Re-run `npx js-bao-codegen-v2`; never manually attach a schema or edit generated files               |
