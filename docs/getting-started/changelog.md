@@ -4,6 +4,12 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao v0.4.2 — 2026-05-05
+
+- StringSet fields now use a nested Y.Map as the canonical Yjs set shape (one key per member), enabling correct CRDT merge semantics: concurrent additions of different members from separate clients now merge to a union instead of overwriting each other.
+- `Model.subscribe()` callbacks now fire when a remote update adds or removes a StringSet member. Previously, member-level ops on the nested Y.Map did not trigger the parent record observer, so subscribers were silently skipped on remote StringSet changes.
+- Data written in the previous plain-object format (`{ member: true, … }`) is still read correctly as a backward-compatible fallback.
+
 ## primitive-app v2.1.7 (patch) — 2026-05-04
 
 - The project template now uses a TOML-based model definition approach: declare models in `src/models/models.toml` and run `npx js-bao-codegen-v2` to generate typed TypeScript classes — no manual `defineModelSchema` or `getJsBaoConfig` wiring needed.
