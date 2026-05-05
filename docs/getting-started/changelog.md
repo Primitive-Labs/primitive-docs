@@ -4,6 +4,10 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao-wss-client v1.4.4 — 2026-05-05
+
+- Updated the `js-bao` peer dependency requirement to `>=0.4.2`, ensuring compatibility with the latest js-bao features including TOML-based codegen (`js-bao-codegen-v2`), `upsertOn` for conditional save/upsert, and the `celContext` database alias.
+
 ## primitive-app v2.1.7 (patch) — 2026-05-04
 
 - The project template now uses a TOML-based model definition approach: declare models in `src/models/models.toml` and run `npx js-bao-codegen-v2` to generate typed TypeScript classes — no manual `defineModelSchema` or `getJsBaoConfig` wiring needed.
