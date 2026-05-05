@@ -276,6 +276,7 @@ kind = "workflow.start"
 forEach = "steps.get-users.data"
 as = "user"
 workflowKey = "process-item"
+maxConcurrent = 25                # default 25; cap on in-flight child runs at any moment
 [steps.input]
 userId = "{{ user.id }}"
 
@@ -310,7 +311,7 @@ htmlBody = "<p>Download: {{ outputs.upload.signedUrl }}</p>"
 textBody = "Download: {{ outputs.upload.signedUrl }}"
 ```
 
-`to` is a single address (string), not an array. Built-in templates: `magic-link`, `otp`, `document-share`, `waitlist-invite`, `waitlist-signup-notification`, `admin-invite`, `app-invite`, `access-request-created`, `access-request-resolved`. Register custom types with `primitive email-templates set <type>`. Per-app hourly rate limit applies.
+`to` is a single address (string), not an array. Built-in templates: `magic-link`, `otp`, `document-share`, `waitlist-invite`, `waitlist-signup-notification`, `admin-invite`, `app-invite`, `access-request-created`, `access-request-resolved`. Register custom types with `primitive email-templates set <type>`. Hourly rate limit: 100 emails per app per hour (`workflowEmailByApp` in `src/config/rate-limits.ts`).
 
 ### `blob.upload` / `blob.download` / `blob.signedUrl`
 
@@ -332,7 +333,7 @@ id = "url"
 kind = "blob.signedUrl"
 bucketKey = "reports"
 blobId = "{{ steps.save.blobId }}"
-expiresInSeconds = 3600           # 30..86400
+expiresInSeconds = 3600           # 30..86400, default 300 (5 min)
 # Output: { url, token, expiresAt, expiresInSeconds }
 
 [[steps]]
@@ -371,6 +372,26 @@ saveAs = "topUsers"
 
 Valid `queryType` values (dotted form, exact strings):
 `overview.dau`, `overview.wau`, `overview.mau`, `overview.growth`, `daily-active`, `rolling-active`, `cohort-retention`, `users.top`, `users.search`, `users.detail`, `users.snapshot`, `events`, `events.grouped`, `workflows.top`, `prompts.top`, `integrations`. `users.detail` and `users.snapshot` require `userUlid`.
+
+Optional fields:
+
+- `groupBy` — for `events.grouped`. One of `action`, `feature`, `day`, `route`, `country`, `deviceType`, `plan`.
+- `filters` — for `events` and `events.grouped`. Array of `{ field, operator, value }` (max 10 entries; values capped at 200 chars). Same field/operator set as the `/analytics/events` REST endpoint.
+- `page` — 0-indexed page number for the `events` feed.
+- `query` — search string (email or ULID) for `users.search`.
+
+```toml
+[[steps]]
+kind = "analytics.query"
+queryType = "events.grouped"
+windowDays = 7
+groupBy = "feature"
+filters = [
+  { field = "feature", operator = "is",       value = "billing" },
+  { field = "action",  operator = "contains", value = "upgrade" },
+]
+saveAs = "billingUpgrades"
+```
 
 ## Templating
 
@@ -589,7 +610,7 @@ primitive workflows configs duplicate <workflow-id> <config-id> --name "experime
 primitive workflows configs archive <workflow-id> <config-id>
 
 # Run inspection
-primitive workflows runs list <workflow-id> [--status running|completed|failed]
+primitive workflows runs list <workflow-id> [--status pending|running|completed|failed]
 primitive workflows runs status <workflow-id> <run-id>
 primitive workflows runs steps <workflow-id> <run-id>
 primitive workflows runs step-detail <workflow-id> <run-id> <step-id>
@@ -620,6 +641,18 @@ primitive cron-triggers create \
   --timezone "America/Los_Angeles" \
   --overlap-policy skip       # skip (default) | allow
 
+# With per-firing input passed to the workflow:
+primitive cron-triggers create \
+  --key nightly-digest --name "Nightly Digest" --cron "0 9 * * *" \
+  --workflow-key send-digest \
+  --input '{"reportType":"daily","priority":"high"}'
+
+# Or map fields from the trigger context into the workflow input:
+primitive cron-triggers create \
+  --key nightly-digest --name "Nightly Digest" --cron "0 9 * * *" \
+  --workflow-key send-digest \
+  --input-mapping '{"runId":"$triggerId","at":"$firedAt"}'
+
 primitive cron-triggers list
 primitive cron-triggers get <trigger-id>
 primitive cron-triggers test <trigger-id>     # fire manually
@@ -629,7 +662,8 @@ primitive cron-triggers delete <trigger-id>
 ```
 
 Notes:
-- The CLI flags are `--key`, `--name`, `--cron`, `--workflow-key`, `--overlap-policy`, `--timezone` — NOT `--schedule` or `--workflow`.
+- The CLI flags are `--key`, `--name`, `--cron`, `--workflow-key`, `--overlap-policy`, `--timezone`, `--input`, `--input-mapping` — NOT `--schedule` or `--workflow`.
+- `--input` and `--input-mapping` accept JSON strings; `--input` is a literal payload and `--input-mapping` projects fields from the trigger firing context into the workflow input. Both are also accepted by `cron-triggers update`.
 - `overlapPolicy` is exactly `skip` or `allow` (no `queue` value exists).
 - Per-app cap of 50 cron triggers.
 - Always set an IANA `--timezone` for user-visible schedules.

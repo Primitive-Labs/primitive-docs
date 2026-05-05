@@ -97,6 +97,97 @@ Behavior:
 - **`member`** is the default — access is determined by direct permissions and group memberships.
 - In CEL rule contexts the field is `user.role` (NOT `user.appRole`). See [Rule CEL context](#rule-cel-context) below.
 
+## Current User: `client.me`
+
+The current authenticated user has its own namespace. Use it for "me"-scoped reads and writes — profile, avatar, the user's view of shared documents, pending document invitations, and the generic bookmarks store.
+
+### Profile
+
+```typescript
+const profile = await client.me.get();
+// { userId, email, name, appRole, appId, avatarUrl? } | null when signed out
+
+await client.me.get({
+  waitForLoad: "localIfAvailableElseNetwork", // | "local" | "network"
+  refreshIfOlderThanMs: 60_000,               // default 5 minutes
+  refreshNetwork: true,                       // bypass cache once
+  serverTimeoutMs: 5_000,                     // soft network timeout
+});
+
+await client.me.update({
+  name: "Alice Reyes",
+  avatarUrl: "https://cdn.example.com/u/alice.png", // pass null to clear
+});
+
+// Upload an image directly (server hosts it and returns a URL)
+const { avatarUrl } = await client.me.uploadAvatar(
+  fileFromInput,
+  "image/png" // also "image/jpeg" | "image/gif" | "image/webp"
+);
+```
+
+`get()` is cache-backed; `update()` and `uploadAvatar()` clear that cache automatically. Reach for the cache controls if you need to override:
+
+```typescript
+await client.me.cacheInfo();   // { updatedAt?, ageMs? }
+await client.me.clearCache();  // forces the next get() to hit the network
+```
+
+### Documents view
+
+```typescript
+// Documents shared with the current user — direct grants AND pending
+// invitations to documents. Includes title, permission level, who granted
+// it, and a `source: "permission" | "invitation"` discriminator.
+const { documents, nextCursor } = await client.me.sharedDocuments({
+  limit: 50,
+  cursor: prevCursor, // for pagination; nextCursor === null when exhausted
+});
+
+// Document invitations the user can accept — convenient for an inbox view.
+const pending = await client.me.pendingDocumentInvitations();
+// [{ invitationId, documentId, title?, email, permission,
+//    invitedAt, invitedBy, expiresAt?, accepted, document?: {...} }, ...]
+```
+
+Use `me.sharedDocuments()` (not bookmark filtering) for "shared with me" UI — it resolves access via every path and includes shares the user hasn't bookmarked.
+
+### Bookmarks (`client.me.bookmarks`)
+
+Generic per-user references to any target type — documents, databases, collections, or anything the app wants to organize. Documents auto-bookmark on creation and on accepting an invitation; everything else is opt-in.
+
+```typescript
+// Add — `key` defaults to `${targetObjType}/${targetObjId}`. Idempotent:
+// re-adding returns status: "already_bookmarked" with the original
+// `bookmarkedAt`.
+const { status, key, bookmarkedAt } = await client.me.bookmarks.add({
+  targetObjType: "document",
+  targetObjId: documentId,
+  key: "projects/acme/q2-planning", // optional; hierarchical keys enable prefix queries
+});
+
+// Remove by key
+await client.me.bookmarks.remove("projects/acme/q2-planning");
+
+// Rename a key (move under a new prefix, etc.)
+await client.me.bookmarks.rename(
+  "projects/acme/q2-planning",
+  "archived/acme/q2-planning"
+);
+
+// List with optional prefix + cursor pagination
+const { bookmarks, nextCursor } = await client.me.bookmarks.list({
+  prefix: "projects/acme/", // optional; matches by key prefix
+  limit: 50,
+});
+```
+
+Design notes:
+
+- Use **hierarchical keys** (`folder/subfolder/leaf`) so prefix queries cheap-render folder views.
+- Don't use bookmarks to drive a "shared with me" UI — they miss shares the user never bookmarked. Use `me.sharedDocuments()` for that.
+- Bookmarks are private to each user; there is no "shared bookmark" surface.
+
 ## Core Concept: Groups
 
 Groups organize users and control access to documents and databases. Instead of granting permissions to individual users, grant access to a group and all members inherit it.

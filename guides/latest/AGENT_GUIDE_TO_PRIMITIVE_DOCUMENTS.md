@@ -173,7 +173,62 @@ await Promise.all(
 const messages = await Message.query({});
 ```
 
-**Implementation tips for Pattern 3:** The demo app does not ship a built-in "multi-document" Pinia store. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over a local store. For per-tag in-memory tracking, build directly on `jsBaoClient.documents.list({ tag })` and `jsBaoClient.documents.open()`, and track per-document readiness yourself (e.g., a `ref<Set<string>>` of opened IDs, derived into a `computed` boolean for `useJsBaoDataLoader`'s `documentReady`).
+**Implementation tips for Pattern 3:** The demo app does not ship a built-in "multi-document" Pinia store. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over a local store. For per-tag in-memory tracking, build directly on `jsBaoClient.documents.list({ tag })` and `jsBaoClient.documents.open()`, and track per-document readiness yourself.
+
+A minimal store for "all documents tagged `channel`":
+
+```typescript
+// stores/channelDocsStore.ts
+import { defineStore } from "pinia";
+import { ref, computed } from "vue";
+import { useJsBaoClient } from "primitive-app";
+
+export const useChannelDocs = defineStore("channelDocs", () => {
+  const client = useJsBaoClient();
+  const documentIds = ref<string[]>([]);
+  const openedIds = ref<Set<string>>(new Set());
+  const loadError = ref<Error | null>(null);
+
+  // True only after every channel doc this user can see is open.
+  const allReady = computed(
+    () =>
+      documentIds.value.length > 0 &&
+      documentIds.value.every((id) => openedIds.value.has(id))
+  );
+
+  async function load() {
+    loadError.value = null;
+    try {
+      const docs = await client.documents.list({ tag: "channel" });
+      documentIds.value = docs.map((d) => d.documentId);
+      await Promise.all(
+        documentIds.value.map(async (id) => {
+          await client.documents.open(id);
+          openedIds.value.add(id);
+        })
+      );
+    } catch (err) {
+      loadError.value = err as Error;
+    }
+  }
+
+  return { documentIds, openedIds, allReady, loadError, load };
+});
+```
+
+Then feed `allReady` into `useJsBaoDataLoader` so queries don't run until every channel doc is open:
+
+```typescript
+const channelDocs = useChannelDocs();
+onMounted(() => channelDocs.load());
+
+const { data: messages } = useJsBaoDataLoader({
+  documentReady: () => channelDocs.allReady,
+  load: () => Message.query({}, { limit: 100 }),
+});
+```
+
+The same pattern adapts to "the K most recent" or "channels the user belongs to" — change `documents.list(...)` and the readiness condition; everything else stays.
 
 ## Data Modeling Decisions
 
@@ -882,14 +937,17 @@ await client.documents.updatePermissions(documentId, {
 });
 
 // By email — resolves if the user exists, otherwise creates a deferred grant
-// that auto-applies at signup. Use createInvitation (not updatePermissions) for
-// the email path.
-await client.documents.createInvitation(
-  documentId,
-  "alice@example.com",
-  "read-write",
-  { sendEmail: true, documentUrl: `${window.location.origin}/lists` }
-);
+// that auto-applies when the recipient signs up. `documentUrl` is required
+// when `sendEmail: true`.
+await client.documents.updatePermissions(documentId, {
+  email: "alice@example.com",
+  permission: "read-write",
+  sendEmail: true,
+  documentUrl: `${window.location.origin}/lists`,
+});
+// Returns either a DirectPermissionGrant (existing user) or a
+// DeferredPermissionGrant ({ invitationId, inviteToken, ... }) that the
+// recipient redeems via client.invitations.accept(inviteToken) after signup.
 
 // With a group
 await client.documents.grantGroupPermission(documentId, {
@@ -1037,30 +1095,40 @@ await jsBaoClient.documents.getPermissions(documentId);
 await jsBaoClient.documents.listGroupPermissions(documentId);
 await jsBaoClient.documents.listPendingInvitations(documentId);
 
-// Mutate access
+// Mutate access — by user id
 await jsBaoClient.documents.updatePermissions(documentId, {
   userId, permission: "read-write",
 });
 await jsBaoClient.documents.updatePermissions(documentId, {
   permissions: [{ userId, permission: "reader" }, ...],
 });
+
+// Mutate access — by email (single canonical entry point for sharing).
+// Resolves to a direct grant if the user exists, or a deferred grant
+// (carrying invitationId + inviteToken) if not. `documentUrl` is REQUIRED
+// when sendEmail is true.
+await jsBaoClient.documents.updatePermissions(documentId, {
+  email: "user@example.com",
+  permission: "read-write",
+  sendEmail: true,
+  documentUrl: `${origin}/lists`,
+  note: "...",
+});
+
+// Remove access — by user id or email
 await jsBaoClient.documents.removePermission(documentId, userId);
-// Cancel a pending email invitation:
-await jsBaoClient.documents.removePermission(documentId, { email });
+await jsBaoClient.documents.removePermission(documentId, { email }); // also cancels a pending deferred grant
 await jsBaoClient.documents.transferOwnership(documentId, newOwnerId);
 
+// Group access
 await jsBaoClient.documents.grantGroupPermission(documentId, {
   groupType, groupId, permission: "read-write",
 });
 await jsBaoClient.documents.revokeGroupPermission(documentId, groupType, groupId);
 
-// Email invitations — `documentUrl` is REQUIRED when sendEmail is true
-await jsBaoClient.documents.createInvitation(
-  documentId, "user@example.com", "read-write",
-  { sendEmail: true, documentUrl: `${origin}/lists`, note: "..." }
-);
-await jsBaoClient.documents.acceptInvitation(documentId);
-await jsBaoClient.documents.declineInvitation(documentId, invitationId);
+// Recipient redeems a deferred grant (after signup or in a different session)
+// using the inviteToken returned from updatePermissions.
+await client.invitations.accept(inviteToken);
 
 // Access requests (when caller has no access yet)
 await jsBaoClient.documents.requestAccess(documentId, {

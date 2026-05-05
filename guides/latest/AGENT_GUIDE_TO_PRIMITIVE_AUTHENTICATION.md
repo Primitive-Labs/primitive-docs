@@ -20,9 +20,8 @@ const config = await client.getAuthConfig();
 // {
 //   appId, name, mode, waitlistEnabled,
 //   googleOAuthEnabled, googleClientId, hasOAuth, redirectUris,
-//   passkeyEnabled, passkeyRpId, passkeyRpName, hasPasskey,
+//   passkeyEnabled, passkeyRpId, passkeyRpName, passkeyRpConfig, hasPasskey,
 //   magicLinkEnabled, otpEnabled
-//   // also: passkeyRpConfig (multi-RP map) returned by the server
 // }
 
 if (config.hasOAuth) showGoogleButton();
@@ -31,7 +30,20 @@ if (config.otpEnabled) showOtpForm();
 if (config.hasPasskey) showPasskeyButton();
 ```
 
-`hasOAuth` is true when Google OAuth is enabled (the flag defaults to enabled when both `googleClientId` and the server-side `googleClientSecret` are configured). `hasPasskey` requires `passkeyEnabled` plus either the new `passkeyRpConfig` map or both legacy `passkeyRpId` and `passkeyRpName`. `magicLinkEnabled` and `otpEnabled` default to `true` unless explicitly disabled in the Admin Console.
+`hasOAuth` is true when Google OAuth is enabled (the flag defaults to enabled when both `googleClientId` and the server-side `googleClientSecret` are configured). `hasPasskey` requires `passkeyEnabled` plus a non-empty `passkeyRpConfig` map. `magicLinkEnabled` and `otpEnabled` default to `true` unless explicitly disabled in the Admin Console.
+
+### Passkey RP config (`passkeyRpConfig`)
+
+`passkeyRpConfig` is a map keyed by RP ID (a bare domain — no protocol, no port, no path), with each value `{ name: string }`. One app can register passkeys against several origins (e.g. `app.example.com` and `staging.example.com`):
+
+```jsonc
+"passkeyRpConfig": {
+  "app.example.com":     { "name": "Example" },
+  "staging.example.com": { "name": "Example (staging)" }
+}
+```
+
+`getAuthConfig()` returns the effective map. Configure passkeys via `passkeyRpConfig`.
 
 ---
 
@@ -47,6 +59,8 @@ if (hasOAuth) {
 ```
 
 `startOAuthFlow` throws `Error("OAuth not configured")` if `oauthRedirectUri` was not passed to `initializeClient`. The browser navigates away — code after the call doesn't run on success.
+
+**`autoOAuth` client option.** Pass `autoOAuth: true` (with `oauthRedirectUri`) to `initializeClient` and the client will auto-redirect to OAuth whenever it comes back online without a valid token (e.g. a refresh failed, or there was no persisted token). For apps where OAuth is the only sign-in path this avoids hand-rolling the "no token, send to login" branch. Leave it off if you have multiple sign-in methods or want to render your own login screen first.
 
 Optional second argument supports waitlist enrollment and invite-token acceptance:
 
@@ -133,6 +147,8 @@ if (magicToken) {
 
 The query param name is **`magic_token`** (not `token`, `magicToken`, or `code`).
 
+The callback URL may also carry `?purpose=login-add-passkey`. The server appends this when the link was sent for an existing user the platform thinks should add a passkey (e.g. they signed in via OTP/magic-link but have no passkey on file). The `magicLinkVerify` call itself is unchanged — apps that read `purpose` from the URL can use it as a hint to route the user to passkey registration after sign-in instead of straight to the home screen.
+
 To accept an invitation server-side at verify time (so the deferred grant resolves to the signing-in user even when emails differ), pass `inviteToken`:
 
 ```typescript
@@ -195,7 +211,9 @@ try {
 }
 ```
 
-The exported `AUTH_CODES` constant covers: `ADDED_TO_WAITLIST`, `INVITATION_REQUIRED`, `DOMAIN_NOT_ALLOWED`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `PASSKEY_NOT_ENABLED`, `MAGIC_LINK_NOT_ENABLED`, `WAITLIST_ENTRY_UPDATED`, `INVITE_TOKEN_INVALID`, `INVITE_TOKEN_EXPIRED`, `INVITE_ALREADY_ACCEPTED`. The server may also return `RATE_LIMITED`, `OTP_MAX_ATTEMPTS`, `OTP_NOT_ENABLED`, and `RESERVED_EMAIL_FOR_ADMIN` — compare those as string literals.
+The exported `AUTH_CODES` constant covers: `ADDED_TO_WAITLIST`, `INVITATION_REQUIRED`, `DOMAIN_NOT_ALLOWED`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `PASSKEY_NOT_ENABLED`, `MAGIC_LINK_NOT_ENABLED`, `WAITLIST_ENTRY_UPDATED`, `INVITE_TOKEN_INVALID`, `INVITE_TOKEN_EXPIRED`, `INVITE_ALREADY_ACCEPTED`. The server may also return `RATE_LIMITED`, `OTP_MAX_ATTEMPTS`, and `RESERVED_EMAIL_FOR_ADMIN` — compare those as string literals.
+
+> **Caveat on `OTP_NOT_ENABLED`.** The constant is defined and exported, but the OTP request endpoint currently returns a plain 400 with the message `"OTP authentication is not enabled for this app"` and **no `code` field** when OTP is disabled. Don't rely on switching on `OTP_NOT_ENABLED` to detect that case — gate the OTP UI on `getAuthConfig().otpEnabled` up front instead.
 
 The same `AuthError` codes apply to `magicLinkRequest`/`magicLinkVerify` and `passkey*` methods.
 
@@ -223,9 +241,23 @@ import { startRegistration } from "@simplewebauthn/browser";
 const { options, challengeToken } = await client.passkeyRegisterStart();
 const credential = await startRegistration({ optionsJSON: options });
 
-await client.passkeyRegisterFinish(credential, challengeToken, "MacBook Pro");
-// Optional 4th arg: { inviteToken } for invite acceptance during registration.
+const result = await client.passkeyRegisterFinish(
+  credential,
+  challengeToken,
+  "MacBook Pro",
+  { inviteToken: tokenFromEmail } // optional — accepts an invite during registration
+);
+// {
+//   success: true,
+//   credentialBackedUp?: boolean,           // present when the authenticator advertises BE/BS bits
+//   invitation?: {                          // present only if inviteToken was supplied AND accepted
+//     invitationId: string,
+//     grantsResolved: { groups: number, documents: number },
+//   }
+// }
 ```
+
+When `inviteToken` is supplied and the invitation resolves successfully, the `invitation` field reports how many deferred grants (group memberships + document permissions) were resolved to the new user — useful for a post-registration confirmation toast (e.g. "Joined 2 groups, 3 documents").
 
 **Don't:**
 
@@ -262,7 +294,13 @@ client.on("auth-failed", ({ message, reason }) => {
 
 // Token applied successfully (login, refresh, or OAuth callback).
 client.on("auth-success", ({ token, previousToken, cause }) => {
-  // cause: "oauthCallback" | "magicLinkVerify" | "otpVerify" | "passkeyAuth" | "manual" | ...
+  // cause names the operation that produced the token. Stable values:
+  //   Sign-in:    "oauthCallback" | "magicLinkVerify" | "otpVerify" | "passkeyAuth"
+  //   Refresh:    "httpRefresh" | "ws-challenge" | "bootstrap:refresh" | "backoff-retry"
+  //   Lifecycle:  "persisted-hydrate" | "ws-handshake" | "auto-network:online"
+  //               | "networkMode:online" | "http-request"
+  //   Manual:     "manual"
+  // Treat unknown values as a generic success — the set may grow.
 });
 
 // Came back online without a valid token. Show sign-in.

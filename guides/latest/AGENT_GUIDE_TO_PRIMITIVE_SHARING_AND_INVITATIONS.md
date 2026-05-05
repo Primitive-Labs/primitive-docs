@@ -61,8 +61,8 @@ The deferred types make email-based sharing work — the platform remembers the 
 ### API surface
 
 ```typescript
-client.invitations.create({ email, role });            // -> AppInvitationInfo
-client.invitations.list({ limit?, cursor? });          // -> { items, cursor? }   (admin/owner only)
+client.invitations.create({ email, role?, expiresAt?, source?, note?, sendEmail? }); // -> AppInvitationInfo
+client.invitations.list({ limit?, cursor? });          // -> { items: AppInvitationInfo[], cursor? }   (admin/owner only)
 client.invitations.delete(invitationId);               // CASCADES to deferred grants
 client.invitations.quota();                            // -> { used, limit, remaining, unlimited }
 client.invitations.get(invitationId);                  // -> AppInvitationInfo (includes inviteToken + status)
@@ -70,6 +70,8 @@ client.invitations.accept(inviteToken);                // authenticated cross-id
 client.invitations.listDeferredGrants({ email?, type?, limit? });  // admin debug only
 client.invitations.revokeDeferredGrant(deferredId, "document" | "group");
 ```
+
+`AppInvitationInfo` items returned by `list()` carry: `invitationId`, `email`, `role`, `invitedBy`, `invitedAt`, `expiresAt`, `accepted`, `acceptedAt`, `source`, `note`, `inviteToken`. The `status` field (`"pending" | "expired" | "accepted"`) is computed server-side and only returned by `get()`, not by `list()` — derive it on the client from `accepted` + `expiresAt` if you need it on a list row.
 
 The cascading delete is `client.invitations.delete(id)` — there is **no `client.invitations.revoke()`**.
 
@@ -80,6 +82,19 @@ The cascading delete is `client.invitations.delete(id)` — there is **no `clien
 await client.invitations.create({
   email: "alice@example.com",
   role: "member", // or "admin" / "owner" (admin/owner only)
+});
+
+// Full options
+await client.invitations.create({
+  email: "alice@example.com",
+  role: "member",
+  expiresAt: new Date(Date.now() + 7 * 86400_000).toISOString(), // optional override
+  source: "team-onboarding-flow",   // optional audit attribution (≤64 chars)
+  note: "Backend hire — Q2 cohort", // optional, surfaces in admin UI
+  sendEmail: true,                   // server-default: false. When true, the
+                                     //   server delivers a default invitation
+                                     //   email; otherwise the caller is
+                                     //   expected to deliver the inviteToken.
 });
 
 // Members: only when memberInvitationsEnabled is true on the app, and only role: "member"
@@ -104,7 +119,7 @@ The client surfaces server errors as `Error("HTTP <status>: <jsonBody>")`. Parse
 | Plain text `"User already has a pending invitation"` | Duplicate create for the same email |
 | Plain text `"User already exists in this app"` | Email is already an `AppUser` |
 
-> **Footgun:** the field is `error`, not `code`. Older docs and the access-request endpoints use `code`. Don't unify.
+> **Footgun:** error bodies on this endpoint use `error`. The access-request endpoints use `code`. Don't conflate the two — read the field name that matches the endpoint you called.
 
 ### Custom invitation emails (`inviteToken`)
 
@@ -129,7 +144,7 @@ const acceptUrl = `${myApp.baseUrl}/invite/accept?inviteToken=${inv.inviteToken}
 await myEmailService.send({ to: inv.email, link: acceptUrl });
 ```
 
-Permissions for `invitations.get`: app admin/owner, OR the invitation's original inviter. Members who did not create the invitation receive 403 — `inviteToken` is a bearer credential, so read access is intentionally narrow. Legacy invitations without a token are lazily upgraded on first read.
+Permissions for `invitations.get`: app admin/owner, OR the invitation's original inviter. Members who did not create the invitation receive 403 — `inviteToken` is a bearer credential, so read access is intentionally narrow.
 
 ### Token-based acceptance (authenticated caller)
 
@@ -454,7 +469,7 @@ await client.me.bookmarks.remove(key);
 
 1. **Use hierarchical `key`s.** `projects/acme/q2-planning` is better than `q2-planning` because prefix queries let you organize folders cheaply. The field on the request is `key`; the server stores it as `userDefinedKey`.
 
-2. **Use `client.me.sharedDocuments()` for "shared with me" UI.** Resolves access via every path (direct, group, pending legacy invitation). Filtering bookmarks for this is wrong (misses unbookmarked shares) and expensive.
+2. **Use `client.me.sharedDocuments()` for "shared with me" UI.** Resolves access via every path (direct, group, pending invitation). Filtering bookmarks for this is wrong (misses unbookmarked shares) and expensive.
 
 3. **Auto-bookmarks happen server-side** on document creation and on certain accept paths. Don't double-create from the client.
 

@@ -93,7 +93,7 @@ Use when each workspace is a sharing unit and every member of that workspace nee
 name = "listMyTasks"
 type = "query"
 modelName = "tasks"
-access = "isMemberOf('team', database.metadata.teamId)"
+access = "isMemberOf('team', database.celContext.teamId)"
 definition = '{"filter":{"assigneeId":"$user.userId"},"sort":{"createdAt":-1},"limit":50}'
 ```
 
@@ -102,7 +102,7 @@ const db = await client.databases.create({
   title: "Alpha",
   databaseType: "project",
 });
-await client.databases.updateMetadata(db.databaseId, { teamId: "team-1" });
+await client.databases.updateCelContext(db.databaseId, { teamId: "team-1" });
 
 const result = await client.databases.executeOperation(
   db.databaseId,
@@ -163,7 +163,7 @@ Documents only. One document per workspace. Owner shares with teammates via grou
 ### Classroom / LMS (mixed)
 
 - **Documents** for student work being actively drafted with teacher feedback (collaborative editing, offline drafting).
-- **Database** (`type: "classroom"`, one per class) for assignments, grades, roster. Operations like `submitWork` (`access: "params.studentId == user.userId"`) and `gradeSubmission` (`access: "isMemberOf('teacher', database.metadata.classId)"`) enforce per-role visibility. Triggers stamp `submittedAt`, `gradedBy`.
+- **Database** (`type: "classroom"`, one per class) for assignments, grades, roster. Operations like `submitWork` (`access: "params.studentId == user.userId"`) and `gradeSubmission` (`access: "isMemberOf('teacher', database.celContext.classId)"`) enforce per-role visibility. Triggers stamp `submittedAt`, `gradedBy`.
 
 ### Multi-tenant SaaS / project management
 
@@ -191,17 +191,29 @@ Each database is one DO. Split by tenant, project, or domain. Don't put everythi
 Registered operations are the only sane way to expose database data to end users:
 
 - Name them like API endpoints (`listTasks`, `createTask`, `tasksByStatus`).
-- Start `access` restrictive (`isMemberOf('team', database.metadata.teamId)`), widen as needed.
-- Use `$user.userId`, `$params.*`, `$database.metadata.*` for substitution; never hardcode user IDs.
+- Start `access` restrictive (`isMemberOf('team', database.celContext.teamId)`), widen as needed.
+- Use `$user.userId`, `$params.*`, `$database.celContext.*` for substitution; never hardcode user IDs.
 - Use `params: { ..., required: false }` to make a single operation accept optional filters instead of declaring `listX` and `listXByY` separately.
 
 ### Use triggers, not client-supplied values, for invariants
 
 `createdAt`, `createdBy`, `modifiedAt`, computed status — all of these belong in `[triggers]`. Even if your client always sets them correctly, a future client (or a malicious one) won't.
 
-### Keep `database.metadata` small and mostly static
+### Never store application state in `database.celContext`
 
-Metadata is capped (~4 KB total, 1 KB per value, 20 keys). Use it as a lookup key — typically a `teamId` or `projectId` — that CEL access rules reference (`isMemberOf('team', database.metadata.teamId)`). For mutable settings users toggle at runtime, store them as a record and read them inside a pipeline (see the settings-record pattern in the Databases guide).
+`celContext` is **only** for values that CEL rules evaluate — typically a stable `teamId` / `projectId` / `tenantId` referenced from an `access` expression like `isMemberOf('team', database.celContext.teamId)`. If a value isn't read by a CEL rule, it does not belong here.
+
+Do **not** put any of the following in `celContext`:
+
+- Application settings or user preferences
+- Feature flags
+- Display names, descriptions, or other UI metadata
+- Mutable runtime state of any kind
+- Anything you might want to update from the client more than once
+
+Why: `celContext` is hard-capped (~4 KB total, 1 KB per value, 20 keys), every change invalidates cached CEL evaluation context, and reads/writes go through an admin-gated path. It is rule-evaluation infrastructure, not a key-value store.
+
+Where the data should live instead: a record inside the database itself. Read it from operations via a pipeline step or `$steps.*` reference, or just query it directly. Records have no size cap (within the per-database limit), can be updated by any caller authorized by the operation's CEL, and don't blow out the rule cache.
 
 ### Use groups for access control, not user-ID checks
 
@@ -221,9 +233,9 @@ Metadata is capped (~4 KB total, 1 KB per value, 20 keys). Use it as a lookup ke
 | Grant `manager` to end users so they can read records | Define registered operations with CEL `access`; `manager`/`owner` are administrative roles only |
 | Use direct record access (`db.connect(...).query(...)`) from end-user clients | Use `client.databases.executeOperation(...)`; direct access requires owner/manager |
 | Switch `setDefaultDocumentId()` repeatedly when the user changes context | Pass `targetDocument` explicitly on each `.save()` |
-| Stash mutable feature flags in `database.metadata` | Store as a record; read via a pipeline `$steps.*` reference |
+| Put any application state in `database.celContext` (settings, flags, UI fields, anything not read by a CEL rule) | Store as a record; read via a pipeline `$steps.*` reference. `celContext` is rule-evaluation infrastructure, not a KV store |
 | Put one giant database for the whole app | One DO per tenant/project/domain |
-| Hardcode IDs in operation `definition` | Use `$user.userId`, `$params.*`, `$database.metadata.*` |
+| Hardcode IDs in operation `definition` | Use `$user.userId`, `$params.*`, `$database.celContext.*` |
 | Trust client-provided `createdAt`, `createdBy`, role fields | Set them with `[triggers]` |
 | One operation per filter combination (`listPosts`, `listPostsByAuthor`, `listPostsByStatus`...) | One operation with `params` declared `required: false` |
 | Make every operation `access: "true"` | Start restrictive (`isMemberOf(...)`, `hasRole(...)`) and widen explicitly |

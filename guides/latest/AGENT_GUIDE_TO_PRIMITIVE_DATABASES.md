@@ -717,20 +717,26 @@ const result = await db.query("tasks", filter, options);
 
 | Operator | Description | Example |
 |----------|-------------|---------|
-| *(exact match)* | Equals a value | `{ status: "active" }` |
+| *(exact match)* | Equals a value (shorthand for `$eq`) | `{ status: "active" }` |
+| `$eq` | Explicit equality | `{ status: { $eq: "active" } }` |
 | `$ne` | Not equal | `{ status: { $ne: "archived" } }` |
 | `$gt` | Greater than | `{ price: { $gt: 10 } }` |
 | `$gte` | Greater than or equal | `{ price: { $gte: 10 } }` |
 | `$lt` | Less than | `{ price: { $lt: 50 } }` |
 | `$lte` | Less than or equal | `{ price: { $lte: 50 } }` |
 | `$in` | Matches any value in array | `{ category: { $in: ["books", "music"] } }` |
+| `$nin` | Matches none of the values in array | `{ status: { $nin: ["archived", "deleted"] } }` |
 | `$startsWith` | String prefix match | `{ name: { $startsWith: "Pro" } }` |
+| `$endsWith` | String suffix match | `{ filename: { $endsWith: ".pdf" } }` |
 | `$containsText` | Full-text search | `{ name: { $containsText: "deluxe" } }` |
 | `$exists` | Field exists (true) or is null/missing (false) | `{ avatar: { $exists: true } }` |
 | `$contains` | StringSet contains a value | `{ tags: { $contains: "featured" } }` |
 | `$all` | StringSet contains all values | `{ tags: { $all: ["featured", "sale"] } }` |
+| `$size` | StringSet element count (number or comparison) | `{ tags: { $size: 3 } }` or `{ tags: { $size: { $gte: 1 } } }` |
 | `$or` | Matches any of the conditions | `{ $or: [{ status: "active" }, { priority: { $gte: 5 } }] }` |
 | `$and` | Matches all conditions (useful when multiple conditions target the same field) | `{ $and: [{ price: { $gte: 10 } }, { price: { $lte: 50 } }] }` |
+
+`$startsWith`, `$endsWith`, and `$containsText` are mutually exclusive on the same field — only one substring operator per field per query.
 
 Multiple filters on different fields are implicitly combined with AND:
 

@@ -73,6 +73,10 @@ await blobs.upload(buf, { filename: file.name, contentType: file.type });
 // Use a blob bucket instead (100 MB cap).
 ```
 
+### Idempotent re-upload
+
+Uploading the same `blobId` twice with **identical** `sha256` and `size` returns 200 with `bytesTransferred: 0` — the server keeps the existing object, so retries from a flaky network are free. Uploading the same `blobId` with **different** bytes (different sha256 or size) returns 409; pick a new `blobId` instead of overwriting. This dedup behavior is what makes `retryWithBackoff`-style upload loops safe.
+
 ### `uploadFile` vs `upload`
 
 Both call the same code path. `uploadFile` returns a slightly trimmed result (`{ blobId, numBytes, bytesTransferred? }`). Prefer `upload`.
@@ -130,6 +134,15 @@ const fresh = await blobs.read(blobId, { as: "text", forceRedownload: true });
 ```
 
 `read` checks the cache first; on a miss it fetches from the server and writes the response into the cache. When offline (`networkMode === "offline"`) and the cache is empty, it throws `"Blob cache unavailable while offline"`.
+
+### Range requests and conditional GETs
+
+The document blob download endpoint supports two HTTP behaviors useful when streaming media or revalidating cached bytes:
+
+- **Range requests.** Send `Range: bytes=START-END` and the server replies with `206 Partial Content` and the requested slice. Out-of-range requests return `416`. This is what `<video>`/`<audio>` elements use to seek; you usually don't issue these manually, but if you build a custom player it works as expected.
+- **Conditional GET.** The server emits an `ETag` (the blob's sha256). Send `If-None-Match: <etag>` on subsequent requests and the server returns `304 Not Modified` with no body when the bytes are unchanged. The browser's HTTP cache honors this automatically when you load the same `downloadUrl(...)` more than once.
+
+Both behaviors are on the document blob path only. Bucket blobs go through signed URLs straight to R2, which has its own range/etag semantics handled by the storage layer.
 
 ---
 

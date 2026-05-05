@@ -32,11 +32,9 @@ All enabled by default. The client automatically emits these lifecycle events:
 | `prompt_started` | `llm` | on | `client.llm.chat()` request begins |
 | `prompt_succeeded` | `llm` | on | `client.llm.chat()` succeeds (records `duration_ms`) |
 | `prompt_failed` | `llm` | on | `client.llm.chat()` fails |
-| `prompt_started` | `gemini` | on | Gemini request begins |
-| `prompt_succeeded` | `gemini` | on | Gemini request succeeds |
-| `prompt_failed` | `gemini` | on | Gemini request fails |
-
-> **Footgun:** Some option names in `analyticsAutoEvents` (`boot`, `firstDocOpen`, `firstDocEdit`, `offlineRecovery`, `serviceWorker`) are accepted by the type but are **no-ops in the current build** — toggling them has no effect. Don't tell users you're tracking events that no longer fire.
+| `prompt_started` | `gemini` | on | Gemini `generate` / `countTokens` / `generateRaw` begins |
+| `prompt_succeeded` | `gemini` | on | Gemini `generate` / `countTokens` / `generateRaw` succeeds |
+| `prompt_failed` | `gemini` | on | Gemini `generate` / `countTokens` / `generateRaw` fails |
 
 ### Server-Side Events
 
@@ -326,6 +324,40 @@ GET /app/{appId}/api/analytics/prompts/top?windowDays=30&limit=10
 ```
 
 > The REST API does **not** expose `users/{userUlid}/timeline`, `users/{userUlid}/events`, `workflows/overview`, `prompts/overview`, or a combined `overview` endpoint. Use the granular endpoints above.
+
+### Filtering events / events-grouped
+
+Both `/analytics/events` and `/analytics/events/grouped` accept up to 10 filter clauses via repeated query parameters of the form `filter[FIELD][OPERATOR]=value`. Values are capped at 200 chars and rejected if they contain control or binary characters (printable Unicode only).
+
+Supported `FIELD`s and the `OPERATOR`s each accepts:
+
+| Field | Operators |
+| --- | --- |
+| `user` | `is`, `contains`, `starts with` |
+| `action` | `is`, `is not`, `contains` |
+| `feature` | `is`, `is not`, `contains` |
+| `route` | `is`, `contains`, `starts with` |
+| `country` | `is`, `is not` |
+| `region` | `is`, `contains` |
+| `city` | `is`, `contains` |
+| `plan` | `is`, `is not` |
+| `deviceType` | `is`, `is not` |
+| `os` | `is`, `is not`, `contains` |
+| `browser` | `is`, `is not`, `contains` |
+| `appVersion` | `is`, `is not`, `contains` |
+
+Example: `?windowDays=7&filter[feature][is]=billing&filter[action][contains]=upgrade`. Unknown fields, unsupported operators, or rejected values are silently dropped.
+
+### Event row shape
+
+Each row from `/analytics/events` includes geographic and per-event metric fields beyond the basic `timestamp` / `user` / `action` / `feature`:
+
+- `region_code`, `region`, `city`, `colo` — derived from the request edge
+- `entity_key` — caller-provided correlation handle (e.g. workflow run id, prompt id)
+- `duration_ms` — for `*_succeeded` / `*_failed` events that record latency
+- `input_tokens`, `output_tokens`, `total_tokens` — populated for `prompt_succeeded` events
+
+These fields are absent (or zero) when the event type doesn't produce them.
 
 ---
 
