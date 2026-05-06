@@ -2846,6 +2846,14 @@ Sub-API for managing document collections.
 
 ***
 
+### collectionTypeConfigs
+
+> **collectionTypeConfigs**: [`CollectionTypeConfigsAPI`](../interfaces/CollectionTypeConfigsAPI.md)
+
+Sub-API for managing collection type configurations.
+
+***
+
 ### cronTriggers
 
 > **cronTriggers**: [`CronTriggersAPI`](../interfaces/CronTriggersAPI.md)
@@ -2859,6 +2867,14 @@ Sub-API for managing cron triggers (workflow schedulers).
 > **databases**: [`DatabasesAPI`](../interfaces/DatabasesAPI.md)
 
 Sub-API for managing databases.
+
+***
+
+### databaseTypeConfigs
+
+> **databaseTypeConfigs**: [`DatabaseTypeConfigsAPI`](../interfaces/DatabaseTypeConfigsAPI.md)
+
+Sub-API for managing database type configurations.
 
 ***
 

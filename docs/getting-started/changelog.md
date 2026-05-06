@@ -4,6 +4,22 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao-wss-client v1.4.4 — 2026-05-06
+
+- **Default group / collection create is now permissive.** With no custom `GroupTypeConfig` / `CollectionTypeConfig`, any signed-in member can create their own group or collection; `edit` and `delete` remain creator-only. Apps that need admin-gated creation must now opt in by attaching a rule set whose `create` rule checks `hasRole('admin')`.
+- Group rule-set operation `group.list` is renamed to `group.get` (single-resource read), parallel to the earlier `collection.list` → `collection.get` rename. Existing rule sets keep working via a backward-compat alias, but newly authored TOML rule sets must use `get` for the `group` category. The `member.list` key is unchanged.
+- New `client.collectionTypeConfigs` and `client.databaseTypeConfigs` SDK sub-APIs give surface parity with the existing `client.groupTypeConfigs` for managing per-type rule-set bindings.
+- `client.collections.listDocuments(collectionId)` now returns full document metadata (title, createdBy, lastModified, tags, effective permission) in a single round-trip — no more N+1 follow-up `documents.get` per row.
+- Record-route hardening: the 14 direct record HTTP routes (`POST records/{save,query,patch,delete,count,batch,aggregate,increment,stringset/*}` plus 4 GET introspection routes) are now manager+ only. Member-role callers must go through `databases.executeOperation(databaseId, operationName, params)` — the operation's `access` CEL is the authorization point. Apps already using the registered-operations pattern need no change.
+- Collection member removal now broadcasts a `docMetadata` access-lost frame, so open WebSocket sessions evict immediately instead of silently retaining the YjsRoom connection.
+- Accept-invite failures (bad / expired / already-accepted token) collapse to a uniform `401 INVITE_TOKEN_INVALID` response so the response shape no longer leaks whether a token exists.
+
+## js-bao v0.4.2 — 2026-05-06
+
+- v2 codegen now auto-promotes `auto_assign = true` `id` fields to `required = true` so the generated attribute interface merges cleanly with `BaseModel` (no more TS2320 declaration-merge clashes).
+- The `allModels` array exported by the generated `index.ts` barrel is now typed as `Array<typeof BaseModel>` instead of `unknown[]`, so you can pass it straight to `JsBaoClient.models` without an `as` cast.
+
+
 ## primitive-app v2.1.7 (patch) — 2026-05-04
 
 - The project template now uses a TOML-based model definition approach: declare models in `src/models/models.toml` and run `npx js-bao-codegen-v2` to generate typed TypeScript classes — no manual `defineModelSchema` or `getJsBaoConfig` wiring needed.

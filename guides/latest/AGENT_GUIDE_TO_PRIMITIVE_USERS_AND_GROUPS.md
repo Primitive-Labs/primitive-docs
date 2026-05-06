@@ -405,7 +405,7 @@ primitive sync push --dir ./config
 
 **Defaults & gotchas:**
 - `autoAddCreator` defaults to `true` **only when a `GroupTypeConfig` row exists** for the type. With **no config row at all**, no auto-add happens.
-- A group type with **no config** (or config with no `ruleSetName`) is **admin/owner-only** for non-admins — `groups.create`/`update`/`delete`/`addMember` all return 403, and `groups.list` filters that type out for member-role callers. Attach a rule set to make the type usable by regular members.
+- A group type with **no config** (or config with no `ruleSetName`) falls back to a built-in default rule set: any signed-in member can `create` a group of that type; `edit` and `delete` are gated to the creator (`user.userId == group.createdBy`); `member.create/edit/delete` are creator-only. Override by attaching a custom rule set to lock the type down or open it up further.
 
 See the [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md#configuring-with-the-cli) for the full sync workflow (`init`, `pull`, `diff`, `push`).
 
@@ -527,9 +527,13 @@ access: "has(database.metadata.teamId) && isMemberOf('team', database.metadata.t
 
 Rule sets control who can manage groups (`category: "group"`) and group members (`category: "member"`). Each `(category, operation)` pair holds a CEL expression evaluated against the requesting user and the target group.
 
-**Valid operations** for both categories: `create`, `edit`, `delete`, `list`. There is no `read` or `update` — use `edit`. There is no `add` — use `create` (for member.create = "add member").
+**Valid operations:**
+- `category: "group"` — `create`, `edit`, `delete`, `get` (the read op was renamed from `list` to `get` to match the single-resource controller method; rule sets persisted before the rename keep working via a `get` → `list` alias, but new TOML configs must use `get`).
+- `category: "member"` — `create`, `edit`, `delete`, `list`.
 
-**Important: a group type with NO rule set defaults to admin/owner-only.** For non-admins, `groups.list()` skips groups whose type has no `ruleSetId`, and all mutations are denied. To make a group type usable by regular members, attach a rule set.
+There is no `read` or `update` — use `edit`. There is no `add` — use `create` (for `member.create` = "add member").
+
+**Default rule set:** A group type with no config (or a config without `ruleSetName`) falls back to built-in defaults: `group.create = "true"` (any signed-in member can create), `group.edit/delete = "user.userId == group.createdBy"` (creator only), and `member.create/edit/delete` are creator-only. Apps that need stricter (or looser) policy install a custom rule set whose defined ops always win.
 
 ### Defining a rule set
 
@@ -547,7 +551,7 @@ description = "Controls who can manage team groups and members"
 create = "true"                                               # any signed-in member can create a team
 edit   = "isMemberOf(group.groupType, group.groupId)"         # only members can rename
 delete = "user.userId == group.createdBy"                     # only the creator can delete
-list   = "isMemberOf(group.groupType, group.groupId)"         # only members see the team in list
+get    = "isMemberOf(group.groupType, group.groupId)"         # only members see the team in list
 
 [rules.member]
 create = "isMemberOf(group.groupType, group.groupId)"         # any member can invite
@@ -607,7 +611,7 @@ list = "target.userId != user.userId"
 # BAD — referencing group.description (not in the context).
 edit = "group.description != ''"
 
-# BAD — typo: operations are `create/edit/delete/list`, not `update/read`.
+# BAD — typo: group ops are `create/edit/delete/get`, not `update/read`.
 [rules.group]
 update = "true"
 read   = "true"
@@ -615,7 +619,7 @@ read   = "true"
 # GOOD — same intent with valid operations.
 [rules.group]
 edit = "true"
-list = "true"
+get  = "true"
 ```
 
 ### Testing rules
@@ -625,7 +629,7 @@ Test a rule set with a simulated request (returns `{ allowed, expression?, conte
 ```typescript
 const result = await client.ruleSets.test(ruleSetId, {
   category: "group",                    // "group" or "member" for resourceType: "group"
-  operation: "create",                  // "create" | "edit" | "delete" | "list"
+  operation: "create",                  // group: "create" | "edit" | "delete" | "get"; member: "create" | "edit" | "delete" | "list"
   user: { userId: "user-123", role: "member" },
   memberships: [{ groupType: "team", groupId: "engineering" }],  // optional
   group: {                                                       // required for non-create when group context is needed
