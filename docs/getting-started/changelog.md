@@ -4,6 +4,11 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao-wss-client v1.4.5 (patch) — 2026-05-07
+
+- Maintenance release shipped as part of a production deploy. No public API changes versus v1.4.3 / v1.4.4 — existing client code continues to work without modification.
+- `js-bao-wss-client@^1.4.5` is the version paired with the latest server deploy; bump your peer dependency if you want to stay on the most recently deployed release.
+
 ## primitive-app v2.1.7 (patch) — 2026-05-04
 
 - The project template now uses a TOML-based model definition approach: declare models in `src/models/models.toml` and run `npx js-bao-codegen-v2` to generate typed TypeScript classes — no manual `defineModelSchema` or `getJsBaoConfig` wiring needed.
