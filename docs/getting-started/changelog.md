@@ -4,6 +4,10 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao-wss-client v1.4.5 (patch) — 2026-05-07
+
+- The legacy per-document invitation methods on `client.documents` — `createInvitation`, `listInvitations`, `getInvitation`, `updateInvitation`, `deleteInvitation`, `acceptInvitation`, and `declineInvitation` — are now deprecated. Calling any of them emits a one-time `logger.warn` per `DocumentsAPI` instance; the methods continue to function unchanged. Migrate to `client.documents.updatePermissions({ email, ... })` for granting access, `client.documents.removePermission({ email })` for revoking, `client.documents.listPendingInvitations(documentId)` for pending shares, and `client.invitations.get(invitationId)` for direct invitation lookup. See issue #619.
+
 ## js-bao-wss-client v1.4.5 — 2026-05-07
 
 - `client.documents.updatePermissions({ email, sendEmail: true, ... })` now actually delivers a share email when the recipient is not yet an app member. The deferred-grant branch previously dropped the email; the flag is now honored end-to-end so the same `sendEmail` toggle works for both existing-member and pending-signup recipients.
