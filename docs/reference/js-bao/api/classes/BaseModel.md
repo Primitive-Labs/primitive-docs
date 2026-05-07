@@ -359,6 +359,31 @@ const urgentCounts = await Model.aggregate({
 
 ***
 
+### attachStringSetObserversToRecord()
+
+> `protected` `static` **attachStringSetObserversToRecord**(`recordYMap`, `schema`): `void`
+
+Walk the schema's stringset fields on `recordYMap` and observe any nested
+Y.Map values. Called from observer setup and from the parent observer body
+so newly-arrived stringset Y.Maps (local migration or remote create) get
+an observer too.
+
+#### Parameters
+
+##### recordYMap
+
+`YMap`\<`any`\>
+
+##### schema
+
+`any`
+
+#### Returns
+
+`void`
+
+***
+
 ### buildAggregationQuery()
 
 > `protected` `static` **buildAggregationQuery**(`options`, `schema`, `modelName`): `AggregationQueryPlan`
@@ -739,6 +764,27 @@ Data migration is now handled during document initialization.
 ### notifyListeners()
 
 > `protected` `static` **notifyListeners**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
+### observeStringSetMapOnce()
+
+> `protected` `static` **observeStringSetMapOnce**(`nestedMap`): `void`
+
+Attach a one-shot observer to a nested-Y.Map stringset field. Calls
+notifyListeners() when the nested map's keys change (i.e. when a remote
+member arrives via Y.applyUpdate, or a local per-member set/delete).
+Idempotent — re-calling on the same Y.Map is a no-op.
+
+#### Parameters
+
+##### nestedMap
+
+`YMap`\<`any`\>
 
 #### Returns
 

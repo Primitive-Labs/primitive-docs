@@ -541,6 +541,14 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/CollectionsAPI"
                 },
                 {
+                  "text": "CollectionTypeConfigInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CollectionTypeConfigInfo"
+                },
+                {
+                  "text": "CollectionTypeConfigsAPI",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CollectionTypeConfigsAPI"
+                },
+                {
                   "text": "ConfirmApplyOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/ConfirmApplyOptions"
                 },
@@ -553,8 +561,16 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/CreateBlobBucketParams"
                 },
                 {
+                  "text": "CreateCollectionTypeConfigParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CreateCollectionTypeConfigParams"
+                },
+                {
                   "text": "CreateCronTriggerParams",
                   "link": "/reference/js-bao-wss-client/api/interfaces/CreateCronTriggerParams"
+                },
+                {
+                  "text": "CreateDatabaseTypeConfigParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/CreateDatabaseTypeConfigParams"
                 },
                 {
                   "text": "CreateInvitationParams",
@@ -623,6 +639,14 @@
                 {
                   "text": "DatabaseSubscribeOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseSubscribeOptions"
+                },
+                {
+                  "text": "DatabaseTypeConfigInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseTypeConfigInfo"
+                },
+                {
+                  "text": "DatabaseTypeConfigsAPI",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseTypeConfigsAPI"
                 },
                 {
                   "text": "DeferredDocumentGrant",
@@ -1061,8 +1085,16 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/TriggerDefInfo"
                 },
                 {
+                  "text": "UpdateCollectionTypeConfigParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/UpdateCollectionTypeConfigParams"
+                },
+                {
                   "text": "UpdateCronTriggerParams",
                   "link": "/reference/js-bao-wss-client/api/interfaces/UpdateCronTriggerParams"
+                },
+                {
+                  "text": "UpdateDatabaseTypeConfigParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/UpdateDatabaseTypeConfigParams"
                 },
                 {
                   "text": "UserProfile",
