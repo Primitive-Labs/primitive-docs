@@ -4,6 +4,10 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## primitive-app v2.1.7 (patch) — 2026-05-07
+
+- Tracks `js-bao-wss-client@^1.4.5` and `js-bao@^0.4.2` as the verified dev/test target — install the latest of both alongside `primitive-app` to pick up the v1.4.5 share-email and deferred-invitation fixes (see the js-bao-wss-client v1.4.5 entry below).
+
 ## js-bao-wss-client v1.4.5 — 2026-05-07
 
 - `client.documents.updatePermissions({ email, sendEmail: true, ... })` now actually delivers a share email when the recipient is not yet an app member. The deferred-grant branch previously dropped the email; the flag is now honored end-to-end so the same `sendEmail` toggle works for both existing-member and pending-signup recipients.
