@@ -4,6 +4,12 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao-wss-client v1.4.5 — 2026-05-07
+
+- `client.documents.updatePermissions({ email, sendEmail: true, ... })` now actually delivers a share email when the recipient is not yet an app member. The deferred-grant branch previously dropped the email; the flag is now honored end-to-end so the same `sendEmail` toggle works for both existing-member and pending-signup recipients.
+- New `document-share-deferred` email type — non-members invited via document share now receive a dedicated template that carries the tokenized accept URL alongside document context, separate from the `document-share` template used for existing members. Customize it the same way as other built-in templates (`primitive email-templates set document-share-deferred ...`).
+- Pending-invitation reuse is now safe across expiry — when a deferred grant or group add reuses an existing pending `AppInvitation`, the platform renews the `invitationToken` and pushes `expiresAt` out 30 days if the invitation has already lapsed. The `invitationId` is preserved, so existing deferred rows linked to it keep resolving correctly.
+
 ## js-bao-wss-client v1.4.4 — 2026-05-06
 
 - **Default group / collection create is now permissive.** With no custom `GroupTypeConfig` / `CollectionTypeConfig`, any signed-in member can create their own group or collection; `edit` and `delete` remain creator-only. Apps that need admin-gated creation must now opt in by attaching a rule set whose `create` rule checks `hasRole('admin')`.
