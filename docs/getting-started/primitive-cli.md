@@ -373,27 +373,40 @@ primitive analytics integrations
 
 ## Test Users for Automated Testing
 
-For integration tests and local dev, the CLI can issue short-lived tokens for test users without going through the normal email flow. Test accounts use the `+primitive` email alias convention:
+For integration tests and local dev, Primitive supports a `+primitivetest` OTP bypass gated by a per-app whitelist. Configure the whitelist with `primitive apps update`:
 
 ```bash
-# Issue a 30-minute test token for a user (creates the user if needed, for a test-mode app)
-primitive test-users login alice+primitive@example.com
+# Authorize one or more base emails to derive +primitivetest test accounts
+primitive apps update --test-account-bases alice@example.com,bob@example.com
+
+# Inspect the current whitelist (along with other app settings)
+primitive apps show
+
+# Clear the whitelist — pass an empty string
+primitive apps update --test-account-bases ''
 ```
+
+The list is capped at 50 base emails per app, and a base cannot itself be a `+primitivetest` derivative. The whitelist is re-checked on every request, so removing a base immediately revokes its derived sessions.
+
+Each whitelisted base authorizes unlimited derived addresses of the form `<base-local>+primitivetest<suffix>@<base-domain>`. From the test side, sign in via the normal OTP flow using the magic code `000000`:
 
 ```typescript
 // In an integration test
-const token = await runCli("test-users login alice+primitive@example.com");
-client.auth.setToken(token);
+await client.otpRequest("alice+primitivetest-teacher@example.com");
+await client.otpVerify("alice+primitivetest-teacher@example.com", "000000");
+// client is now authenticated; the access token expires in 30 minutes
 ```
+
+The derived account must already exist as an `AppUser` in this app — invite it ahead of time or seed it as part of test setup. The bypass never auto-provisions.
 
 Guardrails:
 
-- **Env-gated.** The bypass only works against a server running in test mode. Production servers reject it.
-- **30-minute tokens.** Tokens expire after 30 minutes regardless of your normal session length.
-- **Regular-user scope.** The bypass cannot mint admin tokens.
-- **Requires an invitation.** The user still needs a valid `AppInvitation` for the app.
+- **Per-app whitelist.** Apps without a whitelist have no bypass at all.
+- **30-minute tokens** with a `primitiveBypass: true` claim, re-checked per request against the whitelist.
+- **Member scope only.** `+primitivetest*` cannot hold admin/owner privileges or receive invitations to those roles — boundary calls return `RESERVED_EMAIL_FOR_ADMIN`.
+- **AppUser must exist.** The derived account has to be an existing member of the app.
 
-Use this for automated tests and local development. Do not use it in staging or production workflows. See [Authentication](./authentication.md#test-user-sign-in-for-automated-testing) for more.
+Use this for automated tests and local development. See [Authentication](./authentication.md#test-user-sign-in-for-automated-testing) for the security model in detail.
 
 ## Scripting
 
