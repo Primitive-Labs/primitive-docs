@@ -36,7 +36,7 @@ Before using most commands, you need to authenticate:
 primitive login
 ```
 
-This opens your browser for OAuth authentication. Once complete, your credentials are stored locally at `~/.primitive/credentials.json`.
+This opens your browser for OAuth authentication. Tokens are stored per-environment so dev and prod can stay signed in independently — see [Project Configuration and Environments](#project-configuration-and-environments) below for where they land.
 
 To check your current authentication status:
 
@@ -52,52 +52,90 @@ primitive logout
 
 ## Project Configuration and Environments
 
-Primitive CLI config is **project-scoped**. When you run `primitive init` or any CLI command in a project directory, the CLI creates a `.primitive/config.json` alongside your code. Check this file into version control — it's shared with your team and ensures everyone targets the same apps.
+Primitive CLI config is **project-scoped**. When you run `primitive init` or any CLI command inside a directory containing `.primitive/config.json` (the CLI walks up from the current working directory looking for it), the CLI operates against the named environments declared in that file.
 
 ```
 my-app/
 ├── .primitive/
-│   └── config.json      # project-scoped, checked into git
+│   ├── config.json         # committed — environment definitions
+│   └── credentials.json    # gitignored — per-environment tokens
 ├── src/
 └── package.json
 ```
 
-Your personal credentials stay in `~/.primitive/credentials.json` — never in the project config, never checked in.
+Two files, two purposes:
+
+- **`.primitive/config.json`** is committable. It defines named environments and an optional default. Your whole team targets the same apps because the file is checked in.
+- **`.primitive/credentials.json`** is gitignored. It holds the per-environment access/refresh tokens written by `primitive login`. Never check it in.
+
+Outside a project directory (no `.primitive/config.json` found by walking up from cwd), the CLI falls back to a user-scope config at `~/.primitive/credentials.json` driven by `primitive use <app>`. Most teams never need this — see [User-Scope Fallback](#user-scope-fallback) below.
 
 ### Named Environments
 
-A single project usually targets multiple backends — a development app for day-to-day coding, a staging app for QA, a production app for your customers. `.primitive/config.json` supports **named environments** for each:
+A single project usually targets multiple backends — a development app for day-to-day coding, a staging app for QA, a production app for your customers. Each environment in `.primitive/config.json` binds an `apiUrl` and an `appId` together so "which server" and "which app" always travel as one unit:
 
-```bash
-# Create environments for each backend
-primitive env create dev --app "My App (Dev)"
-primitive env create staging --app "My App (Staging)"
-primitive env create prod --app "My App (Prod)"
-
-# Switch environments
-primitive env use dev
-
-# List
-primitive env list
-
-# Show which environment is active
-primitive env current
+```json
+{
+  "version": 1,
+  "defaultEnvironment": "dev",
+  "environments": {
+    "dev":  { "apiUrl": "http://localhost:8787",       "appId": "app_..." },
+    "prod": { "apiUrl": "https://api.primitive.com",   "appId": "app_..." }
+  }
+}
 ```
 
-Once set, every subsequent command (including `primitive sync push`, `primitive workflows list`, etc.) uses the active environment's app.
+Manage environments with the `env` subcommands:
 
-### Per-Command Override
+```bash
+# Create an environment (auto-creates .primitive/config.json if missing)
+primitive env add dev  --api-url http://localhost:8787      --app-id app_dev123
+primitive env add prod --api-url https://api.primitive.com  --app-id app_prod456
 
-Pass `--env <name>` to override for a single command without switching the default:
+# List all environments and inspect one
+primitive env list
+primitive env show prod
+
+# Set the default environment for this project
+primitive env use dev
+
+# Delete an environment (also clears its credential slot, so re-adding the
+# same name later cannot reuse stale tokens)
+primitive env remove staging
+```
+
+`--app-id` is optional. If you omit it, the environment pins only an `apiUrl` and the app is chosen per-session via `primitive use <appId>`.
+
+### How the Active Environment Is Resolved
+
+Every command resolves an active environment in this order — the first match wins:
+
+1. **`--env <name>` flag** on the command itself
+2. **`PRIMITIVE_ENV` environment variable** (handy for CI)
+3. **`defaultEnvironment`** in `.primitive/config.json` (set by `primitive env use`)
+4. **The only environment defined** — if there is exactly one, it's used automatically
+5. Otherwise the CLI errors and asks you to choose
+
+So in CI you can do:
+
+```bash
+PRIMITIVE_ENV=prod primitive sync push
+```
+
+…or override per-command without changing the default:
 
 ```bash
 primitive workflows runs list --env staging
-primitive sync push --dir ./config --env prod
+primitive sync push --env prod
 ```
 
-### Ad-Hoc App Context
+### Switching Apps Inside a Project
 
-For one-off shells outside a project directory, `primitive use` sets an active app in your user config without touching any `.primitive/config.json`:
+There is no global "currently active app" in project mode. The active app is whatever the resolved environment's `appId` says it is. To point an environment at a different app, edit `.primitive/config.json` (or run `primitive env add` again to overwrite). `primitive use <appId>` is a no-op when the resolved environment already pins an `appId` — for environments that omit `appId`, `use` still sets a per-session override.
+
+### User-Scope Fallback
+
+For one-off shells with no `.primitive/config.json` anywhere up the directory tree, the CLI uses a global config at `~/.primitive/credentials.json` and an active app set by `primitive use`:
 
 ```bash
 primitive use "My App"

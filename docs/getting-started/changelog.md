@@ -114,7 +114,7 @@ A large cumulative release across invitations, sharing, server-side automation, 
 
 **CLI**
 
-- Project-scoped config with named environments — `.primitive/config.json` lives in your project. New `primitive env` commands (`create`, `use`, `list`, `delete`, `rename`) for dev/staging/prod environments.
+- Project-scoped config with named environments — `.primitive/config.json` (committed) declares per-environment `apiUrl` + `appId` pairs and an optional `defaultEnvironment`; `.primitive/credentials.json` (gitignored) holds per-environment tokens. New `primitive env` commands (`add`, `list`, `show`, `use`, `remove`) for dev/staging/prod, with active-env resolution via `--env` → `PRIMITIVE_ENV` → `defaultEnvironment`.
 - Test user sign-in — `+primitivetest<suffix>` OTP bypass for automated testing, gated by a per-app `testAccountBaseEmails` whitelist (`primitive apps update --test-account-bases …`, max 50). Verify with the magic code `000000` to receive a 30-minute token with a `primitiveBypass` claim that is re-checked on every request. The derived account must already exist as an `AppUser`; `+primitivetest*` is reserved at admin/role/invitation boundaries.
 
 **Fixes and performance**
