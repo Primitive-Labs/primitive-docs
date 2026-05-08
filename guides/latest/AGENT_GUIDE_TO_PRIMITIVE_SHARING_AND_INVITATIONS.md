@@ -188,6 +188,15 @@ await client.documents.updatePermissions(documentId, {
 
 Optional fields on either form: `sendEmail`, `documentUrl`, `note`.
 
+When `sendEmail: true`, the server delivers per-recipient emails:
+
+- **Existing app members** receive the `document-share` template, populated with the caller-supplied `documentUrl`.
+- **Non-members (deferred grants)** receive the `document-share-deferred` template, populated with an accept URL composed from `app.baseUrl` + the new `inviteToken` (shape `${app.baseUrl}/invite/accept?inviteToken=...`).
+
+Both branches share two preconditions when `sendEmail: true`: `documentUrl` must be supplied in the request, and the app must have `baseUrl` configured (so the deferred branch can compose its accept URL). Either missing returns HTTP 400 (`"documentUrl is required when sendEmail is true"` or `"Cannot send share email: app baseUrl is not configured"`). Customize either email type with `primitive email-templates set document-share ...` or `primitive email-templates set document-share-deferred ...`.
+
+Repeated email-based calls are idempotent: a second `updatePermissions(documentId, { email })` with the same email updates the existing pending `DeferredDocumentPermission` in place rather than creating a duplicate row, so the latest `permission` value wins at signup-time resolution and `client.documents.listPendingInvitations(documentId)` shows one entry per pending recipient.
+
 **There is no `permission: null` to remove.** Removal is a separate call:
 
 ```typescript

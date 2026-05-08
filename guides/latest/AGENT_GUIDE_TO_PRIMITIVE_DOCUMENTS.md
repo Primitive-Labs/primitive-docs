@@ -937,8 +937,10 @@ await client.documents.updatePermissions(documentId, {
 });
 
 // By email — resolves if the user exists, otherwise creates a deferred grant
-// that auto-applies when the recipient signs up. `documentUrl` is required
-// when `sendEmail: true`.
+// that auto-applies when the recipient signs up. With `sendEmail: true`,
+// `documentUrl` is required AND the app must have `baseUrl` configured
+// (used to compose the accept URL for the deferred-share email). Both
+// preconditions return HTTP 400 if missing.
 await client.documents.updatePermissions(documentId, {
   email: "alice@example.com",
   permission: "read-write",
@@ -948,6 +950,9 @@ await client.documents.updatePermissions(documentId, {
 // Returns either a DirectPermissionGrant (existing user) or a
 // DeferredPermissionGrant ({ invitationId, inviteToken, ... }) that the
 // recipient redeems via client.invitations.accept(inviteToken) after signup.
+// With `sendEmail: true`, existing members get the `document-share` email
+// (using your `documentUrl`); non-members get the `document-share-deferred`
+// email (using `app.baseUrl` + the `inviteToken` for the accept URL).
 
 // With a group
 await client.documents.grantGroupPermission(documentId, {
@@ -1105,8 +1110,12 @@ await jsBaoClient.documents.updatePermissions(documentId, {
 
 // Mutate access — by email (single canonical entry point for sharing).
 // Resolves to a direct grant if the user exists, or a deferred grant
-// (carrying invitationId + inviteToken) if not. `documentUrl` is REQUIRED
-// when sendEmail is true.
+// (carrying invitationId + inviteToken) if not. With `sendEmail: true`:
+// `documentUrl` is REQUIRED AND `app.baseUrl` must be configured (the
+// deferred branch uses it to compose the accept URL). Both preconditions
+// return HTTP 400 if missing. Repeated calls with the same email are
+// idempotent — an existing pending DeferredDocumentPermission for the
+// same (documentId, email) is updated in place, not duplicated.
 await jsBaoClient.documents.updatePermissions(documentId, {
   email: "user@example.com",
   permission: "read-write",
@@ -1186,7 +1195,7 @@ const access = await client.collections.getAccess(collection.collectionId);
 // → { groups: [...], members: [...] }
 ```
 
-For per-context CEL rules using `collectionType` + `contextId`, see the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md).
+For per-context CEL rules using `collectionType` + `contextId` (and the `hasCollectionAccess` helper), see [Rule Sets for Collection Management](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md#rule-sets-for-collection-management) in the Users and Groups guide.
 
 **CLI:**
 

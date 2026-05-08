@@ -59,10 +59,10 @@ Admins and owners are always exempt from the quota.
 Members check their quota before showing an invite UI:
 
 ```typescript
-const quota = await client.invitations.getQuota();
+const quota = await client.invitations.quota();
 // { used: 2, limit: 5, remaining: 3, unlimited: false }
 
-if (quota.remaining > 0) {
+if (quota.unlimited || quota.remaining > 0) {
   showInviteButton();
 }
 ```
@@ -98,7 +98,7 @@ const acceptUrl = `https://myapp.example/invite/accept?inviteToken=${invitation.
 await myEmailService.send({ to: invitation.email, link: acceptUrl });
 ```
 
-The same `inviteToken` is also surfaced inline on the deferred entries returned by `client.documents.setPermissions({ email })` and `client.groups.addMember({ email })`, so the same custom-email pattern works for share-by-email and add-to-group flows. To look up the token for an existing invitation later — e.g. on a "resend invite" button — use:
+The same `inviteToken` is also surfaced inline on the deferred entries returned by `client.documents.updatePermissions({ email })` and `client.groups.addMember({ email })`, so the same custom-email pattern works for share-by-email and add-to-group flows. To look up the token for an existing invitation later — e.g. on a "resend invite" button — use:
 
 ```typescript
 const token = await client.invitations.getAcceptToken(invitationId);
@@ -148,9 +148,10 @@ Documents are private by default. You share them by granting a permission level 
 ### Share by User ID
 
 ```typescript
-await client.documents.setPermissions(documentId, [
-  { userId: "user-abc", permission: "read-write" },
-]);
+await client.documents.updatePermissions(documentId, {
+  userId: "user-abc",
+  permission: "read-write",
+});
 ```
 
 ### Share by Email
@@ -158,32 +159,37 @@ await client.documents.setPermissions(documentId, [
 The most common case — you have a colleague's email but don't know (or care) whether they've signed up yet:
 
 ```typescript
-await client.documents.setPermissions(documentId, [
-  { email: "alice@example.com", permission: "read-write" },
-]);
+await client.documents.updatePermissions(documentId, {
+  email: "alice@example.com",
+  permission: "read-write",
+});
 ```
 
 Two paths:
 
 1. **Existing user** — the server resolves the email to a userId and grants access immediately.
-2. **Non-member** — the server creates an invitation (if one doesn't exist) and remembers the pending share. The recipient receives a share email. When they sign up with that email, the share is applied automatically.
+2. **Non-member** — the server creates an invitation (if one doesn't exist) and remembers the pending share. The recipient receives a share email when `sendEmail: true` is passed (existing members get the `document-share` template; non-members get the `document-share-deferred` template, which carries a tokenized accept URL composed from `app.baseUrl`). When they sign up with that email, the share is applied automatically. Repeated calls for the same recipient are idempotent — the latest `permission` value wins and only one pending entry is tracked.
 
 Batch shares can mix both forms:
 
 ```typescript
-await client.documents.setPermissions(documentId, [
-  { userId: "user-abc", permission: "read-write" },
-  { email: "alice@example.com", permission: "reader" },
-  { email: "bob@example.com", permission: "read-write" },
-]);
+await client.documents.updatePermissions(documentId, {
+  permissions: [
+    { userId: "user-abc", permission: "read-write" },
+    { email: "alice@example.com", permission: "reader" },
+    { email: "bob@example.com", permission: "read-write" },
+  ],
+});
 ```
+
+When you set `sendEmail: true`, you also need `documentUrl` in the request and `app.baseUrl` configured on the app — the server uses both to compose the share/accept links.
 
 ### Share with a Group
 
 Grant document access to everyone in a group. When group membership changes, access updates automatically:
 
 ```typescript
-await client.documents.setGroupPermission(documentId, {
+await client.documents.grantGroupPermission(documentId, {
   groupType: "team",
   groupId: "engineering",
   permission: "read-write",
@@ -193,8 +199,8 @@ await client.documents.setGroupPermission(documentId, {
 ### Checking Who a Document Is Shared With
 
 ```typescript
-const users = await client.users.lookup({ email: "alice@example.com" });
-// Returns the user record if they're in the app, or null.
+const result = await client.users.lookup("alice@example.com");
+// { exists: true, user: { userId, name, email } } | { exists: false }
 ```
 
 See [Working with Documents](./working-with-documents.md) for document fundamentals.
@@ -437,9 +443,11 @@ Document:
 
 ```typescript
 // Existing user — by userId
-await client.documents.setPermissions(documentId, [
-  { userId, permission: null },
-]);
+await client.documents.removePermission(documentId, userId);
+
+// By email — removes a current member if one matches, OR cancels the
+// pending deferred share for that email if no direct grant exists.
+await client.documents.removePermission(documentId, { email: "alice@example.com" });
 ```
 
 Group:
@@ -461,8 +469,8 @@ A typical "invite a teammate and share a project with them" flow:
 
 ```typescript
 // 1. Member (quota-checked) invites a teammate
-const quota = await client.invitations.getQuota();
-if (quota.remaining <= 0) return showUpgradePrompt();
+const quota = await client.invitations.quota();
+if (!quota.unlimited && quota.remaining <= 0) return showUpgradePrompt();
 
 await client.invitations.create({
   email: "newhire@example.com",
@@ -470,9 +478,10 @@ await client.invitations.create({
 });
 
 // 2. Share the project document with them (pending until signup)
-await client.documents.setPermissions(projectDocId, [
-  { email: "newhire@example.com", permission: "read-write" },
-]);
+await client.documents.updatePermissions(projectDocId, {
+  email: "newhire@example.com",
+  permission: "read-write",
+});
 
 // 3. Also add them to the engineering group (pending until signup)
 await client.groups.addMember("team", "engineering", {

@@ -140,7 +140,8 @@ Grant document access to an entire group instead of individual users:
 
 ```typescript
 // Share a document with a group
-await client.documents.setGroupPermission(documentId, {
+await client.documents.grantGroupPermission(documentId, {
+  groupType: "team",
   groupId: "engineering-team",
   permission: "read-write",
 });
@@ -150,16 +151,16 @@ All members of the group receive the specified permission level. When membership
 
 ## Groups and Databases
 
-Use CEL functions to check group membership in database operation access expressions:
+Use CEL functions to check group membership in database operation access expressions. The platform exposes three group-related helpers: `isMemberOf(groupType, groupId)` (two args, strict match), `memberGroups(groupType)` (returns the array of `groupId`s the caller belongs to), and `hasRole(role)` (checks the caller's app role — `"owner"`, `"admin"`, or `"member"`).
 
 ```toml
-# Only team members can access
-access = "isMemberOf('engineering')"
+# Only members of the engineering team
+access = "isMemberOf('team', 'engineering')"
 
-# Only group admins
-access = "hasGroupRole('engineering', 'admin')"
+# App-level admins or owners
+access = "hasRole('admin') || hasRole('owner')"
 
-# Members of any team in the "team" group type
+# Members of any team
 access = "size(memberGroups('team')) > 0"
 ```
 
@@ -167,46 +168,51 @@ access = "size(memberGroups('team')) > 0"
 
 **Team-based workspace access:**
 ```toml
-# Users can only see records belonging to their teams
-access = "isMemberOf(params.teamId)"
+# Users can only see records for teams they belong to
+access = "params.teamId in memberGroups('team')"
 params = [{ name = "teamId", type = "TEXT", required = true }]
 ```
 
-**Role-based access:**
+**Role-based access (read vs. write):**
 ```toml
-# Managers can edit, members can view
-# (use separate operations for read vs. write)
+# App admins can edit; team members can view.
+# Group-level "admin" isn't a built-in concept — model it as a separate
+# group type (e.g. groupType: "team-admin") and check membership there.
 [[types.operations]]
 name = "update-settings"
-access = "hasGroupRole(params.teamId, 'admin')"
+access = "hasRole('admin') || hasRole('owner') || isMemberOf('team-admin', params.teamId)"
 
 [[types.operations]]
 name = "view-settings"
-access = "isMemberOf(params.teamId)"
+access = "isMemberOf('team', params.teamId)"
 ```
 
 **Organization hierarchy:**
 ```toml
-# Parent org admins can manage child teams
-access = "hasGroupRole(params.orgId, 'admin') || hasGroupRole(params.teamId, 'admin')"
+# Member of either the parent org or the team can access
+access = "isMemberOf('org', params.orgId) || isMemberOf('team', params.teamId)"
 ```
 
 ## Rule Sets
 
-Database operations use CEL expressions (like `isMemberOf('engineering')`) to control who can run a specific query or mutation. Rule sets serve a different purpose — they control who can perform **management operations** on platform resources like groups, documents, workflows, and database types.
+Database operations use CEL expressions (like `isMemberOf('team', 'engineering')`) to control who can run a specific query or mutation. Rule sets serve a different purpose — they control who can perform **management operations** on platform resources like groups, collections, and database types.
 
 For example, a rule set can define who is allowed to add or remove members from a group, or who can create new groups of a certain type:
 
 ```bash
-primitive rule-sets create --name "team-management" \
-  --entity-type "group" \
+primitive rule-sets create "team-management" \
+  --resource-type group \
   --rules '{
-    "group": { "create": "true", "edit": "hasGroupRole(group.groupType, '\''admin'\'')", "delete": "hasGroupRole(group.groupType, '\''admin'\'')" },
-    "member": { "create": "isMemberOf(group.groupType, group.groupId)", "edit": "hasGroupRole(group.groupType, '\''admin'\'')", "delete": "hasGroupRole(group.groupType, '\''admin'\'')" }
+    "group":  { "create": "true",                                                     "edit": "user.userId == group.createdBy", "delete": "user.userId == group.createdBy" },
+    "member": { "create": "isMemberOf(group.groupType, group.groupId)",               "edit": "user.userId == group.createdBy", "delete": "user.userId == group.createdBy" }
   }'
 ```
 
-Rule sets are versioned and include built-in testing and debugging tools — you can evaluate rules against simulated requests before deploying them.
+Bind the rule set to a group type via a `GroupTypeConfig` — declare it in `config/group-type-configs/<type>.toml` and run `primitive sync push --dir ./config`, or call `client.groupTypeConfigs.create({ groupType, ruleSetId })` from the SDK. Collection rule sets work the same way — use `--resource-type collection` and bind via `client.collectionTypeConfigs` (or `config/collection-type-configs/<type>.toml`).
+
+App owners and admins bypass rule-set evaluation entirely; rules apply to regular members. Group types with no config row fall back to permissive built-in defaults (any member can `create`; the creator can `edit`/`delete` and manage members; the creator and direct members can read). To **deny** an op for everyone except admins/owners, attach a rule set with that op set to `"false"` (or omit the rule set entirely on a `GroupTypeConfig` row to use that row as an explicit opt-out).
+
+Rule sets are versioned and include built-in testing and debugging tools — you can evaluate rules against simulated requests with `client.ruleSets.test()` before deploying them.
 
 ## Best Practices
 
@@ -214,7 +220,7 @@ Rule sets are versioned and include built-in testing and debugging tools — you
 
 2. **Define group types for each category.** Use separate group types for teams, roles, departments — this keeps your access control expressions clean.
 
-3. **Prefer group membership checks over user ID checks.** `isMemberOf('admin')` is more maintainable than `userId == 'specific-admin-id'`.
+3. **Prefer group membership checks over user ID checks.** `isMemberOf('team', params.teamId)` is more maintainable than `userId == 'specific-admin-id'`.
 
 ## Next Steps
 

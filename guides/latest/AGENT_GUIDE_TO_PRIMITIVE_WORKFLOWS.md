@@ -311,7 +311,7 @@ htmlBody = "<p>Download: {{ outputs.upload.signedUrl }}</p>"
 textBody = "Download: {{ outputs.upload.signedUrl }}"
 ```
 
-`to` is a single address (string), not an array. Built-in templates: `magic-link`, `otp`, `document-share`, `waitlist-invite`, `waitlist-signup-notification`, `admin-invite`, `app-invite`, `access-request-created`, `access-request-resolved`. Register custom types with `primitive email-templates set <type>`. Hourly rate limit: 100 emails per app per hour (`workflowEmailByApp` in `src/config/rate-limits.ts`).
+`to` is a single address (string), not an array. Built-in templates: `magic-link`, `otp`, `document-share`, `document-share-deferred`, `waitlist-invite`, `waitlist-signup-notification`, `admin-invite`, `app-invite`, `access-request-created`, `access-request-resolved`. Register custom types with `primitive email-templates set <type>`. Hourly rate limit: 100 emails per app per hour (`workflowEmailByApp` in `src/config/rate-limits.ts`).
 
 ### `blob.upload` / `blob.download` / `blob.signedUrl`
 

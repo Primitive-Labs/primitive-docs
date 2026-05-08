@@ -14,7 +14,7 @@
 
 ## Methods
 
-### acceptInvitation()
+### ~~acceptInvitation()~~
 
 > **acceptInvitation**(`documentId`): `Promise`\<[`DocumentAccessResult`](DocumentAccessResult.md)\>
 
@@ -31,6 +31,16 @@ The unique identifier of the document whose invitation to accept
 #### Returns
 
 `Promise`\<[`DocumentAccessResult`](DocumentAccessResult.md)\>
+
+#### Deprecated
+
+The per-document accept concept has been removed. Document shares to existing users
+take effect immediately via [documents.updatePermissions](#updatepermissions) —
+no accept call is needed. For not-yet-registered users, deferred grants resolve when the
+recipient accepts the app-level invitation via
+[client.invitations.accept](../classes/JsBaoClient.md#invitations)(inviteToken). The `inviteToken` is
+provided in the deferred-grant response of `documents.updatePermissions` on the inviter side,
+not via any invitee-callable on `documents.*`.
 
 ***
 
@@ -238,7 +248,7 @@ Options for document creation
 
 ***
 
-### createInvitation()
+### ~~createInvitation()~~
 
 > **createInvitation**(`documentId`, `email`, `permission`, `options?`): `Promise`\<[`DocumentInvitationResponse`](DocumentInvitationResponse.md)\>
 
@@ -290,6 +300,17 @@ If true, sends an email notification to the invitee
 
 `Promise`\<[`DocumentInvitationResponse`](DocumentInvitationResponse.md)\>
 
+#### Deprecated
+
+Use [documents.updatePermissions](#updatepermissions)(documentId, { email, permission, sendEmail, documentUrl, note }).
+`updatePermissions` returns `DirectPermissionGrant | DeferredPermissionGrant` — for not-yet-registered emails
+the deferred branch carries `invitationId` + `inviteToken`. The legacy method writes to the per-document
+`DocumentInvitation` model, which is invisible to [listPendingInvitations](#listpendinginvitations).
+
+#### See
+
+[DocumentsAPI.updatePermissions](#updatepermissions)
+
 ***
 
 ### ~~createOffline()~~
@@ -339,7 +360,7 @@ The created document's `documentId`, `title`, `createdBy`, timestamps, and the a
 
 ***
 
-### declineInvitation()
+### ~~declineInvitation()~~
 
 > **declineInvitation**(`documentId`, `invitationId`): `Promise`\<\{ `message`: `string`; `success`: `boolean`; \}\>
 
@@ -362,6 +383,14 @@ The identifier of the specific invitation to decline
 #### Returns
 
 `Promise`\<\{ `message`: `string`; `success`: `boolean`; \}\>
+
+#### Deprecated
+
+No invitee-side decline verb. Pending invitations expire automatically, so a
+recipient who hasn't accepted can simply ignore the invite. To remove yourself from an
+already-accepted share, call
+[documents.removePermission](#removepermission)(documentId, &#123; userId: &lt;your userId&gt; &#125;).
+See issue #619.
 
 ***
 
@@ -391,7 +420,7 @@ Options for document deletion
 
 ***
 
-### deleteInvitation()
+### ~~deleteInvitation()~~
 
 > **deleteInvitation**(`documentId`, `invitationId`): `Promise`\<\{ `message`: `string`; `success`: `boolean`; \}\>
 
@@ -414,6 +443,17 @@ The identifier of the specific invitation to delete
 #### Returns
 
 `Promise`\<\{ `message`: `string`; `success`: `boolean`; \}\>
+
+#### Deprecated
+
+Use [documents.removePermission](#removepermission)(documentId, { email })
+to cancel a pending grant by email, or [client.invitations.delete](../classes/JsBaoClient.md#invitations)(invitationId)
+for app-level cancel.
+
+#### See
+
+ - [DocumentsAPI.removePermission](#removepermission)
+ - `client.invitations.delete`
 
 ***
 
@@ -580,7 +620,7 @@ The unique identifier of the document to check permissions for
 
 ***
 
-### getInvitation()
+### ~~getInvitation()~~
 
 > **getInvitation**(`documentId`, `email`): `Promise`\<[`DocumentInvitation`](DocumentInvitation.md) \| `null`\>
 
@@ -603,6 +643,17 @@ The email address of the invitee to look up
 #### Returns
 
 `Promise`\<[`DocumentInvitation`](DocumentInvitation.md) \| `null`\>
+
+#### Deprecated
+
+Use [client.invitations.get](../classes/JsBaoClient.md#invitations)(invitationId) for direct
+lookup, or [documents.listPendingInvitations](#listpendinginvitations)(documentId)
+filtered by email.
+
+#### See
+
+ - `client.invitations.get`
+ - [DocumentsAPI.listPendingInvitations](#listpendinginvitations)
 
 ***
 
@@ -970,7 +1021,7 @@ Optional list options. Set `includeSystem` to `true` to
 
 ***
 
-### listInvitations()
+### ~~listInvitations()~~
 
 > **listInvitations**(`documentId`): `Promise`\<[`DocumentInvitation`](DocumentInvitation.md)[]\>
 
@@ -987,6 +1038,17 @@ The unique identifier of the document whose invitations to list
 #### Returns
 
 `Promise`\<[`DocumentInvitation`](DocumentInvitation.md)[]\>
+
+#### Deprecated
+
+Use [documents.listPendingInvitations](#listpendinginvitations)(documentId).
+Note: `listPendingInvitations` reads only `DeferredDocumentPermission`. Documents that received
+legacy invitations via [createInvitation](#createinvitation) are stored in the
+per-document `DocumentInvitation` model and will not appear in `listPendingInvitations`.
+
+#### See
+
+[DocumentsAPI.listPendingInvitations](#listpendinginvitations)
 
 ***
 
@@ -1521,7 +1583,7 @@ The document metadata fields to update
 
 ***
 
-### updateInvitation()
+### ~~updateInvitation()~~
 
 > **updateInvitation**(`documentId`, `email`, `permission`, `options?`): `Promise`\<[`DocumentInvitationResponse`](DocumentInvitationResponse.md)\>
 
@@ -1572,6 +1634,15 @@ If true, sends an email notification about the updated permission
 #### Returns
 
 `Promise`\<[`DocumentInvitationResponse`](DocumentInvitationResponse.md)\>
+
+#### Deprecated
+
+Use [documents.updatePermissions](#updatepermissions)(documentId, { email, permission, ... }).
+`updatePermissions` is idempotent — re-calling with the same email updates the existing grant.
+
+#### See
+
+[DocumentsAPI.updatePermissions](#updatepermissions)
 
 ***
 

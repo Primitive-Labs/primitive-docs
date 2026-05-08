@@ -441,7 +441,7 @@ const db = await client.databases.get(databaseId);
 Alongside direct permission grants, a database can be shared with an entire group using `DatabaseGroupPermission`. This mirrors the document-sharing model:
 
 ```typescript
-await client.databases.setGroupPermission(databaseId, {
+await client.databases.grantGroupPermission(databaseId, {
   groupType: "team",
   groupId: "engineering",
   permission: "manager",

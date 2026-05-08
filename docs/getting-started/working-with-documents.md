@@ -350,17 +350,19 @@ Share a document by user ID, by email (grant resolves at signup if they aren't a
 
 ```typescript
 // By user ID
-await client.documents.setPermissions(documentId, [
-  { userId: "user-abc", permission: "read-write" },
-]);
+await client.documents.updatePermissions(documentId, {
+  userId: "user-abc",
+  permission: "read-write",
+});
 
 // By email — works whether or not the recipient is a member yet
-await client.documents.setPermissions(documentId, [
-  { email: "colleague@example.com", permission: "read-write" },
-]);
+await client.documents.updatePermissions(documentId, {
+  email: "colleague@example.com",
+  permission: "read-write",
+});
 
 // With a group
-await client.documents.setGroupPermission(documentId, {
+await client.documents.grantGroupPermission(documentId, {
   groupType: "team",
   groupId: "engineering",
   permission: "read-write",

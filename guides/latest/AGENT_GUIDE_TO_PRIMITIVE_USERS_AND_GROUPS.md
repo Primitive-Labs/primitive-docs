@@ -405,7 +405,8 @@ primitive sync push --dir ./config
 
 **Defaults & gotchas:**
 - `autoAddCreator` defaults to `true` **only when a `GroupTypeConfig` row exists** for the type. With **no config row at all**, no auto-add happens.
-- A group type with **no config** (or config with no `ruleSetName`) falls back to a built-in default rule set: any signed-in member can `create` a group of that type; `edit` and `delete` are gated to the creator (`user.userId == group.createdBy`); `member.create/edit/delete` are creator-only. Override by attaching a custom rule set to lock the type down or open it up further.
+- A group type with **no config row** falls back to built-in default rules. Per-op fallback also applies: when a configured rule set leaves a `(category, op)` pair undefined, that op resolves against the defaults too. The defaults: `group.create = "true"` (any signed-in member); `group.edit/delete` and `member.create/edit/delete` are creator-only (`user.userId == group.createdBy`); `group.get` and `member.list` allow the creator OR any direct group member (`isMemberOf(group.groupType, group.groupId)`).
+- A `GroupTypeConfig` row with no `ruleSetName` (`ruleSetId: null`) is an **explicit opt-out** and denies everything except admin/owner; it does NOT fall through to defaults. To re-enable defaults, delete the config row entirely.
 
 See the [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md#configuring-with-the-cli) for the full sync workflow (`init`, `pull`, `diff`, `push`).
 
@@ -533,7 +534,20 @@ Rule sets control who can manage groups (`category: "group"`) and group members 
 
 There is no `read` or `update` — use `edit`. There is no `add` — use `create` (for `member.create` = "add member").
 
-**Default rule set:** A group type with no config (or a config without `ruleSetName`) falls back to built-in defaults: `group.create = "true"` (any signed-in member can create), `group.edit/delete = "user.userId == group.createdBy"` (creator only), and `member.create/edit/delete` are creator-only. Apps that need stricter (or looser) policy install a custom rule set whose defined ops always win.
+**Default rule set:** A group type with no `GroupTypeConfig` row falls back to built-in defaults:
+
+| Op | Default | Meaning |
+|----|---------|---------|
+| `group.create` | `"true"` | Any signed-in member |
+| `group.edit` | `user.userId == group.createdBy` | Creator only |
+| `group.delete` | `user.userId == group.createdBy` | Creator only |
+| `group.get` | `user.userId == group.createdBy \|\| isMemberOf(group.groupType, group.groupId)` | Creator or direct member |
+| `member.create` | `user.userId == group.createdBy` | Creator only |
+| `member.edit` | `user.userId == group.createdBy` | Creator only |
+| `member.delete` | `user.userId == group.createdBy` | Creator only |
+| `member.list` | `user.userId == group.createdBy \|\| isMemberOf(group.groupType, group.groupId)` | Creator or direct member |
+
+Per-op fallback applies — when a configured rule set defines some ops but leaves others undefined, the missing ops still resolve against this table. Apps that need stricter (or looser) policy install a custom rule set whose defined ops always win. A `GroupTypeConfig` row with no rule set attached (`ruleSetId: null`) is an explicit opt-out and denies everything except admin/owner — it does NOT fall through to these defaults.
 
 ### Defining a rule set
 
@@ -659,6 +673,79 @@ const debug = await client.ruleSets.debug({
 ```
 
 To update rule sets, edit the TOML file and run `primitive sync push --dir ./config`.
+
+## Rule Sets for Collection Management
+
+Collections (see the [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#collections)) use the same rule-set pipeline as groups — a `CollectionTypeConfig` row binds a `collectionType` to a rule set, and per-op fallback resolves missing ops against the built-in defaults. The CEL namespace is `collection.*` (separate from `group.*`), and an extra helper `hasCollectionAccess(collectionId)` is available only inside collection rule sets.
+
+**Resource type:** `collection`. **Categories and operations:**
+
+- `category: "collection"` — `create`, `edit`, `delete`, `get` (the read op was renamed from `list` to `get` for parity with `group.get`; rule sets persisted before the rename keep working via a `get` → `list` alias, but new TOML configs must use `get`).
+- `category: "document"` — `add`, `remove`, `list` (controls which documents the collection can hold).
+- `category: "member"` — `add`, `remove`, `list`.
+
+**Default rule set:** A collection type with no `CollectionTypeConfig` row falls back to:
+
+| Op | Default | Meaning |
+|----|---------|---------|
+| `collection.create` | `"true"` | Any signed-in member |
+| `collection.edit` / `delete` | `user.userId == collection.createdBy` | Creator only |
+| `collection.get` | `user.userId == collection.createdBy \|\| hasCollectionAccess(collection.collectionId)` | Creator or collection member (direct or via `CollectionGroupPermission`) |
+| `document.add` / `remove` | `user.userId == collection.createdBy` | Creator only |
+| `document.list` | `user.userId == collection.createdBy \|\| hasCollectionAccess(collection.collectionId)` | Creator or collection member |
+| `member.add` / `remove` | `user.userId == collection.createdBy` | Creator only |
+| `member.list` | `user.userId == collection.createdBy \|\| hasCollectionAccess(collection.collectionId)` | Creator or collection member |
+
+Per-op fallback applies — configured ops always win, missing ops resolve against this table. A `CollectionTypeConfig` row whose `ruleSetId` is null is an explicit opt-out and denies everything except admin/owner. Self-leave on `member.remove` is currently NOT short-circuited and returns 403 for non-creator readers/writers.
+
+### CEL context for collection rule sets
+
+| Variable | Always present? | Description |
+|----------|-----------------|-------------|
+| `user.userId` | yes | Requesting user's ID |
+| `user.role` | yes | App role (`"owner"` / `"admin"` / `"member"`) |
+| `collection.collectionType` | yes | Collection's type (matches the `CollectionTypeConfig` this rule set is bound to) |
+| `collection.collectionId` | yes (after create) | Collection's ID |
+| `collection.contextId` | yes | Per-instance identifier — parallels `AppGroup.groupId`. Set at create time and immutable. `null` for collections with no context. Use it to express "caller belongs to the group this collection represents." |
+| `collection.name` | yes | Display name |
+| `collection.createdBy` | yes (after create) | userId of the collection's creator |
+| `target.userId` | only `category: "member"`, ops `add` / `remove` | The user being added or removed. Absent for `member.list`. |
+
+Plus the standard CEL functions (`isMemberOf`, `memberGroups`, `hasRole`, `now()`, `fromWorkflow()`) and the collection-only helper:
+
+- `hasCollectionAccess(collectionId)` — true when the caller has direct collection membership (the platform-managed `_col-reader` / `_col-writer` system groups) OR membership in a non-system user-group that holds a `CollectionGroupPermission` of `reader` or `read-write` on the collection. Resolves to `false` outside collection rule sets, and to `false` on `collection.create` (no `collectionId` in scope yet).
+
+### Defining a collection rule set
+
+```toml
+# config/rule-sets/class-reports-rules.toml
+[ruleSet]
+name = "class-reports-rules"
+resourceType = "collection"
+description = "Per-class collections — only members of the class can see/list reports"
+
+[rules.collection]
+create = "isMemberOf('class', collection.contextId)"  # only class members can create their class's collection
+edit   = "user.userId == collection.createdBy"
+delete = "user.userId == collection.createdBy"
+get    = "isMemberOf('class', collection.contextId) || hasCollectionAccess(collection.collectionId)"
+
+[rules.document]
+add    = "isMemberOf('class', collection.contextId)"  # any class member can add reports
+remove = "user.userId == collection.createdBy"
+list   = "isMemberOf('class', collection.contextId) || hasCollectionAccess(collection.collectionId)"
+```
+
+Bind the rule set to a collection type the same way as groups:
+
+```toml
+# config/collection-type-configs/class-reports.toml
+[collectionTypeConfig]
+collectionType = "class-reports"
+ruleSetName    = "class-reports-rules"
+```
+
+Then push with `primitive sync push --dir ./config`. The SDK equivalents are `client.collectionTypeConfigs.{ list, get, create, update, delete }` (parallel to `client.groupTypeConfigs.*`).
 
 ## Common Patterns
 
@@ -817,7 +904,7 @@ await client.groups.addMember("team", "backend", { userId });
 | `addMember` returns `status: "pending_signup"` | Email isn't an app user yet | Expected. Membership resolves when they sign up or accept via `inviteToken`. Render a pending-members UI; cancel via `removeMember({ email })` or `invitations.revokeDeferredGrant(deferredId, "group")`. |
 | `addMember` returns `status: "already_member"` | User already in the group | Idempotent — no error. Replaces the previous HTTP 409 response. |
 | 409 on `groups.create` | A group with that `(groupType, groupId)` already exists | Use a different `groupId` or call `groups.get` first. |
-| 403 on `groups.create` (member role) | Group type has no `ruleSetName`, or the `group.create` rule denied it | Attach a rule set with a permissive `group.create` expression, or call as an owner/admin. |
+| 403 on `groups.create` (member role) | The group type has a `GroupTypeConfig` row with no rule set attached (explicit opt-out), OR a configured `group.create` rule denied the caller | Either delete the `GroupTypeConfig` row to fall back to the permissive default (`group.create = "true"`), attach a rule set with a permissive `group.create`, or call as an owner/admin. |
 | 403 on `groups.create` with `groupType` starting with `_` | Reserved system group type | Pick a different prefix. |
 | Group permission not taking effect on document | User hasn't reopened the document | Close and reopen the document to pick up new group permissions. |
 | CEL `isMemberOf` returns false unexpectedly | Wrong `groupType`/`groupId` casing, user not yet added (deferred), or membership cache stale | Verify with `listUserMemberships(userId)`; remember email-based adds defer until sign-up. |
