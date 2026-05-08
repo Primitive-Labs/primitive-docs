@@ -373,13 +373,18 @@ The `primitive-app` library provides a `PrimitiveDocumentList` component with bu
 
 For the full sharing story — member invitations with quotas, email-based grants, access requests, and bookmarks — see [Sharing and Invitations](./sharing-and-invitations.md).
 
-## Bookmarks
+## Bookmarks — the primary "my documents" view
 
-When a user creates a document, it's automatically added to their bookmarks. Invited users who accept an invitation also get an auto-bookmark. Bookmarks are how users curate their "home screen":
+Bookmarks are how users curate their home screen, and they're the call to reach for when rendering "my documents":
 
 ```typescript
-const { items } = await client.me.bookmarks.list();
+const { bookmarks, nextCursor } = await client.me.bookmarks.list({
+  prefix: "projects/",   // optional hierarchical prefix
+  limit: 50,
+});
 ```
+
+The platform auto-bookmarks documents on creation and on deferred-grant resolution at signup, so apps mostly just need `list` (and `rename`, if you let users reorganize). For documents directly shared with a user (by `userId`) or shared via a group/collection, use `client.me.sharedDocuments()` to surface them as an "inbox" until the user adds them to their bookmarks.
 
 See [Sharing and Invitations](./sharing-and-invitations.md#bookmarks) for the full bookmarks API.
 

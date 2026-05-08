@@ -73,15 +73,15 @@ Attempting to invite over the quota returns a `403 INVITATION_QUOTA_EXCEEDED` er
 Members cannot invite other admins, even when member invitations are enabled. If a member passes `role: "admin"`, the server rejects the request.
 :::
 
-### Listing and Revoking Invitations
+### Listing and Canceling Invitations
 
 ```typescript
 const { items } = await client.invitations.list();
 
-await client.invitations.revoke(invitationId);
+await client.invitations.delete(invitationId);
 ```
 
-Revoking cascades — any pending email-based document shares or group adds attached to the invitation are removed in the same operation.
+`delete` cascades — any pending email-based document shares or group adds attached to the invitation are removed in the same operation. There is no separate `revoke()` method.
 
 ### Sending Your Own Invitation Emails
 
@@ -105,32 +105,7 @@ const token = await client.invitations.getAcceptToken(invitationId);
 // { invitationId, inviteToken, email, expiresAt, accepted, acceptedAt, status }
 ```
 
-### The Invite Acceptance Landing Page
-
-When a recipient clicks an invitation link, your app needs a page at that URL to handle the token. The template ships `InviteAcceptPage.vue` (`src/pages/InviteAcceptPage.vue`), already routed at `/invite/accept?inviteToken=...`, which covers the full flow:
-
-- **Signed-in user** — prompts "Accept with this account or sign out and use a different one." Calls `client.invitations.accept(token)` on confirm, then shows a success screen with how many groups and documents were unlocked.
-- **Signed-out user** — stashes the token in `sessionStorage` and redirects to the login page. After sign-in completes (via any auth method), the pending token is automatically forwarded to the server to resolve deferred grants in the same round-trip. No second click-through needed.
-- **Error states** — expired tokens, already-accepted tokens, and invalid tokens each have their own UI with recovery options.
-
-If you're using the template, this is already wired up. Point your invitation emails at `${yourApp.baseUrl}/invite/accept?inviteToken=${invitation.inviteToken}`.
-
-::: tip Building it yourself
-If you're not using the template, the key is to carry the token across the auth redirect. Stash it in `sessionStorage` before redirecting to login, then pass it to the verification call (`magicLinkVerify`, `otpVerify`, or `passkeyRegisterFinish`) so grants resolve at sign-in. Alternatively, for the signed-in path, call `client.invitations.accept(token)` directly after confirming the user's identity.
-:::
-
-### Accepting an Invitation with a Different Email
-
-A user who already has an account (or who signs up with a *different* email than the one they were invited at) can accept an invitation explicitly using the token:
-
-```typescript
-const result = await client.invitations.accept(inviteToken);
-// { status: "accepted", invitationId, grantsResolved: { groups, documents } }
-```
-
-This is the path for "I was invited at `work@x.com` but I want to accept on my existing `home@y.com` account." The invitation is marked accepted (write-once) and every deferred grant linked to it is bound to the *current* user. The `AppInvitation.acceptedByUserId` field records which user actually accepted, which may differ from the user that owns the invited email.
-
-The classic email-matched signup path still works — `client.invitations.accept(token)` is purely for the cross-identity case.
+For details on what happens when the recipient clicks the link — auto-resolution on email match, explicit accept under a different identity, and the landing-page wiring your app needs (or what the template ships out of the box) — see [How Email-Based Sharing Resolves](#how-email-based-sharing-resolves) below.
 
 
 ## Document Sharing
@@ -229,20 +204,52 @@ See [Users and Groups](./users-and-groups.md) for more on groups.
 
 ## How Email-Based Sharing Resolves
 
-When you share by email to someone who isn't a user yet, Primitive internally records the pending grant and resolves it as soon as the right person redeems the invitation. You don't interact with this machinery directly — the sharing APIs accept emails transparently and the platform handles the rest.
+When you share by email to someone who isn't a user yet, Primitive internally records the pending grant and resolves it as soon as the right person redeems the invitation. The sharing APIs accept emails transparently — the platform handles the rest.
 
-There are two resolution paths, and the platform picks based on what happens first:
+There are two resolution paths. **Apps don't pick which one runs — the recipient does**, by what they click and which email they sign in with.
 
-### Path A — They sign up with the invited email
+### Path A — Sign up with the invited email (automatic)
 
-1. You share a document with `newhire@example.com` at `read-write`.
-2. They receive an app-invitation email.
-3. They sign up with `newhire@example.com` (magic link, OTP, Google, passkey — any method).
-4. On first load, the document is already in their bookmarks and they have `read-write` access. No additional click-through.
+The common case. The user clicks the invite link and signs up using the same email the invitation was sent to:
 
-### Path B — They accept on a different identity
+1. You share a document with `newhire@example.com` at `read-write`. The platform creates an `AppInvitation` + `DeferredDocumentPermission` and sends them an email.
+2. They click the link, land on your app, and sign up using `newhire@example.com` (magic link, OTP, Google, passkey — any method).
+3. The signup flow detects the email match and resolves **every** pending deferred grant linked to that invitation in one transaction — `AppMembership`, `DocumentPermission`, `DocumentGroupPermission`, etc. The document is auto-bookmarked. No `accept` call is needed.
 
-If the recipient already has an account under a different email — say their personal `newhire@gmail.com` — they can sign in there and accept the invitation explicitly with `client.invitations.accept(inviteToken)`. The pending grant binds to *their* userId, even though it was invited at a different email. See [Accepting an Invitation with a Different Email](#accepting-an-invitation-with-a-different-email).
+This is what runs whenever the recipient's signup email matches the invited email. Your app does not need to call `client.invitations.accept(...)` for this case.
+
+### Path B — Accept under a different identity (explicit)
+
+The recipient is signed in (or wants to sign in) under a **different** email than the invitation was sent to — for example, invited at `work@example.com` but signing in with their personal `home@gmail.com` — or they're an **existing user** who wants to bind a fresh deferred grant to their current account. In both cases the platform can't infer intent from the email, so the app calls accept explicitly:
+
+```typescript
+const result = await client.invitations.accept(inviteToken);
+// { status: "accepted", invitationId, grantsResolved: { groups, documents } }
+```
+
+The invitation is marked accepted (write-once) and every deferred grant linked to it is bound to the **currently signed-in user** — regardless of the email the invite was sent to. `AppInvitation.acceptedByUserId` records the user that actually accepted, which may differ from the invited email.
+
+### What your app needs to wire up
+
+The platform composes the invitation URL as `${app.baseUrl}/invite/accept?inviteToken=...` and sends it in the email body. Your app owns the page at `/invite/accept` and decides what happens when someone lands there. The page needs to handle three states:
+
+1. **Signed-in invitee** — show "Accept with this account?", confirm, then call `client.invitations.accept(inviteToken)` and redirect into the app.
+2. **Signed-out invitee** — stash the token in `sessionStorage`, redirect to the login flow, and pass the token through to whichever auth method the user picks (magic link, OTP, passkey, OAuth) so the server resolves grants in the same round-trip — no second click needed after signup.
+3. **Errors** — `INVITE_TOKEN_INVALID`, `INVITE_TOKEN_EXPIRED`, `INVITE_ALREADY_ACCEPTED` each need their own UI. Don't show raw API errors.
+
+The `primitive-app-template` ships a working implementation of all three — `src/pages/InviteAcceptPage.vue` (the landing page) and `src/lib/inviteToken.ts` (the sessionStorage carry-over) wired into `userStore` so each auth method forwards the pending token automatically. **If you're using the template, this is already done — just point your invitation emails at `${yourApp.baseUrl}/invite/accept?inviteToken=${token}`.**
+
+If you're hand-rolling the flow, the steps:
+
+1. Add a route at `/invite/accept` in your app that reads `inviteToken` from the query string.
+2. On mount, branch on signed-in status:
+   - **Signed in:** confirm with the user (so they don't bind grants to the wrong account), then `await client.invitations.accept(inviteToken)`.
+   - **Signed out:** save the token in `sessionStorage` (`primitive:pendingInviteToken` is the convention used by the template) and redirect to your login page.
+3. In your auth flow, after the user picks a method (magic link / OTP / passkey / OAuth), read the pending token from `sessionStorage` and pass it as the `inviteToken` argument to the corresponding verify/finish call (`magicLinkVerify`, `otpVerify`, `passkeyRegisterFinish`, `startOAuthFlow`). The server resolves grants atomically with signup.
+4. Clear the token from `sessionStorage` on success or on a clear error path.
+5. Validate token shape before accepting — the template uses a loose check (`isPlausibleInviteToken` in `src/lib/inviteToken.ts`) to avoid round-tripping obvious garbage.
+
+The `primitive-app-template` and `primitive-app-demo` projects in [`Primitive-Labs/primitive-app-dev`](https://github.com/Primitive-Labs/primitive-app-dev) both implement this end-to-end — read `primitive-app-template/src/pages/InviteAcceptPage.vue` together with `primitive-app-template/src/lib/inviteToken.ts` and `primitive-app-template/src/stores/userStore.ts` to see all the wiring in one place.
 
 ### Domain-Mode Apps
 
@@ -325,15 +332,15 @@ The model is intentionally generic:
 ### Client API
 
 ```typescript
-// Add a bookmark
+// Add a bookmark — targetObjType is "d" for documents (single-letter prefix).
 await client.me.bookmarks.add({
-  userDefinedKey: "projects/acme/q2-planning",
-  targetObjType: "document",
+  targetObjType: "d",
   targetObjId: documentId,
+  key: "projects/acme/q2-planning",   // optional; hierarchical keys enable prefix queries
 });
 
-// List with prefix
-const { items } = await client.me.bookmarks.list({
+// List with prefix — this is the call to power your "my documents" UI.
+const { bookmarks, nextCursor } = await client.me.bookmarks.list({
   prefix: "projects/acme/",
 });
 
@@ -344,24 +351,26 @@ await client.me.bookmarks.rename("projects/acme/q2-planning", "archived/q2-plann
 await client.me.bookmarks.remove("archived/q2-planning");
 ```
 
+Bookmarks are the **primary "my documents" surface** — the user-curated list, independent of permissions. Users can drop a bookmark they no longer want without losing access, and add bookmarks for shares they want to keep handy.
+
 ### Auto-Bookmarking
 
-Two events auto-create bookmarks so users don't have to:
+The platform pre-populates bookmarks for two common cases so apps don't have to:
 
 1. **Document creation** — when a user creates a document, it's bookmarked automatically.
-2. **Invitation acceptance** — when a user accepts a legacy `DocumentInvitation`, a bookmark is added for them.
+2. **Deferred grant resolution at signup** — when a recipient signs in with the email a share or group-add was sent to, the platform creates the appropriate `AppMembership` / `DocumentPermission` rows AND auto-bookmarks any documents that resolved through that flow.
 
-You can still remove these if the app doesn't want them visible.
+Direct grants to existing users (sharing by `userId`) and group/collection-shared documents are NOT auto-bookmarked — those land in `client.me.sharedDocuments()` until the recipient bookmarks them. Bookmarks are also auto-removed when access is revoked.
 
 ### Shared Documents Helper
 
-For a quick "documents shared with me" view, use the dedicated helper rather than filtering bookmarks yourself:
+`client.me.sharedDocuments()` returns the **inbox** view — documents directly shared with the user that aren't yet on their curated list:
 
 ```typescript
 const { documents } = await client.me.sharedDocuments();
 ```
 
-This returns documents the current user has access to via any path (direct, group, or a share that resolved at signup), excluding documents they own.
+It returns docs the user has a non-owner `DocumentPermission` on plus pending document invitations. Group- and collection-shared documents do **not** appear here — those become visible to the user via group/collection listings or by bookmarking them. Use `sharedDocuments` when you want an "inbox of recent shares"; use `me.bookmarks.list` for the primary "my documents" surface.
 
 ## WebSocket Events
 
@@ -396,7 +405,7 @@ Sharing UIs typically show two sections: people who currently have access, and p
 For a document:
 
 ```typescript
-const members = await client.documents.listPermissions(documentId);
+const members = await client.documents.getPermissions(documentId);
 // [{ userId, email, name, avatarUrl, permission, grantedAt }, ...]
 ```
 
@@ -429,10 +438,10 @@ const groupPending = await client.groups.listPendingInvitations(groupType, group
 
 ### Canceling a Pending Invitation
 
-To withdraw a pending invitation — and any pending document shares or group adds attached to it — revoke the invitation itself:
+To withdraw a pending invitation — and any pending document shares or group adds attached to it — delete the invitation itself:
 
 ```typescript
-await client.invitations.revoke(invitationId);
+await client.invitations.delete(invitationId);
 ```
 
 ### Removing Someone

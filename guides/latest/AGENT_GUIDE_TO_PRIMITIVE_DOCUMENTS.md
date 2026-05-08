@@ -83,9 +83,29 @@ const result = await TodoItem.query({});         // throws DocumentClosedError o
 
 ### 2. Document List Access
 
+For a user-facing "my documents" home view, lead with bookmarks:
+
 ```typescript
-const documents = await jsBaoClient.documents.list(); // All documents (owned + shared)
-const invitations = await jsBaoClient.me.pendingDocumentInvitations(); // Pending share invitations
+// Primary "my documents" surface — user-curated; auto-populated on doc
+// creation and on deferred-grant resolution at signup; auto-pruned on
+// permission revoke. Anything the user actively cares about lives here.
+const { bookmarks, nextCursor } = await jsBaoClient.me.bookmarks.list({
+  prefix: "projects/",   // optional hierarchical prefix
+  limit: 50,
+});
+
+// "Inbox" view of things shared with me that aren't on my curated list yet
+// — non-owner DocumentPermissions plus pending DocumentInvitations.
+// Group/collection-shared docs do NOT appear here.
+const shared = await jsBaoClient.me.sharedDocuments({ limit: 50 });
+```
+
+`documents.list` returns documents the caller has a direct `DocumentPermission` on (owner + reader/read-write); it doesn't include group- or collection-shared docs. Use it when you specifically need that scope — e.g. an admin/debug listing or a tag-filtered set you've built your UI around — not as the default "my documents" call.
+
+```typescript
+// Direct DocumentPermission rows (owner + reader + read-write).
+// Group- and collection-shared docs are NOT here.
+const documents = await jsBaoClient.documents.list();
 ```
 
 **Pagination and filtering options:**
@@ -983,7 +1003,7 @@ await client.documents.setGroupPermission(...);  // use grantGroupPermission
 await client.documents.requestAccess(id, { message: "..." }); // missing required `permission`
 ```
 
-Documents are auto-bookmarked for their creator and for any invitee who accepts an invitation. Use `client.me.sharedDocuments()` to render a "shared with me" view — do not filter bookmarks for this purpose.
+Documents are auto-bookmarked for their creator and for any invitee whose deferred grant resolves at signup. Direct grants to existing users (by `userId`) do not auto-bookmark — those land in `me.sharedDocuments` until the user bookmarks them. **Use `client.me.bookmarks.list` as the primary "my documents" surface** (the user-curated list); reserve `client.me.sharedDocuments()` for an "inbox" of recently-shared docs the user hasn't curated yet.
 
 ### Using PrimitiveShareDocumentDialog
 
@@ -1156,6 +1176,7 @@ Group documents into a **collection** to share them as a unit. Permissions grant
 - A document can be in multiple collections; access from all sources combines.
 - Deleting a collection revokes its permissions but never deletes the documents or any direct grants.
 - Member access is O(1) regardless of collection size (uses system-managed groups internally).
+- **Cascade rule:** sharing a collection automatically propagates access to every document inside it (current and future). Don't add per-document grants for documents already shared at the collection level — the collection grant is canonical. Prefer collection-level sharing over per-document sharing whenever the same set of users should see a related set of docs.
 
 ```typescript
 // Create
@@ -1183,7 +1204,7 @@ await client.collections.grantGroupPermission(collection.collectionId, {
 });
 await client.collections.revokeGroupPermission(collection.collectionId, "team", "engineering");
 
-// Share with individual users (O(1))
+// Share with individual users (O(1)). userId only — no email/deferred form yet.
 await client.collections.addMember(collection.collectionId, {
   userId: targetUserId, permission: "reader",
 });
@@ -1194,6 +1215,8 @@ await client.collections.removeMember(collection.collectionId, targetUserId);
 const access = await client.collections.getAccess(collection.collectionId);
 // → { groups: [...], members: [...] }
 ```
+
+> **Gap (#671):** `collections.addMember` accepts `userId` only — no email-based deferred grant, and there's no `collections.listPendingInvitations` to power a "Members + Pending" UI on a collection. To share a collection with someone who hasn't signed up, either get them into the app first (`client.invitations.create({ email })`, or share an individual document by email so the deferred-grant flow runs) and add them to the collection after signup, or share the collection with a group they'll be a member of.
 
 For per-context CEL rules using `collectionType` + `contextId` (and the `hasCollectionAccess` helper), see [Rule Sets for Collection Management](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md#rule-sets-for-collection-management) in the Users and Groups guide.
 

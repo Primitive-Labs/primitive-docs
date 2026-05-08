@@ -150,20 +150,22 @@ const pending = await client.me.pendingDocumentInvitations();
 //    invitedAt, invitedBy, expiresAt?, accepted, document?: {...} }, ...]
 ```
 
-Use `me.sharedDocuments()` (not bookmark filtering) for "shared with me" UI — it resolves access via every path and includes shares the user hasn't bookmarked.
+`me.sharedDocuments()` is the **inbox** view — things directly shared with the user that aren't on their curated list yet. It returns docs where the user has a non-owner `DocumentPermission` plus pending `DocumentInvitation`s; group- and collection-shared docs do NOT appear here. For the user's primary "my documents" home view, lead with `me.bookmarks.list` (next section) — it's the curated list and is auto-populated for the common cases.
 
 ### Bookmarks (`client.me.bookmarks`)
 
-Generic per-user references to any target type — documents, databases, collections, or anything the app wants to organize. Documents auto-bookmark on creation and on accepting an invitation; everything else is opt-in.
+Generic per-user references to any target type — documents, databases, collections, or anything the app wants to organize. **Bookmarks are the primary "my documents" UI surface.** The platform auto-bookmarks documents on creation and on deferred-grant resolution at signup, and auto-removes them on permission revoke, so apps mostly just need `list` + `rename`. Direct grants to existing users (by `userId`) and group/collection-shared docs are NOT auto-bookmarked — those land in `me.sharedDocuments` until the user adds them to their curated list.
+
+Today only `targetObjType: "d"` (document) is registered — adding for any other type returns `UNKNOWN_TARGET_TYPE`.
 
 ```typescript
 // Add — `key` defaults to `${targetObjType}/${targetObjId}`. Idempotent:
 // re-adding returns status: "already_bookmarked" with the original
 // `bookmarkedAt`.
 const { status, key, bookmarkedAt } = await client.me.bookmarks.add({
-  targetObjType: "document",
+  targetObjType: "d",                 // documents are "d" (NOT "document")
   targetObjId: documentId,
-  key: "projects/acme/q2-planning", // optional; hierarchical keys enable prefix queries
+  key: "projects/acme/q2-planning",   // optional; hierarchical keys enable prefix queries
 });
 
 // Remove by key
@@ -185,7 +187,8 @@ const { bookmarks, nextCursor } = await client.me.bookmarks.list({
 Design notes:
 
 - Use **hierarchical keys** (`folder/subfolder/leaf`) so prefix queries cheap-render folder views.
-- Don't use bookmarks to drive a "shared with me" UI — they miss shares the user never bookmarked. Use `me.sharedDocuments()` for that.
+- Lead with `me.bookmarks.list` for the user's primary "my documents" surface — it covers everything they actively care about. Reserve `me.sharedDocuments` for an "inbox" view of things not yet on the curated list.
+- Bookmarks are presentational; never gate access decisions on them.
 - Bookmarks are private to each user; there is no "shared bookmark" surface.
 
 ## Core Concept: Groups
