@@ -4,6 +4,11 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao v0.5.0 — 2026-05-08
+
+- Published as v0.5.0 — a minor version bump that promotes the cumulative 0.4.x codegen, schema-discovery, and CEL improvements (see prior 0.4.x entries) to a stable release line. No API changes vs. 0.4.2; existing imports continue to work unchanged.
+- Apps using `js-bao-wss-client` should install `js-bao@>=0.5.0` to satisfy the updated peer-dependency range.
+
 ## js-bao-wss-client v1.4.5 — 2026-05-07
 
 - `client.documents.updatePermissions({ email, sendEmail: true, ... })` now actually delivers a share email when the recipient is not yet an app member. The deferred-grant branch previously dropped the email; the flag is now honored end-to-end so the same `sendEmail` toggle works for both existing-member and pending-signup recipients.

@@ -10,7 +10,7 @@ Scoped API for operating on a single document without repeating the document ID.
 
 ## Methods
 
-### acceptInvitation()
+### ~~acceptInvitation()~~
 
 > **acceptInvitation**(): `Promise`\<[`DocumentAccessResult`](DocumentAccessResult.md)\>
 
@@ -19,6 +19,15 @@ Accept a pending invitation to access this document.
 #### Returns
 
 `Promise`\<[`DocumentAccessResult`](DocumentAccessResult.md)\>
+
+#### Deprecated
+
+The per-document accept concept has been removed. Document shares to existing users
+take effect immediately via `documents.updatePermissions` — no accept call is needed. For
+not-yet-registered users, deferred grants resolve when the recipient accepts the app-level
+invitation via `client.invitations.accept(inviteToken)`. The `inviteToken` is provided in the
+deferred-grant response of `documents.updatePermissions` on the inviter side, not via any
+invitee-callable on `documents.*`. See issue #619 and [DocumentsAPI.acceptInvitation](DocumentsAPI.md#acceptinvitation).
 
 ***
 
@@ -34,7 +43,7 @@ Get the blob API context for this document.
 
 ***
 
-### declineInvitation()
+### ~~declineInvitation()~~
 
 > **declineInvitation**(`invitationId`): `Promise`\<\{ `message`: `string`; `success`: `boolean`; \}\>
 
@@ -51,6 +60,14 @@ The identifier of the specific invitation to decline
 #### Returns
 
 `Promise`\<\{ `message`: `string`; `success`: `boolean`; \}\>
+
+#### Deprecated
+
+No invitee-side decline verb. Pending invitations expire automatically, so a
+recipient who hasn't accepted can simply ignore the invite. To remove yourself from an
+already-accepted share, call
+`documents.removePermission(documentId, { userId: <your userId> })`.
+See issue #619 and [DocumentsAPI.declineInvitation](DocumentsAPI.md#declineinvitation).
 
 ***
 
