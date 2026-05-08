@@ -71,22 +71,35 @@ Primitive provides three libraries that work together:
 ### js-bao — Data Layer
 A JavaScript ORM for defining data models and performing queries. Works with any framework. When used with documents, it reads and writes to a local in-browser database for instant operations.
 
-```typescript
-import { defineModelSchema, BaseModel } from "js-bao";
+You declare models in `src/models/models.toml` and let codegen produce the TypeScript classes — one source of truth, auto-registered at startup:
 
-const taskSchema = defineModelSchema({
-  name: "tasks",
-  fields: {
-    id: { type: "id", autoAssign: true, indexed: true },
-    title: { type: "string", indexed: true },
-    completed: { type: "boolean", default: false },
-  },
-});
+```toml
+# src/models/models.toml
+[models.tasks.fields.id]
+type = "id"
+auto_assign = true
+indexed = true
 
-export class Task extends BaseModel {
-  static schema = taskSchema;
-}
+[models.tasks.fields.title]
+type = "string"
+indexed = true
+
+[models.tasks.fields.completed]
+type = "boolean"
+default = false
 ```
+
+```bash
+npx js-bao-codegen-v2
+```
+
+```typescript
+import { Task } from "@/models";
+const task = new Task({ title: "Review PR" });
+await task.save();
+```
+
+See [Defining Your Models](./defining-your-models.md) for the full TOML reference (field types, relationships, unique constraints, the `migrate` tool for older projects).
 
 ### js-bao-wss-client — Backend Client
 Manages all interaction with the Primitive backend: authentication, document sync, database operations, blob storage, workflows, LLM calls, integrations, and analytics.

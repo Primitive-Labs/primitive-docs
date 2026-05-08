@@ -148,7 +148,7 @@
         "Understanding document permissions",
         "Using useJsBaoDataLoader for reactive data"
       ],
-      "concepts": ["BaseModel", "defineModelSchema", "query", "save", "documents.open", "documents.list", "useJsBaoDataLoader", "documentReady", "initialDataLoaded", "upsertByUnique", "aliases"],
+      "concepts": ["BaseModel", "models.toml", "js-bao-codegen-v2", "query", "save", "documents.open", "documents.list", "me.bookmarks", "useJsBaoDataLoader", "documentReady", "initialDataLoaded", "upsertByUnique", "aliases"],
       "prerequisites": [],
       "relatedGuides": ["workflows", "devtools", "databases", "data-modeling"]
     },

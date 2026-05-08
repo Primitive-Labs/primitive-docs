@@ -413,50 +413,39 @@ Relationship traversal uses the same engine as `Model.query(...)` with `include`
 
 ### Unique Constraints
 
-Two ways to enforce uniqueness:
+Two ways to enforce uniqueness — both declared in `models.toml`:
 
-```typescript
-// 1. Single-field uniqueness via field option (use this when possible —
-//    enables `upsertOn` on save).
-const userSchema = defineModelSchema({
-  name: "users",
-  fields: {
-    id: { type: "id", autoAssign: true },
-    email: { type: "string", unique: true, indexed: true },
-  },
-});
+```toml
+# 1. Single-field uniqueness via the field's `unique` option.
+#    Use this whenever possible — enables `upsertOn` on save.
+[models.users.fields.email]
+type = "string"
+unique = true
+indexed = true
 
-// 2. Multi-field (composite) uniqueness via options.uniqueConstraints.
-//    Each entry is a NAMED constraint — the name is what you pass to
-//    upsertByUnique / findByUnique.
-const categorySchema = defineModelSchema({
-  name: "categories",
-  fields: {
-    id: { type: "id", autoAssign: true },
-    name: { type: "string" },
-    parentId: { type: "string" },
-  },
-  options: {
-    uniqueConstraints: [
-      { name: "name_parent_unique", fields: ["name", "parentId"] },
-    ],
-  },
-});
+# 2. Multi-field (composite) uniqueness via [[models.X.options.unique_constraints]].
+#    Each entry is a NAMED constraint — the name is what you pass to
+#    upsertByUnique / findByUnique at runtime.
+[[models.categories.options.unique_constraints]]
+name = "name_parent_unique"
+fields = ["name", "parentId"]
 ```
 
-**Wrong** — these forms compile but the constraint will be silently dropped or wrongly typed:
+After `npx js-bao-codegen-v2`, single-field constraints get an auto-generated runtime name of `<modelName>_<fieldName>_unique` (e.g. `users_email_unique`); composite constraints use the `name` you declared (e.g. `name_parent_unique`).
 
-```typescript
-// DON'T: top-level uniqueConstraints (must be inside `options`)
-defineModelSchema({ name: "...", fields: {...}, uniqueConstraints: [...] });
+**Wrong** — these TOML shapes are silently rejected or fail at codegen:
 
-// DON'T: array-of-arrays shorthand — not supported. Each entry must be
-// { name, fields }.
-defineModelSchema({
-  name: "...",
-  fields: {...},
-  options: { uniqueConstraints: [["name", "parentId"]] as any },
-});
+```toml
+# DON'T: composite uniqueness at the top level of the model — it must
+# live under [[models.X.options.unique_constraints]].
+[[models.categories.unique_constraints]]
+name = "name_parent_unique"
+fields = ["name", "parentId"]
+
+# DON'T: bare array of fields. Each constraint must be a table with
+# both `name` and `fields`.
+[models.categories.options]
+unique_constraints = [["name", "parentId"]]
 ```
 
 ### Working with StringSets
@@ -810,7 +799,7 @@ if (task) {
 `upsertByUnique(constraintName, lookupValue(s), data, options?)` — finds an existing record by a named constraint and updates it, or creates one if none exists. The `data` object MUST include the same constraint field values as `lookupValue` (mismatch throws). When creating a new record, `targetDocument` is REQUIRED.
 
 ```typescript
-// Composite-key example — uses the constraint name from defineModelSchema above.
+// Composite-key example — uses the constraint name declared in models.toml above.
 await Category.upsertByUnique(
   "name_parent_unique",                    // constraint name
   ["Work", null],                          // values in field order
@@ -828,7 +817,7 @@ await User.upsertByUnique(
 );
 ```
 
-Single-field constraints declared via `unique: true` get an auto-generated name of `<schemaName>_<fieldName>_unique` (where `schemaName` is the `name` you passed to `defineModelSchema`). Use `options.uniqueConstraints` to control the name.
+Single-field constraints declared via `unique = true` in TOML get an auto-generated name of `<modelName>_<fieldName>_unique` (where `modelName` is the `[models.<name>]` block key). Use `[[models.X.options.unique_constraints]]` to control the name explicitly.
 
 For single-field upserts where the value already lives on the instance, `save({ upsertOn })` is simpler than `upsertByUnique` — see next section.
 
@@ -874,31 +863,42 @@ This applies both to new saves and updates, and is consistent across single save
 
 ### Singleton Model per Document (Avoiding ID Confusion)
 
-Create a singleton model per document for metadata. Child models reference by model ID, not document ID:
+Create a singleton model per document for metadata. Child models reference by model ID, not document ID — declared in `models.toml`:
 
-```typescript
-// TodoList - one per document
-const todoListSchema = defineModelSchema({
-  name: "todo_lists",
-  fields: {
-    id: { type: "id", autoAssign: true, indexed: true },
-    title: { type: "string" },
-    createdAt: { type: "number" },
-    createdBy: { type: "string" },
-  },
-});
+```toml
+# TodoList — one per document
+[models.todo_lists.fields.id]
+type = "id"
+auto_assign = true
+indexed = true
 
-// TodoItem references TodoList by MODEL ID
-const todoItemSchema = defineModelSchema({
-  name: "todo_items",
-  fields: {
-    id: { type: "id", autoAssign: true, indexed: true },
-    listId: { type: "string", indexed: true }, // Model ID, not document ID
-    title: { type: "string" },
-    completed: { type: "boolean" },
-  },
-});
+[models.todo_lists.fields.title]
+type = "string"
+
+[models.todo_lists.fields.createdAt]
+type = "number"
+
+[models.todo_lists.fields.createdBy]
+type = "string"
+
+# TodoItem references TodoList by MODEL ID (not document ID)
+[models.todo_items.fields.id]
+type = "id"
+auto_assign = true
+indexed = true
+
+[models.todo_items.fields.listId]
+type = "string"
+indexed = true
+
+[models.todo_items.fields.title]
+type = "string"
+
+[models.todo_items.fields.completed]
+type = "boolean"
 ```
+
+Run `npx js-bao-codegen-v2` and import as `import { TodoList, TodoItem } from "@/models";`.
 
 **Use this pattern when:**
 

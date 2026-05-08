@@ -876,14 +876,50 @@ const result = await db.aggregate("orders", {
 
 ## Defining Models
 
-Databases are schemaless — you can save any JSON records without defining models. However, model files provide type safety and automatic index syncing.
+Databases are schemaless on the server — you can save any JSON records without defining models. Defining models gives you type safety, autoregistration, and automatic index syncing on connect.
 
-If your app also uses documents, you can share the same `BaseModel` classes with both documents and databases. See the [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#defining-models) for the full model definition workflow with `BaseModel` and codegen.
+The canonical workflow is TOML + codegen, the same one used for document-backed models. Declare each model in `src/models/models.toml`, run `npx js-bao-codegen-v2`, and import the generated class from `@/models`:
 
-For database-only apps, use `createModelClass` from the client library:
+```toml
+# src/models/models.toml
+[models.tasks.fields.id]
+type = "id"
+auto_assign = true
+indexed = true
+
+[models.tasks.fields.title]
+type = "string"
+indexed = true
+
+[models.tasks.fields.status]
+type = "string"
+indexed = true
+
+[models.tasks.fields.priority]
+type = "number"
+indexed = true
+
+[models.tasks.fields.assignee]
+type = "string"
+```
 
 ```typescript
-import { defineModelSchema, createModelClass, InferAttrs, TypedModelConstructor } from "js-bao-wss-client";
+import { Task } from "@/models";
+const db = client.databases.connect(databaseId);
+await db.syncIndexes(Task);
+```
+
+The same TOML powers documents and databases — there's no separate "database-only" authoring path in the template app. See the [Defining Your Models guide](https://docs.primitive.com/getting-started/defining-your-models) (or the [Documents agent guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#defining-models)) for the full TOML reference: field types, options, relationships, unique constraints, and schema iteration.
+
+If you're not using the project template (no `models.toml`, no codegen), the lower-level primitives are still exported for programmatic use:
+
+```typescript
+import {
+  defineModelSchema,
+  createModelClass,
+  InferAttrs,
+  TypedModelConstructor,
+} from "js-bao-wss-client";
 import type { BaseModel } from "js-bao";
 
 const taskSchema = defineModelSchema({
@@ -905,7 +941,9 @@ const Task: TypedModelConstructor<Task> = createModelClass({ schema: taskSchema 
 export { Task };
 ```
 
-Database field types: `id` (primary key, use `autoAssign: true` for ULIDs), `string`, `number`, `boolean`, `date`, `stringset` (set-of-strings field — use with `addToSet`/`removeFromSet`).
+This produces the same runtime artifact as codegen output, but you lose the auto-registered barrel and the boot-time TOML/code consistency check. Reach for it only if TOML+codegen genuinely doesn't fit your build setup; the migration path back to TOML is `npx js-bao-codegen-v2 migrate`.
+
+Database field types: `id` (primary key, use `auto_assign = true` for ULIDs), `string`, `number`, `boolean`, `date`, `stringset` (set-of-strings field — use with `addToSet`/`removeFromSet`).
 
 ### Indexes
 
