@@ -231,23 +231,27 @@ The invitation is marked accepted (write-once) and every deferred grant linked t
 
 ### What your app needs to wire up
 
-The platform composes the invitation URL as `${app.baseUrl}/invite/accept?inviteToken=...` and sends it in the email body. Your app owns the page at `/invite/accept` and decides what happens when someone lands there. The page needs to handle three states:
+The `inviteToken` is what carries the invitation across the wire — every share-by-email flow returns one (`client.invitations.create({ email })`, the deferred branch of `client.documents.updatePermissions({ email })`, and `client.groups.addMember({ email })` all expose `inviteToken` on the response). Your app decides where to send the recipient: the platform's default email templates use a conventional URL shape of `${app.baseUrl}/invite/accept?inviteToken=...`, but that's a convention the templates use — not a platform-enforced shape. If you send your own email (`sendEmail: false` plus your own ESP, or a custom email template), you can drop the token into any URL you like as long as the page on the other end knows how to read it.
+
+Whatever URL you land them on, the page needs to handle three states:
 
 1. **Signed-in invitee** — show "Accept with this account?", confirm, then call `client.invitations.accept(inviteToken)` and redirect into the app.
 2. **Signed-out invitee** — stash the token in `sessionStorage`, redirect to the login flow, and pass the token through to whichever auth method the user picks (magic link, OTP, passkey, OAuth) so the server resolves grants in the same round-trip — no second click needed after signup.
 3. **Errors** — `INVITE_TOKEN_INVALID`, `INVITE_TOKEN_EXPIRED`, `INVITE_ALREADY_ACCEPTED` each need their own UI. Don't show raw API errors.
 
-The `primitive-app-template` ships a working implementation of all three — `src/pages/InviteAcceptPage.vue` (the landing page) and `src/lib/inviteToken.ts` (the sessionStorage carry-over) wired into `userStore` so each auth method forwards the pending token automatically. **If you're using the template, this is already done — just point your invitation emails at `${yourApp.baseUrl}/invite/accept?inviteToken=${token}`.**
+The `primitive-app-template` ships a working implementation of all three — `src/pages/InviteAcceptPage.vue` (the landing page, mounted at `/invite/accept`) and `src/lib/inviteToken.ts` (the sessionStorage carry-over) wired into `userStore` so each auth method forwards the pending token automatically. **If you're using the template, this is already done — point your invitation emails at `${yourApp.baseUrl}/invite/accept?inviteToken=${token}` (the convention the template's router expects).** If you let the platform send the default email and your `app.baseUrl` is configured, this is also the URL shape the default templates use, so the two line up out of the box.
 
-If you're hand-rolling the flow, the steps:
+If you're hand-rolling the flow (custom email + custom landing page), the steps:
 
-1. Add a route at `/invite/accept` in your app that reads `inviteToken` from the query string.
-2. On mount, branch on signed-in status:
+1. Pick a URL shape that suits your app. Anything that round-trips the `inviteToken` works — the platform doesn't enforce a specific path. The token can ride in a query string, a fragment, or as part of a short-link redirect — your call.
+2. Render that URL inside your custom email body (or inline magic-link page), substituting the `inviteToken` you got back from `client.invitations.create({ email, sendEmail: false })`, the deferred branch of `client.documents.updatePermissions({ email })`, or `client.groups.addMember({ email })`.
+3. Build a route in your app that reads the token from wherever you put it.
+4. On mount, branch on signed-in status:
    - **Signed in:** confirm with the user (so they don't bind grants to the wrong account), then `await client.invitations.accept(inviteToken)`.
    - **Signed out:** save the token in `sessionStorage` (`primitive:pendingInviteToken` is the convention used by the template) and redirect to your login page.
-3. In your auth flow, after the user picks a method (magic link / OTP / passkey / OAuth), read the pending token from `sessionStorage` and pass it as the `inviteToken` argument to the corresponding verify/finish call (`magicLinkVerify`, `otpVerify`, `passkeyRegisterFinish`, `startOAuthFlow`). The server resolves grants atomically with signup.
-4. Clear the token from `sessionStorage` on success or on a clear error path.
-5. Validate token shape before accepting — the template uses a loose check (`isPlausibleInviteToken` in `src/lib/inviteToken.ts`) to avoid round-tripping obvious garbage.
+5. In your auth flow, after the user picks a method (magic link / OTP / passkey / OAuth), read the pending token from `sessionStorage` and pass it as the `inviteToken` argument to the corresponding verify/finish call (`magicLinkVerify`, `otpVerify`, `passkeyRegisterFinish`, `startOAuthFlow`). The server resolves grants atomically with signup.
+6. Clear the token from `sessionStorage` on success or on a clear error path.
+7. Validate token shape before accepting — the template uses a loose check (`isPlausibleInviteToken` in `src/lib/inviteToken.ts`) to avoid round-tripping obvious garbage.
 
 The `primitive-app-template` and `primitive-app-demo` projects in [`Primitive-Labs/primitive-app-dev`](https://github.com/Primitive-Labs/primitive-app-dev) both implement this end-to-end — read `primitive-app-template/src/pages/InviteAcceptPage.vue` together with `primitive-app-template/src/lib/inviteToken.ts` and `primitive-app-template/src/stores/userStore.ts` to see all the wiring in one place.
 
