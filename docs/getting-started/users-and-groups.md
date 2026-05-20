@@ -224,7 +224,7 @@ Rule sets are versioned and include built-in testing and debugging tools — you
 
 ## Next Steps
 
-- **[Sharing and Invitations](./sharing-and-invitations.md)** — Invitations, email-based shares, access requests, bookmarks
+- **[Sharing and Invitations](./sharing-and-invitations.md)** — Invitations, email-based shares, collections, access requests
 - **[Working with Databases](./working-with-databases.md)** — Use groups in database access control
 - **[Working with Documents](./working-with-documents.md)** — Share documents with groups
 - **[Authentication](./authentication.md)** — How users get authenticated

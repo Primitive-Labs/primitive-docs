@@ -20,12 +20,12 @@ The Primitive Admin Console is a web-based dashboard for managing your apps, use
 
 ### Sharing & Access
 - Review and approve/deny pending document access requests
-- Browse bookmarks and shared-document state per user
+- Browse a user's owned and shared documents
 - View audit trail of share, invitation, and access-request activity
 
 ### Databases
 - Browse databases and their types
-- View and test registered operations (including `applyToQuery` and `executeBatch`)
+- View and test registered operations (including `applyToQuery`)
 - Inspect operation access control expressions and per-subscription filter rules
 - Grant group-based permissions on a database
 - Run operations directly to verify behavior

@@ -337,6 +337,33 @@ client.on("auth:state", ({ authenticated }) => { if (!authenticated) promptLogin
 
 ---
 
+## Per-App User Disable
+
+Admins can disable a user's access to a single app without deleting their global user account. The `AppUser` record carries:
+
+| Field | Meaning |
+|---|---|
+| `status` | `"active"` or `"disabled"`. Missing/null is treated as `"active"`. |
+| `disabledAt` | Timestamp the user was disabled. |
+| `disabledBy` | `adminId` that performed the disable. |
+
+When `status === "disabled"`:
+
+- Every auth-completion endpoint (passkey, OAuth callback, magic-link verify, OTP verify) rejects with `AUTH_USER_DISABLED` before issuing tokens.
+- The user's open WebSocket connections are force-disconnected via the connection-worker DO.
+- Existing access tokens are revoked; in-flight workflow runs the user started are terminated.
+
+Admin endpoints (admin token required):
+
+```http
+PUT /admin/api/apps/{appId}/users/{userId}/disable
+PUT /admin/api/apps/{appId}/users/{userId}/enable
+```
+
+The admin console exposes the same toggles. App code does not need to special-case disabled users — the platform rejects them before they get an authenticated session. Make sure error UIs render `AUTH_USER_DISABLED` differently from generic auth errors so the user knows to contact an admin.
+
+---
+
 ## Token Inspection & Manual Token
 
 ```typescript
@@ -480,7 +507,7 @@ Sign-in resolves any pending `DeferredDocumentPermission` and `DeferredGroupAdd`
 
 Implications:
 
-1. **Don't re-grant after signup.** If a doc was shared with the email pre-signup, the new user already has the bookmark and access.
+1. **Don't re-grant after signup.** If a doc was shared with the email pre-signup, the new user already has access — the deferred grant resolved automatically.
 2. **Domain-mode apps re-validate at resolution.** Deferred grants for emails outside allowed domains are silently dropped.
 3. **`invitation`/`accepted` WS events fire after resolution** — subscribe to refresh the inviter's UI.
 

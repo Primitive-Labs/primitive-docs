@@ -77,20 +77,20 @@
     {
       "topic": "sharing-and-invitations",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md",
-      "description": "Invitations, document and database sharing, member invitation quotas, access requests, and bookmarks",
-      "keywords": ["sharing", "share", "invitation", "invitations", "invite", "email invite", "access request", "request access", "bookmarks", "bookmark", "member invitation", "quota", "sharing by email", "setPermissions", "setGroupPermission"],
+      "description": "Invitations, document and database sharing, collections, member invitation quotas, and access requests",
+      "keywords": ["sharing", "share", "invitation", "invitations", "invite", "email invite", "access request", "request access", "collection", "collections", "member invitation", "quota", "sharing by email", "updatePermissions", "grantGroupPermission"],
       "useCases": [
         "Sharing a document by userId, email, or group",
         "Sharing a database with a group",
+        "Sharing documents in bulk via a collection",
         "Inviting users to an app (admin or member-initiated)",
         "Enforcing member-invitation quotas",
         "Responding to a document access denial with a request-access flow",
         "Approving or denying document access requests",
         "Rendering a 'people with access + pending invitations' panel",
-        "Managing a user's bookmarks",
-        "Listing documents a user has been shared into"
+        "Listing the documents a user owns or has been shared into"
       ],
-      "concepts": ["client.documents.setPermissions", "client.documents.setGroupPermission", "client.invitations.create", "client.invitations.getQuota", "client.invitations.revoke", "client.documents.requestAccess", "client.documents.approveAccessRequest", "client.documents.denyAccessRequest", "client.me.bookmarks", "client.me.sharedDocuments", "canRequestAccess", "AppInvitation", "memberInvitationsEnabled", "memberInvitationLimit"],
+      "concepts": ["client.documents.updatePermissions", "client.documents.grantGroupPermission", "client.collections.addMember", "client.invitations.create", "client.invitations.quota", "client.invitations.delete", "client.documents.requestAccess", "client.documents.approveAccessRequest", "client.documents.denyAccessRequest", "client.me.ownedDocuments", "client.me.sharedDocuments", "canRequestAccess", "AppInvitation", "memberInvitationsEnabled", "memberInvitationLimit"],
       "prerequisites": [],
       "relatedGuides": ["documents", "users-and-groups", "authentication"]
     },
@@ -98,7 +98,7 @@
       "topic": "scheduling-and-realtime",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md",
       "description": "Cron-scheduled workflows and real-time database subscriptions over WebSocket",
-      "keywords": ["cron", "schedule", "scheduled workflow", "CronTrigger", "timezone", "overlap", "subscription", "subscriptions", "db.subscribe", "real-time", "WebSocket", "live data", "DatabaseSubscription"],
+      "keywords": ["cron", "schedule", "scheduled workflow", "CronTrigger", "timezone", "overlap", "subscription", "subscriptions", "db.subscribe", "real-time", "WebSocket", "live data", "DatabaseTypeSubscription", "originConnectionId", "isOrigin"],
       "useCases": [
         "Scheduling a workflow to run on a cron expression",
         "Handling timezones and overlap policies for scheduled jobs",
@@ -108,7 +108,7 @@
         "Building load+subscribe UIs for live views",
         "Driving workflow-progress UIs by subscribing to workflow-written records"
       ],
-      "concepts": ["CronTrigger", "client.cronTriggers.create", "client.cronTriggers.run", "overlapPolicy", "IANA timezone", "DatabaseSubscription", "client.databases.database().subscribe", "access rule", "filter rule", "WebSocketNotifier"],
+      "concepts": ["CronTrigger", "client.cronTriggers.create", "client.cronTriggers.test", "overlapPolicy", "IANA timezone", "DatabaseTypeSubscription", "client.databases.subscribe", "originConnectionId", "originUserId", "isOrigin", "select projection", "emit filter", "access rule", "filter rule"],
       "prerequisites": [],
       "relatedGuides": ["workflows", "databases"]
     },
@@ -116,7 +116,7 @@
       "topic": "databases",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md",
       "description": "Server-side database storage with CEL-based access control, registered operations, triggers, real-time subscriptions, and group permissions",
-      "keywords": ["databases", "database", "server-side", "CEL", "access control", "operations", "triggers", "query", "mutation", "aggregate", "pipeline", "Durable Objects", "SQLite", "permissions", "groups", "subscription", "subscriptions", "real-time", "applyToQuery", "executeBatch", "batch", "apply to query", "DatabaseGroupPermission"],
+      "keywords": ["databases", "database", "server-side", "CEL", "access control", "operations", "triggers", "autoPopulatedFields", "defaultAccess", "query", "mutation", "aggregate", "pipeline", "Durable Objects", "SQLite", "permissions", "groups", "subscription", "subscriptions", "real-time", "applyToQuery", "DatabaseTypeSubscription", "DatabaseGroupPermission"],
       "useCases": [
         "Creating and managing server-side databases",
         "Defining registered operations with access control",
@@ -126,12 +126,13 @@
         "Executing mutations and batch operations",
         "Running query-and-mutate operations with applyToQuery",
         "Building multi-step pipeline operations",
+        "Configuring autoPopulatedFields and defaultAccess on a type",
         "Subscribing to real-time database changes over WebSocket",
         "Granting database access to a group via DatabaseGroupPermission",
         "Importing CSV data into databases",
         "Managing database permissions"
       ],
-      "concepts": ["databases.create", "databases.connect", "databases.executeOperation", "DatabaseTypeConfig", "registered operations", "CEL expressions", "isMemberOf", "hasRole", "triggers", "pipeline", "aggregate", "bulk import", "DoDb", "syncIndexes", "applyToQuery", "executeBatch", "itemAccess", "databases.database().subscribe", "DatabaseSubscription", "DatabaseGroupPermission", "setGroupPermission"],
+      "concepts": ["databases.create", "databases.connect", "databases.executeOperation", "DatabaseTypeConfig", "registered operations", "autoPopulatedFields", "defaultAccess", "CEL expressions", "isMemberOf", "hasRole", "triggers", "pipeline", "aggregate", "bulk import", "DoDb", "syncIndexes", "applyToQuery", "itemAccess", "databases.subscribe", "DatabaseTypeSubscription", "select projection", "originConnectionId", "DatabaseGroupPermission", "grantGroupPermission"],
       "prerequisites": [],
       "relatedGuides": ["documents", "data-modeling", "users-and-groups", "scheduling-and-realtime"]
     },
@@ -148,15 +149,15 @@
         "Understanding document permissions",
         "Using useJsBaoDataLoader for reactive data"
       ],
-      "concepts": ["BaseModel", "models.toml", "js-bao-codegen-v2", "query", "save", "documents.open", "documents.list", "me.bookmarks", "useJsBaoDataLoader", "documentReady", "initialDataLoaded", "upsertByUnique", "aliases"],
+      "concepts": ["BaseModel", "models.toml", "js-bao-codegen-v2", "query", "save", "documents.open", "me.ownedDocuments", "me.sharedDocuments", "useJsBaoDataLoader", "documentReady", "initialDataLoaded", "upsertByUnique", "aliases"],
       "prerequisites": [],
       "relatedGuides": ["workflows", "devtools", "databases", "data-modeling"]
     },
     {
       "topic": "workflows",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md",
-      "description": "Creating multi-step automation pipelines with AI/LLM calls, integrations, email, blobs, analytics, cron scheduling, and database operations",
-      "keywords": ["workflows", "automation", "pipelines", "steps", "LLM", "AI", "OpenAI", "Gemini", "TOML", "templates", "email.send", "blob step", "analytics.query", "applyToQuery", "executeBatch", "cron", "scheduled", "inline email", "custom email template"],
+      "description": "Creating multi-step automation pipelines with AI/LLM calls, integrations, email, blobs, analytics, cron scheduling, synchronous invocation, and database operations",
+      "keywords": ["workflows", "automation", "pipelines", "steps", "LLM", "AI", "OpenAI", "Gemini", "TOML", "templates", "email.send", "switch step", "forEach", "zip", "successWhen", "runSync", "syncCallable", "analytics.query", "applyToQuery", "cron", "scheduled", "include fragments", "$params validator"],
       "useCases": [
         "Building multi-step automation pipelines",
         "Chaining LLM calls together",
@@ -166,13 +167,14 @@
         "Writing blobs from workflows",
         "Running analytics queries from workflows",
         "Running query+mutate database operations",
-        "Running batch database writes with per-item CEL",
+        "Branching with switch steps and runIf predicates",
+        "Fanning out work with forEach (concurrent or zip) and successWhen",
         "Scheduling workflows with cron triggers",
-        "Conditional step execution",
-        "Data transformation between steps",
+        "Invoking short workflows synchronously via runSync",
+        "Sharing common step blocks via include fragments",
         "Inspecting workflow run steps for debugging"
       ],
-      "concepts": ["workflow", "steps", "llm.chat", "gemini.generate", "integration.call", "prompt.execute", "transform", "runIf", "saveAs", "templates", "publish", "preview", "email.send", "blob", "analytics.query", "database.applyToQuery", "database.executeBatch", "cron trigger", "overlapPolicy", "workflow run steps"],
+      "concepts": ["workflow", "steps", "llm.chat", "gemini.generate", "integration.call", "prompt.execute", "transform", "switch", "runIf", "saveAs", "templates", "now", "today", "uuid", "ulid", "CEL safe navigation", "syncCallable", "workflows.runSync", "forEach zip", "successWhen", "include fragments", "email.send", "blob.upload", "analytics.query", "database.applyToQuery", "cron trigger", "overlapPolicy", "workflow run steps"],
       "prerequisites": [],
       "relatedGuides": ["prompts", "integrations", "scheduling-and-realtime", "blobs", "analytics"]
     },

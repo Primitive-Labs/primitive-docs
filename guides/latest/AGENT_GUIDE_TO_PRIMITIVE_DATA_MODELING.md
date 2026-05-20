@@ -16,7 +16,7 @@ How to choose between **documents** and **databases**, and how to combine them. 
 | Access control | Whole-document grant: `reader`, `read-write`, `owner` | Per-operation CEL on registered operations |
 | Per-record access for end users | Not possible — anyone with the doc gets everything | Yes — operation CEL + filters scope what each caller sees |
 | Practical size | ~10 MB per document (soft) | ~5 GB per database (one DO each) |
-| Server-enforced fields | No (client writes Yjs updates directly) | Yes — triggers (`createdAt`, `createdBy`, etc.) |
+| Server-enforced fields | No (client writes Yjs updates directly) | Yes — `autoPopulatedFields` and per-model triggers |
 | Aggregates / multi-step reads | Client-side over local data | `aggregate`, `pipeline`, `count` operations |
 
 The corollaries that follow are what to use when picking sides.
@@ -113,42 +113,53 @@ const result = await client.databases.executeOperation(
 
 Use for: any data where access scopes change per record or per caller. The operation's CEL gate plus `$user.userId` / `$params.*` substitution does the per-row scoping for you.
 
-### Database — server-enforced fields via triggers
+### Database — server-enforced fields
+
+For cross-model invariants (`createdAt`/`createdBy`/`updatedAt`), use `autoPopulatedFields` on the type config — one declaration covers every model:
+
+```toml
+[type.autoPopulatedFields]
+ownerId   = "user.userId"
+createdAt = { value = "now()", on = "create" }
+updatedAt = { value = "now()", on = ["create", "update"] }
+```
+
+For invariants that depend on the record's data (e.g. set `completedAt` only when `status == "done"`), use a per-model trigger:
 
 ```toml
 [triggers.tasks]
 triggers = [
-  { on = "create", set = { createdAt = "now()", createdBy = "user.userId" } },
-  { on = "update", set = { modifiedAt = "now()" } },
+  { on = "save", when = "record.status == 'done' && record.completedAt == null", set = { completedAt = "now()" } },
 ]
 ```
 
-Triggers fire in the DO before save. Clients cannot bypass them, even if they call a mutation operation that doesn't include those fields.
+Both fire server-side before the write reaches storage. Clients cannot bypass them.
 
 ### Database — real-time subscription
 
-Subscriptions are registered per-database via the admin REST API (not via TOML / `primitive sync`):
+Subscriptions are declared on the type config and apply to every database of that type. Push them with `primitive sync push`.
 
-```http
-POST /app/{appId}/api/databases/{databaseId}/subscriptions
-```
-```json
-{
-  "subscriptionKey": "my-open-tickets",
-  "displayName": "My open tickets",
-  "filter": "record.assigneeId == user.userId && record.status == 'open'",
-  "accessRule": "user.userId != ''"
-}
+```toml
+[[subscriptions]]
+subscriptionKey = "my-open-tickets"
+displayName = "My open tickets"
+modelName = "ticket"
+accessRule = "user.userId != ''"
+filter = "record.assigneeId == user.userId && record.status == 'open'"
+select = ["id", "title", "priority", "updatedAt"]  # optional projection
 ```
 
 ```typescript
 const initial = await client.databases.executeOperation(dbId, "listMyTickets", {});
 const unsub = client.databases.subscribe(dbId, "my-open-tickets", {
-  onChange: (event) => applyChanges(event.changes),
+  onChange: (event) => {
+    if (event.isOrigin) return;        // this tab wrote it
+    applyChanges(event.changes);
+  },
 });
 ```
 
-Subscriptions deliver deltas only — always pair with an operation call for the initial state, and use semantically equivalent filters.
+Subscriptions deliver deltas only — always pair with an operation call for the initial state, and use semantically equivalent filters. See the Databases guide for the full frame shape (`originConnectionId`, `originUserId`, `isOrigin`, `isOriginUser`, `changeType`).
 
 ## Worked architectures
 
@@ -195,9 +206,9 @@ Registered operations are the only sane way to expose database data to end users
 - Use `$user.userId`, `$params.*`, `$database.celContext.*` for substitution; never hardcode user IDs.
 - Use `params: { ..., required: false }` to make a single operation accept optional filters instead of declaring `listX` and `listXByY` separately.
 
-### Use triggers, not client-supplied values, for invariants
+### Use server-side stamps, not client-supplied values, for invariants
 
-`createdAt`, `createdBy`, `modifiedAt`, computed status — all of these belong in `[triggers]`. Even if your client always sets them correctly, a future client (or a malicious one) won't.
+`createdAt`, `createdBy`, `updatedAt`, computed status — all of these belong in `autoPopulatedFields` (cross-model) or `[triggers.<model>]` (model-specific). Even if your client always sets them correctly, a future client (or a malicious one) won't.
 
 ### Never store application state in `database.celContext`
 
@@ -236,7 +247,7 @@ Where the data should live instead: a record inside the database itself. Read it
 | Put any application state in `database.celContext` (settings, flags, UI fields, anything not read by a CEL rule) | Store as a record; read via a pipeline `$steps.*` reference. `celContext` is rule-evaluation infrastructure, not a KV store |
 | Put one giant database for the whole app | One DO per tenant/project/domain |
 | Hardcode IDs in operation `definition` | Use `$user.userId`, `$params.*`, `$database.celContext.*` |
-| Trust client-provided `createdAt`, `createdBy`, role fields | Set them with `[triggers]` |
+| Trust client-provided `createdAt`, `createdBy`, role fields | Set them with `autoPopulatedFields` or `[triggers.<model>]` |
 | One operation per filter combination (`listPosts`, `listPostsByAuthor`, `listPostsByStatus`...) | One operation with `params` declared `required: false` |
 | Make every operation `access: "true"` | Start restrictive (`isMemberOf(...)`, `hasRole(...)`) and widen explicitly |
 | Use a database for real-time collaborative editing | Use a document — Yjs handles merge; databases will lose concurrent edits |

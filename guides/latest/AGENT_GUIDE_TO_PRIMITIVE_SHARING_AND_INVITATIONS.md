@@ -1,32 +1,34 @@
 # Agent Guide to Primitive Sharing and Invitations
 
-Guidelines for AI agents implementing invitations, document sharing, group membership, access requests, and bookmarks.
+Guidelines for AI agents implementing invitations, document sharing, group and collection membership, and access requests.
 
 ## Mental Model
 
-Sharing in Primitive is built from three orthogonal primitives the client cares about, plus several internal primitives the platform manages on your behalf.
+Sharing in Primitive is built from a small set of primitives the client cares about, plus several internal primitives the platform manages on your behalf.
 
 **Client-facing primitives:**
 
 | Primitive | Grants | Scope |
 |-----------|--------|-------|
 | `AppInvitation` | Right to join the app | App |
+| `AppMembership` | Membership in an app | App |
 | `DocumentPermission` | Direct access to one document | Document |
 | `DocumentGroupPermission` | Access via group membership | Document |
 | `DatabaseGroupPermission` | Access to a database via group (`"manager"` only) | Database |
+| `Collection` membership | Access to every document in a collection | Collection |
+| `CollectionGroupPermission` | Collection access via group membership | Collection |
 | `DocumentAccessRequest` | Request the owner notice you | Document |
-| `Bookmark` | Presentational pointer only (no access) | User |
 
 **Internal (platform-managed):**
 
 | Primitive | Purpose |
 |-----------|---------|
-| `DeferredDocumentPermission` | Tracks an email-based share until the recipient signs up |
-| `DeferredGroupAdd` | Tracks an email-based group add until the recipient signs up |
+| `DeferredDocumentPermission` | Tracks an email-based document share until the recipient signs up |
+| `DeferredGroupAdd` | Tracks an email-based group or collection add until the recipient signs up |
 
 The deferred types make email-based sharing work — the platform remembers the intent until a matching user account exists. **Do not interact with them directly in product code.** The sharing APIs accept emails transparently. `client.invitations.listDeferredGrants(...)` exists only for admin debugging tools.
 
-**Permission levels (document):** `"owner"` > `"read-write"` > `"reader"`. (`"admin"` is an app-role projection, not a grantable document permission.) Effective permission = MAX(direct, group-derived). Granting a *lower* group permission to someone who already has a higher direct grant is a no-op for them.
+**Permission levels (document):** `"owner"` > `"read-write"` > `"reader"`. (`"admin"` is an app-role projection, not a grantable document permission.) Effective permission = MAX(direct, group-derived, collection-derived). Granting a *lower* group permission to someone who already has a higher direct grant is a no-op for them.
 
 **Decision rules:**
 
@@ -35,7 +37,7 @@ The deferred types make email-based sharing work — the platform remembers the 
 3. If a user hits a 403 → check the response's `canRequestAccess` hint and either show "Request access" or a hard-deny screen.
 4. **Share at the highest level that fits — `collection` > `group` > `doc`.** Granting on a collection automatically propagates to every document inside it (current and future). Don't add per-document grants for things you've already shared at the collection level. Same logic for groups: add a user to a group once, every doc that group has access to follows.
 5. Use groups for team-scoped access; use direct permissions for individual access.
-6. Bookmarks are UI state, not access. Never use bookmarks to gate access — but **do** use `client.me.bookmarks.list` as the primary "my documents" surface (see [Discovery cheat sheet](#discovery-cheat-sheet)).
+6. Use `client.me.ownedDocuments()` for "documents I own" and `client.me.sharedDocuments()` for "documents shared directly with me." Group- and collection-scoped access is read through `groups.listDocuments`/`collections.listDocuments` (or by iterating the user's memberships).
 
 ---
 
@@ -45,15 +47,13 @@ The deferred types make email-based sharing work — the platform remembers the 
 
 2. **Never assume a deferred grant is immediate.** Email-based grants resolve at signup, not at write time. Don't show "Alice is a member" until she actually has an `AppMembership` row (i.e. her addMember response had `status: "added"` or `"already_member"`).
 
-3. **Never grant access just because a bookmark exists.** Bookmarks are presentational. Access comes from `DocumentPermission`, `DocumentGroupPermission`, `DatabaseGroupPermission`, or a resolved deferred grant.
+3. **Check member-invitation quota before showing invite UI.** A member with a 0 quota will hit a 403; hide the button instead.
 
-4. **Check member-invitation quota before showing invite UI.** A member with a 0 quota will hit a 403; hide the button instead.
+4. **Parse the 403 body for the `canRequestAccess` hint** when `documents.get` fails. The HTTP error message contains a JSON body with `{ code: "DOC_ACCESS_DENIED", canRequestAccess: bool }`.
 
-5. **Parse the 403 body for the `canRequestAccess` hint** when `documents.get` fails. The HTTP error message contains a JSON body with `{ code: "DOC_ACCESS_DENIED", canRequestAccess: bool }`.
-
-6. **Cancel pending shares with the right call.** Email-based shares/group-adds attached to an `AppInvitation` do *not* auto-cancel when you remove a single share. Either:
-   - Cancel one pending share by email: `client.documents.removePermission(docId, { email })` or `client.groups.removeMember(type, id, { email })`.
-   - Cancel everything (the invite + all pending shares + all pending group adds linked to it): `client.invitations.delete(invitationId)`.
+5. **Cancel pending shares with the right call.** Email-based shares/group-adds attached to an `AppInvitation` do *not* auto-cancel when you remove a single share. Either:
+   - Cancel one pending share by email: `client.documents.removePermission(docId, { email })`, `client.groups.removeMember(type, id, { email })`, or `client.collections.removeMember(collectionId, ...)`.
+   - Cancel everything (the invite + all pending shares + all pending group/collection adds linked to it): `client.invitations.delete(invitationId)`.
 
 ---
 
@@ -348,11 +348,22 @@ const { items, cursor } = await client.groups.listMembers("team", "engineering")
 Sharing a `DocumentCollection` (see the [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#collections)) cascades access to every document inside it — current and future. Reach for collections when several documents share a sharing context.
 
 ```typescript
-// Add an individual member
+// Add an individual member by userId
 await client.collections.addMember(collectionId, {
-  userId: "user-abc",                    // userId only — see gap below
+  userId: "user-abc",
   permission: "read-write",              // "reader" or "read-write"
 });
+
+// Or by email — deferred grant resolves on signup, mirroring documents/groups
+const result = await client.collections.addMember(collectionId, {
+  email: "newhire@example.com",
+  permission: "reader",
+  sendEmail: true,                       // optional: platform sends an invite email
+  collectionUrl: "https://...",          // required when sendEmail is true
+  note: "Sharing the onboarding docs",
+});
+// result.status: "added" | "already_member" | "pending_signup"
+// Pending case carries { invitationId, inviteToken, expiresAt }.
 
 // Share with a group (fans out to every document in the collection)
 await client.collections.grantGroupPermission(collectionId, {
@@ -364,13 +375,15 @@ await client.collections.grantGroupPermission(collectionId, {
 // Inspect / undo
 const access = await client.collections.getAccess(collectionId);
 // → { members: [...], groups: [...] }
+const pending = await client.collections.listPendingInvitations(collectionId);
+// → [{ email, permission, invitationId, expiresAt, ... }]
 await client.collections.removeMember(collectionId, "user-abc");
 await client.collections.revokeGroupPermission(collectionId, "team", "engineering");
 ```
 
 **Cascade rule:** once a user gains access to the collection, they have access to every document in it. Don't add per-document grants for documents already shared at the collection level — the collection grant is canonical.
 
-> **Gap (#671):** `collections.addMember` accepts `userId` only — there's no email-based deferred grant yet, and there's no `collections.listPendingInvitations` for a "Members + Pending" UI on a collection. To share a collection with someone who hasn't signed up, either invite them at the app level first (`client.invitations.create({ email })` or share an individual document with them by email so the deferred-grant flow runs) and add them to the collection after signup, or share the collection with a group they'll be a member of.
+The deferred-grant flow on `collections.addMember({ email })` mirrors the document share path: `app.baseUrl` must be configured, `sendEmail: true` requires `collectionUrl`, and `client.invitations.delete(invitationId)` cancels every pending collection add (plus any pending document shares and group adds) attached to the invitation.
 
 ---
 
@@ -488,65 +501,31 @@ The server pushes WS frames `document:access-request-created` (to owners/admins)
 
 ---
 
-## Bookmarks
-
-### API
-
-```typescript
-await client.me.bookmarks.add({
-  targetObjType: "d",                              // documents are "d", not "document"
-  targetObjId: documentId,
-  key: "projects/acme/q2-planning",                // optional; default `${type}/${id}`
-});
-
-const { bookmarks, nextCursor } = await client.me.bookmarks.list({
-  prefix: "projects/acme/",
-  limit: 100,
-});
-
-await client.me.bookmarks.rename(oldKey, newKey);
-await client.me.bookmarks.remove(key);
-```
-
-`add()` returns `{ status: "added" | "already_bookmarked", key, targetObjType, targetObjId, bookmarkedAt }`. Today only `targetObjType: "d"` (document) is registered. Adding for an unsupported type returns `{ code: "UNKNOWN_TARGET_TYPE" }`.
-
-### Design guidelines
-
-1. **`me.bookmarks.list` is the primary "my documents" UI.** It's the user-curated list and the platform pre-populates it for the common cases — auto-bookmark on document creation and on deferred-grant resolution at signup, auto-removal on permission revoke. For everyday "my stuff" UI, lead with bookmarks; users can drop bookmarks they don't want without losing access, and add bookmarks for shares they want to keep handy.
-
-2. **Use hierarchical `key`s.** `projects/acme/q2-planning` is better than `q2-planning` because prefix queries let you organize folders cheaply. The field on the request is `key`; the server stores it as `userDefinedKey`.
-
-3. **Use `client.me.sharedDocuments()` for the inbox view** — "things directly shared with me that aren't on my curated list yet." It returns documents the user has a non-owner `DocumentPermission` on plus pending `DocumentInvitation`s; group- and collection-shared docs do **not** appear here (they show up only when the user bookmarks them, or when you query `groups.listDocuments` / `collections.listDocuments` directly).
-
-4. **Auto-bookmarks happen server-side** on document creation and on deferred-grant resolution at signup. Direct grants to existing users (by `userId`) do not auto-bookmark — the recipient sees them in `me.sharedDocuments` until they bookmark them. Don't double-create bookmarks from the client.
-
-5. **Bookmarks are purely presentational.** Never make access decisions based on bookmark existence.
-
----
-
 ## Discovery cheat sheet
 
 Pick the call that answers the question you're actually asking. The most common UX questions and the right call:
 
 | Question | Call |
 |----------|------|
-| **"My documents" home view** (created + bookmarked shares/collections/groups) — preferred | `client.me.bookmarks.list({ prefix?, cursor?, limit? })` |
-| Documents I created (the definitive owned list, even ones I un-bookmarked) | `client.documents.list({ limit?, cursor?, tag?, returnPage? })` — actually returns docs where I have a direct `DocumentPermission` (owner + reader/read-write); use it when you specifically need that scope |
-| Documents directly shared with me that aren't on my curated list yet | `client.me.sharedDocuments({ cursor?, limit? })` |
+| Documents the user owns (created or had ownership transferred to) | `client.me.ownedDocuments({ tag?, limit?, cursor?, returnPage? })` |
+| Documents directly shared with the user (`DocumentPermission` + pending `DocumentInvitation`) | `client.me.sharedDocuments({ tag?, cursor?, limit? })` |
+| Pending document invitations the user can accept | `client.me.pendingDocumentInvitations()` |
 | Documents inside a collection | `client.collections.listDocuments(collectionId, { limit?, cursor? })` |
 | Documents shared with a group | `client.groups.listDocuments(groupType, groupId)` |
-| Collections I'm a direct member of | `client.collections.list({ limit?, cursor? })` |
+| Collections the user is a direct member of | `client.collections.list({ limit?, cursor? })` |
 | Members of a group | `client.groups.listMembers(groupType, groupId, { limit?, cursor? })` |
 | Members + groups on a collection | `client.collections.getAccess(collectionId)` |
 | Group permissions on a document | `client.documents.listGroupPermissions(documentId)` |
-| **Pending email invites on a document** (for "Members + Pending" UI) | `client.documents.listPendingInvitations(documentId)` |
-| **Pending email invites on a group** (for "Members + Pending" UI) | `client.groups.listPendingInvitations(groupType, groupId)` |
+| Pending email invites on a document (for "Members + Pending" UI) | `client.documents.listPendingInvitations(documentId)` |
+| Pending email invites on a group (for "Members + Pending" UI) | `client.groups.listPendingInvitations(groupType, groupId)` |
+| Pending email invites on a collection (for "Members + Pending" UI) | `client.collections.listPendingInvitations(collectionId)` |
+
+To render a complete "everything I can access" view, combine `me.ownedDocuments()` + `me.sharedDocuments()` with the user's collection and group memberships (iterate `collections.list` / `groups.listUserMemberships` and call the corresponding `listDocuments`).
 
 **Anti-patterns:**
 
-- Filtering `me.bookmarks.list` to build a "shared with me" inbox — bookmarks miss shares the user never bookmarked. Use `me.sharedDocuments` for that.
 - Polling `client.invitations.list` (or `listDeferredGrants`) to populate "Members + Pending" rows — those are app-level / admin surfaces. Per-resource `listPendingInvitations` is the product UI source.
-- Calling `documents.list` to render a "my documents" home view — it doesn't include group- or collection-shared docs, and it surfaces docs the user un-bookmarked. Lead with `me.bookmarks.list`.
+- Calling `me.sharedDocuments` and assuming it includes group- or collection-shared docs — it only carries direct `DocumentPermission` rows and pending `DocumentInvitation`s.
 
 ---
 
@@ -727,15 +706,16 @@ if (body?.code === "DOC_ACCESS_DENIED" && body.details?.canRequestAccess) {
 ## Anti-Patterns
 
 - Calling a method that doesn't exist: `setPermissions`, `setGroupPermission`, `client.invitations.revoke`, `client.deferredGrants.list`, `client.users.lookup({ email })`. The correct names are `updatePermissions`, `grantGroupPermission`, `client.invitations.delete`, `client.invitations.listDeferredGrants`, `client.users.lookup(email)`.
+- Reaching for `client.me.bookmarks.*` — removed. There is no bookmarks API today; build "my documents" from `me.ownedDocuments` + `me.sharedDocuments` (and group/collection lists for indirect access).
+- Reaching for `client.documents.createInvitation`, `acceptInvitation`, `declineInvitation`, or `listPendingInvitationsForUser` — these per-document invitation methods are deprecated. Use `documents.updatePermissions(documentId, { email, ... })` to share by email; the recipient redeems the returned `inviteToken` via `client.invitations.accept(inviteToken)`, and `client.me.pendingDocumentInvitations()` is the current "invitations I can accept" listing.
+- Reaching for `client.documents.list()` — deprecated. Use `client.me.ownedDocuments(...)` and `client.me.sharedDocuments(...)`.
 - Passing `permission: null` to remove a grant — there is no null form. Use `removePermission`.
 - Lowering a user's direct permission while they still have a higher one via group — the group wins (effective = MAX).
-- Filtering bookmarks to build "shared with me." Use `client.me.sharedDocuments()`.
-- Making access decisions based on bookmark membership.
+- Assuming `me.sharedDocuments()` includes group- or collection-shared docs — it doesn't. Combine it with `collections.list()` / `groups.listUserMemberships(...)` for a complete picture.
 - Showing a "request access" button without parsing the 403 body for `details.canRequestAccess`.
 - Calling `client.invitations.delete()` to cancel a single pending document share — it cascades to every share and group add linked to that invitation.
 - Polling `invitations.list()` for acceptance. Subscribe to `client.on("invitation", ...)` and switch on `event.action === "accepted"` (delivered to the inviter).
 - Listening for `client.on("document:access-request-resolved", ...)` — that channel doesn't exist client-side.
-- Using `targetObjType: "document"` for bookmarks — it's `"d"`.
 
 ---
 
@@ -754,8 +734,6 @@ Server-emitted body codes. The client throws `Error("HTTP <status>: <body>")`; p
 | `INVITE_TOKEN_INVALID` | `invitations.accept` | Token doesn't decode |
 | `INVITE_TOKEN_EXPIRED` | `invitations.accept` | Past `expiresAt` |
 | `INVITE_ALREADY_ACCEPTED` | `invitations.accept` | Token already redeemed |
-| `UNKNOWN_TARGET_TYPE` | `me.bookmarks.add` | `targetObjType` not registered (only `"d"` today) |
-| `TARGET_ACCESS_DENIED` | `me.bookmarks.add` | Caller has no permission to the bookmarked target |
 
 ---
 

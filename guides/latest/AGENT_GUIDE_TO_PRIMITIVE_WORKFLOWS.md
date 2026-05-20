@@ -28,7 +28,7 @@ greeting = "Hello {{ input.name }}"
 ```
 
 Workflow-level fields the engine actually reads:
-`perUserMaxRunning`, `perUserMaxQueued`, `perAppMaxRunning` (default 25), `perAppMaxQueued` (default 10000), `queueTtlSeconds` (default 43200), `dequeueOrder`, `accessRule`, `inputSchema`, `outputSchema`, `requiresClientApply` (default `true` — see "Client apply" below). Sync currently pushes everything except `perAppMax*`, `queueTtlSeconds`, and `requiresClientApply`; set those via `primitive workflows update` if you need non-defaults.
+`perUserMaxRunning`, `perUserMaxQueued`, `perAppMaxRunning` (default 25), `perAppMaxQueued` (default 10000), `queueTtlSeconds` (default 43200), `dequeueOrder`, `accessRule`, `inputSchema`, `outputSchema`, `requiresClientApply` (default `true` — see "Client apply" below), `syncCallable` (default `false` — see "Synchronous invocation" below). Sync pushes the schema fields, access rule, queue settings, and step list; `requiresClientApply` and `syncCallable` are server-side flags set via `primitive workflows update` (or admin API).
 
 ### Per-step common fields
 
@@ -38,14 +38,16 @@ All steps support these in addition to their own:
 |---|---|
 | `id` (req) | Unique within the workflow |
 | `kind` (req) | Step type — see list below |
+| `name`, `description` | Optional human-readable labels surfaced in CLI/admin views |
 | `runIf` | CEL expression; skip step if false |
 | `selector` | Override `selected` context (`{ source = "step", stepId = "..." }` or `{ source = "context", path = "outputs.x" }`) |
 | `saveAs` | Also store output under `outputs[saveAs]` |
-| `forEach` | Iterate over a list expression (path to array, or to `{items: [...]}`) |
+| `forEach` | Iterate over a list expression (path to array, or to `{items: [...]}`), or a `{ zip, as }` table for parallel-array iteration |
 | `as` | Loop variable name (default exposes `selected`) |
 | `maxItems` | forEach cap (default 200) |
 | `concurrency` | Parallel forEach lanes (integer 1-100; default 1 = sequential). Results preserve insertion order. |
-| `continueOnError` | Capture errors as `{ error, errorDetails }` instead of failing the workflow |
+| `successWhen` | CEL predicate evaluated per forEach iteration to classify the result as functionally succeeded vs empty (see `forEach` below) |
+| `continueOnError` | Capture errors as `{ error, errorDetails, ok: false, errored: true }` instead of failing the workflow |
 | `strict` | Throw if any template expression in this step is unresolved |
 
 ## Step types
@@ -69,6 +71,36 @@ items = "{{ steps.fetch.data }}"     # single-expression mode preserves arrays
 ### `noop`
 
 Returns `{ message, payload }`. For testing.
+
+### `switch`
+
+First-match branching. Cases are CEL `when` expressions evaluated top-to-bottom in the same scope as `runIf`; the first truthy case's `output` is templated and returned. Non-selected cases are NOT templated, so they can safely reference outputs of steps that didn't run.
+
+```toml
+[[steps]]
+id = "tier"
+kind = "switch"
+saveAs = "plan"
+
+[[steps.cases]]
+when = "input.score >= 90"
+[steps.cases.output]
+label = "gold"
+discount = 0.2
+
+[[steps.cases]]
+when = "input.score >= 70"
+[steps.cases.output]
+label = "silver"
+discount = 0.1
+
+[steps.default]
+[steps.default.output]
+label = "standard"
+discount = 0
+```
+
+`default` is opt-in. Omit it and a no-match throws `Switch step '<id>' had no matching case and no default`. An explicit `default = { output = null }` skips on no-match (the step output is `null`).
 
 ### `delay`
 
@@ -407,6 +439,26 @@ saveAs = "billingUpgrades"
 | `secrets` | App secrets (read-only) |
 | `<asVar>` | Current item inside a `forEach` step |
 | `loop`, `iteration` | `{ index, count, first, last }` inside `forEach` (use `iteration` in CEL `runIf` since `loop` is reserved) |
+| `now`, `today`, `uuid`, `ulid` | Built-in zero-arg helpers (see below) |
+
+### Built-in template helpers
+
+Four zero-arg helpers are always available in templates. They re-evaluate on every reference — `{{ now }} {{ now }}` produces two different timestamps.
+
+| Name | Returns |
+|---|---|
+| `now` | Current ISO 8601 timestamp (e.g. `2026-05-20T14:38:00.123Z`) |
+| `today` | Current UTC date as `YYYY-MM-DD` |
+| `uuid` | Fresh random UUID v4 |
+| `ulid` | Fresh random ULID (lexicographically sortable) |
+
+```toml
+filename = "report-{{ today }}-{{ ulid }}.pdf"
+correlationId = "{{ uuid }}"
+generatedAt = "{{ now }}"
+```
+
+User-provided keys win over built-ins. If you bind `as = "uuid"` in a forEach, pass `input.now`, or have a step output named `today`, the user value shadows the built-in for that scope.
 
 **Single-expression mode**: when the entire string is one `{{ ... }}`, the raw value (array/object) is returned, not stringified. Otherwise expressions are coerced to strings and interpolated.
 
@@ -441,15 +493,38 @@ Available filters (see `src/workflows/runner/templates.ts` for full list):
 
 Templates have **no arithmetic** (`{{ a + b }}` won't work). Move math into a step or filter chain.
 
+**Missing path sentinel.** In interpolation mode (`"prefix-{{ steps.x.y }}-suffix"`), an unresolved path renders as `<missing: steps.x.y>` so it's visible in step output and logs. In single-expression mode (`"{{ steps.x.y }}"` alone) the raw value is `null` so downstream `runIf`/comparisons work naturally. A resolved `null` interpolates as `"null"`; a resolved empty string interpolates as `""`. Set `strict = true` on the step to throw on any unresolved path instead.
+
 ## `runIf` (CEL, not templates)
 
 ```toml
 runIf = "input.shouldRun"                        # truthy
 runIf = "outputs.text.length < 1000"             # comparison
 runIf = "steps.check.isMember && input.amount > 0"
+runIf = "steps.previous.ok"                      # uniform verdict on every step
+runIf = "!steps.fetch.skipped"
 ```
 
 CEL context: `input`, `selected`, `steps`, `outputs`, `meta`, `secrets`, plus `iteration` (and `as`-var) inside `forEach`. **Do NOT wrap in `{{ }}`** — `runIf` parses CEL directly. A CEL evaluation error fails the step (or is captured by `continueOnError`).
+
+### Safe navigation
+
+CEL optional types are enabled in every workflow context (`runIf`, `accessRule`, group/database access rules, cron triggers). Use them to collapse multi-conjunct null guards.
+
+| Syntax | Meaning |
+|---|---|
+| `steps.foo.?bar` | Optional field access — returns an optional, never throws on missing |
+| `steps.foo[?"bar"]` | Optional index access (same, for map/list lookups) |
+| `expr.orValue(default)` | Unwrap optional, falling back to `default` |
+| `expr.hasValue()` | True if the optional is set |
+| `optional.of(x)` / `optional.none()` | Construct optionals explicitly |
+
+```cel
+runIf = 'steps.fetch.?data.?items.orValue([]).size() > 0'
+runIf = 'steps.profile.?role.hasValue() && steps.profile.role == "owner"'
+```
+
+Without safe navigation, `steps.fetch.data.items` throws on any missing intermediate; with it, the chain short-circuits to `optional.none()` and `.orValue([])` supplies the fallback.
 
 ## `forEach`
 
@@ -465,7 +540,7 @@ subject = "Update"
 htmlBody = "<p>Hi {{ member.name }}</p>"
 ```
 
-Output is always `{ items: [...per-iter results], errors: [{index, error}], totalSucceeded, totalFailed }` — even when there are no errors. Results are ordered by input index regardless of completion order.
+Output is always `{ items: [...per-iter results], errors: [{index, error}], totalSucceeded, totalFailed, totalEmpty, ok }` — even when there are no errors. Results are ordered by input index regardless of completion order. `ok` is `true` iff every iteration succeeded (and the source was non-empty); use it in `runIf` on the next step.
 
 **Parallel forEach** — add `concurrency` to fan out iterations across multiple lanes:
 
@@ -483,6 +558,40 @@ htmlBody = "<p>Hi {{ member.name }}</p>"
 ```
 
 When `concurrency = 1` (the default), iterations are sequential. When `concurrency > 1`, the engine fans them out in parallel batches — durable mode uses child workflow instances so restarts don't re-run completed items. For very large fan-outs, `workflow.start` + `workflow.await` gives finer control.
+
+### Zip mode (parallel arrays by index)
+
+When the inputs you want to iterate live in several arrays of the same length, use the `{ zip, as }` form. Each iteration binds one variable per `as` name from the matching `zip` expression at the same index.
+
+```toml
+[[steps]]
+id = "send"
+kind = "email.send"
+forEach = { zip = ["steps.list.users", "steps.list.tokens"], as = ["user", "token"] }
+to = "{{ user.email }}"
+subject = "Your code"
+htmlBody = "<p>Code: {{ token }}</p>"
+```
+
+This replaces the silently-corrupting `steps.list.tokens[iteration.index]` pattern — if the arrays drift in length, the engine surfaces it instead of indexing past the end.
+
+### `successWhen` (functional success vs. empty)
+
+For iterations that don't throw but didn't accomplish anything meaningful (e.g. an HTTP 200 with `body.matches = []`), use `successWhen` to classify the outcome.
+
+```toml
+[[steps]]
+id = "lookup"
+kind = "integration.call"
+forEach = "input.queries"
+as = "q"
+successWhen = "result.body.matches.size() > 0"
+[steps.request]
+method = "GET"
+path = "/search?q={{ q }}"
+```
+
+The predicate runs against each iteration's `result` plus the usual `input`/`steps`/`outputs`/`meta`/`iteration` context. Truthy → `functional_status: "succeeded"`; falsy → `"empty"`; throws → `"failed"` (the predicate is not evaluated). `totalEmpty` on the step output counts the empty bucket. A broken predicate falls back to `"succeeded"` and the workflow continues.
 
 ## Error handling
 
@@ -522,6 +631,24 @@ After all steps run:
 
 **Best practice**: end with a `transform` step using `saveAs = "output"` that explicitly shapes the return value.
 
+### Uniform step verdict
+
+Every entry in `steps[id]` carries a reserved verdict namespace alongside the runner's own fields:
+
+| Field | When set |
+|---|---|
+| `ok: boolean` | Always. `true` if the step ran and the runner classified it as successful; `false` for skipped, errored, or kind-specific failures (e.g. an `integration.call` that returned HTTP 5xx) |
+| `skipped: true` | The step's `runIf` evaluated falsy. The runner did NOT execute. |
+| `errored: true` | The step threw but was captured by `continueOnError = true` |
+| `error`, `errorDetails` | Companion fields populated when `errored: true` |
+
+`ok`, `skipped`, `errored`, `error`, and `errorDetails` are written by the engine and override any same-named field the runner would have produced. Downstream `runIf` and templates can rely on them on every step kind:
+
+```toml
+runIf = "steps.fetch.ok"
+runIf = "!steps.fetch.skipped && !steps.fetch.errored"
+```
+
 ## Access control
 
 `accessRule` is a CEL expression. Evaluated when:
@@ -548,6 +675,18 @@ primitive workflows update <workflow-id> --requires-client-apply false
 ```
 
 `primitive sync push` does NOT push this flag — set it via the create/update commands.
+
+## Synchronous invocation (`runSync`)
+
+Opt a workflow into synchronous invocation by setting `syncCallable = true` (admin API or `primitive workflows update`). Once set, clients can call `client.workflows.runSync()` and `await` the final envelope in a single round-trip — useful for short, latency-sensitive tasks like input validation, enrichment lookups, or webhook handlers that must reply with a result.
+
+Constraints:
+
+- **Step kinds are restricted.** The server validates step kinds against a sync-compatible list when the flag is set (or when steps are pushed against a sync-callable workflow). Long-running or suspending kinds (`event.wait`, `workflow.await`, `delay` over the timeout) reject at save time with `Workflow contains sync-incompatible steps`.
+- **Timeout.** `timeoutMs` defaults to 5s and is capped server-side at 30s (Cloudflare Workers CPU budget). Exceeding it resolves with `status: "timeout"`.
+- **Apply still applies.** A sync-callable workflow may still have `requiresClientApply = true`, in which case `runSync` resolves with `status: "apply_pending"` and the normal `claimApply`/`confirmApply` flow takes over. Most sync-callable workflows want `requiresClientApply = false`.
+
+Long-running workflows should keep using `start()` plus the WebSocket / polling lifecycle.
 
 ## Workflow lifecycle
 
@@ -585,6 +724,9 @@ primitive workflows create --from-file workflow.toml [--requires-client-apply fa
 primitive workflows update <workflow-id> --status active
 primitive workflows delete <workflow-id>           # archive
 primitive workflows delete <workflow-id> --hard --yes
+
+# Expand fragment includes (for debugging)
+primitive workflows expand <workflow.toml>
 
 # Preview a workflow
 primitive workflows preview <workflow-id> --input '{"x":1}' --wait
@@ -629,6 +771,31 @@ primitive workflows analytics top --days 7
 ```
 
 All inspection commands take `--json`.
+
+### Reusable step fragments
+
+A workflow TOML can pull shared `[[steps]]` blocks out of fragment files via `include`:
+
+```toml
+# config/workflows/onboard.toml
+[workflow]
+key = "onboard"
+name = "Onboard new user"
+status = "active"
+
+include = ["common-validation", "common-audit"]
+
+[[steps]]
+id = "create-account"
+kind = "database.mutate"
+# ...
+```
+
+Fragments live at `<workflowDir>/../workflow-fragments/<name>.toml` and contain only `[[steps]]` tables (no `[workflow]` block, no further `include`). The CLI expands `include` references before `sync push` — the server only ever stores the flattened step list. Step ids must be unique across the expanded set; collisions are reported with both source locations. Use `primitive workflows expand <file>` to print the expanded result.
+
+### Operation `$params` validation
+
+When a workflow references a registered database operation via `database.query`/`mutate`/etc., the CLI checks that every `$params.X` substitution in the operation's TOML maps to a declared `[[operations.params]]` entry at `sync push` time. A typo like `$params.proectId` is reported with the file path and line number of the offending `[[operations]]` block instead of silently no-opping at runtime.
 
 ### Cron triggers
 
@@ -683,6 +850,17 @@ const result = await client.workflows.start({
   forceRerun: false,                // optional — terminate existing run with same key
 });
 // → { runId, runKey, instanceId, status, existing? }
+
+// Synchronous invocation — only on workflows with syncCallable = true
+const sync = await client.workflows.runSync({
+  workflowKey: "validate-token",
+  input: { token },
+  timeoutMs: 5000,                 // default 5000; server caps at 30000
+  // signal: abortSignal,            // optional AbortSignal
+});
+// → { runId, runKey, status, output?, error?, run?, existing? }
+// status: "completed" | "failed" | "terminated" | "timeout" | "apply_pending"
+// Promise resolves for every terminal outcome — only transport errors reject.
 
 const status = await client.workflows.getStatus({
   workflowKey: "my-workflow",
@@ -763,8 +941,8 @@ Authorization = "Bearer {{ secrets.API_KEY }}"
 # WRONG — meta only has whatever you passed to start()
 filename = "{{ meta.startedAt }}.pdf"
 
-# RIGHT — use a filter, or pass it in via meta
-filename = "{{ '' | now }}.pdf"
+# RIGHT — use a built-in helper, or pass timestamps in via meta
+filename = "{{ now }}.pdf"
 ```
 
 ### Wrong: re-running an idempotent step inside a retry loop

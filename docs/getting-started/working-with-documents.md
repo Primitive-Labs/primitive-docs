@@ -50,7 +50,7 @@ Users have multiple documents but work in one at a time. They create, switch bet
 The `primitive-app` library provides `PrimitiveDocumentSwitcher` and `PrimitiveDocumentList` components for this pattern.
 
 ```typescript
-const documents = await jsBaoClient.documents.list();
+const documents = await jsBaoClient.me.ownedDocuments();
 await jsBaoClient.documents.open(selectedDocumentId);
 ```
 
@@ -371,22 +371,37 @@ await client.documents.grantGroupPermission(documentId, {
 
 The `primitive-app` library provides a `PrimitiveDocumentList` component with built-in sharing UI.
 
-For the full sharing story — member invitations with quotas, email-based grants, access requests, and bookmarks — see [Sharing and Invitations](./sharing-and-invitations.md).
+For the full sharing story — member invitations with quotas, email-based grants, and access requests — see [Sharing and Invitations](./sharing-and-invitations.md).
 
-## Bookmarks — the primary "my documents" view
+## Listing the User's Documents
 
-Bookmarks are how users curate their home screen, and they're the call to reach for when rendering "my documents":
+Two calls cover the "my documents" surface:
 
 ```typescript
-const { bookmarks, nextCursor } = await client.me.bookmarks.list({
-  prefix: "projects/",   // optional hierarchical prefix
-  limit: 50,
+// Documents the user owns — what they created or had ownership transferred to.
+const owned = await client.me.ownedDocuments();
+
+// Documents shared directly with the user (non-owner permission grants and
+// pending document invitations). Doesn't include group- or collection-shared
+// documents — those are listed through the group or collection.
+const { documents } = await client.me.sharedDocuments();
+```
+
+Both accept `tag`, `limit`, and `cursor` for filtering and pagination. `me.ownedDocuments()` also has an `includeRoot` flag (the user's root document is excluded by default) and a `returnPage: true` overload that returns a paginated `DocumentListPage` instead of a flat array.
+
+## Document Thumbnails and Metadata
+
+Documents carry two presentation fields you can update at any time:
+
+```typescript
+await client.documents.update(documentId, {
+  title: "Q2 Planning",
+  thumbnailBlobId: blob.blobId,     // reference a blob you previously uploaded
+  metadata: { color: "blue", tags: ["plan", "q2"] },  // ≤4KB JSON, replace semantics
 });
 ```
 
-The platform auto-bookmarks documents on creation and on deferred-grant resolution at signup, so apps mostly just need `list` (and `rename`, if you let users reorganize). For documents directly shared with a user (by `userId`) or shared via a group/collection, use `client.me.sharedDocuments()` to surface them as an "inbox" until the user adds them to their bookmarks.
-
-See [Sharing and Invitations](./sharing-and-invitations.md#bookmarks) for the full bookmarks API.
+`thumbnailBlobId` points at a blob you've already uploaded; the platform makes the thumbnail readable to anyone with access to the document. `metadata` is a small JSON blob (4KB cap on the serialized form) for UI hints that should travel with the document — pass `null` to clear either field.
 
 ## Document Access Requests
 

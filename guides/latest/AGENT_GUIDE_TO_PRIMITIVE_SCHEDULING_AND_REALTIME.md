@@ -28,19 +28,19 @@ Two independent capabilities. They often combine, but they answer different ques
 
 3. **`overlapPolicy` is `"skip"` (default) or `"allow"`.** There is no `"queue"`. `"skip"` checks if the previous run is still active and increments `skippedCount`; `"allow"` always fires.
 
-4. **Per-app cap is 50 cron triggers; per-database cap is 20 subscriptions** (and max 5 declared `params` per subscription).
+4. **Per-app cap is 50 cron triggers.** Subscriptions live on the database type config and apply to every database of that type — push them with `primitive sync push` alongside operations and triggers (max 5 declared `params` per subscription).
 
-5. **Subscriptions need both `accessRule` and `filter` CEL.** `accessRule` is checked once at subscribe time with full user/membership context. `filter` runs per change and only sees `user.userId`, `record.*`, `params.*` — no memberships, no `database.*`. Don't put membership logic in `filter`.
+5. **Subscriptions need both `accessRule` and `filter` CEL.** `accessRule` is checked once at subscribe time with full user/membership context. `filter` runs per change and only sees `user.userId`, `record.*`, `previousData.*`, `params.*` — no memberships, no `database.*`. Don't put membership logic in `filter`.
 
-6. **Writer's *connection* is excluded from subscription fanout, not the writer's user.** Another connection of the same user (e.g. another browser tab) WILL receive the change.
+6. **Writer's *connection* is excluded from subscription fanout, not the writer's user.** Another connection of the same user (e.g. another browser tab) WILL receive the change. Use `isOrigin` / `isOriginUser` on the inbound frame to suppress optimistic echoes.
 
 7. **No replay on reconnect.** The client auto re-issues `db.subscribe`, but missed changes during the disconnect are gone. Re-load on reconnect if you need consistency.
 
 8. **`unsub()` leaks if not called.** Each `subscribe()` returns an `unsub` function. Call it on view teardown or you accumulate `ConnectionMapping` rows and dead callbacks.
 
-9. **Subscriptions are per-database, not per-database-type.** They are NOT defined in TOML/sync — create them via the HTTP API or `client` (no `primitive sync` path).
+9. **Subscriptions are type-scoped.** A single subscription definition on a database type config serves every database of that type. Define them in the same TOML file as the rest of the type config.
 
-10. **The `filter` field has no `record.*` shorthand for top-level fields.** Use `record.data.fieldName`, not `record.fieldName`. Operation, model, and id are at the top level of `record`.
+10. **In the subscription `filter`, fields are not spread onto `record`.** Use `record.<fieldName>` for record fields plus the top-level `record.op`, `record.id`, `record.modelName`. `previousData.<fieldName>` is available for the pre-write row when subscribers exist.
 
 ---
 
@@ -186,46 +186,46 @@ const cronRuns = items.filter(r => r.contextDocId?.startsWith("cron:"));
 
 ## Database Subscriptions
 
-### Registering (server-side)
+### Registering (type config)
 
-Subscriptions are created via the HTTP API or client — they are **not** part of `primitive sync` TOML config. One subscription is scoped to one database (not to a database type).
+Subscriptions are defined on the database type config and apply to every database of that type. Push them via `primitive sync push` alongside operations and triggers.
 
-```typescript
-await client.makeRequest(
-  "POST",
-  `/databases/${databaseId}/subscriptions`,
-  {
-    subscriptionKey: "my-open-tickets",
-    displayName: "My open tickets",
-    accessRule: "user.userId != ''",                                  // CEL, evaluated at subscribe time
-    filter: "record.modelName == 'ticket' && record.data.assigneeId == user.userId && record.data.status == 'open'",
-  }
-);
+```toml
+# config/database-types/support-desk.toml
+[type]
+databaseType = "support-desk"
+
+[[subscriptions]]
+subscriptionKey = "my-open-tickets"
+displayName = "My open tickets"
+modelName = "ticket"
+accessRule = "user.userId != ''"
+filter = "record.assigneeId == user.userId && record.status == 'open'"
+
+# Optional — restricts payload fields server-side
+select = ["id", "title", "priority", "updatedAt"]
+# Optional — restricts which change types are delivered
+emit = ["enter", "update", "leave"]
 ```
 
 Parameterized:
 
-```typescript
-await client.makeRequest(
-  "POST",
-  `/databases/${databaseId}/subscriptions`,
-  {
-    subscriptionKey: "tickets-by-team",
-    displayName: "Tickets by team",
-    accessRule: "isMemberOf('team', params.teamId)",
-    filter: "record.modelName == 'ticket' && record.data.teamId == params.teamId",
-    params: {
-      teamId: { type: "string", required: true },
-    },
-  }
-);
+```toml
+[[subscriptions]]
+subscriptionKey = "tickets-by-team"
+displayName = "Tickets by team"
+modelName = "ticket"
+accessRule = "isMemberOf('team', params.teamId)"
+filter = "record.teamId == params.teamId"
+params = '{"teamId":{"type":"string","required":true}}'
 ```
 
-Notes on the schema:
-- There is **no `modelName` field** on the subscription itself. Filter on `record.modelName` inside the CEL expression if you only want one model.
-- `params` schema declares names with `type` (`string` | `number` | `boolean`) and optional `required: true`. Max 5 entries.
-- Per-database limit: 20 active subscriptions.
-- Field is `accessRule` (not `access`).
+Schema notes:
+- `subscriptionKey` is unique within the database type. Clients reference it when subscribing.
+- `modelName` scopes the subscription to one model.
+- `select` (optional string array) projects `data` and `previousData` to the listed fields before broadcast. Fields not listed never leave the server.
+- `emit` (optional string array) restricts which `changeType` values are delivered: `"enter"` (record entered the filter set), `"update"` (record was in the set and changed), `"leave"` (record exited the set).
+- `params` is a JSON string with names declared as `{ type: "string" | "number" | "boolean", required?: true }`. Max 5 entries.
 
 ### Subscribing (client)
 
@@ -236,12 +236,13 @@ const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
   onChange: (event) => {
     // event.type === "db.change"
     // event.databaseId, event.subscriptionKey, event.timestamp
+    // event.originConnectionId, event.originUserId, event.isOrigin, event.isOriginUser
+    if (event.isOrigin) return;  // this tab wrote it; UI already updated
     for (const change of event.changes) {
       // change.op:           "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet"
-      // change.modelName:    e.g. "ticket"
-      // change.id:           record id
-      // change.data:         new record data (save/patch/increment/addToSet/removeFromSet)
-      // change.previousData: prior data (patch/delete)
+      // change.changeType:   "enter" | "update" | "leave"
+      // change.modelName, change.id
+      // change.data, change.previousData  (subject to the subscription's `select`)
       applyChange(change);
     }
   },
@@ -272,10 +273,10 @@ sub.unsubscribe();
 // WRONG — onChange receives an envelope with `changes[]`, not a single record.
 onChange: (record) => render(record);
 
-// WRONG — record fields are nested under .data
-filter: "record.assigneeId == user.userId"
-// CORRECT:
+// WRONG — record fields are at the top level of `record`, not nested under .data.
 filter: "record.data.assigneeId == user.userId"
+// CORRECT:
+filter: "record.assigneeId == user.userId"
 ```
 
 ### CEL variables
@@ -294,11 +295,8 @@ filter: "record.data.assigneeId == user.userId"
 |----------|-------|
 | `user.userId` | The subscriber's user id. |
 | `user.role` | **Always `""` empty string in filter context.** Don't rely on it. |
-| `record.modelName` | Which model the row belongs to. |
-| `record.op` | One of `save`/`patch`/`delete`/`increment`/`addToSet`/`removeFromSet`. |
-| `record.id` | Record id. |
-| `record.data` | New data (null on delete). |
-| `record.previousData` | Prior data (null on create). |
+| `record.*` | The post-write record fields, plus `record.op`, `record.id`, `record.modelName`. |
+| `previousData.*` | The pre-write row when available (patch/delete). |
 | `params.*` | Bound params from `subscribe()`. |
 
 `filter` cannot grant access that `accessRule` denies — they're ANDed (subscribe is rejected if `accessRule` fails; otherwise only filter-matching changes are sent).
@@ -311,17 +309,30 @@ interface DatabaseChangePayload {
   databaseId: string;
   subscriptionKey: string;
   timestamp: string;             // ISO
+  /** Writer's connection id, or null for server-side writes (cron, workflow, admin). */
+  originConnectionId: string | null;
+  /** Writer's user id, or null for server-side writes. */
+  originUserId: string | null;
+  /** True iff this exact connection produced the write. Synthesized per recipient. */
+  isOrigin: boolean;
+  /** True iff any session signed in as the current user produced the write. */
+  isOriginUser: boolean;
   changes: DatabaseChangeEvent[]; // 1+ changes; batched per write op
 }
 
 interface DatabaseChangeEvent {
   op: "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet";
+  /** Filter-set transition. "enter" for newly matching rows, "update" for in-set
+   * changes, "leave" for rows that no longer match. */
+  changeType?: "enter" | "update" | "leave";
   modelName: string;
   id: string;
-  data?: any;          // present on save/patch/increment/addToSet/removeFromSet
-  previousData?: any;  // present on patch/delete
+  data?: any;          // present on save/patch/increment/addToSet/removeFromSet, subject to `select`
+  previousData?: any;  // present on patch/delete, subject to `select`
 }
 ```
+
+`isOrigin` flips to `false` for the writer's own frames sent before a WS reconnect (the local connection id rotates), which is harmless because the writer-exclusion server-side fanout already dropped the frame from that exact connection. `isOriginUser` is the stable cross-tab signal — use it for cache invalidation that doesn't care which tab made the write.
 
 ### Reconnect & cleanup behavior
 

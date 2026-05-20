@@ -447,7 +447,7 @@ await t.save({ targetDocument: "some-doc-id" });
 
 // Underlying client (auth, documents, etc.)
 await window.__primitiveAppClient.me.get();
-await window.__primitiveAppClient.documents.list();
+await window.__primitiveAppClient.me.ownedDocuments();
 ```
 
 Not exposed in production builds or non-debug hostnames.

@@ -83,51 +83,42 @@ const result = await TodoItem.query({});         // throws DocumentClosedError o
 
 ### 2. Document List Access
 
-For a user-facing "my documents" home view, lead with bookmarks:
+The "my documents" surface is split across two calls. Use `ownedDocuments` for what the user created (or had ownership transferred to) and `sharedDocuments` for things shared directly with them:
 
 ```typescript
-// Primary "my documents" surface — user-curated; auto-populated on doc
-// creation and on deferred-grant resolution at signup; auto-pruned on
-// permission revoke. Anything the user actively cares about lives here.
-const { bookmarks, nextCursor } = await jsBaoClient.me.bookmarks.list({
-  prefix: "projects/",   // optional hierarchical prefix
+// Documents the user owns. Cache-backed and offline-aware.
+const owned = await jsBaoClient.me.ownedDocuments({
+  tag: "todolist",          // optional tag filter
+  limit: 50,
+  // returnPage: true,        // returns DocumentListPage instead of array
+  // includeRoot: false,      // root document excluded by default
+});
+
+// Documents shared directly with the user — non-owner DocumentPermissions
+// plus pending DocumentInvitations. Group- and collection-shared documents
+// do NOT appear here.
+const { documents, nextCursor } = await jsBaoClient.me.sharedDocuments({
   limit: 50,
 });
-
-// "Inbox" view of things shared with me that aren't on my curated list yet
-// — non-owner DocumentPermissions plus pending DocumentInvitations.
-// Group/collection-shared docs do NOT appear here.
-const shared = await jsBaoClient.me.sharedDocuments({ limit: 50 });
 ```
 
-`documents.list` returns documents the caller has a direct `DocumentPermission` on (owner + reader/read-write); it doesn't include group- or collection-shared docs. Use it when you specifically need that scope — e.g. an admin/debug listing or a tag-filtered set you've built your UI around — not as the default "my documents" call.
+For an "everything I can access" surface, combine these two calls with group and collection memberships:
 
 ```typescript
-// Direct DocumentPermission rows (owner + reader + read-write).
-// Group- and collection-shared docs are NOT here.
-const documents = await jsBaoClient.documents.list();
+const owned  = await jsBaoClient.me.ownedDocuments();
+const shared = (await jsBaoClient.me.sharedDocuments()).documents;
+const collections = await jsBaoClient.collections.list();
+// then iterate collections / groups.listUserMemberships and call
+// collections.listDocuments / groups.listDocuments.
 ```
 
-**Pagination and filtering options:**
+`jsBaoClient.documents.hasLocalCopy(documentId)` is the synchronous local-cache check, useful when deciding whether to render skeletons before `open()` resolves.
 
-```typescript
-// Filter by tag
-const todoLists = await jsBaoClient.documents.list({ tag: "todolist" });
+#### Do not use
 
-// Paginated results
-const page = await jsBaoClient.documents.list({
-  limit: 20,
-  cursor: previousCursor,  // From previous page
-  returnPage: true,        // Returns { items, cursor } instead of array
-});
-// page.items = DocumentInfo[], page.cursor = next page cursor
-
-// Include root document (excluded by default)
-const withRoot = await jsBaoClient.documents.list({ includeRoot: true });
-
-// Check if a document has a local copy (synchronous)
-const hasLocal = jsBaoClient.documents.hasLocalCopy(documentId);
-```
+- **`client.documents.list()`** — deprecated. Returns the union of owner + reader + read-write rows and logs a console warning on every call. Use `me.ownedDocuments` and `me.sharedDocuments`; they have the same option set (`tag`, `limit`, `cursor`, `returnPage`).
+- **`client.documents.createInvitation(...)`, `documents.acceptInvitation(...)`, `documents.declineInvitation(...)`, `documents.listPendingInvitationsForUser(...)`** — the per-document `DocumentInvitation` flow. Use `documents.updatePermissions(documentId, { email, ... })` for the share path; the platform creates an `AppInvitation` + `DeferredDocumentPermission` and the recipient redeems it via `client.invitations.accept(inviteToken)`. `client.me.pendingDocumentInvitations()` is the current "invitations I can accept" lookup.
+- **`client.me.bookmarks.*`** — removed. There is no bookmarks API; render "my documents" from `me.ownedDocuments()` + `me.sharedDocuments()` (and `collections.list()` / `groups.listUserMemberships(...)` if you also want group/collection access).
 
 ## Common Document Usage Patterns
 
@@ -166,7 +157,7 @@ Users have multiple documents but work in one at a time, switching between them.
 
 ```typescript
 // List, open, create
-const documents = await jsBaoClient.documents.list();
+const documents = await jsBaoClient.me.ownedDocuments();
 await jsBaoClient.documents.open(selectedDocumentId);
 
 const { metadata } = await jsBaoClient.documents.create({
@@ -180,11 +171,11 @@ await jsBaoClient.documents.open(metadata.documentId);
 
 **Best for:** Apps that query across many documents, each with its own sharing context — chat (per channel), multi-tenant dashboards, collaborative workspaces with distinct collections.
 
-All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `documents.list({ tag })`.
+All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `me.ownedDocuments({ tag })` (and `me.sharedDocuments({ tag })` if the user can also be a non-owner).
 
 ```typescript
 // Open every document with a given tag
-const channels = await jsBaoClient.documents.list({ tag: "channel" });
+const channels = await jsBaoClient.me.ownedDocuments({ tag: "channel" });
 await Promise.all(
   channels.map((ch) => jsBaoClient.documents.open(ch.documentId))
 );
@@ -193,7 +184,7 @@ await Promise.all(
 const messages = await Message.query({});
 ```
 
-**Implementation tips for Pattern 3:** The demo app does not ship a built-in "multi-document" Pinia store. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over a local store. For per-tag in-memory tracking, build directly on `jsBaoClient.documents.list({ tag })` and `jsBaoClient.documents.open()`, and track per-document readiness yourself.
+**Implementation tips for Pattern 3:** The demo app does not ship a built-in "multi-document" Pinia store. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over a local store. For per-tag in-memory tracking, build directly on `jsBaoClient.me.ownedDocuments({ tag })` and `jsBaoClient.documents.open()`, and track per-document readiness yourself.
 
 A minimal store for "all documents tagged `channel`":
 
@@ -219,8 +210,9 @@ export const useChannelDocs = defineStore("channelDocs", () => {
   async function load() {
     loadError.value = null;
     try {
-      const docs = await client.documents.list({ tag: "channel" });
-      documentIds.value = docs.map((d) => d.documentId);
+      const owned = await client.me.ownedDocuments({ tag: "channel" });
+      const shared = (await client.me.sharedDocuments({ tag: "channel" })).documents;
+      documentIds.value = [...owned, ...shared].map((d) => d.documentId);
       await Promise.all(
         documentIds.value.map(async (id) => {
           await client.documents.open(id);
@@ -248,7 +240,7 @@ const { data: messages } = useJsBaoDataLoader({
 });
 ```
 
-The same pattern adapts to "the K most recent" or "channels the user belongs to" — change `documents.list(...)` and the readiness condition; everything else stays.
+The same pattern adapts to "the K most recent" or "channels the user belongs to" — change the `me.ownedDocuments` / `me.sharedDocuments` calls and the readiness condition; everything else stays.
 
 ## Data Modeling Decisions
 
@@ -274,12 +266,12 @@ const { metadata } = await jsBaoClient.documents.create({
   tags: ["todolist"],
 });
 
-// Filter documents by tag using list options
-const todoLists = await jsBaoClient.documents.list({ tag: "todolist" });
+// Filter the user's owned documents by tag
+const todoLists = await jsBaoClient.me.ownedDocuments({ tag: "todolist" });
 
 // Or filter locally
-const documents = await jsBaoClient.documents.list();
-const todoLists = documents.filter((doc) => doc.tags?.includes("todolist"));
+const owned = await jsBaoClient.me.ownedDocuments();
+const todoListsLocal = owned.filter((doc) => doc.tags?.includes("todolist"));
 ```
 
 **Programmatic tag management:**
@@ -937,7 +929,7 @@ await jsBaoClient.documents.open(result.documentId);
 
 ## Sharing Documents
 
-Documents can be shared with individual users (by userId or email), with groups, or exposed to a request-access flow for users with a link. For the full picture — member invitations with quotas, deferred grants, access requests, and bookmarks — see the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md).
+Documents can be shared with individual users (by userId or email), with groups, with collections, or exposed to a request-access flow for users with a link. For the full picture — member invitations with quotas, deferred grants, and access requests — see the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md).
 
 ### Quick Reference
 
@@ -1003,7 +995,7 @@ await client.documents.setGroupPermission(...);  // use grantGroupPermission
 await client.documents.requestAccess(id, { message: "..." }); // missing required `permission`
 ```
 
-Documents are auto-bookmarked for their creator and for any invitee whose deferred grant resolves at signup. Direct grants to existing users (by `userId`) do not auto-bookmark — those land in `me.sharedDocuments` until the user bookmarks them. **Use `client.me.bookmarks.list` as the primary "my documents" surface** (the user-curated list); reserve `client.me.sharedDocuments()` for an "inbox" of recently-shared docs the user hasn't curated yet.
+Render the user's documents from two calls: `client.me.ownedDocuments()` for documents they own, and `client.me.sharedDocuments()` for documents shared directly with them (non-owner `DocumentPermission` plus pending `DocumentInvitation`s). Group- and collection-shared documents are listed through `groups.listDocuments` / `collections.listDocuments`.
 
 ### Using PrimitiveShareDocumentDialog
 
@@ -1090,12 +1082,25 @@ await jsBaoClient.documents.waitForInSync(documentId);
 ### Updating Document Metadata
 
 ```typescript
-// Update a document's title
-await jsBaoClient.documents.update(documentId, { title: "New Title" });
+// Update a document's title, thumbnail, and presentation metadata.
+// Each field is optional; pass `null` to clear `thumbnailBlobId` or `metadata`.
+await jsBaoClient.documents.update(documentId, {
+  title: "New Title",
+  thumbnailBlobId: blob.blobId,        // a blob ID owned by this document
+  metadata: { color: "blue", cover: { kind: "preset", name: "ocean" } },
+});
 
 // Check if a document is currently open
 const open = jsBaoClient.documents.isOpen(documentId);
 ```
+
+`thumbnailBlobId` points at a blob you've already uploaded; the platform marks the referenced blob readable to anyone with access to the document. `metadata` is a JSON-serializable object with a 4KB cap on its serialized UTF-8 form — keep it to the kind of presentation hints that need to travel with the document (cover image references, badge colors, list layout). Failures return:
+
+| Error code | Meaning |
+|---|---|
+| `METADATA_TOO_LARGE` | Serialized `metadata` exceeds 4KB |
+| `BLOB_NOT_FOUND` | `thumbnailBlobId` references a blob the platform can't resolve |
+| `BLOB_DOC_MISMATCH` | The blob exists but belongs to a different document |
 
 ### Deleting Documents
 

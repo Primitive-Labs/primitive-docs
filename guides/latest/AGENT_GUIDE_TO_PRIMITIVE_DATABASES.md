@@ -252,10 +252,13 @@ A **database type** is a named configuration shared across many databases. It pr
 
 - **Registered operations** (`type` is one of `query`, `mutation`, `count`, `aggregate`, `pipeline`, `applyToQuery`) with per-operation CEL `access`
 - **Triggers** — computed fields evaluated in the DO before each save
-- **`celContextAccess`** (formerly `metadataAccess`) — CEL expression that lets non-owner/manager users **read and update** the database's CEL context (defaults to deny when unset; owner/manager always have access). Both names are accepted; `celContextAccess` is preferred.
+- **`celContextAccess`** — CEL expression that lets non-owner/manager users read and update the database's CEL context (defaults to deny when unset; owner/manager always have access)
+- **`autoPopulatedFields`** — declarative server-side field stamping on writes (see below)
+- **`defaultAccess`** — fallback CEL access rule applied to operations that omit their own `access`
+- **Subscriptions** — type-scoped real-time subscription definitions
 - **Rule set attachment** — controls who can edit the type config and its operations
 
-Real-time subscriptions are configured **per-database**, not on the type — see [Real-Time Subscriptions](#real-time-subscriptions).
+Real-time subscriptions are also part of the type config — see [Real-Time Subscriptions](#real-time-subscriptions). One subscription definition serves every database of that type.
 
 ### Triggers
 
@@ -284,7 +287,41 @@ Triggers are computed fields that run server-side in the Durable Object before a
 | `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`, `hasRole(role)` | Membership/role checks |
 | `fromWorkflow()`, `fromWorkflow(key)` | True if the write was issued by a workflow step (or a specific workflow) |
 
-**Don't confuse trigger CEL with operation substitutions.** Triggers use bare CEL — `user.userId`, `now()`. Operation `definition` and `params` use `$user.userId`, `$now`, `$params.x`, `$database.celContext.x` substitutions, which are deep string-replacement on the JSON template, NOT CEL. (`$database.metadata.x` is accepted as a legacy alias.)
+**Don't confuse trigger CEL with operation substitutions.** Triggers use bare CEL — `user.userId`, `now()`. Operation `definition` and `params` use `$user.userId`, `$now`, `$params.x`, `$database.celContext.x` substitutions, which are deep string-replacement on the JSON template, NOT CEL. (`$database.metadata.x` is accepted as an alternate alias for the same value.)
+
+### Auto-populated fields
+
+`autoPopulatedFields` is a declarative alternative to writing the same `createdAt`/`createdBy`/`updatedAt` triggers on every model. Set it on the database type config; the engine stamps the listed fields server-side, applied per op-kind (`create` ⇔ `save` ⇔ `applyToQuery` insert path; `update` ⇔ `patch` ⇔ `applyToQuery` update path).
+
+```toml
+[type]
+databaseType = "project"
+
+[type.autoPopulatedFields]
+ownerId  = "user.userId"                                       # shorthand → on = ["create"]
+createdAt = { value = "now()", on = "create" }
+updatedAt = { value = "now()", on = ["create", "update"] }
+```
+
+Each entry is either:
+- A **shorthand** string — the CEL expression to evaluate. Defaults to `on = ["create"]`.
+- A **verbose** map `{ value, on }`. `value` is the CEL expression. `on` is `"create"`, `"update"`, or an array of those (the string form is normalized to a single-element array). Other values are rejected.
+
+The `value` CEL shares the same context as the operation's access expression: `user.*`, `database.*`, `params.*`, plus `now()` and the membership functions. Stamps reference `secrets.*` only when needed (the engine refuses to evaluate stamps that read secrets if the operation didn't pre-declare it).
+
+Use auto-populated fields for cross-model invariants (every write should stamp a timestamp); use per-model triggers for invariants that depend on the record's data (e.g. setting `completedAt` only when `status == "done"`).
+
+### `defaultAccess`
+
+Specify a CEL access rule that applies to operations that don't declare their own `access`:
+
+```toml
+[type]
+databaseType = "project"
+defaultAccess = "isMemberOf('team', database.celContext.teamId)"
+```
+
+An operation can override the default by setting its own `access`. Without `defaultAccess` (and no per-operation rule), the operation is denied for non-owner/manager callers.
 
 ## Registered Operations
 
@@ -1049,35 +1086,46 @@ For a unified "all DBs I can access" view, combine `databases.list()` with `grou
 
 ## Real-Time Subscriptions
 
-Databases push changes to connected clients over WebSocket. Subscriptions are **per-database** (not per-type) and **created via the REST/admin API, not via the TOML sync flow**. Up to 20 active subscriptions per database; up to 5 declared params per subscription.
+Databases push changes to connected clients over WebSocket. Subscriptions are **type-scoped** — defined once on the database type config and applied to every database of that type. The model key is `(appId, databaseType, subscriptionKey)`.
 
-### Registering a subscription (admin API)
+### Registering a subscription
 
-`POST /app/{appId}/api/databases/{databaseId}/subscriptions` — body shape:
+Declare subscriptions in the same TOML file as the rest of the type config:
 
-```json
-{
-  "subscriptionKey": "my-open-tickets",
-  "displayName": "My open tickets",
-  "description": "Tickets assigned to me",
-  "filter": "record.modelName == 'tickets' && record.data.assigneeId == user.userId && record.data.status == 'open'",
-  "accessRule": "user.userId != ''",
-  "params": { "teamId": { "type": "string", "required": false } }
-}
+```toml
+[type]
+databaseType = "support-desk"
+
+[[subscriptions]]
+subscriptionKey = "my-open-tickets"
+displayName = "My open tickets"
+modelName = "ticket"
+accessRule = "user.userId != ''"
+filter = "record.assigneeId == user.userId && record.status == 'open'"
+# Optional: only send these fields in each change frame
+select = ["id", "title", "priority", "updatedAt"]
+# Optional: only deliver these change types ("enter" | "update" | "leave")
+emit = ["enter", "leave"]
+# Optional: declared params bound to the subscriber
+params = '{"teamId":{"type":"string","required":false}}'
 ```
 
-**`record` shape inside `filter`:** `record.modelName`, `record.op` (one of `save | patch | delete | increment | addToSet | removeFromSet`), `record.id`, `record.data` (the new/written payload, or `null` for deletes), `record.previousData` (the prior row when subscribers exist; `null` otherwise). Field-level access is via `record.data.<field>` and `record.previousData.<field>` — fields are not spread onto `record` itself.
+Push with `primitive sync push` — the same flow as operations and triggers.
 
 Field semantics:
 
+- `subscriptionKey` — unique within the type. Clients reference it when subscribing.
+- `modelName` — the model whose changes drive the subscription.
 - `accessRule` (CEL) — evaluated at subscribe time; false → subscribe is rejected.
-- `filter` (CEL) — evaluated per-change, per-subscriber against `record.*`. Only matches are delivered. Cannot grant access `accessRule` denies.
-- `params` — declared params bound to the subscriber and exposed as `params.*` inside `filter` and `accessRule`. Supported types: `string`, `number`, `boolean`. Type checks at subscribe time are strict — no coercion (mismatched types are rejected with an error frame).
+- `filter` (CEL) — evaluated per-change, per-subscriber against `record.*` and `previousData.*`. Only matches are delivered. Cannot grant access `accessRule` denies.
+- `select` (string array) — narrows `data` (and `previousData`) to the listed fields **server-side**. Omit to send full records. Use `select` to keep sensitive fields off the wire entirely.
+- `emit` (string array) — one or more of `"enter"`, `"update"`, `"leave"`. Restricts which `changeType` values are delivered (see frame shape below). Omit for all.
+- `params` — declared params bound to the subscriber, exposed as `params.*` in `accessRule` and `filter`. Supported types: `string`, `number`, `boolean`. Type checks are strict — no coercion.
 
 CEL context differs between the two phases:
 
-- `accessRule` (subscribe time): `user.userId`, `user.role`, `params.*`, plus the standard membership functions (`isMemberOf`, `memberGroups`, `hasRole`).
-- `filter` (per-change broadcast): `user.userId` (with `user.role` empty), `record.*` (the changed row, including `record.op`, `record.id`, `record.previousData` when available), and `params.*`. Memberships and `database.*` are **not** bound at filter time, so put group-based authorization in `accessRule`, not `filter`.
+- `accessRule` (subscribe time): `user.userId`, `user.role`, `params.*`, plus `isMemberOf`, `memberGroups`, `hasRole`.
+- `filter` (per-change broadcast): `user.userId`, `record.*` (the changed row, post-write), `previousData.*` (the prior row), `record.op`, `record.id`, `params.*`. Memberships and `database.*` are **not** bound at filter time — put group-based authorization in `accessRule`, not `filter`.
 
 ### Subscribing from the client
 
@@ -1085,9 +1133,11 @@ CEL context differs between the two phases:
 const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
   params: { teamId: "team-1" },
   onChange: (event) => {
-    // event.changes: Array of { op, modelName, id, data?, previousData? }
+    // event.changes: Array of { op, changeType, modelName, id, data?, previousData? }
+    if (event.isOrigin) return;     // this tab already applied the change optimistically
     for (const change of event.changes) {
-      // change.op: "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet"
+      // change.op:         "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet"
+      // change.changeType: "enter" | "update" | "leave"
       applyChange(change);
     }
   },
@@ -1097,15 +1147,28 @@ const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
 unsub();
 ```
 
-`subscribe` is synchronous; the unsubscribe callback returns immediately. The client auto-reissues `db.subscribe` on WebSocket reconnect.
+`subscribe` returns synchronously; the unsubscribe callback returns immediately. The client auto-reissues `db.subscribe` on WebSocket reconnect.
+
+### Change-frame origin attribution
+
+Every `db.change` frame carries who produced the write so subscribers can suppress their own optimistic echoes:
+
+| Field | Meaning |
+|---|---|
+| `originConnectionId` | The writer's WebSocket connection id, or `null` for server-side writes (cron, workflow steps, admin imports, HTTP writes without `X-JB-Connection-Id`) |
+| `originUserId` | The writer's user id, or `null` for server-side writes |
+| `isOrigin` | Synthesized per-recipient: `true` iff `originConnectionId` matches this client's current WS connection id |
+| `isOriginUser` | Synthesized per-recipient: `true` iff any tab/process signed in as the receiver wrote it. Differs from `isOrigin` across tabs of the same user — useful for cache invalidation that only cares about user identity. |
+
+On WS reconnect the local connection id rotates, so a frame for the writer's own pre-reconnect write may arrive with `isOrigin: false`. That's expected and harmless because the writer-exclusion server-side fanout still drops the frame from the writing connection itself.
 
 ### Critical Rules
 
 1. **Always pair initial load with subscription.** Subscriptions deliver deltas only — fetch initial state with a regular `executeOperation` call and keep the query's filter semantically equivalent to the subscription's `filter`.
-2. **Writer's connection is excluded.** The client that triggered the mutation does not receive the change event back.
+2. **Writer's connection is excluded server-side.** The connection that triggered the mutation does not receive the change event back.
 3. **No replay on reconnect.** Re-query on reconnect; the server does not buffer missed changes.
-4. **Each change carries `previousData` only when the database has active subscribers.** If you need to compare old vs new in your filter, you can; the server pre-reads the row before mutating.
-5. **Workflow mutations fan out too.** A `database.mutate` step in a workflow wakes up every matching subscription.
+4. **Workflow mutations fan out too.** A `database.mutate` step in a workflow wakes up every matching subscription. Workflow writes arrive with `originConnectionId: null` / `originUserId: null` and both `isOrigin` flags `false`.
+5. **`select` is privacy-affecting.** Fields not listed never leave the worker. Use it instead of trying to scrub fields client-side.
 
 See the [Scheduling and Real-Time guide](AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md) for the full walkthrough.
 

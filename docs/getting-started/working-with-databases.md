@@ -286,6 +286,34 @@ triggers = [
 
 **Available in trigger expressions:** `user.userId`, `user.role`, `record.*`, `database.id`, `database.celContext` (also `database.metadata`), `now()`
 
+## Auto-Populated Fields
+
+For invariants like `createdAt` / `createdBy` / `updatedAt` that you want on every model of a type, set `autoPopulatedFields` on the type config itself. The engine stamps the listed fields server-side, applied per op-kind (`create` for inserts, `update` for patches).
+
+```toml
+[type]
+databaseType = "project"
+
+[type.autoPopulatedFields]
+ownerId   = "user.userId"                                   # defaults to on = ["create"]
+createdAt = { value = "now()", on = "create" }
+updatedAt = { value = "now()", on = ["create", "update"] }
+```
+
+Each entry is either a CEL expression string (which stamps on create only) or a `{ value, on }` object where `on` is `"create"`, `"update"`, or both. The CEL has the same context as operation access rules.
+
+Use auto-populated fields for cross-model invariants. Stick with per-model triggers when the rule depends on the record's data (e.g. `completedAt` only when `status == "done"`).
+
+## Default Access
+
+Set `defaultAccess` on the type config to apply a CEL rule to every operation that doesn't declare its own `access`. Without `defaultAccess` and no per-operation rule, the operation is denied to non-owner/manager callers.
+
+```toml
+[type]
+databaseType = "project"
+defaultAccess = "isMemberOf('team', database.celContext.teamId)"
+```
+
 ## Pipelines
 
 Chain multiple read operations together, where later steps can reference results from earlier ones:
@@ -381,29 +409,39 @@ A missing CEL context key (`$database.celContext.nonExistent` → `null`) natura
 
 ## Real-Time Subscriptions
 
-Databases can push changes to connected clients over WebSocket — your app doesn't have to poll. Define a subscription in your type config, subscribe from the client, and the server fans out change events to every connection whose filter matches.
+Databases can push changes to connected clients over WebSocket — your app doesn't have to poll. Subscriptions are scoped to a *database type*, so one definition serves every database of that type. Declare them in the type config, subscribe from the client, and the server fans out matching change events:
 
 ```toml
 [[subscriptions]]
-name = "my-open-tickets"
+subscriptionKey = "my-open-tickets"
+displayName = "My open tickets"
 modelName = "ticket"
-access = "user.userId != ''"
+accessRule = "user.userId != ''"
 filter = "record.assigneeId == user.userId && record.status == 'open'"
+# Optional — narrow the payload server-side
+select = ["id", "title", "priority", "updatedAt"]
 ```
 
 ```typescript
-const sub = await client.databases
-  .database(databaseId)
-  .subscribe("my-open-tickets");
-
-sub.on("change", (event) => {
-  // event.op: "save" | "patch" | "delete"
-  // event.before / event.after
-  applyChange(event);
+const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
+  onChange: (event) => {
+    if (event.isOrigin) return;  // this tab wrote it; UI already updated
+    for (const change of event.changes) {
+      // change.op:         "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet"
+      // change.changeType: "enter" | "update" | "leave"
+      // change.data, change.previousData (subject to the select projection)
+      applyChange(change);
+    }
+  },
 });
+
+// Later
+unsub();
 ```
 
-Writes from workflows fan out to subscriptions the same way as writes from clients — making this the primary pattern for live "workflow progress" UIs.
+Every frame carries `originConnectionId` / `originUserId` (or `null` for server-side writes), plus per-recipient `isOrigin` / `isOriginUser` flags so you can suppress your own optimistic echoes and invalidate caches across tabs of the same user.
+
+Writes from workflows fan out to subscriptions the same way as writes from clients — making this the primary pattern for live "workflow progress" UIs. Workflow writes arrive with `originConnectionId: null`, `originUserId: null`, and both `isOrigin` flags `false`.
 
 See [Scheduled and Real-Time Automation](./scheduled-and-realtime-automation.md) for the full walkthrough including parameterized subscriptions, access enforcement, and reconnection behavior.
 
@@ -448,7 +486,7 @@ await client.databases.grantGroupPermission(databaseId, {
 });
 ```
 
-Members of the group can then call `databases.get(databaseId)` and execute operations. Note that `databases.list()` deliberately does **not** include group-access databases — this matches the documents semantics, where the list is "things I directly own" and discovery of shared things happens through another channel (group memberships, bookmarks, or a shared link).
+Members of the group can then call `databases.get(databaseId)` and execute operations. Note that `databases.list()` deliberately does **not** include group-access databases — this matches the documents semantics, where the list is "things I directly own" and discovery of shared things happens through another channel (group memberships, collections, or a shared link).
 
 ### Discovering Databases via Group Memberships
 

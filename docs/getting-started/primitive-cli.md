@@ -255,7 +255,7 @@ primitive sync diff
 primitive sync push
 ```
 
-Pass `--dir <path>` to override and use a fixed directory (legacy behavior, still supported):
+Pass `--dir <path>` to override and use a fixed directory:
 
 ```bash
 primitive sync init --dir ./config
@@ -271,13 +271,24 @@ This creates a directory structure like:
   integrations/*.toml         # Integration configs
   prompts/*.toml              # Prompt configs
   workflows/*.toml            # Workflow definitions
+  workflow-fragments/*.toml   # Reusable [[steps]] blocks for workflows
   database-types/*.toml       # Database type configs + operations
   email-templates/*.toml      # Email template overrides
 ```
 
-:::tip
-If you previously used `--dir ./config` and are switching to project environments, the CLI will print a migration hint pointing you to the new location. Run `primitive sync pull` once to re-sync into the new per-environment path.
-:::
+`workflow-fragments/<name>.toml` lets several workflows share a common run of `[[steps]]`. Reference them from a workflow file with `include = ["<name>"]`; the CLI expands fragments client-side before push (the server only stores the canonical flattened step list). Use `primitive workflows expand <workflow.toml>` to inspect the expanded result.
+
+### When `sync push` fails
+
+`sync push` reports the server's error message along with the entity it was applying when the failure happened, so you can jump straight to the offending file:
+
+```
+Failed to update workflow "send-digest": Workflow contains sync-incompatible steps
+```
+
+For workflows in particular, the CLI validates referenced operation params at push time: every `$params.X` substitution inside a workflow's database operations must match a declared `[[operations.params]]` entry, and the error names the file and line of the operation block where the bad reference appears. This catches typos like `$params.proectId` that would otherwise silently no-op at runtime.
+
+CLI diagnostics (success/warning/info messages) are written to stderr; only structured data (e.g. `--json` output) goes to stdout, so piping `primitive sync diff --json | jq` works without any extra redirects.
 
 ## Claude Code Skill
 
@@ -460,6 +471,8 @@ To get the current access token for use with other tools:
 ```bash
 primitive token
 ```
+
+`primitive token` automatically refreshes the active access token if it's expired or about to expire, so scripts that pipe it into another tool ( `curl -H "Authorization: Bearer $(primitive token)" ...`) keep working past the access-token lifetime without a manual `primitive login`.
 
 ## Getting Help
 

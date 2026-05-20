@@ -82,11 +82,24 @@ const result = await client.users.lookup("alice@example.com");
 // { exists: true, user: { userId, name, email } } | { exists: false }
 ```
 
-There is no `list()` or `get()` method on `client.users`. The current authenticated user lives on a separate namespace: `client.me.get()` returns the current user's profile (cached, with the same `GetUserOptions` knobs). To enumerate every user in the app, use the CLI:
+There is no `list()` or `get()` method on `client.users`. The current authenticated user lives on a separate namespace: `client.me.get()` returns the current user's profile (cached, with the same `GetUserOptions` knobs). To enumerate or search users in the app, use the REST endpoint or the CLI:
 
 ```bash
-primitive users list
+# Paginated list of app users
+primitive users list [--limit N] [--cursor <next>]
+
+# Substring search by name (minimum 2 characters per term; tokens AND-combined)
+# Backed by a global search index on User.name.
+primitive users list --name "ali"
+
+# Direct API call for in-app pickers
+const res = await fetch(`/app/${appId}/api/users?name=${encodeURIComponent("ali")}&limit=20`, {
+  headers: { Authorization: `Bearer ${token}` },
+});
+const { items, nextCursor } = await res.json();
 ```
+
+User search returns rows of `{ userId, email, name, avatarUrl, role, addedAt }` filtered to members of the current app.
 
 ### App roles
 
@@ -99,7 +112,7 @@ Behavior:
 
 ## Current User: `client.me`
 
-The current authenticated user has its own namespace. Use it for "me"-scoped reads and writes — profile, avatar, the user's view of shared documents, pending document invitations, and the generic bookmarks store.
+The current authenticated user has its own namespace. Use it for "me"-scoped reads and writes — profile, avatar, the user's owned and shared documents, and pending document invitations.
 
 ### Profile
 
@@ -136,12 +149,23 @@ await client.me.clearCache();  // forces the next get() to hit the network
 ### Documents view
 
 ```typescript
-// Documents shared with the current user — direct grants AND pending
-// invitations to documents. Includes title, permission level, who granted
-// it, and a `source: "permission" | "invitation"` discriminator.
+// Documents the user owns (created, or had ownership transferred to).
+// Cache-backed and offline-aware.
+const owned = await client.me.ownedDocuments({
+  tag: "draft",                 // optional tag filter
+  limit: 50,
+  cursor: prevCursor,
+  // returnPage: true,           // overload returning a paginated DocumentListPage
+  // includeRoot: false,         // root document is excluded by default
+});
+
+// Documents shared directly with the user (non-owner `DocumentPermission`
+// rows + pending `DocumentInvitation`s). Group- and collection-scoped
+// shares do NOT appear here — those are accessed via the group or collection.
 const { documents, nextCursor } = await client.me.sharedDocuments({
   limit: 50,
-  cursor: prevCursor, // for pagination; nextCursor === null when exhausted
+  cursor: prevCursor,
+  tag: "shared",
 });
 
 // Document invitations the user can accept — convenient for an inbox view.
@@ -150,46 +174,7 @@ const pending = await client.me.pendingDocumentInvitations();
 //    invitedAt, invitedBy, expiresAt?, accepted, document?: {...} }, ...]
 ```
 
-`me.sharedDocuments()` is the **inbox** view — things directly shared with the user that aren't on their curated list yet. It returns docs where the user has a non-owner `DocumentPermission` plus pending `DocumentInvitation`s; group- and collection-shared docs do NOT appear here. For the user's primary "my documents" home view, lead with `me.bookmarks.list` (next section) — it's the curated list and is auto-populated for the common cases.
-
-### Bookmarks (`client.me.bookmarks`)
-
-Generic per-user references to any target type — documents, databases, collections, or anything the app wants to organize. **Bookmarks are the primary "my documents" UI surface.** The platform auto-bookmarks documents on creation and on deferred-grant resolution at signup, and auto-removes them on permission revoke, so apps mostly just need `list` + `rename`. Direct grants to existing users (by `userId`) and group/collection-shared docs are NOT auto-bookmarked — those land in `me.sharedDocuments` until the user adds them to their curated list.
-
-Today only `targetObjType: "d"` (document) is registered — adding for any other type returns `UNKNOWN_TARGET_TYPE`.
-
-```typescript
-// Add — `key` defaults to `${targetObjType}/${targetObjId}`. Idempotent:
-// re-adding returns status: "already_bookmarked" with the original
-// `bookmarkedAt`.
-const { status, key, bookmarkedAt } = await client.me.bookmarks.add({
-  targetObjType: "d",                 // documents are "d" (NOT "document")
-  targetObjId: documentId,
-  key: "projects/acme/q2-planning",   // optional; hierarchical keys enable prefix queries
-});
-
-// Remove by key
-await client.me.bookmarks.remove("projects/acme/q2-planning");
-
-// Rename a key (move under a new prefix, etc.)
-await client.me.bookmarks.rename(
-  "projects/acme/q2-planning",
-  "archived/acme/q2-planning"
-);
-
-// List with optional prefix + cursor pagination
-const { bookmarks, nextCursor } = await client.me.bookmarks.list({
-  prefix: "projects/acme/", // optional; matches by key prefix
-  limit: 50,
-});
-```
-
-Design notes:
-
-- Use **hierarchical keys** (`folder/subfolder/leaf`) so prefix queries cheap-render folder views.
-- Lead with `me.bookmarks.list` for the user's primary "my documents" surface — it covers everything they actively care about. Reserve `me.sharedDocuments` for an "inbox" view of things not yet on the curated list.
-- Bookmarks are presentational; never gate access decisions on them.
-- Bookmarks are private to each user; there is no "shared bookmark" surface.
+Together, `me.ownedDocuments()` + `me.sharedDocuments()` give the two halves of "documents the user has direct access to." For group- or collection-scoped access, iterate `groups.listUserMemberships(...)` / `client.collections.list()` and call `groups.listDocuments` / `collections.listDocuments`.
 
 ## Core Concept: Groups
 

@@ -1,6 +1,6 @@
 # Sharing and Invitations
 
-Primitive apps are multi-user. This page is about getting other people into your app and giving them access to your data — invitations, document sharing, group membership, access requests, and bookmarks.
+Primitive apps are multi-user. This page is about getting other people into your app and giving them access to your data — invitations, document sharing, group and collection membership, and access requests.
 
 The building blocks work together. Most real apps end up using several of them:
 
@@ -10,9 +10,9 @@ The building blocks work together. Most real apps end up using several of them:
 | **Member invitations** | Let non-admin members invite teammates (with quotas) |
 | **Document sharing** | Grant document-level access to a user, email, or group |
 | **Group membership** | Bulk access via team/role membership |
+| **Collections** | Group documents and share them as a set; add members by user id or email |
 | **Email-based sharing** | Share by email to someone who isn't a user yet — resolves when they sign up |
 | **Document access requests** | "Request access" flow for users with a link |
-| **Bookmarks** | User-curated list of documents, databases, or any target |
 
 ## App Invitations
 
@@ -202,6 +202,40 @@ The `"pending_signup"` branch carries `invitationId` and `inviteToken` so you ca
 
 See [Users and Groups](./users-and-groups.md) for more on groups.
 
+## Collection Membership
+
+A collection bundles documents together so they can be shared as a unit. Adding a member to a collection grants them access to every document currently in it and to any document later added to it. Like groups, you can add by user id or by email:
+
+```typescript
+// Existing user
+await client.collections.addMember(collectionId, {
+  userId: "u-1234",
+  permission: "read-write",   // "reader" | "read-write"
+});
+
+// By email — deferred grant resolves on signup
+const result = await client.collections.addMember(collectionId, {
+  email: "newhire@example.com",
+  permission: "reader",
+  sendEmail: true,                    // optional: platform sends an invite email
+  collectionUrl: "https://...",       // required when sendEmail is true
+  note: "Sharing the onboarding docs",
+});
+// result.status: "added" | "already_member" | "pending_signup"
+```
+
+The deferred-grant flow mirrors document shares (see [How Email-Based Sharing Resolves](#how-email-based-sharing-resolves)) — the platform records a `DeferredGroupAdd`, sends an invitation email when `sendEmail: true`, and applies the membership when the recipient signs up with the matching email.
+
+To see who's currently a member and who has a pending invitation:
+
+```typescript
+const access = await client.collections.getAccess(collectionId);
+// { directMembers, groupPermissions, ... }
+
+const pending = await client.collections.listPendingInvitations(collectionId);
+// [{ email, permission, invitationId, ... }]
+```
+
 ## How Email-Based Sharing Resolves
 
 When you share by email to someone who isn't a user yet, Primitive internally records the pending grant and resolves it as soon as the right person redeems the invitation. The sharing APIs accept emails transparently — the platform handles the rest.
@@ -214,7 +248,7 @@ The common case. The user clicks the invite link and signs up using the same ema
 
 1. You share a document with `newhire@example.com` at `read-write`. The platform creates an `AppInvitation` + `DeferredDocumentPermission` and sends them an email.
 2. They click the link, land on your app, and sign up using `newhire@example.com` (magic link, OTP, Google, passkey — any method).
-3. The signup flow detects the email match and resolves **every** pending deferred grant linked to that invitation in one transaction — `AppMembership`, `DocumentPermission`, `DocumentGroupPermission`, etc. The document is auto-bookmarked. No `accept` call is needed.
+3. The signup flow detects the email match and resolves **every** pending deferred grant linked to that invitation in one transaction — `AppMembership`, `DocumentPermission`, `DocumentGroupPermission`, collection memberships, etc. No `accept` call is needed.
 
 This is what runs whenever the recipient's signup email matches the invited email. Your app does not need to call `client.invitations.accept(...)` for this case.
 
@@ -319,62 +353,24 @@ When resolved, the requester receives:
 - A requester cannot re-submit while a previous request for the same document is still pending.
 - Once a request is resolved (approved or denied), it can't be re-resolved.
 
-## Bookmarks
+## Listing the User's Documents
 
-Bookmarks are how users curate their own list of "things I care about" — documents they've been shared into, databases they work in, workflows they use, anything.
-
-### What Bookmarks Are (and Aren't)
-
-Bookmarks are **presentational**, not access control. A bookmark is just a pointer that says "this user wants this item on their home screen." The underlying document/database permissions are still what decides access.
-
-The model is intentionally generic:
-
-- Primary key: `userId`
-- Sort key: `userDefinedKey` (arbitrary string you pick — supports prefix queries)
-- Fields: `targetObjType` (e.g. `"document"`, `"database"`), `targetObjId`
-
-### Client API
+Two calls cover the "my documents" surface — what the user owns and what's been shared with them:
 
 ```typescript
-// Add a bookmark — targetObjType is "d" for documents (single-letter prefix).
-await client.me.bookmarks.add({
-  targetObjType: "d",
-  targetObjId: documentId,
-  key: "projects/acme/q2-planning",   // optional; hierarchical keys enable prefix queries
-});
+// Documents the user owns (they created them, or ownership was transferred).
+const owned = await client.me.ownedDocuments();
+// Options: { includeRoot, tag, limit, cursor, forward, returnPage } — pass returnPage: true for a paginated DocumentListPage.
 
-// List with prefix — this is the call to power your "my documents" UI.
-const { bookmarks, nextCursor } = await client.me.bookmarks.list({
-  prefix: "projects/acme/",
-});
-
-// Rename (change the user-defined key)
-await client.me.bookmarks.rename("projects/acme/q2-planning", "archived/q2-planning");
-
-// Remove
-await client.me.bookmarks.remove("archived/q2-planning");
-```
-
-Bookmarks are the **primary "my documents" surface** — the user-curated list, independent of permissions. Users can drop a bookmark they no longer want without losing access, and add bookmarks for shares they want to keep handy.
-
-### Auto-Bookmarking
-
-The platform pre-populates bookmarks for two common cases so apps don't have to:
-
-1. **Document creation** — when a user creates a document, it's bookmarked automatically.
-2. **Deferred grant resolution at signup** — when a recipient signs in with the email a share or group-add was sent to, the platform creates the appropriate `AppMembership` / `DocumentPermission` rows AND auto-bookmarks any documents that resolved through that flow.
-
-Direct grants to existing users (sharing by `userId`) and group/collection-shared documents are NOT auto-bookmarked — those land in `client.me.sharedDocuments()` until the recipient bookmarks them. Bookmarks are also auto-removed when access is revoked.
-
-### Shared Documents Helper
-
-`client.me.sharedDocuments()` returns the **inbox** view — documents directly shared with the user that aren't yet on their curated list:
-
-```typescript
+// Documents shared directly with the user.
 const { documents } = await client.me.sharedDocuments();
+// Options: { tag, limit, cursor }. Includes non-owner DocumentPermissions and
+// pending DocumentInvitations. Does NOT include group- or collection-shared docs —
+// those are listed through the group (groups.listDocuments) or the collection
+// (collections.listDocuments).
 ```
 
-It returns docs the user has a non-owner `DocumentPermission` on plus pending document invitations. Group- and collection-shared documents do **not** appear here — those become visible to the user via group/collection listings or by bookmarking them. Use `sharedDocuments` when you want an "inbox of recent shares"; use `me.bookmarks.list` for the primary "my documents" surface.
+For pending document invitations specifically, use `client.me.pendingDocumentInvitations()`.
 
 ## WebSocket Events
 
@@ -502,7 +498,8 @@ await client.groups.addMember("team", "engineering", {
 });
 
 // When the new user signs up, all three pending actions apply atomically.
-// They land in the app with the project bookmarked and full team-group access.
+// They land in the app with full team-group access and the project visible
+// in their `me.sharedDocuments()` list.
 ```
 
 ## Next Steps

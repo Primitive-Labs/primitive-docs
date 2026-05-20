@@ -88,12 +88,18 @@ primitive email-templates test magic-link
 Any sign-in method resolves pending invitations and email-based shares automatically:
 
 - If an invitation exists for the user's email, it's consumed and the user joins the app.
-- Any pending document shares or group adds that were addressed to their email are applied atomically after the account is created — documents are shared, group memberships are added, bookmarks are set up.
+- Any pending document shares, group adds, or collection adds addressed to their email are applied atomically after the account is created — documents are shared, group and collection memberships are granted.
 - Domain-mode apps re-validate the email domain at resolution time. A pending share for `alice@outside.com` won't land in an app restricted to `@mycompany.com`.
 
 From the end-user's perspective: they sign in for the first time, and the things other people invited them into are already there. No manual "accept invitation" step.
 
 See [Sharing and Invitations](./sharing-and-invitations.md) for how to create these shares.
+
+## Disabling a User Per App
+
+Admins can disable a user's access to a single app from the admin console without deleting their global account. A disabled user's existing tokens are revoked, open WebSocket connections are dropped, and any subsequent sign-in attempt (passkey, OAuth, magic link, OTP) is rejected with the error code `AUTH_USER_DISABLED`. Re-enabling restores access immediately; no re-invitation is needed.
+
+Display `AUTH_USER_DISABLED` in your sign-in UI as a distinct error so the user understands they should contact an admin rather than retrying or trying a different method.
 
 ## Test User Sign-In for Automated Testing
 

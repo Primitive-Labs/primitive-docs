@@ -282,6 +282,17 @@ if (blobs.hasServiceWorkerControl()) {
 
 ---
 
+## Document thumbnails and presentation metadata
+
+A document carries two fields that pair naturally with the blob system — set them with `client.documents.update(documentId, ...)` (covered in detail in the [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#updating-document-metadata)):
+
+- **`thumbnailBlobId`** points at an existing blob owned by the document. Anyone with access to the document inherits read access to the referenced blob, so a thumbnail uploaded as a private document blob can safely back a thumbnail surface.
+- **`metadata`** is a small JSON-serializable object capped at 4KB serialized UTF-8. Use it for presentation hints that should travel with the document (cover image references, color tags, list-card layout, etc.).
+
+Both fields are optional and accept `null` to clear. Errors surface as `BLOB_NOT_FOUND` (referenced blob missing), `BLOB_DOC_MISMATCH` (blob belongs to a different document), or `METADATA_TOO_LARGE` (serialized `metadata` exceeds 4KB).
+
+---
+
 ## Complete example: image upload with progress + display
 
 ```typescript

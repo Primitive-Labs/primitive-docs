@@ -117,6 +117,10 @@ Results show real-time log output, pass/fail status, execution time, and score s
 - Use `log?.()` for debugging output
 - Return scores in `passed/total (percentage%)` format
 
+## Server Timing
+
+Every REST response from the app and admin APIs carries a `Server-Timing: handler;dur=<milliseconds>` header so the browser's Network panel can attribute slow requests to server-side handler work. The CORS configuration exposes the header so cross-origin clients can read it too.
+
 ## Production Behavior
 
 Dev tools are automatically excluded from production builds — the floating button and overlay won't appear when `import.meta.env.DEV` is false.
