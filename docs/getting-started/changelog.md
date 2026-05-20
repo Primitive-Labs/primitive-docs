@@ -91,7 +91,7 @@ A large cumulative release across invitations, sharing, server-side automation, 
 
 **Server-side automation**
 
-- Real-time database subscriptions — `db.subscribe` / `db.unsubscribe` over WebSocket. Server-side subscriptions use parameterized CEL filters to broadcast `db.change` frames to matching connections. Mutations (including those from workflows) automatically trigger subscriptions. Writer's connection is excluded.
+- Real-time database subscriptions — `db.subscribe` / `db.unsubscribe` over WebSocket. Server-side subscriptions use parameterized CEL filters to broadcast `db.change` frames to matching connections. Mutations (including those from workflows) automatically trigger subscriptions. Each frame carries `originConnectionId` / `originUserId`, and the client surfaces `isOrigin` / `isOriginUser` flags so the writing tab can suppress its own echo.
 - Cron-triggered workflows — new `CronTrigger` model and CLI (`primitive cron-triggers …`). IANA timezone support, overlap skip policy, per-app cap of 50.
 - `applyToQuery` database operation — server-side query+mutate in one request with safe-looping truncation signal.
 - `analytics.query` workflow step — all 16 analytics query types available from workflows. Default deny, admin/owner bypass, per-run cap of 50.

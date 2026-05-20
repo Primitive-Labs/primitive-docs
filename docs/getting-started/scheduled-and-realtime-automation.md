@@ -223,7 +223,7 @@ Each `db.change` frame carries origin attribution so consumers can tell who wrot
 | `isOrigin` | `true` when this specific tab/process produced the write |
 | `isOriginUser` | `true` when any session signed in as the current user produced the write (use for cross-tab cache invalidation) |
 
-The writer's own connection is also excluded from fanout server-side, so clients don't see their own mutations twice. `isOrigin`/`isOriginUser` cover the cross-tab and reconnect cases.
+The writer's own connection receives the `db.change` frame just like every other matching subscriber — server-side fanout doesn't filter out the writer. Use `isOrigin` to suppress the echo on the tab that produced the write (it already updated optimistically), and `isOriginUser` to coordinate the cross-tab/reconnect cases for other sessions of the same user.
 
 Parameterized subscriptions take a `params` object at subscribe time — the same substitution syntax as operations:
 
