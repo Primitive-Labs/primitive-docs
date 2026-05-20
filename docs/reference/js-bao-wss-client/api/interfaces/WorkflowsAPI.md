@@ -158,6 +158,34 @@ Release a claimed workflow apply so another client can retry. Called automatical
 
 ***
 
+### runSync()
+
+> **runSync**(`options`): `Promise`\<[`RunSyncWorkflowResult`](RunSyncWorkflowResult.md)\>
+
+Synchronously invoke a workflow and wait for the final result.
+
+Only callable on workflows marked `syncCallable: true` in their
+server-side definition (issue #728). Use this for low-latency,
+short-task workflows. Long-running workflows should keep using
+`start()` plus the WebSocket / polling lifecycle.
+
+The promise **resolves** with the final envelope for every outcome,
+including engine failure and timeout — failure surfaces as
+`status: "failed"` (or `"timeout"` / `"terminated"`), not a thrown
+error. Network / transport errors still reject as usual.
+
+#### Parameters
+
+##### options
+
+[`RunSyncWorkflowOptions`](RunSyncWorkflowOptions.md)
+
+#### Returns
+
+`Promise`\<[`RunSyncWorkflowResult`](RunSyncWorkflowResult.md)\>
+
+***
+
 ### start()
 
 > **start**(`options`): `Promise`\<[`StartWorkflowResult`](StartWorkflowResult.md)\>

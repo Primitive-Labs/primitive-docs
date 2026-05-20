@@ -14,6 +14,12 @@
 
 ***
 
+### autoStamp?
+
+> `optional` **autoStamp**: `"create"` \| `"update"` \| `"both"`
+
+***
+
 ### default?
 
 > `optional` **default**: `string` \| `number` \| `boolean`

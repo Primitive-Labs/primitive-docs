@@ -924,7 +924,7 @@ The unique identifier of the document to check sync status for
 
 ***
 
-### list()
+### ~~list()~~
 
 #### Call Signature
 
@@ -944,6 +944,17 @@ Controls which documents are returned, how they are loaded, and pagination
 
 `Promise`\<[`DocumentInfo`](DocumentInfo.md)[]\>
 
+##### Deprecated
+
+`documents.list()` returns the legacy union of
+  owner + read-write + reader permissions and will eventually be removed.
+  Use [client.me.ownedDocuments(...)](MeAPI.md#owneddocuments) for
+  the owner-only subset and
+  [client.me.sharedDocuments(...)](MeAPI.md#shareddocuments) for the
+  non-owner subset. The runtime behavior of `documents.list` is unchanged
+  for back-compat; callers see a one-time `logger.warn` per
+  `DocumentsAPI` instance pointing at the replacements.
+
 #### Call Signature
 
 > **list**(`options`): `Promise`\<`DocumentListPage`\>
@@ -961,6 +972,17 @@ Controls which documents are returned, how they are loaded, and pagination
 ##### Returns
 
 `Promise`\<`DocumentListPage`\>
+
+##### Deprecated
+
+`documents.list()` returns the legacy union of
+  owner + read-write + reader permissions and will eventually be removed.
+  Use [client.me.ownedDocuments(...)](MeAPI.md#owneddocuments) for
+  the owner-only subset and
+  [client.me.sharedDocuments(...)](MeAPI.md#shareddocuments) for the
+  non-owner subset. The runtime behavior of `documents.list` is unchanged
+  for back-compat; callers see a one-time `logger.warn` per
+  `DocumentsAPI` instance pointing at the replacements.
 
 ***
 

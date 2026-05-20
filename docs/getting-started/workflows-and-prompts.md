@@ -81,17 +81,17 @@ Templates use double braces. They reference the workflow's run context:
 {{ steps.<id>.field }}            # Output from a previous step (by step id)
 {{ outputs.<saveAs>.field }}      # Output from a step that used saveAs
 {{ secrets.API_KEY }}             # App secret (read-only)
-{{ input.name | default: "Anonymous" }}   # Filters with single |
+{{ input.name | default:"Anonymous" }}   # Filters with single |
 {{ input.title || "Untitled" }}            # Fallback with double || (or)
 ```
 
-Four built-in helpers are always available — `{{ now }}` (ISO timestamp), `{{ today }}` (YYYY-MM-DD), `{{ uuid }}`, `{{ ulid }}`. They re-evaluate on every reference.
+Four built-in helpers are always available — <span v-pre>`{{ now }}`</span> (ISO timestamp), <span v-pre>`{{ today }}`</span> (YYYY-MM-DD), <span v-pre>`{{ uuid }}`</span>, <span v-pre>`{{ ulid }}`</span>. They re-evaluate on every reference.
 
-When the entire string is one expression (`"{{ steps.fetch.items }}"`), the raw array or object is returned. Otherwise expressions are coerced to strings and interpolated.
+When the entire string is one expression (<span v-pre>`"{{ steps.fetch.items }}"`</span>), the raw array or object is returned. Otherwise expressions are coerced to strings and interpolated.
 
 ### Conditional Execution
 
-Skip a step when a CEL expression evaluates falsy. `runIf` is parsed as CEL directly — do **not** wrap it in `{{ }}`:
+Skip a step when a CEL expression evaluates falsy. `runIf` is parsed as CEL directly — do **not** wrap it in <span v-pre>`{{ }}`</span>:
 
 ```toml
 [[steps]]
@@ -351,11 +351,11 @@ Summarize the following text in {{ variables.style }} style:
 
 ### Template Variables
 
-Prompts use the same `{{ }}` template syntax as workflows. The values you pass to `prompts.execute(...)` are exposed under `variables`:
+Prompts use the same <span v-pre>`{{ }}`</span> template syntax as workflows. The values you pass to `prompts.execute(...)` are exposed under `variables`:
 
 ```
 {{ variables.text }}                          # Caller-provided variable
-{{ variables.name | default: "Anonymous" }}    # With fallback
+{{ variables.name | default:"Anonymous" }}    # With fallback
 {{ variables.items[0].name }}                  # Nested access
 ```
 
@@ -435,7 +435,7 @@ methods = ["GET"]
 X-API-Key = "{{ secrets.WEATHER_API_KEY }}"
 ```
 
-`defaultHeaders` and `staticQuery` resolve `{{ secrets.* }}` server-side, so secrets never appear in workflow step output snapshots. Keep credentials in the integration config rather than passing them through `request.headers` in a workflow step.
+`defaultHeaders` and `staticQuery` resolve <span v-pre>`{{ secrets.* }}`</span> server-side, so secrets never appear in workflow step output snapshots. Keep credentials in the integration config rather than passing them through `request.headers` in a workflow step.
 
 ```bash
 # Add the secret

@@ -401,7 +401,7 @@ primitive email-templates test magic-link
 primitive email-templates delete magic-link
 ```
 
-Email template types include built-in types (`magic-link`, `otp`, `access-request-created`, `access-request-resolved`, and others) plus any custom kebab-case type names you register. Each type exposes template variables (e.g. `{{magicLinkUrl}}`, `{{otpCode}}`) that Primitive substitutes at send time. Use `primitive email-templates variables <type>` to see the full list.
+Email template types include built-in types (`magic-link`, `otp`, `access-request-created`, `access-request-resolved`, and others) plus any custom kebab-case type names you register. Each type exposes template variables (e.g. <span v-pre>`{{magicLinkUrl}}`</span>, <span v-pre>`{{otpCode}}`</span>) that Primitive substitutes at send time. Use `primitive email-templates variables <type>` to see the full list.
 
 ### Analytics
 

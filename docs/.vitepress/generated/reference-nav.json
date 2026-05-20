@@ -461,34 +461,6 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/BlobUploadStatus"
                 },
                 {
-                  "text": "BookmarkAddParams",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkAddParams"
-                },
-                {
-                  "text": "BookmarkAddResult",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkAddResult"
-                },
-                {
-                  "text": "BookmarkItem",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkItem"
-                },
-                {
-                  "text": "BookmarkListOptions",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkListOptions"
-                },
-                {
-                  "text": "BookmarkListResult",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkListResult"
-                },
-                {
-                  "text": "BookmarkRemoveResult",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkRemoveResult"
-                },
-                {
-                  "text": "BookmarkRenameResult",
-                  "link": "/reference/js-bao-wss-client/api/interfaces/BookmarkRenameResult"
-                },
-                {
                   "text": "BucketBlobListResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/BucketBlobListResult"
                 },
@@ -641,6 +613,10 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/DatabaseTypeConfigsAPI"
                 },
                 {
+                  "text": "DeferredCollectionAdd",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DeferredCollectionAdd"
+                },
+                {
                   "text": "DeferredDocumentGrant",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DeferredDocumentGrant"
                 },
@@ -663,6 +639,10 @@
                 {
                   "text": "DeferredPermissionGrant",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DeferredPermissionGrant"
+                },
+                {
+                  "text": "DirectCollectionAdd",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DirectCollectionAdd"
                 },
                 {
                   "text": "DirectGroupAdd",
@@ -937,12 +917,20 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/OfflineAuthUnlockedEvent"
                 },
                 {
+                  "text": "OwnedDocumentsOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/OwnedDocumentsOptions"
+                },
+                {
                   "text": "PaginatedResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/PaginatedResult"
                 },
                 {
                   "text": "PaginationOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/PaginationOptions"
+                },
+                {
+                  "text": "PendingCollectionInvitationEntry",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/PendingCollectionInvitationEntry"
                 },
                 {
                   "text": "PendingCreateCommittedEvent",
@@ -1009,6 +997,14 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/RuleSetTestResult"
                 },
                 {
+                  "text": "RunSyncWorkflowOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/RunSyncWorkflowOptions"
+                },
+                {
+                  "text": "RunSyncWorkflowResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/RunSyncWorkflowResult"
+                },
+                {
                   "text": "SchemaDiscoveredEvent",
                   "link": "/reference/js-bao-wss-client/api/interfaces/SchemaDiscoveredEvent"
                 },
@@ -1027,6 +1023,10 @@
                 {
                   "text": "SharedDocumentListResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/SharedDocumentListResult"
+                },
+                {
+                  "text": "SharedDocumentsOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/SharedDocumentsOptions"
                 },
                 {
                   "text": "StartWorkflowOptions",
@@ -1126,6 +1126,10 @@
               "text": "Type Aliases",
               "items": [
                 {
+                  "text": "AddCollectionMemberParams",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/AddCollectionMemberParams"
+                },
+                {
                   "text": "AuthCode",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/AuthCode"
                 },
@@ -1140,6 +1144,10 @@
                 {
                   "text": "BlobDisposition",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/BlobDisposition"
+                },
+                {
+                  "text": "CollectionAddMemberResult",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/CollectionAddMemberResult"
                 },
                 {
                   "text": "DeferredGrant",

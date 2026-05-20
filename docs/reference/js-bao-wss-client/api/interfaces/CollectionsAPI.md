@@ -36,9 +36,21 @@ The unique identifier of the document to add
 
 ### addMember()
 
-> **addMember**(`collectionId`, `params`): `Promise`\<[`CollectionMemberInfo`](CollectionMemberInfo.md)\>
+> **addMember**(`collectionId`, `params`): `Promise`\<[`CollectionAddMemberResult`](../type-aliases/CollectionAddMemberResult.md)\>
 
-Add a member to a collection.
+Add a member to a collection by user ID or email address.
+
+Returns a discriminated union based on whether the target is an existing
+app user (direct add) or a yet-to-sign-up email (deferred add):
+
+- `{ status: "added", userId, permission, addedAt, addedBy, ... }` — new membership created.
+- `{ status: "already_member", userId, permission, ... }` — the user already had the requested permission.
+- `{ status: "pending_signup", email, permission, deferredId, expiresAt,
+  invitationId, inviteToken }` — email not yet in the app; a
+  `DeferredGroupAdd` row has been created (or an existing unresolved
+  one is returned idempotently). When the recipient signs in, the
+  grant resolves into the same access state a direct add would have
+  produced.
 
 #### Parameters
 
@@ -50,13 +62,13 @@ The unique identifier of the collection to add the member to
 
 ##### params
 
-`AddCollectionMemberParams`
+[`AddCollectionMemberParams`](../type-aliases/AddCollectionMemberParams.md)
 
-Member details
+Member details (provide either userId or email, not both)
 
 #### Returns
 
-`Promise`\<[`CollectionMemberInfo`](CollectionMemberInfo.md)\>
+`Promise`\<[`CollectionAddMemberResult`](../type-aliases/CollectionAddMemberResult.md)\>
 
 ***
 
@@ -278,6 +290,32 @@ Pagination controls
 #### Returns
 
 `Promise`\<`PaginatedResult`\<[`CollectionDocumentInfo`](CollectionDocumentInfo.md)\>\>
+
+***
+
+### listPendingInvitations()
+
+> **listPendingInvitations**(`collectionId`): `Promise`\<[`PendingCollectionInvitationEntry`](PendingCollectionInvitationEntry.md)[]\>
+
+Lists pending (unresolved, non-expired) invitations scoped to a
+collection. Returns denormalized rows so callers can render a "members
++ pending" view without touching the internal deferred-grants surface.
+
+Visibility: callers with any read access to the collection can see this
+list — direct `_col-*` members, indirect members via a user-defined
+group with a `CollectionGroupPermission`, and app admins/owners.
+
+#### Parameters
+
+##### collectionId
+
+`string`
+
+The unique identifier of the collection
+
+#### Returns
+
+`Promise`\<[`PendingCollectionInvitationEntry`](PendingCollectionInvitationEntry.md)[]\>
 
 ***
 

@@ -702,7 +702,7 @@ The document to use as the default for all unmapped models
 
 > **updateLocalMetadata**(`documentId`, `updates`): `Promise`\<`void`\>
 
-Update a document's locally stored metadata (title, tags).
+Update a document's locally stored metadata (title, tags, thumbnailBlobId, docMetadata).
 
 #### Parameters
 
@@ -716,11 +716,25 @@ The document to update metadata for
 
 Fields to update in the local metadata cache
 
+###### docMetadata?
+
+`unknown`
+
+New parsed metadata blob (or null to clear).
+  Note: the server's wire field is named `metadata`; the local cache key is
+  `docMetadata` to avoid colliding with the cache envelope's `metadata` key.
+
 ###### tags?
 
 `string`[]
 
 New document tags
+
+###### thumbnailBlobId?
+
+`string` \| `null`
+
+New thumbnail blob id (or null to clear)
 
 ###### title?
 

@@ -6,14 +6,6 @@
 
 # Interface: MeAPI
 
-## Properties
-
-### bookmarks
-
-> `readonly` **bookmarks**: `MeBookmarksAPI`
-
-Generic bookmark operations for the current user.
-
 ## Methods
 
 ### cacheInfo()
@@ -62,6 +54,82 @@ Controls caching and loading behavior
 
 ***
 
+### ownedDocuments()
+
+#### Call Signature
+
+> **ownedDocuments**(`options`): `Promise`\<`DocumentListPage`\>
+
+List documents the current user owns (issue #628).
+
+Returns docs where the caller's `DocumentPermission.permission === "owner"`.
+Mirrors [MeAPI.sharedDocuments](#shareddocuments) for parallel structure
+("owned-by-me" vs "shared-with-me").
+
+Returns the *current owner* set (not creators) — ownership transfer
+updates `DocumentPermission.permission` without changing
+`Document.createdBy`, so this method tracks live ownership.
+
+Inherits the same offline-first / cache-aware machinery as the
+(deprecated) `documents.list` reader: both call the same internal
+helper, with the owner filter applied across local cache, network
+response, and merged-result paths. The owner-only response is
+cached additively (`authoritative: false`) — non-owner rows from a
+prior `documents.list` call are NOT evicted; ownership-revocation
+lag is accepted as an eventual-consistency tradeoff.
+
+Cursor format is **raw JSON** (matching `/documents`), NOT base64url.
+
+##### Parameters
+
+###### options
+
+[`OwnedDocumentsOptions`](OwnedDocumentsOptions.md) & `object`
+
+Same option set as the legacy `documents.list`.
+
+##### Returns
+
+`Promise`\<`DocumentListPage`\>
+
+#### Call Signature
+
+> **ownedDocuments**(`options?`): `Promise`\<[`DocumentInfo`](DocumentInfo.md)[]\>
+
+List documents the current user owns (issue #628).
+
+Returns docs where the caller's `DocumentPermission.permission === "owner"`.
+Mirrors [MeAPI.sharedDocuments](#shareddocuments) for parallel structure
+("owned-by-me" vs "shared-with-me").
+
+Returns the *current owner* set (not creators) — ownership transfer
+updates `DocumentPermission.permission` without changing
+`Document.createdBy`, so this method tracks live ownership.
+
+Inherits the same offline-first / cache-aware machinery as the
+(deprecated) `documents.list` reader: both call the same internal
+helper, with the owner filter applied across local cache, network
+response, and merged-result paths. The owner-only response is
+cached additively (`authoritative: false`) — non-owner rows from a
+prior `documents.list` call are NOT evicted; ownership-revocation
+lag is accepted as an eventual-consistency tradeoff.
+
+Cursor format is **raw JSON** (matching `/documents`), NOT base64url.
+
+##### Parameters
+
+###### options?
+
+[`OwnedDocumentsOptions`](OwnedDocumentsOptions.md)
+
+Same option set as the legacy `documents.list`.
+
+##### Returns
+
+`Promise`\<[`DocumentInfo`](DocumentInfo.md)[]\>
+
+***
+
 ### pendingDocumentInvitations()
 
 > **pendingDocumentInvitations**(): `Promise`\<`object`[]\>
@@ -79,14 +147,15 @@ Lists pending document invitations for the current user.
 > **sharedDocuments**(`options?`): `Promise`\<[`SharedDocumentListResult`](SharedDocumentListResult.md)\>
 
 List documents shared with the current user.
-Includes individually-shared documents (DocumentPermission) and
-pending legacy DocumentInvitations.
+Includes individually-shared documents (`DocumentPermission`, non-owner)
+and pending legacy `DocumentInvitation`s. Pass `tag` to filter by a
+document tag (issue #628 — parity with `documents.list({ tag })`).
 
 #### Parameters
 
 ##### options?
 
-`PaginationOptions`
+[`SharedDocumentsOptions`](SharedDocumentsOptions.md)
 
 #### Returns
 
