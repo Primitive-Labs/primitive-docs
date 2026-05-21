@@ -28,9 +28,9 @@ Two independent capabilities. They often combine, but they answer different ques
 
 3. **`overlapPolicy` is `"skip"` (default) or `"allow"`.** There is no `"queue"`. `"skip"` checks if the previous run is still active and increments `skippedCount`; `"allow"` always fires.
 
-4. **Per-app cap is 50 cron triggers.** Subscriptions live on the database type config and apply to every database of that type — push them with `primitive sync push` alongside operations and triggers (max 5 declared `params` per subscription).
+4. **Per-app cap is 50 cron triggers.** Subscriptions are type-scoped — one definition per `(databaseType, subscriptionKey)` applies across every database of that type. Register them via the admin HTTP API at `/databases/types/<databaseType>/subscriptions` (POST/PUT/DELETE; admin app permission required). Max 5 declared `params` per subscription.
 
-5. **Subscriptions need both `accessRule` and `filter` CEL.** `accessRule` is checked once at subscribe time with full user/membership context. `filter` runs per change and only sees `user.userId`, `record.*`, `previousData.*`, `params.*` — no memberships, no `database.*`. Don't put membership logic in `filter`.
+5. **Subscriptions require both `access` and `filter` CEL.** Both are required non-empty CEL strings (an empty `filter` is rejected with `HTTP 400: filter (CEL expression) is required`). `access` is checked once at subscribe time with full user/membership context. `filter` runs per change and only sees `user.userId`, `record.*`, `previousData.*`, `params.*` — no memberships, no `database.*`. Don't put membership logic in `filter`. Use `"true"` for `filter` if `access` is the only narrowing you need.
 
 6. **Writer's *connection* is excluded from subscription fanout, not the writer's user.** Another connection of the same user (e.g. another browser tab) WILL receive the change. Use `isOrigin` / `isOriginUser` on the inbound frame to suppress optimistic echoes.
 
@@ -38,9 +38,9 @@ Two independent capabilities. They often combine, but they answer different ques
 
 8. **`unsub()` leaks if not called.** Each `subscribe()` returns an `unsub` function. Call it on view teardown or you accumulate `ConnectionMapping` rows and dead callbacks.
 
-9. **Subscriptions are type-scoped.** A single subscription definition on a database type config serves every database of that type. Define them in the same TOML file as the rest of the type config.
+9. **Subscriptions are type-scoped.** A single subscription definition serves every database of that type. CRUD lives on the admin HTTP API; `primitive sync push` does not manage subscriptions.
 
-10. **In the subscription `filter`, fields are not spread onto `record`.** Use `record.<fieldName>` for record fields plus the top-level `record.op`, `record.id`, `record.modelName`. `previousData.<fieldName>` is available for the pre-write row when subscribers exist.
+10. **In the subscription `filter`, record fields live under `record.data.*`.** The CEL `record` namespace exposes `record.modelName`, `record.op`, `record.id`, `record.data.<fieldName>`, and `record.previousData.<fieldName>`. Don't write `record.<fieldName>` — record payload fields are nested under `data`.
 
 ---
 
@@ -186,46 +186,69 @@ const cronRuns = items.filter(r => r.contextDocId?.startsWith("cron:"));
 
 ## Database Subscriptions
 
-### Registering (type config)
+### Registering (admin HTTP API)
 
-Subscriptions are defined on the database type config and apply to every database of that type. Push them via `primitive sync push` alongside operations and triggers.
+Subscription CRUD is admin-scoped (HTTP `admin` app permission). The CLI does not manage subscriptions — POST/PUT/DELETE directly against `/databases/types/<databaseType>/subscriptions` from a server-side client that holds admin permission.
 
-```toml
-# config/database-types/support-desk.toml
-[type]
-databaseType = "support-desk"
-
-[[subscriptions]]
-subscriptionKey = "my-open-tickets"
-displayName = "My open tickets"
-modelName = "ticket"
-accessRule = "user.userId != ''"
-filter = "record.assigneeId == user.userId && record.status == 'open'"
-
-# Optional — restricts payload fields server-side
-select = ["id", "title", "priority", "updatedAt"]
-# Optional — restricts which change types are delivered
-emit = ["enter", "update", "leave"]
+```typescript
+// Server-side, using an admin-capable client (e.g. the app's __primitiveAppClient)
+await adminClient.fetch(
+  `/databases/types/support-desk/subscriptions`,
+  {
+    method: "POST",
+    body: JSON.stringify({
+      subscriptionKey: "my-open-tickets",
+      displayName: "My open tickets",
+      modelName: "ticket",
+      access: "user.userId != ''",
+      filter: "record.data.assigneeId == user.userId && record.data.status == 'open'",
+      // Optional — restricts payload fields server-side
+      select: ["id", "title", "priority", "updatedAt"],
+      // Optional — restricts which change types are delivered
+      emit: ["enter", "update", "leave"],
+    }),
+  },
+);
 ```
 
 Parameterized:
 
-```toml
-[[subscriptions]]
-subscriptionKey = "tickets-by-team"
-displayName = "Tickets by team"
-modelName = "ticket"
-accessRule = "isMemberOf('team', params.teamId)"
-filter = "record.teamId == params.teamId"
-params = '{"teamId":{"type":"string","required":true}}'
+```typescript
+await adminClient.fetch(
+  `/databases/types/support-desk/subscriptions`,
+  {
+    method: "POST",
+    body: JSON.stringify({
+      subscriptionKey: "tickets-by-team",
+      displayName: "Tickets by team",
+      modelName: "ticket",
+      access: "isMemberOf('team', params.teamId)",
+      filter: "record.data.teamId == params.teamId",
+      params: { teamId: { type: "string", required: true } },
+    }),
+  },
+);
 ```
 
-Schema notes:
-- `subscriptionKey` is unique within the database type. Clients reference it when subscribing.
-- `modelName` scopes the subscription to one model.
-- `select` (optional string array) projects `data` and `previousData` to the listed fields before broadcast. Fields not listed never leave the server.
-- `emit` (optional string array) restricts which `changeType` values are delivered: `"enter"` (record entered the filter set), `"update"` (record was in the set and changed), `"leave"` (record exited the set).
-- `params` is a JSON string with names declared as `{ type: "string" | "number" | "boolean", required?: true }`. Max 5 entries.
+Endpoints:
+- `GET /databases/types/<databaseType>/subscriptions` — list active subscriptions for the type.
+- `POST /databases/types/<databaseType>/subscriptions` — create.
+- `GET /databases/types/<databaseType>/subscriptions/<subscriptionKey>` — read one.
+- `PUT /databases/types/<databaseType>/subscriptions/<subscriptionKey>` — update (`filter`, `access`, `select`, `emit`, `params` are all patchable).
+- `DELETE /databases/types/<databaseType>/subscriptions/<subscriptionKey>` — archive.
+
+Field reference (POST/PUT body):
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `subscriptionKey` | Yes | Per-`(app, databaseType)` unique. Clients reference it on `subscribe()`. Must NOT contain `#`. |
+| `displayName` | Yes | Human label. |
+| `modelName` | Yes | Scopes the subscription to one model. |
+| `access` | Yes | CEL — evaluated once at subscribe time. Non-empty string required. |
+| `filter` | Yes | CEL — evaluated per change. Non-empty string required (use `"true"` for "match every change `access` allowed"). |
+| `select` | No | Array of field names to project `data` / `previousData` to before broadcast. Fields not listed never leave the server. |
+| `emit` | No | Array restricting delivered `changeType` values: `"enter"`, `"update"`, `"leave"`. |
+| `params` | No | Object: `{ <name>: { type: "string" \| "number" \| "boolean", required?: boolean } }`. Max 5 entries. Bound at subscribe time. |
 
 ### Subscribing (client)
 
@@ -273,15 +296,15 @@ sub.unsubscribe();
 // WRONG — onChange receives an envelope with `changes[]`, not a single record.
 onChange: (record) => render(record);
 
-// WRONG — record fields are at the top level of `record`, not nested under .data.
-filter: "record.data.assigneeId == user.userId"
-// CORRECT:
+// WRONG — record payload fields are nested under `record.data`, not spread on `record`.
 filter: "record.assigneeId == user.userId"
+// CORRECT:
+filter: "record.data.assigneeId == user.userId"
 ```
 
 ### CEL variables
 
-`accessRule` (full context, evaluated once at subscribe time):
+`access` (full context, evaluated once at subscribe time):
 
 | Variable | Notes |
 |----------|-------|
@@ -295,11 +318,12 @@ filter: "record.assigneeId == user.userId"
 |----------|-------|
 | `user.userId` | The subscriber's user id. |
 | `user.role` | **Always `""` empty string in filter context.** Don't rely on it. |
-| `record.*` | The post-write record fields, plus `record.op`, `record.id`, `record.modelName`. |
-| `previousData.*` | The pre-write row when available (patch/delete). |
+| `record.modelName`, `record.op`, `record.id` | Top-level change metadata. |
+| `record.data.<fieldName>` | The post-write record fields. `null` on `delete`. |
+| `record.previousData.<fieldName>` | The pre-write row when available (patch/delete). `null` on a fresh insert. |
 | `params.*` | Bound params from `subscribe()`. |
 
-`filter` cannot grant access that `accessRule` denies — they're ANDed (subscribe is rejected if `accessRule` fails; otherwise only filter-matching changes are sent).
+`filter` cannot grant access that `access` denies — they're ANDed (subscribe is rejected if `access` fails; otherwise only filter-matching changes are sent).
 
 ### Change envelope shape
 
@@ -339,7 +363,7 @@ interface DatabaseChangeEvent {
 - The WS client persists the registry of `(databaseId, subscriptionKey, params, onChange)` tuples and re-issues `db.subscribe` automatically when the socket reopens. No app code needed.
 - **No replay** of changes that occurred while disconnected. If you need consistency on reconnect, re-run your initial-load query.
 - The writer's connection is excluded from broadcast via `excludeConnectionId`. The writer's user is NOT excluded — other tabs/devices of the same user receive the change.
-- Auth refresh that does NOT require a hard reconnect leaves subscriptions intact. A hard reconnect re-runs the registry pass (so `accessRule` is re-evaluated against the current user/memberships).
+- Auth refresh that does NOT require a hard reconnect leaves subscriptions intact. A hard reconnect re-runs the registry pass (so `access` is re-evaluated against the current user/memberships).
 
 ---
 
@@ -421,10 +445,11 @@ const unsub = client.databases.subscribe(metricsDbId, "hourly-rollups", {
 - Cron schedule with a user-visible hour but no `timezone` — fires at the wrong wall-clock time.
 - Using `key`, `schedule`, or `input` in the client API — fields are `triggerKey`, `cron`, `rootInput`.
 - Calling `.test()` / `.update()` / `.pause()` with the trigger's *key* — they take the *id*.
-- Putting `isMemberOf()` or per-user logic in subscription `filter` — `filter` has no membership data. Put it in `accessRule`.
-- Writing `record.fieldName` in `filter` — record fields live under `record.data.fieldName`.
-- Defining subscriptions in TOML / `primitive sync` — they are HTTP-API only.
-- Adding a `modelName` field to the subscription — there isn't one. Filter on `record.modelName` in CEL.
+- Putting `isMemberOf()` or per-user logic in subscription `filter` — `filter` has no membership data. Put it in `access`.
+- Writing `record.fieldName` in `filter` — record payload fields live under `record.data.fieldName`. Only `record.modelName`, `record.op`, `record.id` are top-level.
+- Sending an empty / missing `filter` on POST or PUT — both `access` and `filter` are required non-empty CEL strings. Use `"true"` if you don't want filter narrowing.
+- Defining subscriptions in TOML / `primitive sync push` — the CLI does not manage subscriptions. CRUD is admin-HTTP only.
+- Sending the body field `accessRule` — the wire-format field name is `access`. POSTing `accessRule` is rejected with `access (CEL expression) is required`.
 - Assuming the writer's own mutation comes back through THEIR subscription on the SAME connection — it doesn't. (Other connections of the same user DO receive it.)
 - Relying on replay after disconnect. There is none. Re-load if you need consistency.
 - Forgetting to call the returned `unsub()`. Leaks `ConnectionMapping` rows and registry entries.
@@ -455,7 +480,7 @@ Common states:
 
 - Subscribe call returns an error message (sent over WS as `type: "error"`, `context: "db.subscribe"`):
   - `"Database not found"` / `"Subscription not found"` — wrong id/key or archived.
-  - `"Access denied to subscription"` — `accessRule` returned false. Test the rule against the caller's user/memberships.
+  - `"Access denied to subscription"` — `access` returned false. Test the rule against the caller's user/memberships.
   - `"Missing required parameter: ..."` / `"Undeclared parameter: ..."` / `"Parameter ... must be of type ..."` — params don't match schema.
 - Changes aren't arriving — verify (a) the write completed, (b) the subscription's `filter` matches the actual record (remember `record.data.field` not `record.field`), (c) the subscriber's connection is still open.
 - "Seeing my own writes" — only happens if a different connection performed the write (e.g. another tab) or you have a client-side optimistic update on the same path.
@@ -466,4 +491,4 @@ Common states:
 
 - [Workflows](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md) — what cron triggers fire
 - [Databases](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) — operations, access rules, triggers
-- [Users and Groups](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) — CEL membership checks for `accessRule`
+- [Users and Groups](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) — CEL membership checks for `access`

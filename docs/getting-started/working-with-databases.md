@@ -409,18 +409,28 @@ A missing CEL context key (`$database.celContext.nonExistent` → `null`) natura
 
 ## Real-Time Subscriptions
 
-Databases can push changes to connected clients over WebSocket — your app doesn't have to poll. Subscriptions are scoped to a *database type*, so one definition serves every database of that type. Declare them in the type config, subscribe from the client, and the server fans out matching change events:
+Databases can push changes to connected clients over WebSocket — your app doesn't have to poll. Subscriptions are scoped to a *database type*, so one definition serves every database of that type. Register the subscription against the admin HTTP API, subscribe from the client, and the server fans out matching change events:
 
-```toml
-[[subscriptions]]
-subscriptionKey = "my-open-tickets"
-displayName = "My open tickets"
-modelName = "ticket"
-accessRule = "user.userId != ''"
-filter = "record.assigneeId == user.userId && record.status == 'open'"
-# Optional — narrow the payload server-side
-select = ["id", "title", "priority", "updatedAt"]
+```typescript
+// Server-side registration via an admin-capable client
+await adminClient.fetch(
+  `/databases/types/support-desk/subscriptions`,
+  {
+    method: "POST",
+    body: JSON.stringify({
+      subscriptionKey: "my-open-tickets",
+      displayName: "My open tickets",
+      modelName: "ticket",
+      access: "user.userId != ''",
+      filter: "record.data.assigneeId == user.userId && record.data.status == 'open'",
+      // Optional — narrow the payload server-side
+      select: ["id", "title", "priority", "updatedAt"],
+    }),
+  },
+);
 ```
+
+`access` and `filter` are both required CEL expressions. `access` is checked once at subscribe time with the full user/membership context; `filter` runs per change and sees `user.userId`, `record.modelName` / `record.op` / `record.id`, the post-write payload at `record.data.<fieldName>`, the pre-write payload at `record.previousData.<fieldName>`, and the subscriber's bound `params.*`. Use `"true"` for `filter` if `access` already narrows the scope sufficiently.
 
 ```typescript
 const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {

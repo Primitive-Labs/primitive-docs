@@ -153,40 +153,44 @@ Use subscriptions for:
 
 Unlike documents (which sync an entire CRDT), database subscriptions push **changes to individual rows**. Each subscription is defined on a *database type* (so one definition serves every database of that type) and has:
 
-- A **target model** (e.g. `"ticket"`)
-- An **access rule** — a CEL expression that decides if this user can subscribe at all
-- A **filter expression** — a CEL expression evaluated against each change; only matches are delivered
+- A **target model** (e.g. `"ticket"`) — `modelName`, required
+- An **access rule** — a CEL expression that decides if this user can subscribe at all (`access`, required)
+- A **filter expression** — a CEL expression evaluated against each change; only matches are delivered (`filter`, required — use `"true"` if you want every change in scope)
 - An optional **`select`** projection — a list of field names to include in each change frame
 - An optional **`emit`** filter — restricts which change types are delivered (`"enter"`, `"update"`, `"leave"`)
 
 ### Registering a Subscription
 
-Subscriptions live in your database type config, next to operations and triggers:
+Subscription CRUD is admin-scoped and lives on the HTTP API at `/databases/types/<databaseType>/subscriptions`. Create one by POSTing the definition from a server-side client that holds admin app permission:
 
-```toml
-# config/database-types/support-desk.toml
-[databaseType]
-databaseType = "support-desk"
-
-[[subscriptions]]
-subscriptionKey = "my-open-tickets"
-displayName = "My open tickets"
-modelName = "ticket"
-access = "user.userId != ''"
-filter = "record.assigneeId == user.userId && record.status == 'open'"
-# Optional: only send these fields in each change frame
-select = ["id", "title", "priority", "updatedAt"]
-# Optional: only fire when a row enters or leaves the filter set
-emit = ["enter", "leave"]
+```typescript
+// Server-side: from your app's admin-capable client (e.g. __primitiveAppClient)
+await adminClient.fetch(
+  `/databases/types/support-desk/subscriptions`,
+  {
+    method: "POST",
+    body: JSON.stringify({
+      subscriptionKey: "my-open-tickets",
+      displayName: "My open tickets",
+      modelName: "ticket",
+      access: "user.userId != ''",
+      filter: "record.data.assigneeId == user.userId && record.data.status == 'open'",
+      // Optional: only send these fields in each change frame
+      select: ["id", "title", "priority", "updatedAt"],
+      // Optional: only fire when a row enters or leaves the filter set
+      emit: ["enter", "leave"],
+    }),
+  },
+);
 ```
 
-Then push as usual:
-
-```bash
-primitive sync push --dir ./config
-```
+`PUT` and `DELETE` on `/databases/types/<databaseType>/subscriptions/<subscriptionKey>` update or remove a registration. The endpoint requires admin app permission, so this is a setup-time / configuration call — not something your app's end users invoke.
 
 Subscriptions are keyed by `(databaseType, subscriptionKey)` and apply across every database of that type.
+
+::: warning Wire-format field names
+The POST body uses `access` (not `accessRule`). `filter` is required — an empty or missing `filter` is rejected with `HTTP 400: filter (CEL expression) is required`. Use `"true"` if you want every change matched by `access` delivered.
+:::
 
 ### Subscribing from Your App
 
@@ -225,18 +229,28 @@ Each `db.change` frame carries origin attribution so consumers can tell who wrot
 
 The writer's own connection receives the `db.change` frame just like every other matching subscriber — server-side fanout doesn't filter out the writer. Use `isOrigin` to suppress the echo on the tab that produced the write (it already updated optimistically), and `isOriginUser` to coordinate the cross-tab/reconnect cases for other sessions of the same user.
 
-Parameterized subscriptions take a `params` object at subscribe time — the same substitution syntax as operations:
+Parameterized subscriptions take a `params` object at subscribe time — the same substitution syntax as operations. Declare the schema when you register the subscription, then bind values when subscribing:
 
-```toml
-[[subscriptions]]
-subscriptionKey = "tickets-by-team"
-modelName = "ticket"
-access = "isMemberOf('team', params.teamId)"
-filter = "record.teamId == params.teamId"
-params = '{"teamId":{"type":"string","required":true}}'
+```typescript
+// Server-side registration via the admin HTTP API
+await adminClient.fetch(
+  `/databases/types/support-desk/subscriptions`,
+  {
+    method: "POST",
+    body: JSON.stringify({
+      subscriptionKey: "tickets-by-team",
+      displayName: "Tickets by team",
+      modelName: "ticket",
+      access: "isMemberOf('team', params.teamId)",
+      filter: "record.data.teamId == params.teamId",
+      params: { teamId: { type: "string", required: true } },
+    }),
+  },
+);
 ```
 
 ```typescript
+// Client-side subscribe
 const unsub = client.databases.subscribe(databaseId, "tickets-by-team", {
   params: { teamId: "eng" },
   onChange: (event) => { /* ... */ },

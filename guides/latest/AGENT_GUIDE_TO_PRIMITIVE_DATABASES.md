@@ -1090,42 +1090,45 @@ Databases push changes to connected clients over WebSocket. Subscriptions are **
 
 ### Registering a subscription
 
-Declare subscriptions in the same TOML file as the rest of the type config:
+Subscriptions are managed via the admin HTTP API at `/databases/types/<databaseType>/subscriptions` (admin app permission required). The CLI does not manage subscriptions — POST/PUT/DELETE directly from a server-side client.
 
-```toml
-[type]
-databaseType = "support-desk"
-
-[[subscriptions]]
-subscriptionKey = "my-open-tickets"
-displayName = "My open tickets"
-modelName = "ticket"
-accessRule = "user.userId != ''"
-filter = "record.assigneeId == user.userId && record.status == 'open'"
-# Optional: only send these fields in each change frame
-select = ["id", "title", "priority", "updatedAt"]
-# Optional: only deliver these change types ("enter" | "update" | "leave")
-emit = ["enter", "leave"]
-# Optional: declared params bound to the subscriber
-params = '{"teamId":{"type":"string","required":false}}'
+```typescript
+await adminClient.fetch(
+  `/databases/types/support-desk/subscriptions`,
+  {
+    method: "POST",
+    body: JSON.stringify({
+      subscriptionKey: "my-open-tickets",
+      displayName: "My open tickets",
+      modelName: "ticket",
+      access: "user.userId != ''",
+      filter: "record.data.assigneeId == user.userId && record.data.status == 'open'",
+      // Optional: only send these fields in each change frame
+      select: ["id", "title", "priority", "updatedAt"],
+      // Optional: only deliver these change types ("enter" | "update" | "leave")
+      emit: ["enter", "leave"],
+      // Optional: declared params bound to the subscriber
+      params: { teamId: { type: "string", required: false } },
+    }),
+  },
+);
 ```
-
-Push with `primitive sync push` — the same flow as operations and triggers.
 
 Field semantics:
 
-- `subscriptionKey` — unique within the type. Clients reference it when subscribing.
+- `subscriptionKey` — unique within the type. Clients reference it when subscribing. Must not contain `#`.
+- `displayName` — required human label.
 - `modelName` — the model whose changes drive the subscription.
-- `accessRule` (CEL) — evaluated at subscribe time; false → subscribe is rejected.
-- `filter` (CEL) — evaluated per-change, per-subscriber against `record.*` and `previousData.*`. Only matches are delivered. Cannot grant access `accessRule` denies.
+- `access` (CEL, required) — evaluated at subscribe time; false → subscribe is rejected. Must be a non-empty string.
+- `filter` (CEL, required) — evaluated per-change, per-subscriber against `record.*` (with payload nested under `record.data.*`) and `record.previousData.*`. Only matches are delivered. Cannot grant access `access` denies. Must be a non-empty string — use `"true"` for "match every change `access` allowed".
 - `select` (string array) — narrows `data` (and `previousData`) to the listed fields **server-side**. Omit to send full records. Use `select` to keep sensitive fields off the wire entirely.
 - `emit` (string array) — one or more of `"enter"`, `"update"`, `"leave"`. Restricts which `changeType` values are delivered (see frame shape below). Omit for all.
-- `params` — declared params bound to the subscriber, exposed as `params.*` in `accessRule` and `filter`. Supported types: `string`, `number`, `boolean`. Type checks are strict — no coercion.
+- `params` — declared params bound to the subscriber, exposed as `params.*` in `access` and `filter`. Supported types: `string`, `number`, `boolean`. Type checks are strict — no coercion. Max 5 entries.
 
 CEL context differs between the two phases:
 
-- `accessRule` (subscribe time): `user.userId`, `user.role`, `params.*`, plus `isMemberOf`, `memberGroups`, `hasRole`.
-- `filter` (per-change broadcast): `user.userId`, `record.*` (the changed row, post-write), `previousData.*` (the prior row), `record.op`, `record.id`, `params.*`. Memberships and `database.*` are **not** bound at filter time — put group-based authorization in `accessRule`, not `filter`.
+- `access` (subscribe time): `user.userId`, `user.role`, `params.*`, plus `isMemberOf`, `memberGroups`, `hasRole`.
+- `filter` (per-change broadcast): `user.userId` (the subscriber), `record.modelName`, `record.op`, `record.id`, `record.data.<fieldName>` (post-write payload), `record.previousData.<fieldName>` (pre-write payload, when present), and `params.*`. Memberships and `database.*` are **not** bound at filter time — put group-based authorization in `access`, not `filter`.
 
 ### Subscribing from the client
 
