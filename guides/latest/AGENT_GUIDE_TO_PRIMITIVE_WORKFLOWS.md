@@ -233,7 +233,11 @@ databaseId = "{{ input.dbId }}"
 operationName = "createTask"
 [steps.params]
 title = "{{ input.title }}"
-# Output: { results: [{ ok, id }] }
+# Output: { results: [{ success: true, id }] }
+# Each entry has `success` (not `ok`) + `id`. Failures throw — a result entry's
+# presence implies it succeeded. In `runIf`, prefer the step-level verdict
+# `steps['create-task'].ok` (true iff every result item succeeded) or
+# `size(steps['create-task'].?results) > 0`.
 
 [[steps]]
 id = "mark-overdue"
@@ -1003,6 +1007,29 @@ Doesn't exist. Use `forEach` over a `database.mutate` step, or use `database.app
 ### Wrong: arbitrary analytics query types
 
 Use the dotted form. `top-users` → `users.top`. `events-grouped` → `events.grouped`. `workflows` → `workflows.top`.
+
+### Wrong: mirroring workflow state into a separate database row
+
+```toml
+# WRONG — patching an `importJobs` row at the end of the workflow to track status
+[[steps]]
+id = "mark-done"
+kind = "database.mutate"
+operationName = "patch-import-job"
+[steps.params]
+id = "{{ input.jobId }}"
+data = '{ "status": "ready_to_review" }'
+```
+
+This drifts the moment the workflow ends without your mutate firing — async failure, terminated run, an upstream step that throws between the data write and the status patch. The row sticks on `"processing"` forever and your UI spins indefinitely.
+
+The workflow engine already tracks status (`running` / `apply_pending` / `apply_claimed` / `complete` / `failed` / `terminated`). Use the workflow's own machinery instead of mirroring it:
+
+- **`meta` (≤1KB)** passed to `workflows.start()` for small client-display fields that need to ride alongside the run (filenames, blob IDs, source labels). Surfaces in `listRuns`, `getStatus`, and `workflowStarted` / `workflowStatus` events.
+- **Run `output`** (via a final `transform` step with `saveAs = "output"`) for parsed results. Read via `getStatus({ workflowKey, runKey })`.
+- **`requiresClientApply = true`** when you need a "ready for user action" stage before finalization — the run sits in `apply_pending`, the client `claimApply`s it, runs whatever it needs locally, then `confirmApply`s. The run's status now encodes the full pipeline including "user has applied this".
+
+Only persist a separate database row when you need durable history beyond the workflow's 45-day TTL — and even then, store a *result record*, not a status mirror.
 
 ## Limits / TTLs
 
