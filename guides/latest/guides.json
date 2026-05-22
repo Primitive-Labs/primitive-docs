@@ -231,6 +231,27 @@
       "relatedGuides": ["workflows", "integrations", "blobs"]
     },
     {
+      "topic": "performance",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_PERFORMANCE.md",
+      "description": "Patterns and anti-patterns for cutting cold-load time and round-trip count in Primitive apps",
+      "keywords": ["performance", "perf", "slow", "latency", "round trips", "N+1", "pipeline op", "Promise.all", "cold path", "first paint", "bulk op", "subscribe", "cron cache", "stale-while-revalidate", "Pinia", "measure"],
+      "useCases": [
+        "Diagnosing why a page is slow on cold load",
+        "Replacing N+1 executeOperation loops with a single bulk call",
+        "Bundling related queries into a pipeline operation",
+        "Parallelizing independent awaits with Promise.all",
+        "Moving third-party API calls to a server-side cron",
+        "Rendering with cached values and refreshing reactively",
+        "Caching source data with DB-subscribe invalidation",
+        "Deferring non-critical init off the cold path",
+        "Auditing an existing Primitive app for common slow patterns",
+        "Instrumenting first-paint time to verify a perf win"
+      ],
+      "concepts": ["pipeline operation", "bulk op", "Promise.all", "cold path vs background", "re-block trap", "stale-while-revalidate", "client.databases.subscribe", "fromWorkflow", "server-side cron", "pure compute", "Pinia store"],
+      "prerequisites": [],
+      "relatedGuides": ["databases", "integrations", "workflows", "scheduling-and-realtime"]
+    },
+    {
       "topic": "devtools",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DEVTOOLS.md",
       "description": "Using Document Explorer and Test Harness for debugging and testing",
