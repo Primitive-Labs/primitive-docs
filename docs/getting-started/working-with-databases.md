@@ -250,6 +250,20 @@ access = """isMemberOf('admin', 'admins') || isMemberOf('team', database.celCont
 | `isMemberOf(groupType, groupId)` | Check group membership |
 | `memberGroups(groupType)` | List groups of a type the user belongs to |
 | `hasRole(role)` | Check if the user has a specific app role |
+| `fromWorkflow()` | True when the call originated from any workflow step |
+| `fromWorkflow(workflowKey)` | True when the call originated from the named workflow |
+
+Use `fromWorkflow(...)` to gate an operation so only a specific workflow can invoke it — useful for cron-fired refreshes that no user, including admins, should be able to call directly:
+
+```toml
+[[operations]]
+name = "bulk-update-prices"
+type = "applyToQuery"
+modelName = "security"
+access = "fromWorkflow('refresh-security-prices')"
+```
+
+The workflow identity is only injected when the caller is the internal workflow step runner; external HTTP clients cannot spoof it.
 
 ### Per-Parameter Access
 
@@ -313,6 +327,51 @@ Set `defaultAccess` on the type config to apply a CEL rule to every operation th
 databaseType = "project"
 defaultAccess = "isMemberOf('team', database.celContext.teamId)"
 ```
+
+## Schema Gate (Optional)
+
+Add `[models.<Name>.fields.<field>]` blocks to your `config/database-types/<type>.toml` to declare which models and fields the type's registered operations may reference. When a schema is present, the server checks every op edit against it:
+
+```toml
+# config/database-types/inventory.toml
+[type]
+databaseType = "inventory"
+
+[models.product.fields.id]
+type = "id"
+auto_assign = true
+indexed = true
+
+[models.product.fields.name]
+type = "string"
+
+[models.product.fields.priceCents]
+type = "number"
+indexed = true
+
+[[operations]]
+name = "list-products"
+type = "query"
+modelName = "product"
+access = "true"
+definition = '{"filter":{"priceCents":{"$gt":0}}}'
+```
+
+With the schema in place, a future op that filters on `nameTypo` instead of `name` is rejected at push time with `OPERATION_REFERENCES_UNDEFINED` — before it can return broken data. Schema edits are checked in the reverse direction: a change that would invalidate an existing op is rejected with `SCHEMA_BREAKS_OPERATIONS`.
+
+To add a schema to an existing type that already has ops and live data, scaffold it from the server:
+
+```bash
+primitive databases schema generate inventory
+```
+
+This inspects existing ops and introspects the live Durable Object, then splices a `[models.*]` block into the local TOML. Review the inferred types, fix anything the generator guessed wrong, and run `primitive sync push`.
+
+Ops with dynamic references (e.g. `modelName = "$params.kind"`) can't be statically verified. The op-edit gate accepts them as warnings, and the schema-edit gate flags them with `SCHEMA_HAS_UNCHECKABLE_OPS` — re-run with `primitive sync push --accept-warnings` to commit once you've reviewed them.
+
+::: tip
+Types without any `[models.*]` block keep the pre-gate behavior — ops are accepted without static consistency checks. Once you add a schema, the gate also prevents removing it while ops are still registered (`OPS_EXIST`).
+:::
 
 ## Pipelines
 

@@ -255,6 +255,7 @@ A **database type** is a named configuration shared across many databases. It pr
 - **`celContextAccess`** — CEL expression that lets non-owner/manager users read and update the database's CEL context (defaults to deny when unset; owner/manager always have access)
 - **`autoPopulatedFields`** — declarative server-side field stamping on writes (see below)
 - **`defaultAccess`** — fallback CEL access rule applied to operations that omit their own `access`
+- **`[models.*]` schema** — optional server-enforced model declaration. When present, every op edit (and the schema edit itself) is checked against it; see [Schema gate](#schema-gate)
 - **Subscriptions** — type-scoped real-time subscription definitions
 - **Rule set attachment** — controls who can edit the type config and its operations
 
@@ -323,6 +324,52 @@ defaultAccess = "isMemberOf('team', database.celContext.teamId)"
 
 An operation can override the default by setting its own `access`. Without `defaultAccess` (and no per-operation rule), the operation is denied for non-owner/manager callers.
 
+### Schema gate
+
+A database type can carry an optional schema — one or more `[models.<Name>.fields.<field>]` blocks in the same TOML file as the type config. When a schema is present, the server enforces consistency between ops and the schema in both directions:
+
+- **Op-edit gate.** Creating or editing an operation runs every static `modelName` and field reference in `filter` / `projection` / `sort` / `data` / `access` / mutation `condition` against the schema. References that don't resolve fail with HTTP 422 `OPERATION_REFERENCES_UNDEFINED` (the response payload lists each unresolved ref).
+- **Schema-edit gate.** Editing or deleting the schema runs every existing op against the proposed new schema. If any op would break, the edit fails with HTTP 422 `SCHEMA_BREAKS_OPERATIONS`. If any op contains references the gate can't statically resolve (see "Dynamic references" below), the edit fails with HTTP 422 `SCHEMA_HAS_UNCHECKABLE_OPS` until you re-run with `primitive sync push --accept-warnings`. Deleting the schema entirely (removing all `[models.*]` blocks from the local file) is rejected with HTTP 409 `OPS_EXIST` while any operations are still registered.
+
+```toml
+# config/database-types/inventory.toml
+[type]
+databaseType = "inventory"
+
+[models.product.fields.id]
+type = "id"
+auto_assign = true
+indexed = true
+
+[models.product.fields.name]
+type = "string"
+
+[models.product.fields.priceCents]
+type = "number"
+indexed = true
+
+[[operations]]
+name = "list-products"
+type = "query"
+modelName = "product"
+access = "true"
+definition = '{"filter":{"priceCents":{"$gt":0}}}'
+```
+
+Adding the `[models.product.fields.*]` blocks above means any future `[[operations]]` that references `product.nameTypo` (instead of `name`) is rejected at push time, before it can return broken data.
+
+**Dynamic references.** Some refs can't be statically checked — for example, `modelName = "$params.kind"` (model determined at call time), a raw `filter` or `projection` lifted from `$params`, `record[expr]` field access, or lambda bodies inside pipelines. These are surfaced as *warnings*, not errors. The op is accepted, but the schema-edit gate later flags them so the operator can review whether the dynamic reference is still consistent with the new schema.
+
+**Bootstrapping an existing type.** If a type already has registered operations and you want to add a schema retroactively, use the scaffolding command:
+
+```bash
+primitive databases schema generate <database-type>
+```
+
+It calls a server-side endpoint that inspects existing ops + introspects the live DO, infers field types where it can, and splices a `[models.*]` block into the local `config/database-types/<type>.toml` file (just before the first `[[operations]]` block). Review the result — the generator guesses types from observed values, and you may need to fix what it got wrong — then run `primitive sync push` (or `primitive sync push --dry-run` first) to attach it.
+
+**Schemaless types.** A type without any `[models.*]` block is unchanged from the pre-gate behavior — ops are accepted without static consistency checks. Once you add a schema, the consistency invariant holds: the schema-edit gate prevents removing it while ops remain, so future op edits stay aligned with the schema.
+
 ## Registered Operations
 
 Registered operations are named, parameterized database operations defined at the database-type level. They are the primary data access layer — all user interaction with database data goes through operations.
@@ -348,7 +395,18 @@ Each operation has an `access` field — a CEL expression evaluated at call time
 
 Only `database.id` and the CEL context object are available in CEL — other database fields like `createdBy` are not exposed. `database.celContext` and `database.metadata` are aliases for the same object; prefer `database.celContext` in new code. To check ownership, store the creator's ID in metadata at creation time or use group membership.
 
-**CEL functions:** `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`, `hasRole(role)`
+**CEL functions:** `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`, `hasRole(role)`, `fromWorkflow()`, `fromWorkflow(workflowKey)`
+
+`fromWorkflow()` is true when the call originated from a workflow step (any workflow); `fromWorkflow("key")` restricts to a specific workflow. Use it to lock down ops that should only be invoked by an internal workflow:
+
+```toml
+[[operations]]
+name = "bulkUpdatePricesFromWorkflow"
+access = "fromWorkflow('refresh-security-prices')"
+# …
+```
+
+This is the cleanest expression of "only the named cron-fired workflow can call this — no user, not even an admin, can call it directly with a hand-crafted request." The workflow identity is only injected when the caller is the internal workflow step runner; external HTTP clients cannot spoof it.
 
 For group-based access patterns, per-parameter access, and detailed CEL examples, see the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md).
 
@@ -946,7 +1004,9 @@ const db = client.databases.connect(databaseId);
 await db.syncIndexes(Task);
 ```
 
-The same TOML powers documents and databases — there's no separate "database-only" authoring path in the template app. See the [Defining Your Models guide](https://docs.primitive.com/getting-started/defining-your-models) (or the [Documents agent guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#defining-models)) for the full TOML reference: field types, options, relationships, unique constraints, and schema iteration.
+The same TOML powers documents and client-side database models. See the [Defining Your Models guide](https://docs.primitive.com/getting-started/defining-your-models) (or the [Documents agent guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#defining-models)) for the full TOML reference: field types, options, relationships, unique constraints, and schema iteration.
+
+If you want the server to enforce that registered operations only reference fields you've declared, declare those same models *inside the database type config* (`config/database-types/<type>.toml`) using `[models.<Name>.fields.<field>]` blocks. The CLI sync push extracts that subtree and stores it as the type's `schema`, which the op-edit and schema-edit gates check against — see [Schema gate](#schema-gate).
 
 If you're not using the project template (no `models.toml`, no codegen), the lower-level primitives are still exported for programmatic use:
 
@@ -1352,3 +1412,8 @@ Any field starting with `_` (underscore) is reserved for internal use. The inter
 | 409 from a mutation operation | One or more sub-ops in the batch failed (e.g., `ifNotExists` conflict) | Inspect the error message; mutation operations bundle all sub-ops into one DO `/batch` call and surface the first failure |
 | `executeBatch` rejected with 400 "executeBatch only supports mutation operations" | Operation type is not `mutation` | Only `type = "mutation"` operations work with `executeBatch` |
 | Records not found after save | Querying wrong `modelName` | Model names are case-sensitive collection identifiers |
+| 422 `OPERATION_REFERENCES_UNDEFINED` on op create/edit | The op references a model or field not present in the type's `[models.*]` schema | Check the response's `refs` list; either fix the typo, or add the field to the schema. See [Schema gate](#schema-gate) |
+| 422 `SCHEMA_BREAKS_OPERATIONS` on schema edit | A schema change would invalidate at least one existing op | Response lists the breaking ops + unresolved refs. Either reshape the schema or update the ops first |
+| 422 `SCHEMA_HAS_UNCHECKABLE_OPS` on schema edit | At least one op has dynamic refs (e.g. `modelName = "$params.kind"`) the gate can't statically verify against the new schema | Confirm the dynamic refs are still consistent and re-run with `primitive sync push --accept-warnings` to commit |
+| 409 `OPS_EXIST` on schema deletion | Removing the schema (`schema: null` via the API, or stripping all `[models.*]` blocks from the local file) is blocked while operations remain | Delete the registered operations first, then remove the schema |
+| 413 `SCHEMA_TOO_LARGE` on schema edit | The inline schema exceeds the per-type cap | Trim the schema or split the model surface across multiple types |
