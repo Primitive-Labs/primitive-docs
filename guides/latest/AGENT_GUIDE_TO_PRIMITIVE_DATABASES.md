@@ -43,18 +43,19 @@ Create a database type config with operations in `config/database-types/project.
 [type]
 databaseType = "project"
 celContextAccess = "isMemberOf('team', database.celContext.teamId)"
+timestamps = { create = "createdAt", update = "modifiedAt" }
 
 [triggers.tasks]
 triggers = [
-  { on = "create", set = { createdAt = "now()", createdBy = "user.userId" } },
-  { on = "update", set = { modifiedAt = "now()" } },
+  { on = "create", set = { createdBy = "user.userId" } },
+  { on = "save", when = "record.status == 'done' && record.completedAt == null", set = { completedAt = "now()" } },
 ]
 
 [[operations]]
 name = "listTasks"
 type = "query"
 modelName = "tasks"
-access = "isMemberOf('team', database.metadata.teamId)"
+access = "isMemberOf('team', database.celContext.teamId)"
 definition = '{"filter":{"projectId":"$params.projectId"},"sort":{"createdAt":-1},"limit":50}'
 params = '{"projectId":{"type":"string","required":true}}'
 
@@ -62,8 +63,8 @@ params = '{"projectId":{"type":"string","required":true}}'
 name = "createTask"
 type = "mutation"
 modelName = "tasks"
-access = "isMemberOf('team', database.metadata.teamId)"
-definition = '{"operations":[{"op":"save","data":{"title":"$params.title","projectId":"$params.projectId","status":"open","createdBy":"$user.userId","createdAt":"$now"}}]}'
+access = "isMemberOf('team', database.celContext.teamId)"
+definition = '{"operations":[{"op":"save","data":{"title":"$params.title","projectId":"$params.projectId","status":"open","createdBy":"$user.userId"}}]}'
 params = '{"title":{"type":"string","required":true},"projectId":{"type":"string","required":true}}'
 ```
 
@@ -144,11 +145,11 @@ Note: Double-quoted strings (`"..."`) also work for CEL with single quotes insid
 databaseType = "project"
 ruleSetName = "project-admin-rules"    # optional — rule set for managing this type's config
 celContextAccess = "isMemberOf('team', database.celContext.teamId)"  # optional — CEL for CEL context updates
+timestamps = { create = "createdAt", update = "modifiedAt" }         # optional — auto-stamp timestamps on every write
 
 [triggers.tasks]
 triggers = [
-  { on = "create", set = { createdAt = "now()", createdBy = "user.userId" } },
-  { on = "update", set = { modifiedAt = "now()" } },
+  { on = "create", set = { createdBy = "user.userId" } },
   { on = "save", when = "record.status == 'done' && record.completedAt == null", set = { completedAt = "now()" } },
 ]
 
@@ -241,6 +242,9 @@ primitive databases records models <id>
 primitive databases records describe <id> <model>
 primitive databases records query <id> <model> --filter '{"status":"open"}'
 
+# TypeScript codegen from database-type TOML (record interfaces + op param/result types)
+primitive databases codegen --sync-dir ./config --output ./src/generated/db
+
 # Data migration (records + indexes + constraints; type config excluded — run sync push on target first)
 primitive databases export <id> --output ./out
 primitive databases import ./out --overwrite [--dry-run]
@@ -256,10 +260,10 @@ A **database type** is a named configuration shared across many databases. It pr
 - **`autoPopulatedFields`** — declarative server-side field stamping on writes (see below)
 - **`defaultAccess`** — fallback CEL access rule applied to operations that omit their own `access`
 - **`[models.*]` schema** — optional server-enforced model declaration. When present, every op edit (and the schema edit itself) is checked against it; see [Schema gate](#schema-gate)
-- **Subscriptions** — type-scoped real-time subscription definitions
+- **Subscriptions** — type-scoped real-time subscription definitions (managed via `[[subscriptions]]` blocks in the TOML)
 - **Rule set attachment** — controls who can edit the type config and its operations
 
-Real-time subscriptions are also part of the type config — see [Real-Time Subscriptions](#real-time-subscriptions). One subscription definition serves every database of that type.
+Real-time subscriptions are also part of the type config — see [Real-Time Subscriptions](#real-time-subscriptions). One subscription definition serves every database of that type. Define them as `[[subscriptions]]` blocks in the same TOML file; `primitive sync push` manages them alongside operations.
 
 ### Triggers
 
@@ -289,6 +293,33 @@ Triggers are computed fields that run server-side in the Durable Object before a
 | `fromWorkflow()`, `fromWorkflow(key)` | True if the write was issued by a workflow step (or a specific workflow) |
 
 **Don't confuse trigger CEL with operation substitutions.** Triggers use bare CEL — `user.userId`, `now()`. Operation `definition` and `params` use `$user.userId`, `$now`, `$params.x`, `$database.celContext.x` substitutions, which are deep string-replacement on the JSON template, NOT CEL. (`$database.metadata.x` is accepted as an alternate alias for the same value.)
+
+### Timestamps
+
+The `timestamps` knob on the `[type]` config stamps `createdAt` and/or `modifiedAt` fields automatically on every write, removing the need for per-model trigger boilerplate. Field names are caller-configurable.
+
+```toml
+[type]
+databaseType = "project"
+timestamps = { create = "createdAt", update = "modifiedAt" }
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `create` | string | Field name stamped with the current ISO 8601 timestamp on record creation. Optional. |
+| `update` | string | Field name stamped on every save (including the first). Optional. |
+| `models` | string[] | Restrict stamping to these models only. Optional — omit to stamp every model under the type. |
+
+Either lifecycle key can be omitted independently: `timestamps = { create = "createdAt" }` stamps only on create. Field names are yours to choose (`createdAt`/`modifiedAt`, `created_at`/`updated_at`, etc.).
+
+```toml
+# Only stamp accounts and holdings
+timestamps = { create = "createdAt", update = "modifiedAt", models = ["accounts", "holdings"] }
+```
+
+If a model has both an explicit `[[triggers]]` block AND `timestamps`, the trigger fires after the auto-stamp (last writer wins). Since the auto-stamp checks "is the field absent" first, an explicit trigger that sets the field always wins on its lifecycle.
+
+Use `timestamps` for the common "every write should have a created/modified stamp" pattern. Use per-model triggers when the rule depends on the record's data (e.g. `completedAt` only when `status == "done"`). Use `autoPopulatedFields` when you need CEL-resolved values beyond `now()` (e.g. `updatedBy = "user.userId"`).
 
 ### Auto-populated fields
 
@@ -1150,7 +1181,37 @@ Databases push changes to connected clients over WebSocket. Subscriptions are **
 
 ### Registering a subscription
 
-Subscriptions are managed via the admin HTTP API at `/databases/types/<databaseType>/subscriptions` (admin app permission required). The CLI does not manage subscriptions — POST/PUT/DELETE directly from a server-side client.
+Subscriptions can be managed via TOML config files with `primitive sync push` (recommended) or via the admin HTTP API at `/databases/types/<databaseType>/subscriptions`.
+
+**Via TOML (recommended)** — add `[[subscriptions]]` blocks to your database type config file:
+
+```toml
+# config/database-types/support-desk.toml
+[type]
+databaseType = "support-desk"
+
+[[subscriptions]]
+subscriptionKey = "my-open-tickets"
+displayName = "My open tickets"
+modelName = "ticket"
+accessRule = "user.userId != ''"
+filter = "record.data.assigneeId == user.userId && record.data.status == 'open'"
+select = ["id", "title", "priority", "updatedAt"]
+emit = ["enter", "leave"]
+
+[[subscriptions]]
+subscriptionKey = "tickets-by-team"
+displayName = "Tickets by team"
+modelName = "ticket"
+accessRule = "isMemberOf('team', params.teamId)"
+filter = "record.data.teamId == params.teamId"
+[subscriptions.params]
+teamId = { type = "string", required = true }
+```
+
+`primitive sync push` creates new subscriptions, updates changed ones, and deletes keys present on the server but missing from the TOML. `primitive sync pull` round-trips subscriptions back into `[[subscriptions]]` blocks.
+
+**Via admin HTTP API** — POST/PUT/DELETE directly from a server-side client:
 
 ```typescript
 await adminClient.fetch(
@@ -1176,19 +1237,19 @@ await adminClient.fetch(
 
 Field semantics:
 
-- `subscriptionKey` — unique within the type. Clients reference it when subscribing. Must not contain `#`.
+- `subscriptionKey` — unique within the type. Clients reference it when subscribing. Must not contain `#`. Re-creating a subscription with the same key after deletion returns HTTP 409 if an archived row still holds the key — use a different key or hard-delete first.
 - `displayName` — required human label.
 - `modelName` — the model whose changes drive the subscription.
-- `access` (CEL, required) — evaluated at subscribe time; false → subscribe is rejected. Must be a non-empty string.
-- `filter` (CEL, required) — evaluated per-change, per-subscriber against `record.*` (with payload nested under `record.data.*`) and `record.previousData.*`. Only matches are delivered. Cannot grant access `access` denies. Must be a non-empty string — use `"true"` for "match every change `access` allowed".
+- `access` / `accessRule` (CEL, required) — evaluated at subscribe time; false → subscribe is rejected. Must be a non-empty string. The TOML field is `accessRule`; the HTTP API field is `access`.
+- `filter` (CEL, required) — evaluated per-change, per-subscriber against `record.*` (with payload nested under `record.data.*`) and `record.previousData.*`. Only matches are delivered. Cannot grant access `access` denies. Must be a non-empty string — use `"true"` for "match every change `access` allowed". **Cannot reference `database.*`** — a `filter` that references `database.celContext.*` or `database.metadata.*` is rejected with HTTP 400 at save time.
 - `select` (string array) — narrows `data` (and `previousData`) to the listed fields **server-side**. Omit to send full records. Use `select` to keep sensitive fields off the wire entirely.
 - `emit` (string array) — one or more of `"enter"`, `"update"`, `"leave"`. Restricts which `changeType` values are delivered (see frame shape below). Omit for all.
 - `params` — declared params bound to the subscriber, exposed as `params.*` in `access` and `filter`. Supported types: `string`, `number`, `boolean`. Type checks are strict — no coercion. Max 5 entries.
 
 CEL context differs between the two phases:
 
-- `access` (subscribe time): `user.userId`, `user.role`, `params.*`, plus `isMemberOf`, `memberGroups`, `hasRole`.
-- `filter` (per-change broadcast): `user.userId` (the subscriber), `record.modelName`, `record.op`, `record.id`, `record.data.<fieldName>` (post-write payload), `record.previousData.<fieldName>` (pre-write payload, when present), and `params.*`. Memberships and `database.*` are **not** bound at filter time — put group-based authorization in `access`, not `filter`.
+- `access` (subscribe time): `user.userId`, `user.role`, `database.id`, `database.celContext.*` (also `database.metadata.*`), `params.*`, plus `isMemberOf`, `memberGroups`, `hasRole`.
+- `filter` (per-change broadcast): `user.userId` (the subscriber), `record.modelName`, `record.op`, `record.id`, `record.data.<fieldName>` (post-write payload), `record.previousData.<fieldName>` (pre-write payload, when present), and `params.*`. Memberships and `database.*` are **not** bound at filter time — put group-based and database-context-based authorization in `access`, not `filter`.
 
 ### Subscribing from the client
 

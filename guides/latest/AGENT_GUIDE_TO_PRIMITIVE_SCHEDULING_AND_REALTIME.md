@@ -186,12 +186,38 @@ const cronRuns = items.filter(r => r.contextDocId?.startsWith("cron:"));
 
 ## Database Subscriptions
 
-### Registering (admin HTTP API)
+### Registering
 
-Subscription CRUD is admin-scoped (HTTP `admin` app permission). The CLI does not manage subscriptions — POST/PUT/DELETE directly against `/databases/types/<databaseType>/subscriptions` from a server-side client that holds admin permission.
+Subscriptions can be managed via TOML config files with `primitive sync push` (recommended) or via the admin HTTP API.
+
+**Via TOML (recommended)** — add `[[subscriptions]]` blocks to your database type config:
+
+```toml
+# config/database-types/support-desk.toml
+[[subscriptions]]
+subscriptionKey = "my-open-tickets"
+displayName = "My open tickets"
+modelName = "ticket"
+accessRule = "user.userId != ''"
+filter = "record.data.assigneeId == user.userId && record.data.status == 'open'"
+select = ["id", "title", "priority", "updatedAt"]
+emit = ["enter", "update", "leave"]
+
+[[subscriptions]]
+subscriptionKey = "tickets-by-team"
+displayName = "Tickets by team"
+modelName = "ticket"
+accessRule = "isMemberOf('team', params.teamId)"
+filter = "record.data.teamId == params.teamId"
+[subscriptions.params]
+teamId = { type = "string", required = true }
+```
+
+`primitive sync push` creates new subscriptions, updates changed ones, and deletes keys present on the server but missing from the TOML. `primitive sync pull` round-trips them back.
+
+**Via admin HTTP API** — POST/PUT/DELETE directly against `/databases/types/<databaseType>/subscriptions` from a server-side client that holds admin permission:
 
 ```typescript
-// Server-side, using an admin-capable client (e.g. the app's __primitiveAppClient)
 await adminClient.fetch(
   `/databases/types/support-desk/subscriptions`,
   {
@@ -202,29 +228,8 @@ await adminClient.fetch(
       modelName: "ticket",
       access: "user.userId != ''",
       filter: "record.data.assigneeId == user.userId && record.data.status == 'open'",
-      // Optional — restricts payload fields server-side
       select: ["id", "title", "priority", "updatedAt"],
-      // Optional — restricts which change types are delivered
       emit: ["enter", "update", "leave"],
-    }),
-  },
-);
-```
-
-Parameterized:
-
-```typescript
-await adminClient.fetch(
-  `/databases/types/support-desk/subscriptions`,
-  {
-    method: "POST",
-    body: JSON.stringify({
-      subscriptionKey: "tickets-by-team",
-      displayName: "Tickets by team",
-      modelName: "ticket",
-      access: "isMemberOf('team', params.teamId)",
-      filter: "record.data.teamId == params.teamId",
-      params: { teamId: { type: "string", required: true } },
     }),
   },
 );
@@ -232,23 +237,23 @@ await adminClient.fetch(
 
 Endpoints:
 - `GET /databases/types/<databaseType>/subscriptions` — list active subscriptions for the type.
-- `POST /databases/types/<databaseType>/subscriptions` — create.
+- `POST /databases/types/<databaseType>/subscriptions` — create. Returns 409 if the `subscriptionKey` collides with an existing (or archived) subscription.
 - `GET /databases/types/<databaseType>/subscriptions/<subscriptionKey>` — read one.
 - `PUT /databases/types/<databaseType>/subscriptions/<subscriptionKey>` — update (`filter`, `access`, `select`, `emit`, `params` are all patchable).
-- `DELETE /databases/types/<databaseType>/subscriptions/<subscriptionKey>` — archive.
+- `DELETE /databases/types/<databaseType>/subscriptions/<subscriptionKey>` — hard-delete.
 
-Field reference (POST/PUT body):
+Field reference:
 
-| Field | Required | Notes |
-|-------|----------|-------|
-| `subscriptionKey` | Yes | Per-`(app, databaseType)` unique. Clients reference it on `subscribe()`. Must NOT contain `#`. |
-| `displayName` | Yes | Human label. |
-| `modelName` | Yes | Scopes the subscription to one model. |
-| `access` | Yes | CEL — evaluated once at subscribe time. Non-empty string required. |
-| `filter` | Yes | CEL — evaluated per change. Non-empty string required (use `"true"` for "match every change `access` allowed"). |
-| `select` | No | Array of field names to project `data` / `previousData` to before broadcast. Fields not listed never leave the server. |
-| `emit` | No | Array restricting delivered `changeType` values: `"enter"`, `"update"`, `"leave"`. |
-| `params` | No | Object: `{ <name>: { type: "string" \| "number" \| "boolean", required?: boolean } }`. Max 5 entries. Bound at subscribe time. |
+| Field | TOML key | HTTP key | Required | Notes |
+|-------|----------|----------|----------|-------|
+| Subscription key | `subscriptionKey` | `subscriptionKey` | Yes | Per-`(app, databaseType)` unique. Clients reference it on `subscribe()`. Must NOT contain `#`. |
+| Display name | `displayName` | `displayName` | Yes | Human label. |
+| Model name | `modelName` | `modelName` | Yes | Scopes the subscription to one model. |
+| Access rule | `accessRule` | `access` | Yes | CEL — evaluated once at subscribe time. Non-empty string required. |
+| Filter | `filter` | `filter` | Yes | CEL — evaluated per change. Non-empty string required (use `"true"` for "match every change `access` allowed"). **Cannot reference `database.*`** — rejected with 400. |
+| Select | `select` | `select` | No | Array of field names to project `data` / `previousData` to before broadcast. Fields not listed never leave the server. |
+| Emit | `emit` | `emit` | No | Array restricting delivered `changeType` values: `"enter"`, `"update"`, `"leave"`. |
+| Params | `[subscriptions.params]` | `params` | No | `{ <name>: { type: "string" \| "number" \| "boolean", required?: boolean } }`. Max 5. Bound at subscribe time. |
 
 ### Subscribing (client)
 
@@ -309,6 +314,8 @@ filter: "record.data.assigneeId == user.userId"
 | Variable | Notes |
 |----------|-------|
 | `user.userId`, `user.role` | `role` is the caller's app role. |
+| `database.id` | The database instance ID. |
+| `database.celContext.*` | The database's CEL context object (also accessible as `database.metadata.*`). |
 | `isMemberOf(type, id)`, `hasRole(role)` | Standard membership helpers. |
 | `params.*` | Subscriber-supplied params. |
 

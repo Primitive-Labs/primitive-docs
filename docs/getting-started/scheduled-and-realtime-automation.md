@@ -161,35 +161,30 @@ Unlike documents (which sync an entire CRDT), database subscriptions push **chan
 
 ### Registering a Subscription
 
-Subscription CRUD is admin-scoped and lives on the HTTP API at `/databases/types/<databaseType>/subscriptions`. Create one by POSTing the definition from a server-side client that holds admin app permission:
+Define subscriptions as `[[subscriptions]]` blocks in your database type TOML, alongside operations:
 
-```typescript
-// Server-side: from your app's admin-capable client (e.g. __primitiveAppClient)
-await adminClient.fetch(
-  `/databases/types/support-desk/subscriptions`,
-  {
-    method: "POST",
-    body: JSON.stringify({
-      subscriptionKey: "my-open-tickets",
-      displayName: "My open tickets",
-      modelName: "ticket",
-      access: "user.userId != ''",
-      filter: "record.data.assigneeId == user.userId && record.data.status == 'open'",
-      // Optional: only send these fields in each change frame
-      select: ["id", "title", "priority", "updatedAt"],
-      // Optional: only fire when a row enters or leaves the filter set
-      emit: ["enter", "leave"],
-    }),
-  },
-);
+```toml
+# config/database-types/support-desk.toml
+[[subscriptions]]
+subscriptionKey = "my-open-tickets"
+displayName = "My open tickets"
+modelName = "ticket"
+accessRule = "user.userId != ''"
+filter = "record.data.assigneeId == user.userId && record.data.status == 'open'"
+select = ["id", "title", "priority", "updatedAt"]
+emit = ["enter", "leave"]
 ```
 
-`PUT` and `DELETE` on `/databases/types/<databaseType>/subscriptions/<subscriptionKey>` update or remove a registration. The endpoint requires admin app permission, so this is a setup-time / configuration call — not something your app's end users invoke.
+`primitive sync push` creates, updates, and deletes subscriptions to match your TOML. `primitive sync pull` round-trips them back. Subscriptions are keyed by `(databaseType, subscriptionKey)` and apply across every database of that type.
 
-Subscriptions are keyed by `(databaseType, subscriptionKey)` and apply across every database of that type.
+You can also manage subscriptions via the admin HTTP API at `/databases/types/<databaseType>/subscriptions` (POST/PUT/DELETE). The HTTP API uses `access` (not `accessRule`) as the field name.
 
-::: warning Wire-format field names
-The POST body uses `access` (not `accessRule`). `filter` is required — an empty or missing `filter` is rejected with `HTTP 400: filter (CEL expression) is required`. Use `"true"` if you want every change matched by `access` delivered.
+::: warning
+`filter` is required — an empty or missing `filter` is rejected with `HTTP 400`. Use `"true"` if you want every change matched by `accessRule` delivered. Subscription `filter` expressions **cannot** reference `database.*` — use `accessRule` for database-context-based authorization instead.
+:::
+
+::: tip Subscription key collisions
+Creating a subscription with a `subscriptionKey` that already exists (including archived subscriptions) returns HTTP 409. Use a different key or delete the existing subscription first.
 :::
 
 ### Subscribing from Your App
@@ -229,24 +224,18 @@ Each `db.change` frame carries origin attribution so consumers can tell who wrot
 
 The writer's own connection receives the `db.change` frame just like every other matching subscriber — server-side fanout doesn't filter out the writer. Use `isOrigin` to suppress the echo on the tab that produced the write (it already updated optimistically), and `isOriginUser` to coordinate the cross-tab/reconnect cases for other sessions of the same user.
 
-Parameterized subscriptions take a `params` object at subscribe time — the same substitution syntax as operations. Declare the schema when you register the subscription, then bind values when subscribing:
+Parameterized subscriptions take a `params` object at subscribe time. Declare the schema when you register the subscription, then bind values when subscribing:
 
-```typescript
-// Server-side registration via the admin HTTP API
-await adminClient.fetch(
-  `/databases/types/support-desk/subscriptions`,
-  {
-    method: "POST",
-    body: JSON.stringify({
-      subscriptionKey: "tickets-by-team",
-      displayName: "Tickets by team",
-      modelName: "ticket",
-      access: "isMemberOf('team', params.teamId)",
-      filter: "record.data.teamId == params.teamId",
-      params: { teamId: { type: "string", required: true } },
-    }),
-  },
-);
+```toml
+# config/database-types/support-desk.toml
+[[subscriptions]]
+subscriptionKey = "tickets-by-team"
+displayName = "Tickets by team"
+modelName = "ticket"
+accessRule = "isMemberOf('team', params.teamId)"
+filter = "record.data.teamId == params.teamId"
+[subscriptions.params]
+teamId = { type = "string", required = true }
 ```
 
 ```typescript
@@ -319,10 +308,8 @@ const unsub = client.databases.subscribe(jobsDbId, "my-jobs", {
 
 Two things are checked:
 
-1. **`access` at subscribe time** — if this CEL expression returns `false`, the subscribe call fails immediately. The connection cannot subscribe.
-2. **`filter` on each change** — evaluated once per change, per subscribed connection. Only matches are delivered. The filter cannot grant access the `access` rule denies — it can only narrow.
-
-Both run in the same CEL environment as operation access rules, so `user.*`, `isMemberOf`, `hasRole`, etc. are all available.
+1. **`accessRule` at subscribe time** — if this CEL expression returns `false`, the subscribe call fails immediately. The connection cannot subscribe. Has the full context: `user.*`, `database.id`, `database.celContext.*`, `isMemberOf`, `hasRole`, and `params.*`.
+2. **`filter` on each change** — evaluated once per change, per subscribed connection. Only matches are delivered. The filter cannot grant access the access rule denies — it can only narrow. Has a narrower context: `user.userId`, `record.*`, and `params.*` only — no `database.*` or membership functions.
 
 ### Limits and Behavior
 

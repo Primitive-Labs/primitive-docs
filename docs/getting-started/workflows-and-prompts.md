@@ -140,7 +140,7 @@ const { items } = await client.workflows.listRuns({
 });
 ```
 
-For short, latency-sensitive workflows (validation, enrichment, webhook responses), opt the workflow into synchronous invocation by setting `syncCallable = true` on it (via `primitive workflows update`). Clients can then `await` the final result in one round-trip:
+For short, latency-sensitive workflows (validation, enrichment, webhook responses), opt the workflow into synchronous invocation by setting `syncCallable = true` in the workflow TOML (pushed by `primitive sync push`) or via `primitive workflows update --sync-callable true`. Clients can then `await` the final result in one round-trip:
 
 ```typescript
 const result = await client.workflows.runSync({

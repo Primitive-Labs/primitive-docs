@@ -28,7 +28,7 @@ greeting = "Hello {{ input.name }}"
 ```
 
 Workflow-level fields the engine actually reads:
-`perUserMaxRunning`, `perUserMaxQueued`, `perAppMaxRunning` (default 25), `perAppMaxQueued` (default 10000), `queueTtlSeconds` (default 43200), `dequeueOrder`, `accessRule`, `inputSchema`, `outputSchema`, `requiresClientApply` (default `true` — see "Client apply" below), `syncCallable` (default `false` — see "Synchronous invocation" below). Sync pushes the schema fields, access rule, queue settings, and step list; `requiresClientApply` and `syncCallable` are server-side flags set via `primitive workflows update` (or admin API).
+`perUserMaxRunning`, `perUserMaxQueued`, `perAppMaxRunning` (default 25), `perAppMaxQueued` (default 10000), `queueTtlSeconds` (default 43200), `dequeueOrder`, `accessRule`, `inputSchema`, `outputSchema`, `requiresClientApply` (default `true` — see "Client apply" below), `syncCallable` (default `false` — see "Synchronous invocation" below). Sync pushes the schema fields, access rule, queue settings, step list, `requiresClientApply`, and `syncCallable`.
 
 ### Per-step common fields
 
@@ -513,7 +513,7 @@ CEL context: `input`, `selected`, `steps`, `outputs`, `meta`, `secrets`, plus `i
 
 ### Safe navigation
 
-CEL optional types are enabled in every workflow context (`runIf`, `accessRule`, group/database access rules, cron triggers). Use them to collapse multi-conjunct null guards.
+CEL optional types are enabled in every workflow context (`runIf`, `accessRule`, group/database access rules, cron triggers). Use them to collapse multi-conjunct null guards into single-line expressions.
 
 | Syntax | Meaning |
 |---|---|
@@ -523,12 +523,28 @@ CEL optional types are enabled in every workflow context (`runIf`, `accessRule`,
 | `expr.hasValue()` | True if the optional is set |
 | `optional.of(x)` / `optional.none()` | Construct optionals explicitly |
 
+Common operations work directly on optional values — no `.orValue()` unwrap needed:
+
+| Expression | Semantics |
+|---|---|
+| `size(steps.x.?data)` | `none` → `0`; `some(xs)` → `xs.size()`. Works for lists, maps, strings, bytes. |
+| `steps.x.?body.?token != ''` | `none` is never equal to any scalar value (absent ≠ empty string). |
+| `steps.x.?body.?err == null` | `none == null` is `true` (absent path treated as null). |
+
 ```cel
-runIf = 'steps.fetch.?data.?items.orValue([]).size() > 0'
-runIf = 'steps.profile.?role.hasValue() && steps.profile.role == "owner"'
+runIf = "size(steps['fetch'].?data) > 0"
+runIf = "steps['profile'].?body.?err != null"
+runIf = "steps['profile'].?body.?token != ''"
 ```
 
-Without safe navigation, `steps.fetch.data.items` throws on any missing intermediate; with it, the chain short-circuits to `optional.none()` and `.orValue([])` supplies the fallback.
+You can still use `.orValue()` and `.hasValue()` when you need explicit control over the fallback value:
+
+```cel
+runIf = "steps.fetch.?data.?items.orValue([]).size() > 0"
+runIf = "steps.profile.?role.hasValue() && steps.profile.role == 'owner'"
+```
+
+Without safe navigation, `steps.fetch.data.items` throws on any missing intermediate; with it, the chain short-circuits to `optional.none()`.
 
 ## `forEach`
 
@@ -670,19 +686,24 @@ Behavior:
 
 By default, `requiresClientApply = true`. After the workflow completes, status becomes `apply_pending` and a connected client must call `claimApply` → run `onApply` → `confirmApply` to finalize. If no client is listening, the run sits in `apply_pending` indefinitely.
 
-For server-only workflows (no client follow-up), set `requiresClientApply = false`:
+For server-only workflows (no client follow-up), set `requiresClientApply = false` in the workflow TOML:
+
+```toml
+[workflow]
+key = "nightly-digest"
+requiresClientApply = false
+```
+
+`primitive sync push` pushes this flag. You can also set it via the CLI:
 
 ```bash
 primitive workflows create --from-file workflow.toml --requires-client-apply false
-# or:
 primitive workflows update <workflow-id> --requires-client-apply false
 ```
 
-`primitive sync push` does NOT push this flag — set it via the create/update commands.
-
 ## Synchronous invocation (`runSync`)
 
-Opt a workflow into synchronous invocation by setting `syncCallable = true` (admin API or `primitive workflows update`). Once set, clients can call `client.workflows.runSync()` and `await` the final envelope in a single round-trip — useful for short, latency-sensitive tasks like input validation, enrichment lookups, or webhook handlers that must reply with a result.
+Opt a workflow into synchronous invocation by setting `syncCallable = true` in the TOML (pushed by `primitive sync push`) or via `primitive workflows update --sync-callable true`. Once set, clients can call `client.workflows.runSync()` and `await` the final envelope in a single round-trip — useful for short, latency-sensitive tasks like input validation, enrichment lookups, or webhook handlers that must reply with a result.
 
 Constraints:
 

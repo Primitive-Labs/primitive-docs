@@ -47,6 +47,7 @@ Then define operations in `config/database-types/products.toml`:
 ```toml
 [type]
 databaseType = "products"
+timestamps = { create = "createdAt", update = "modifiedAt" }
 
 [[operations]]
 name = "list-products"
@@ -279,6 +280,20 @@ definition = '{"operations":[{"op":"patch","id":"$params.userId","data":{"role":
 params = '{"userId":{"type":"string","required":true},"role":{"type":"string","required":true,"access":"hasRole(\"super-admin\")"}}'
 ```
 
+## Timestamps
+
+The simplest way to stamp `createdAt` / `modifiedAt` on every record is the `timestamps` knob on the `[type]` config:
+
+```toml
+[type]
+databaseType = "orders"
+timestamps = { create = "createdAt", update = "modifiedAt" }
+```
+
+Field names are yours to choose. Either lifecycle key (`create`, `update`) can be omitted. Add `models = ["orders", "items"]` to restrict stamping to specific models.
+
+For more complex rules — like stamping `completedAt` only when `status == "done"` — use per-model triggers (below). For CEL-resolved values like `updatedBy = "user.userId"`, use `autoPopulatedFields`.
+
 ## Triggers
 
 Triggers are computed fields that run automatically before a record is saved. Configure them per model in the database type TOML:
@@ -286,8 +301,7 @@ Triggers are computed fields that run automatically before a record is saved. Co
 ```toml
 [triggers.orders]
 triggers = [
-  { on = "create", set = { createdAt = "now()", createdBy = "user.userId" } },
-  { on = "update", set = { modifiedAt = "now()" } },
+  { on = "create", set = { createdBy = "user.userId" } },
   { on = "save", when = "record.status == 'complete' && record.completedAt == null", set = { completedAt = "now()" } },
 ]
 ```
@@ -372,6 +386,16 @@ Ops with dynamic references (e.g. `modelName = "$params.kind"`) can't be statica
 ::: tip
 Types without any `[models.*]` block keep the pre-gate behavior — ops are accepted without static consistency checks. Once you add a schema, the gate also prevents removing it while ops are still registered (`OPS_EXIST`).
 :::
+
+## TypeScript Codegen
+
+Generate TypeScript record interfaces and operation param/result types from your database-type TOML:
+
+```bash
+primitive databases codegen --sync-dir ./config --output ./src/generated/db
+```
+
+This reads the `[models.*]` schema blocks and `[[operations]]` definitions from your TOML and emits typed interfaces — one per model, plus typed params and result shapes for each operation. Keeps your client-side types aligned with the server-authoritative schema without hand-maintaining parallel `.ts` files.
 
 ## Pipelines
 
@@ -468,28 +492,24 @@ A missing CEL context key (`$database.celContext.nonExistent` → `null`) natura
 
 ## Real-Time Subscriptions
 
-Databases can push changes to connected clients over WebSocket — your app doesn't have to poll. Subscriptions are scoped to a *database type*, so one definition serves every database of that type. Register the subscription against the admin HTTP API, subscribe from the client, and the server fans out matching change events:
+Databases can push changes to connected clients over WebSocket — your app doesn't have to poll. Subscriptions are scoped to a *database type*, so one definition serves every database of that type. Define them in TOML alongside your operations, push with `primitive sync push`, and the server fans out matching change events.
 
-```typescript
-// Server-side registration via an admin-capable client
-await adminClient.fetch(
-  `/databases/types/support-desk/subscriptions`,
-  {
-    method: "POST",
-    body: JSON.stringify({
-      subscriptionKey: "my-open-tickets",
-      displayName: "My open tickets",
-      modelName: "ticket",
-      access: "user.userId != ''",
-      filter: "record.data.assigneeId == user.userId && record.data.status == 'open'",
-      // Optional — narrow the payload server-side
-      select: ["id", "title", "priority", "updatedAt"],
-    }),
-  },
-);
+```toml
+# config/database-types/support-desk.toml
+[[subscriptions]]
+subscriptionKey = "my-open-tickets"
+displayName = "My open tickets"
+modelName = "ticket"
+accessRule = "user.userId != ''"
+filter = "record.data.assigneeId == user.userId && record.data.status == 'open'"
+select = ["id", "title", "priority", "updatedAt"]
 ```
 
-`access` and `filter` are both required CEL expressions. `access` is checked once at subscribe time with the full user/membership context; `filter` runs per change and sees `user.userId`, `record.modelName` / `record.op` / `record.id`, the post-write payload at `record.data.<fieldName>`, the pre-write payload at `record.previousData.<fieldName>`, and the subscriber's bound `params.*`. Use `"true"` for `filter` if `access` already narrows the scope sufficiently.
+`accessRule` and `filter` are both required CEL expressions. `accessRule` is checked once at subscribe time with the full user/membership/database context; `filter` runs per change and sees `user.userId`, `record.modelName` / `record.op` / `record.id`, the post-write payload at `record.data.<fieldName>`, the pre-write payload at `record.previousData.<fieldName>`, and the subscriber's bound `params.*`. Use `"true"` for `filter` if `accessRule` already narrows the scope sufficiently.
+
+::: warning
+Subscription `filter` expressions **cannot** reference `database.*` — the server rejects them with HTTP 400 at save time. Put database-context-based authorization in `accessRule` instead (e.g. `accessRule = "isMemberOf('team', database.celContext.teamId)"`).
+:::
 
 ```typescript
 const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {

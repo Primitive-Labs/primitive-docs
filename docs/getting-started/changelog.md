@@ -4,6 +4,29 @@ New features, API changes, and important fixes in the Primitive platform librari
 
 <!-- CHANGELOG:START - Auto-updated by CI. New entries go below this line. -->
 
+## js-bao-wss — 2026-05-26
+
+**Features**
+
+- **`primitive databases codegen`** — new CLI subcommand that generates TypeScript record interfaces and operation param/result types from database-type TOML schemas. Eliminates hand-maintained type files that drift from the server-authoritative schema.
+- **`timestamps` knob on database type config** — set `timestamps = { create = "createdAt", update = "modifiedAt" }` on `[type]` to auto-stamp timestamp fields on every write. Supports per-model opt-in via `models = [...]`. Removes the need for per-model `[[triggers]]` boilerplate for common timestamp patterns.
+
+**Fixes**
+
+- Subscription `filter` CEL expressions referencing `database.*` now return HTTP 400 at save time (previously silently never matched at broadcast time). Put database-context-based authorization in the subscription's `access` / `accessRule` instead.
+- `database.celContext.*` now resolves in subscription `accessRule` expressions at subscribe time — previously only `database.metadata.*` worked, causing subscriptions using the guide-recommended `celContext` alias to fail with "Access denied."
+- Aggregate operation `sort.field` is now resolved against the set of declared `outputField` names (e.g. `"count"` from `{"type":"count","outputField":"count"}`), not against the model's record fields. Previously the schema gate rejected the canonical aggregate-with-sort pattern.
+- Database `subscriptionKey` collisions now return HTTP 409 (was 500). Archived subscriptions are hard-deleted, so recreating a subscription with a previously-used key works correctly.
+- `X-JB-Connection-Id` is now propagated on `databases.connect()` DoDb record writes, so origin attribution (`isOrigin` / `isOriginUser`) works on direct-record writes — not just `executeOperation` calls.
+- CLI `primitive sync push` now round-trips `[[subscriptions]]` blocks in database-type TOML — creates, updates, and deletes subscriptions to match the local file. Previously subscriptions were silently ignored by the CLI.
+- CLI `primitive sync push` now pushes `syncCallable` and `requiresClientApply` workflow flags from the `[workflow]` TOML block. Previously these required separate `primitive workflows update` or admin API calls after each push.
+- CLI workflow validator now accepts `cases` and `default` fields on `switch` steps (previously rejected with "unknown field").
+- Optional-aware CEL overloads: `size()`, `==`, and `!=` now work directly on optional values without requiring `.orValue()` unwrap. `size(steps['x'].?data) > 0` and `steps['x'].?body.?token != ''` work as expected.
+
+**Cleanup**
+
+- `AppUser.iterateAll()` now throws. Downstream tooling should use the `usersForApp` GSI instead.
+
 ## js-bao-wss-client v1.4.5 — 2026-05-07
 
 - `client.documents.updatePermissions({ email, sendEmail: true, ... })` now actually delivers a share email when the recipient is not yet an app member. The deferred-grant branch previously dropped the email; the flag is now honored end-to-end so the same `sendEmail` toggle works for both existing-member and pending-signup recipients.
