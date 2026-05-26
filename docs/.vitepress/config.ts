@@ -385,6 +385,7 @@ export default defineConfig({
         items: [
           { text: 'Overview', link: '/' },
           { text: 'Starting with the Template App', link: '/getting-started/template-app' },
+          { text: 'Swift Client (iOS / macOS)', link: '/getting-started/swift-client' },
           { text: 'Deploying to Production', link: '/getting-started/deploying-to-production' },
           { text: 'Example Apps', link: '/getting-started/example-apps' },
         ],
