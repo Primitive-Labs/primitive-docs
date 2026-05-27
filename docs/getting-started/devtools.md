@@ -70,42 +70,77 @@ Local-first apps depend on browser APIs (IndexedDB, WebSocket) that don't exist 
 
 ### Writing Tests
 
-Create test files with the `.primitive-test.ts` suffix in your tests directory:
+Create test files with the `.primitive-test.ts` suffix in your tests directory. Each file exports a `TestGroup`:
 
 ```typescript
 // src/tests/myFeature.primitive-test.ts
 import type { TestGroup } from "primitive-app";
-import { Task } from "@/models/Task";
 
-export const taskTestGroup: TestGroup = {
-  name: "Task Operations",
+const tests: TestGroup = {
+  name: "My Feature",
   tests: [
     {
-      id: "task-crud",
-      name: "can create and query tasks",
-      async run(ctx, log?): Promise<string> {
-        // ctx.docId is an auto-created isolated test document
-        const task = new Task({ title: "Test Task", priority: 1 });
-        await task.save({ targetDocument: ctx.docId });
-
-        const found = await Task.find(task.id as string);
-        if (found?.title !== "Test Task") {
-          throw new Error("Task not found or title mismatch");
-        }
-
-        log?.("Task created and retrieved successfully");
-        return "1/1 (100.0%)";
+      id: "add-numbers",
+      name: "Addition works",
+      run: async (log) => {
+        log("Testing 2 + 2...");
+        if (2 + 2 !== 4) throw new Error("Math is broken");
+        return "passed";
       },
     },
   ],
 };
+
+export default tests;
 ```
 
-### Test Isolation
-The harness automatically creates an isolated test document for each test (`ctx.docId`) and cleans it up afterward, even if the test throws. If you create additional documents, clean them up in a `finally` block.
+Each test's `run` function receives a `log` callback for debug output and returns a string result.
+
+### Tests That Need a Document
+
+Tests that perform model operations (`.save()`, `.query()`, `.find()`, `.delete()`) need an ephemeral test document. Use `createTestDocument()` and `destroyTestDocument()` with a try/finally block:
+
+```typescript
+import { createTestDocument, destroyTestDocument } from "primitive-app";
+import type { TestGroup } from "primitive-app";
+import { Task } from "@/models/Task";
+
+const tests: TestGroup = {
+  name: "Task CRUD",
+  tests: [
+    {
+      id: "task-save",
+      name: "Task save and query",
+      run: async (log) => {
+        const doc = await createTestDocument();
+        try {
+          const task = new Task({ title: "Test Task", priority: 1 });
+          await task.save();
+
+          const found = await Task.find(task.id);
+          if (found?.title !== "Test Task") {
+            throw new Error("Task not found or title mismatch");
+          }
+
+          log(`Saved and retrieved task ${task.id}`);
+          return "passed";
+        } finally {
+          await destroyTestDocument(doc);
+        }
+      },
+    },
+  ],
+};
+
+export default tests;
+```
+
+`createTestDocument()` creates an isolated local-only document and sets it as the default for all model operations. `destroyTestDocument()` closes and evicts it. The `finally` block ensures cleanup even if the test throws.
+
+Tests that don't touch the database — pure logic, validation, in-memory model instances — skip the document lifecycle entirely and just use the `(log) => ...` signature.
 
 ### Running Tests
-1. Click the dev tools button and select Test Runner
+1. Click the dev tools button and select **Test Harness**
 2. Select tests to run (all are selected by default)
 3. Click **Run Selected Tests**
 
@@ -114,8 +149,61 @@ Results show real-time log output, pass/fail status, execution time, and score s
 ### Best Practices
 - Keep business logic in `src/lib/` (not embedded in components) so it's easy to test
 - Test real behavior — don't mock browser APIs
-- Use `log?.()` for debugging output
-- Return scores in `passed/total (percentage%)` format
+- Use `log()` for debugging output visible in the test results
+- Only create test documents when your test actually needs database operations
+- Always clean up test documents in a `finally` block
+
+### Migrating from `primitive-app` &lt; 3.0
+
+If upgrading from an earlier version of `primitive-app`, the test harness API has changed:
+
+| Before | After |
+|---|---|
+| `run: async (ctx, log?) => { ... }` | `run: async (log) => { ... }` |
+| `ctx.docId` provided automatically | Call `createTestDocument()` / `destroyTestDocument()` explicitly |
+| `log` was optional (`log?.()`) | `log` is always provided (`log()`) |
+| `TestDocContext` type | Removed |
+
+For CRUD tests, replace the `ctx` parameter with explicit document lifecycle:
+
+```typescript
+// Before
+run: async (ctx, log?) => {
+  const task = new Task({ title: "test" });
+  await task.save();
+  log?.("saved");
+  return "passed";
+}
+
+// After
+run: async (log) => {
+  const doc = await createTestDocument();
+  try {
+    const task = new Task({ title: "test" });
+    await task.save();
+    log("saved");
+    return "passed";
+  } finally {
+    await destroyTestDocument(doc);
+  }
+}
+```
+
+For pure-logic tests, remove the unused `ctx` parameter and the optional chaining on `log`:
+
+```typescript
+// Before
+run: async (_ctx, log?) => {
+  log?.("testing...");
+  return "passed";
+}
+
+// After
+run: async (log) => {
+  log("testing...");
+  return "passed";
+}
+```
 
 ## Server Timing
 
