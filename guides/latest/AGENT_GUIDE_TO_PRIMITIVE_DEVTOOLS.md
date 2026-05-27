@@ -214,19 +214,24 @@ There is no separate "Sort tab" or multi-field sort UI.
 Runs `.primitive-test.ts` files in the same authenticated session as the
 host app. Key invariants:
 
-1. **Per-test ephemeral document.** Before each test, the harness creates a
-   local-only document titled `===TEST=== {timestamp}-{random}`, opens it
-   with `enableNetworkSync: false`, and calls `client.setDefaultDocumentId(docId)`.
+1. **Explicit document lifecycle.** Tests that need database/model operations
+   call `createTestDocument()` / `destroyTestDocument()` themselves.
+   `createTestDocument()` creates a local-only document titled
+   `===TEST=== {timestamp}-{random}`, opens it with
+   `enableNetworkSync: false`, and calls `client.setDefaultDocumentId(docId)`.
    Model operations like `.save()`, `.find()`, `.query()` use it implicitly.
-2. **Document isolation between tests.** After each test (success or failure),
-   the test document is closed and `evict()`ed (no server round-trip — they
-   are local-only).
-3. **Host-app docs are quiesced.** `beginTestRun()` closes every currently
+2. **Pure-logic tests skip documents.** Tests that only use in-memory model
+   instances, utility functions, or validation logic don't need a test
+   document — they just use the simple `(log) => ...` signature.
+3. **Document cleanup via try/finally.** `destroyTestDocument()` closes and
+   `evict()`s the document (no server round-trip — they are local-only).
+   Always call it in a `finally` block.
+4. **Host-app docs are quiesced.** `beginTestRun()` closes every currently
    open host document; `endTestRun()` re-opens them after the run.
-4. **Leftover cleanup.** `deleteAllTestDocuments()` runs on app start, when
+5. **Leftover cleanup.** `deleteAllTestDocuments()` runs on app start, when
    the overlay opens, and at the start of each run — anything titled with
    `===TEST===` is evicted.
-5. **No timeout.** A test can hang indefinitely; the runner won't kill it.
+6. **No timeout.** A test can hang indefinitely; the runner won't kill it.
 
 ### UI
 
@@ -246,7 +251,7 @@ host app. Key invariants:
 **Right panel — output:**
 - Buttons: **Copy** (all output), **Copy Failing Tests** (lines whose
   `testId` matches a failed test), **Clear** (output + results + focus).
-- Monospace lines: `HH:MM:SS AM/PM - <message>`. Per-test `log?.()`
+- Monospace lines: `HH:MM:SS AM/PM - <message>`. Per-test `log()`
   output is prefixed with `[<test-id>]`.
 - During a run: progress bar at the bottom: "Running: {group} :: {name}"
   and "{completed}/{total}".
@@ -269,28 +274,24 @@ Files: `src/tests/**/*.primitive-test.ts` (matches the configured
 `testsDir` + `testPattern`). Default and named array exports both work;
 the plugin's virtual module spreads arrays and wraps single groups.
 
+The `run` signature is `(log: TestLogFn) => Promise<string>`. `log` is
+always provided — no optional chaining needed.
+
+**Pure-logic test** (no document needed):
+
 ```typescript
 import type { TestGroup } from "primitive-app";
-import { Task } from "@/models/Task";
 
 const myTests: TestGroup = {
   name: "My Feature",                    // shown as group header
   tests: [
     {
-      id: "task-create-find",            // MUST be globally unique
-      name: "Task: create and find",     // shown in test row
-      run: async (ctx, log) => {
-        log?.("creating...");
-
-        // ctx.docId is already set as the default document for model ops.
-        const task = new Task({ title: "Hello" });
-        await task.save();               // implicitly uses ctx.docId
-
-        const found = await Task.find(task.id as string);
-        if (!found) throw new Error("not found");
-        if (found.title !== "Hello")
-          throw new Error(`title=${found.title}`);
-
+      id: "validate-email",             // MUST be globally unique
+      name: "Email validation",         // shown in test row
+      run: async (log) => {
+        log("testing email format...");
+        if (!isValidEmail("a@b.com")) throw new Error("rejected valid email");
+        if (isValidEmail("not-an-email")) throw new Error("accepted invalid");
         return "ok";                     // PASS
       },
     },
@@ -301,7 +302,42 @@ export default myTests;
 // or: export const myTests = [...]   // arrays are spread
 ```
 
-The signature is fixed: `(ctx: TestDocContext, log?: TestLogFn) => Promise<string>`.
+**CRUD test** (needs a document for `.save()`, `.find()`, `.query()`, `.delete()`):
+
+```typescript
+import { createTestDocument, destroyTestDocument } from "primitive-app";
+import type { TestGroup } from "primitive-app";
+import { Task } from "@/models/Task";
+
+const myTests: TestGroup = {
+  name: "Task CRUD",
+  tests: [
+    {
+      id: "task-create-find",
+      name: "Task: create and find",
+      run: async (log) => {
+        const doc = await createTestDocument();
+        try {
+          const task = new Task({ title: "Hello" });
+          await task.save();               // implicitly uses the test document
+
+          const found = await Task.find(task.id as string);
+          if (!found) throw new Error("not found");
+          if (found.title !== "Hello")
+            throw new Error(`title=${found.title}`);
+
+          log("task created and found");
+          return "ok";                     // PASS
+        } finally {
+          await destroyTestDocument(doc);
+        }
+      },
+    },
+  ],
+};
+
+export default myTests;
+```
 
 | Outcome | Produce by | UI shows |
 |---|---|---|
@@ -322,7 +358,7 @@ const bad: TestGroup = {
     {
       id: "x",
       name: "x",
-      run: (ctx) => "synchronous return"  // run MUST return Promise<string>
+      run: (log) => "synchronous return"  // run MUST return Promise<string>
     } as any
   ]
 };
@@ -332,17 +368,22 @@ const bad: TestGroup = {
 { id: "test-1", ... }   // in tests/b.primitive-test.ts  — CONFLICT
 
 // WRONG — no error means PASS even if the assertion is missing
-run: async (_ctx) => {
-  const found = await Task.find("nope");
-  // forgot to throw if !found
-  return "ok";
+run: async (log) => {
+  const doc = await createTestDocument();
+  try {
+    const found = await Task.find("nope");
+    // forgot to throw if !found
+    return "ok";
+  } finally {
+    await destroyTestDocument(doc);
+  }
 }
 
-// WRONG — passing { targetDocument: ... } with the wrong id breaks isolation;
-// rely on ctx.docId or pass it explicitly:
-run: async (ctx) => {
-  await new Task({ title: "x" }).save({ targetDocument: ctx.docId }); // ok
-  // NOT { targetDocument: someOtherDoc } — that record won't get cleaned up
+// WRONG — missing finally block: document leaks if test throws
+run: async (log) => {
+  const doc = await createTestDocument();
+  await new Task({ title: "x" }).save();
+  await destroyTestDocument(doc);   // never reached if save() throws
   return "ok";
 }
 
@@ -351,9 +392,20 @@ run: async (ctx) => {
 //   src/tests/foo.test.ts          ← NOT discovered
 //   src/tests/foo.primitive-test.ts ← discovered
 
-// WRONG — log() will throw if log is undefined; always use optional chaining
-run: async (_ctx, log) => {
-  log("starting");      // may TypeError; do log?.("starting")
+// WRONG — using createTestDocument when no database ops are needed
+// (wastes time creating/destroying a document for nothing)
+run: async (log) => {
+  const doc = await createTestDocument();  // unnecessary
+  try {
+    if (2 + 2 !== 4) throw new Error("math broken");
+    return "ok";
+  } finally {
+    await destroyTestDocument(doc);
+  }
+}
+// RIGHT — pure logic, no document needed
+run: async (log) => {
+  if (2 + 2 !== 4) throw new Error("math broken");
   return "ok";
 }
 ```
@@ -364,12 +416,12 @@ run: async (_ctx, log) => {
 {
   id: "compat",
   name: "compatibility checks",
-  run: async (_ctx, log) => {
+  run: async (log) => {
     const checks = [check1(), check2(), check3(), check4(), check5()];
     const passed = checks.filter(Boolean).length;
     const total = checks.length;
     const pct = ((passed / total) * 100).toFixed(1);
-    log?.(`${passed}/${total} passed`);
+    log(`${passed}/${total} passed`);
     return `${passed}/${total} (${pct}%)`;   // blue score badge
   },
 }
