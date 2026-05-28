@@ -21,7 +21,7 @@ When writing Swift code, fetch the conceptual JS guide for the feature you're wo
 
 3. **Wire `TypedModel<T>` instances through `appState.makeTypedModel(doc:documentId:)`.** Constructing `TypedModel<T>(doc:)` directly works but skips registration with the in-app debug inspector. Use `makeTypedModel` so the model shows up in the Debug Inspector tab.
 
-4. **Snake_case wire field names are forever.** TOML keys are wire field names. Once data is on disk, renaming a key orphans every existing record (both Swift and JS clients reading the same doc). If snake_case reads awkwardly at call sites, add camelCase aliases in a hand-written `+Extensions.swift` companion file — but the underlying stored property keeps the wire key.
+4. **Wire field names are forever.** TOML keys are wire field names. Once data is on disk, renaming a key orphans every existing record (both Swift and JS clients reading the same doc). Style is your call: **snake_case is the cross-client convention** (web/Node + Swift speaking the same Primitive doc); **camelCase is fine for Swift-only docs**. The codegen tool preserves whatever you write — `text` stays `text`, `created_at` stays `created_at`, `createdAt` stays `createdAt`. If you went snake_case for cross-client reasons and the call sites read awkwardly, add camelCase aliases in a hand-written `+Extensions.swift` companion — but the underlying stored property keeps the wire key.
 
 5. **No nulls in CRDT-backed fields.** The CRDT layer does not model `nil`. Use `""` for absent strings, `0` for absent numbers, sentinel timestamps for "never". Check those values explicitly.
 
@@ -390,7 +390,11 @@ Anything codegen can't emit — `Identifiable` conformance, computed helpers, ca
 ```swift
 // Sources/MyApp/Models/TodoItem+Extensions.swift
 import Foundation
-import PrimitiveApp
+// No need to import `JsBaoClient` / `PrimitiveApp` here unless the
+// companion actually references one of their types — `Identifiable` is
+// stdlib and the convenience init only uses `UUID` / `Date`. The
+// generated `TodoItem` is in the same module, so it's reachable
+// without an import.
 
 extension TodoItem: Identifiable {}
 
