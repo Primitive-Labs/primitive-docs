@@ -57,6 +57,13 @@ The single most common way to write wrong-but-compiling Swift against Primitive 
 | Combine sink on `appState.$isConnected` to run post-connect setup | `override func connectClient() async { await super.connectClient(); … }` | `connectClient()` is `open` — override it and call super. The Combine sink is the workaround you reach for when you forget that. |
 | `createDocument` then `openDocument` then start writing | `createDocument(options:)` returns `(documentId, doc: YDocument?)` — start writing on the returned doc | Local-first: the returned YDocument is writable immediately, the server commit happens in the background. Re-opening with `.network` blocks ~15s on a freshly-created empty doc waiting for a sync event that never has anything to deliver. |
 | `documents.list()` + filter by tag for a per-user singleton | `documents.getOrCreateWithAlias(...)` keyed by `scope: "user"` | Aliases were built for singletons; tag-filtering is fragile (the doc may not have the tag you assume, or may be filtered out for permission reasons). |
+| `me.ownedDocuments(tag:)` + `me.sharedDocuments(tag:)` + manual merge for "every doc I can read" | `me.accessibleDocuments(tag:)` | One call, dedupes by `documentId`, attaches an `_origin: "owned"|"shared"` key so reconcile passes can keep the distinction. |
+| `selectDocumentAwaiting(_:)` for a per-item detail view in a multi-doc app | `appState.openAuxiliaryDoc(_:modelType:)` from `.task`, `appState.closeAuxiliaryDoc(_:)` from `.onDisappear` | `selectDocumentAwaiting` closes the previously-selected doc, so using it for a per-item detail view closes your library/index doc. Use the auxiliary helpers when there's an ambient doc + N transient docs. |
+| Subscribe to `.documentMetadataChanged` and filter on `action == "deleted"` in detail views | Subscribe to `.documentDeleted` directly | Derived event with the same trigger but no payload-filter boilerplate. |
+| Raw `documents.updatePermissions(documentId:params:[String: Any])` for the common email-share | `documents.invite(documentId:email:permission:)` | Typed shape, doesn't require knowing the key vocabulary. Returns the same dict so the response shape stays uniform. |
+| Raw `collections.addMember(collectionId:params:)` for the common email-invite | `collections.invite(collectionId:email:permission:)` | Same reason. |
+| Hand-rolled "list pending → find by email → revoke" for cancelling a collection invite | `collections.cancelPendingInvitation(collectionId:email:)` | One call, returns `Bool` (`false` = no pending invite matched, e.g. already accepted). |
+| `List(loader.data ?? []) { … }` for view-data binding | `switch loader.phase { case .loading: …; .empty: …; .loaded(let d): … }` | `?? []` collapses "not yet loaded" with "loaded, no items" — empty-state placeholders flash for ~50ms on every appearance. `LoaderPhase` makes the bug unreachable. |
 
 When in doubt: `primitive guides get swift-client` (or read this guide) and search for the shape you want. Every section has a *"Pick the right helper"* card at the top.
 
@@ -216,6 +223,43 @@ final class MyAppState: PrimitiveAppState {
 ```
 
 That's the whole shape: subclass, override `connectClient` to drive the doc setup, override `onDocumentOpened(doc:documentId:)` to bind models. Views observe `appState.todos` and bind a `BaoDataLoader` against it (see §4f below).
+
+### Multi-doc apps: library + per-item docs
+
+`selectDocumentAwaiting(_:)` is the single-selected-doc lifecycle — it closes the previously selected doc before opening the new one. Right for "one document per user" apps; **wrong** for apps that keep one ambient doc open (e.g. a library/index doc) while opening N other docs alongside it.
+
+For the multi-doc shape, use **`appState.openAuxiliaryDoc(_:modelType:)`** (and `closeAuxiliaryDoc(_:)`). These go through the same `JsBaoClient.openDocument(...)` path — DocumentManager registers the doc for sync, the inspector picks up the `TypedModel` — but they don't touch `selectedDocId` or call `onDocumentOpened`. The caller (typically a SwiftUI detail view) owns the lifecycle:
+
+```swift
+struct ItemDetailView: View {
+    let documentId: String
+    @EnvironmentObject var appState: MyAppState
+    @State private var todos: TypedModel<TodoItem>?
+
+    var body: some View {
+        Group {
+            if let todos { /* render */ }
+            else { ProgressView() }
+        }
+        .task {
+            do {
+                let (_, model) = try await appState.openAuxiliaryDoc(
+                    documentId,
+                    modelType: TodoItem.self
+                )
+                todos = model
+            } catch {
+                /* surface error */
+            }
+        }
+        .onDisappear {
+            Task { await appState.closeAuxiliaryDoc(documentId) }
+        }
+    }
+}
+```
+
+The library doc stays the `selectedDocId` (so the debug inspector points there); the auxiliary doc is open in parallel for the duration of the detail view.
 
 `AuthGateView` is the built-in sign-in screen — it wraps your signed-in UI and shows OAuth / Magic Link / OTP / Passkey options until the user authenticates. To customize the UI, build a custom gate around `appState.authManager` directly instead of using `AuthGateView`.
 
@@ -439,7 +483,7 @@ One `TypedModel` per record type per document.
 
 ### 4f. Read
 
-**For view-data binding, use `BaoDataLoader<[T]>` with `.onModelChange` — this is the canonical view-reactivity pattern**:
+**For view-data binding, use `BaoDataLoader<[T]>` with `.onModelChange`, and render through `loader.phase` — this is the canonical view-reactivity pattern**:
 
 ```swift
 struct TodoListView: View {
@@ -447,22 +491,42 @@ struct TodoListView: View {
     @StateObject private var loader = BaoDataLoader<[TodoItem]>()
 
     var body: some View {
-        if let todos = appState.todos {
-            List(loader.data ?? []) { /* row */ }
-                .task {
-                    loader.bind(
-                        client: appState.client,
-                        subscribeTo: [.onModelChange(todos)]
-                    ) { _ in
-                        todos.findAll().sorted { $0.sortOrder < $1.sortOrder }
-                    }
+        Group {
+            if let todos = appState.todos {
+                // `loader.phase` is a trinary that distinguishes
+                // "still loading" from "loaded but empty" — avoids the
+                // empty-state flash that `List(loader.data ?? [])`
+                // produces for ~50ms on first appearance.
+                switch loader.phase {
+                case .loading:
+                    ProgressView()
+                case .empty:
+                    Text("No todos yet")
+                case .loaded(let todos):
+                    List(todos) { /* row */ }
                 }
-        } else {
-            ProgressView()
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            guard let todos = appState.todos else { return }
+            loader.bind(
+                client: appState.client,
+                subscribeTo: [.onModelChange(todos)]
+            ) { _ in
+                todos.findAll().sorted { $0.sortOrder < $1.sortOrder }
+            }
         }
     }
 }
 ```
+
+> **Anti-pattern:** `List(loader.data ?? []) { … }` followed by
+> `if loader.data?.isEmpty == true { Text("Empty") }`. The `?? []`
+> collapses "not yet loaded" and "loaded, no items" into the same
+> branch, so the empty-state placeholder flashes every time the view
+> appears. `loader.phase` makes the wrong-by-default state unreachable.
 
 `.onModelChange` fires whenever **any** record on the model is added, updated, or deleted — local writes (synchronous, on the same thread as the mutation) **and** remote writes (from the observer-drain queue). One trigger covers both reactivity sources. The loader debounces (default 50ms) so a burst of writes coalesces into one reload.
 
@@ -565,6 +629,165 @@ try await client.documents.aliases.set(
     mustNotExist: false
 )
 ```
+
+## Sharing (documents + collections)
+
+Same shape on both surfaces: invite by email, list members, list pending invites, cancel an invite. Email-targeted invites route through the unified **deferred-grant** flow — if the email already corresponds to an app user the grant lands as a live permission; otherwise it sits as a `DeferredDocumentPermission` / `DeferredGroupAdd` row that resolves the moment that user signs up. Same `inviteToken` works across the signup boundary.
+
+### Pick the right helper
+
+| Shape | Use |
+|---|---|
+| Invite an email to a single document | `client.documents.invite(documentId:email:permission:)` |
+| Invite an email to a collection (cascades to all docs in it) | `client.collections.invite(collectionId:email:permission:)` |
+| Add a known user (by id) directly | `client.collections.addMember(collectionId:userId:permission:)` |
+| List live members of a document | `client.documents.getPermissions(documentId:)` |
+| List pending email invites on a document | `client.documents.listPendingInvitations(documentId:)` |
+| List live members + pending invites of a collection | `client.collections.getAccess(collectionId:)` / `listPendingInvitations(collectionId:)` |
+| Remove a member from a document (by email or userId) | `client.documents.removePermission(documentId:email:)` / `(userId:)` |
+| Remove a member from a collection (by userId) | `client.collections.removeMember(collectionId:userId:)` |
+| Cancel a pending email invite on a collection | `client.collections.cancelPendingInvitation(collectionId:email:)` |
+
+Avoid the raw `[String: Any]` overloads (`updatePermissions(documentId:params:)`, `addMember(collectionId:params:)`) unless you genuinely need a key not exposed by the typed wrapper. The wrappers exist precisely because the raw shape's contract is opaque from Swift.
+
+### Canonical: invite an email
+
+```swift
+// Single document
+_ = try await client.documents.invite(
+    documentId: listDocId,
+    email: "friend@example.com",
+    permission: .readWrite
+)
+
+// Collection cascade — friend gets access to every doc in the collection,
+// and any doc added to the collection later inherits the grant.
+_ = try await client.collections.invite(
+    collectionId: collectionId,
+    email: "friend@example.com",
+    permission: .reader
+)
+```
+
+Both return a dict carrying the grant status. Keys to look for:
+
+| Key | Meaning |
+|---|---|
+| `status` | `"added"` / `"already_member"` / `"pending_signup"` |
+| `userId` | Present when `status != "pending_signup"` |
+| `inviteToken` | Present when `status == "pending_signup"` — pass to a recipient via your own out-of-band channel if you need a deep-link |
+| `invitationId` / `deferredId` | Server ids; `deferredId` is required to revoke before signup |
+| `expiresAt` | ISO-8601, when the deferred grant times out |
+
+### Listing + revoking
+
+```swift
+// Live document members
+let perms = try await client.documents.getPermissions(documentId: docId)
+
+// Pending email invites on a document
+let pending = try await client.documents.listPendingInvitations(documentId: docId)
+
+// Remove either kind:
+_ = try await client.documents.removePermission(documentId: docId, email: "friend@example.com")
+_ = try await client.documents.removePermission(documentId: docId, userId: someUserId)
+
+// Collection access (live + pending in one dict)
+let access = try await client.collections.getAccess(collectionId: cid)
+let collMembers = access["members"] as? [[String: Any]] ?? []
+let collPending = try await client.collections.listPendingInvitations(collectionId: cid)
+
+// Revoke:
+_ = try await client.collections.removeMember(collectionId: cid, userId: someUserId)
+let cancelled = try await client.collections.cancelPendingInvitation(
+    collectionId: cid,
+    email: "friend@example.com"
+)
+// `cancelled == false` if no pending invite for that email exists.
+```
+
+`cancelPendingInvitation` wraps the two-step "list pending → find by email → delete deferred grant" dance internally — under the hood it calls the global `DELETE /deferred-grants/:id?type=group` verb.
+
+### Watching for permission changes / access loss
+
+When a peer revokes your access (or hard-deletes a doc you have open), the server sends a `docMetadata` frame with `action: "deleted"`. The Swift client emits **both**:
+- `.documentMetadataChanged` (typed `DocumentMetadataChangedEvent`) — general purpose
+- `.documentDeleted` (typed `DocumentDeletedEvent`) — derived, for detail views to subscribe to specifically
+
+The server collapses "doc was deleted" and "your access was revoked" to the same wire shape, so subscribers can't distinguish from the payload. Detail views should dismiss themselves on either signal — the user no longer sees the data either way.
+
+```swift
+private var deletedSub: EventSubscription?
+
+.task {
+    deletedSub = client.events.on(.documentDeleted) { [weak self] (ev: DocumentDeletedEvent) in
+        Task { @MainActor in
+            guard let self, ev.documentId == self.openDocId else { return }
+            self.dismiss()
+        }
+    }
+}
+```
+
+## Collections
+
+Collections are server-side folders that cascade permissions to every document they contain. The same grant that's read off a doc directly is also read off any collection the doc belongs to — server resolves the max permission across all channels.
+
+### Pick the right helper
+
+| Shape | Use |
+|---|---|
+| Create a named collection | `client.collections.create(name:description:)` |
+| List collections the user can see | `client.collections.list(options:)` |
+| Get a collection's metadata | `client.collections.get(collectionId:)` |
+| Rename / change metadata | `client.collections.update(collectionId:params:)` |
+| Delete a collection (docs survive) | `client.collections.delete(collectionId:)` |
+| Add an existing doc to a collection | `client.collections.addDocument(collectionId:documentId:)` |
+| Remove a doc from a collection | `client.collections.removeDocument(collectionId:documentId:)` |
+| List the docs inside a collection | `client.collections.listDocuments(collectionId:options:)` |
+| Find which collections a doc belongs to | `client.collections.listCollectionsForDocument(documentId:)` |
+| Invite / list / remove members | See **Sharing** section above |
+
+### Add and remove a document
+
+`addDocument` and `removeDocument` are idempotent — calling `addDocument` on a doc that's already in the collection is a no-op (no error), and `removeDocument` on a doc that isn't in the collection is also a no-op.
+
+```swift
+// Move a doc INTO a collection
+_ = try await client.collections.addDocument(
+    collectionId: collectionId,
+    documentId: docId
+)
+
+// Move it OUT (back to "loose"). Other collections it belongs to are
+// untouched — a doc can be in multiple collections.
+_ = try await client.collections.removeDocument(
+    collectionId: collectionId,
+    documentId: docId
+)
+```
+
+### What happens to permissions on add/remove
+
+| Action | Effect on the doc's permissions |
+|---|---|
+| `addDocument` | Cascade members of the collection gain access to the doc immediately. Direct permissions on the doc are unaffected. |
+| `removeDocument` | Cascade members lose access **only if** they don't have any other channel (direct grant, another collection that contains the doc). Server resolves the max across remaining channels. |
+| `collections.delete` | All docs in the collection survive. Cascade members lose access through this collection (same "max across remaining channels" rule). |
+
+### Who can add what
+
+`addDocument` requires:
+- The caller has at least `read-write` on **the document being added**, AND
+- The caller is at least a `read-write` member of **the collection**.
+
+A `reader`-only collection member cannot add docs (they can only see them). A `reader`-only doc permission can never put the doc into a collection.
+
+`removeDocument` requires the same level of access.
+
+### Multi-collection membership
+
+A single document can live in any number of collections at once. The local app-state pattern in this template assumes **one collection per doc** (the `ListRef` has a single `collectionId` field) for UI simplicity; if you need multi-membership, model it as a separate `[String]` field or skip the local cache and query `listCollectionsForDocument(documentId:)` on demand.
 
 ## Blobs
 
@@ -691,6 +914,8 @@ deinit {
 | `.workflowStatus` | `WorkflowStatusEvent { workflowKey, runKey, status, output, error, needsApply }` | Workflow run reached terminal state |
 | `.status` | `StatusChangedEvent` | Connection state changed (connecting / connected / disconnected) |
 | `.authSuccess` | `AuthSuccessEvent` | Token obtained or refreshed |
+| `.documentMetadataChanged` | `DocumentMetadataChangedEvent { documentId, action, metadata?, changedFields?, source? }` | Server-pushed metadata change. `action` ∈ `"created" \| "updated" \| "deleted" \| "evicted"`. |
+| `.documentDeleted` | `DocumentDeletedEvent { documentId, source }` | Derived from `action: "deleted"` — covers both hard-delete and access-revocation (server collapses both to the same wire shape). Detail views that have the doc open should subscribe to this and dismiss themselves. |
 
 ### BaoDataLoader — the canonical view-data binding
 
@@ -710,17 +935,40 @@ Trigger options (`LoaderTrigger`):
 ```swift
 @StateObject private var loader = BaoDataLoader<[TodoItem]>()
 
-.task {
-    loader.bind(
-        client: appState.client,
-        subscribeTo: [.onModelChange(todos)]
-    ) { _ in
-        todos.findAll().sorted { $0.createdAt > $1.createdAt }
+var body: some View {
+    Group {
+        switch loader.phase {
+        case .loading:           ProgressView()
+        case .empty:             EmptyState()
+        case .loaded(let items): List(items) { /* row */ }
+        }
+    }
+    .task {
+        loader.bind(
+            client: appState.client,
+            subscribeTo: [.onModelChange(todos)]
+        ) { _ in
+            todos.findAll().sorted { $0.createdAt > $1.createdAt }
+        }
     }
 }
 ```
 
 `loader.reloadNow()` after writes is **not** required when you use `.onModelChange` — local writes fire the trigger synchronously. You only need it when the load closure depends on something the loader can't subscribe to (e.g. a REST resource).
+
+#### `loader.phase` vs `loader.data ?? []`
+
+`loader.phase` is the trinary view-facing state:
+
+| Case | Meaning |
+|---|---|
+| `.loading` | First load hasn't completed yet. Show a spinner. |
+| `.empty` | First load completed; data conforms to `LoaderEmptiness` and is empty (`[]`, `""`, etc.). Show your empty-state placeholder. |
+| `.loaded(Data)` | First load completed and the data is non-empty. Render it. |
+
+`[T]`, `String`, and `Optional<LoaderEmptiness>` get `LoaderEmptiness` conformance out of the box; custom `Data` types adopt the protocol if they want `.empty`.
+
+Prefer this over the raw `loader.data ?? []` shape — it collapses "not yet loaded" with "loaded, no items" and produces the empty-state flash that views written from older snippets exhibit.
 
 ## Authentication
 
@@ -1003,9 +1251,14 @@ Before declaring Swift code complete:
 **Helper choice (the high-leverage checks):**
 - [ ] Used `documents.getOrCreateWithAlias(...)` for per-user singleton docs — NOT `aliases.resolve` + `createWithAlias` two-step.
 - [ ] View-data binding is `BaoDataLoader<[T]>` + `.onModelChange(typedModel)` — NOT `@Published var items` + manual `refresh()`.
+- [ ] Views render through `switch loader.phase` (`.loading | .empty | .loaded`) — NOT `List(loader.data ?? []) { … }` (which flashes the empty state for ~50ms on every appearance).
 - [ ] Post-connect setup is `override func connectClient() async` — NOT a Combine sink on `$isConnected`.
 - [ ] TypedModel binding is inside `onDocumentOpened(doc:documentId:)` — NOT a second `openDocument(...)` call to fetch a YDocument.
+- [ ] Multi-doc app: per-item detail views use `appState.openAuxiliaryDoc(_:modelType:)` / `closeAuxiliaryDoc(_:)` — NOT `selectDocumentAwaiting(_:)` (which closes the ambient library doc).
 - [ ] Fresh-doc creation that immediately writes uses `createDocument(options:)` and its returned YDocument — NOT `createWithAlias` + `openDocument(.network)` (which can park 15s on an empty doc).
+- [ ] Email-based sharing uses `documents.invite(...)` / `collections.invite(...)` — NOT the raw `[String: Any]` overloads.
+- [ ] Reconcile "every doc I can read" with `me.accessibleDocuments(tag:)` — NOT manual merge of `ownedDocuments` + `sharedDocuments`.
+- [ ] Detail views subscribe to `.documentDeleted` to pop on delete/revoke — NOT `.documentMetadataChanged` filtered by `action == "deleted"`.
 
 **Codegen and schema:**
 - [ ] All models are in `schema.toml`, not hand-rolled `BaoModelRecord` structs.
