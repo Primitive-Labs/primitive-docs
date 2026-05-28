@@ -178,10 +178,10 @@ required = true
 type = "boolean"
 
 [models.tasks.fields.createdAt]
-type = "string"   # ISO8601 — no native date type
+type = "string"   # ISO8601 timestamp — `type = "date"` works too; both round-trip as String
 ```
 
-One `[models.X]` block per record type. Supported `type` values: `id`, `string`, `number`, `boolean`. Mark `required = true` for fields that the generated `init?(record:)` should refuse to construct without.
+One `[models.X]` block per record type. Supported `type` values: `id`, `string`, `number`, `boolean`, `date` (round-trips as `String`; use ISO-8601), `stringset` (`Set<String>`). Mark `required = true` for fields that the generated `init?(record:)` should refuse to construct without.
 
 ### 4b. Wire the codegen build step
 
@@ -397,10 +397,12 @@ You could keep a `@Published var items: [TaskRecord]` on the state class and cal
 Writes are **local-first** — they apply to the CRDT immediately, then sync to the server in the background.
 
 ```swift
-tasks.create(TaskRecord(title: "Buy milk"))             // uses the +Extensions convenience init
-tasks.update("task_123", ["completed": true])
-tasks.delete("task_123")
+try tasks.create(TaskRecord(title: "Buy milk"))         // throws on schema-validation failure
+tasks.update("task_123", ["completed": true])           // no throw — record already validated
+tasks.delete("task_123")                                // no throw
 ```
+
+`create` is the only CRUD call that throws — it validates the new record (required fields, type coercibility, unique constraints) before inserting. `update`/`delete` operate on records that already passed validation, so they don't throw; unknown field keys in an `update` payload are dropped silently.
 
 A write is visible to local reads on the next line. Remote peers see it when the WebSocket round-trip completes; a `.sync` event fires when the server acks.
 
