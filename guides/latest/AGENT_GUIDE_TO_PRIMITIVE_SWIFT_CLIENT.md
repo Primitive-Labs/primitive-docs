@@ -35,13 +35,30 @@ When writing Swift code, fetch the conceptual JS guide for the feature you're wo
 
 10. **Use `[weak self]` + a `runKey`-match guard inside workflow handlers.** Stale completions from a prior app session can otherwise resolve a fresh continuation.
 
-11. **Open documents BEFORE constructing `TypedModel<T>` for them.** `TypedModel<T>(doc:)` requires the `YDocument` that `client.openDocument(...)` returns.
+11. **Bind `TypedModel<T>` inside `onDocumentOpened(doc:documentId:)` — don't re-open the doc just to get a YDocument.** The base class's `selectDocumentAwaiting(_:)` opens the doc, sets up sync routing, and hands you the live `YDocument` through the `onDocumentOpened(doc:documentId:)` override. Calling `client.openDocument(...)` a second time to fetch a YDocument is wasteful and races with the base class's bookkeeping.
 
 12. **Set `DEVELOPMENT_TEAM` in `project.yml` (NOT in Xcode UI) and regenerate the xcodeproj.** The xcodeproj is xcodegen output — any UI edits are wiped on the next `xcodegen generate`. The team ID is the only setting that has to exist for device, TestFlight, and App Store builds; simulator builds run unsigned.
 
 13. **Use the `JsBaoClient` and `PrimitiveAppState` instances from `appState` — do NOT construct them yourself.** `PrimitiveAppState.initialize()` owns the client lifecycle, reads `primitive.json`, attaches the auth manager, and (in dev) auto-signs in via the CLI token. Manual instantiation breaks the dev-mode auth bypass and the inspector registration.
 
 14. **Treat `[String: Any]` API responses as untyped at the boundary.** `documents.create`, `documents.aliases.resolve`, `blobs.upload`, etc. return `[String: Any]`. Cast at the call site (`result["documentId"] as? String`) and validate immediately — there's no compile-time response shape.
+
+15. **Prefer the high-level helper over the low-level dance.** Every section below has a *"Pick the right helper"* card listing the in-tree idiomatic choice for each shape. Reach for those first; only fall through to lower-level APIs when the high-level one doesn't fit. The lower-level APIs exist for completeness and edge cases — they're not the default path.
+
+## Helper Preference Order
+
+The single most common way to write wrong-but-compiling Swift against Primitive is to reach for a JS-flavored REST + state-class pattern when there's a higher-level Swift helper that's right there. The table below is the cheat sheet — read each row as *"If you're about to do X, do Y instead."*
+
+| Don't do this | Do this instead | Why |
+|---|---|---|
+| `aliases.resolve` + `createWithAlias` two-step | `documents.getOrCreateWithAlias(alias:title:)` | Single atomic upsert. The two-step has a TOCTOU window where two clients onboarding simultaneously both fall into the `createWithAlias` branch and lose one of the docs. |
+| `client.openDocument(...)` in a subclass to get a YDocument for a `TypedModel` | Override `onDocumentOpened(doc:documentId:)` and bind there | The base class already opens the doc once via `selectDocumentAwaiting` and hands you the `YDocument`. Re-opening duplicates the work and races with `selectedDocId` routing. |
+| `@Published var items: [T]` + manual `refresh()` after every mutation | `BaoDataLoader<[T]>` bound with `.onModelChange(typedModel)` | The loader owns the subscription lifecycle, debounces reloads, and re-fetches on local **and** remote writes via one trigger. The `@Published` + refresh pattern silently drifts whenever you add a mutation site and forget to call `refresh()`. |
+| Combine sink on `appState.$isConnected` to run post-connect setup | `override func connectClient() async { await super.connectClient(); … }` | `connectClient()` is `open` — override it and call super. The Combine sink is the workaround you reach for when you forget that. |
+| `createDocument` then `openDocument` then start writing | `createDocument(options:)` returns `(documentId, doc: YDocument?)` — start writing on the returned doc | Local-first: the returned YDocument is writable immediately, the server commit happens in the background. Re-opening with `.network` blocks ~15s on a freshly-created empty doc waiting for a sync event that never has anything to deliver. |
+| `documents.list()` + filter by tag for a per-user singleton | `documents.getOrCreateWithAlias(...)` keyed by `scope: "user"` | Aliases were built for singletons; tag-filtering is fragile (the doc may not have the tag you assume, or may be filtered out for permission reasons). |
+
+When in doubt: `primitive guides get swift-client` (or read this guide) and search for the shape you want. Every section has a *"Pick the right helper"* card at the top.
 
 ## Core Concepts: PrimitiveApp + JsBaoClient
 
@@ -152,20 +169,53 @@ DO NOT edit the xcodeproj's signing settings in the Xcode UI — they're overwri
 
 ## App Lifecycle: PrimitiveAppState + AuthGateView
 
-`PrimitiveAppState` is the `@StateObject` your app holds. Subclass it when you need app-specific state (document caches, `TypedModel` registry, etc.):
+`PrimitiveAppState` is the `@StateObject` your app holds. Subclass it when you need app-specific state (document caches, `TypedModel` registry, etc.). The canonical shape:
 
 ```swift
 @MainActor
 final class MyAppState: PrimitiveAppState {
     @Published private(set) var todos: TypedModel<TodoItem>?
 
-    override func onDocumentOpened(_ doc: YDocument, documentId: String) async {
-        // Called when the user's library/default doc opens.
-        // Build per-doc TypedModel instances here.
+    // 1. Extend the connect flow. Call super first so the base class
+    //    connects and fetches /me + document list; then run your
+    //    app-specific setup. `connectClient` is `open` for this.
+    override func connectClient() async {
+        await super.connectClient()
+        await openLibraryDoc()
+    }
+
+    // 2. Resolve-or-create the user's singleton doc with the
+    //    race-free atomic alias upsert. Don't split this into
+    //    `aliases.resolve` + `createWithAlias` — see the Helper
+    //    Preference Order table above.
+    private func openLibraryDoc() async {
+        guard let client else { return }
+        do {
+            let result = try await client.documents.getOrCreateWithAlias(
+                alias: ["scope": "user", "aliasKey": "library"],
+                title: "Library"
+            )
+            guard let id = result["documentId"] as? String else { return }
+
+            // 3. selectDocumentAwaiting opens the doc, routes the
+            //    base class's sync/remoteUpdate hooks at it, and
+            //    fires onDocumentOpened(doc:documentId:) below.
+            await selectDocumentAwaiting(id)
+        } catch {
+            errorMessage = "Failed to open library: \(error.localizedDescription)"
+        }
+    }
+
+    // 4. Live YDocument arrives here — bind your TypedModels.
+    //    `makeTypedModel(doc:documentId:)` also registers the model
+    //    with the in-app debug inspector.
+    override func onDocumentOpened(doc: YDocument, documentId: String) async {
         todos = makeTypedModel(doc: doc, documentId: documentId)
     }
 }
 ```
+
+That's the whole shape: subclass, override `connectClient` to drive the doc setup, override `onDocumentOpened(doc:documentId:)` to bind models. Views observe `appState.todos` and bind a `BaoDataLoader` against it (see §4f below).
 
 `AuthGateView` is the built-in sign-in screen — it wraps your signed-in UI and shows OAuth / Magic Link / OTP / Passkey options until the user authenticates. To customize the UI, build a custom gate around `appState.authManager` directly instead of using `AuthGateView`.
 
@@ -220,7 +270,18 @@ required = true
 indexed = true
 ```
 
-Supported `type` values: `id`, `string`, `number`, `boolean`. `required = true` makes the codegen-emitted `init?(record:)` reject construction without that field. `indexed = true` registers a SQLite index for query-path filtering.
+Supported `type` values:
+
+| TOML `type` | Swift storage | Notes |
+|---|---|---|
+| `id`        | `String` (non-optional) | Always emitted as a non-optional `String`; the runtime guarantees the value. Use exactly one `id` field per model. |
+| `string`    | `String` / `String?` | |
+| `number`    | `Double` / `Double?` | |
+| `boolean`   | `Bool` / `Bool?` | |
+| `date`      | `String` / `String?` (ISO-8601) | Round-trips as a `String` — the runtime treats it as ISO-8601, but no parsing happens at the storage boundary. For timestamps you'll compare or sort on, prefer `number` (epoch seconds) to skip per-read parsing. |
+| `stringset` | `Set<String>` / `Set<String>?` | Insertion-orderless string set; emits the right `.asStringSet` / `.stringset` accessors. |
+
+`required = true` makes the codegen-emitted `init?(record:)` reject construction without that field. `indexed = true` registers a SQLite index for query-path filtering.
 
 ### 4b. Dual-path codegen wiring
 
@@ -348,21 +409,62 @@ public extension TodoItem {
 
 The codegen sweep only deletes files starting with the `// Generated by swift-bao-codegen` banner. Companions survive every regen.
 
+> **SourceKit footgun, first time only.** Editing your companion file (e.g. `TodoItem+Extensions.swift`) before codegen has run for the first time produces a red `No such module 'PrimitiveApp'` underline in Xcode/VS Code. The real cause is that `TodoItem` doesn't exist yet (codegen hasn't emitted it), but SourceKit's diagnostic blames the import instead. Run `swift build` once (or the codegen step from `run-ios.sh`) and the underline goes away. After the first generation, schema edits don't repeat this — only the very first scaffold.
+
 ### 4e. Binding to a document
+
+**The canonical bind site is `onDocumentOpened(doc:documentId:)`** — see the `MyAppState` example in "App Lifecycle" above. The base class hands you the live `YDocument` for free; just bind through `makeTypedModel(...)`:
+
+```swift
+override func onDocumentOpened(doc: YDocument, documentId: String) async {
+    todos = makeTypedModel(doc: doc, documentId: documentId)
+}
+```
+
+If you genuinely need to open a doc outside the app-state lifecycle (e.g. a per-item doc opened from a list view), you can call `openDocument` directly — but go through `appState.makeTypedModel(...)` for the bind, not `TypedModel<TodoItem>(doc: doc)`, so the debug inspector picks it up:
 
 ```swift
 let doc = try await client.openDocument(documentId, options: OpenDocumentOptions(
-    waitForLoad: .network,            // or .local / .localIfAvailableElseNetwork
+    waitForLoad: .network,
     enableNetworkSync: true
 ))
 let todos: TypedModel<TodoItem> = appState.makeTypedModel(doc: doc, documentId: documentId)
 ```
 
-**Always** go through `appState.makeTypedModel(...)` rather than `TypedModel<TodoItem>(doc: doc)` directly — the convenience method registers the model with the in-app debug inspector. One `TypedModel` per record type per document.
+One `TypedModel` per record type per document.
 
 ### 4f. Read
 
-Reads are **synchronous** and hit the local CRDT — no `async/await`:
+**For view-data binding, use `BaoDataLoader<[T]>` with `.onModelChange` — this is the canonical view-reactivity pattern**:
+
+```swift
+struct TodoListView: View {
+    @EnvironmentObject var appState: MyAppState
+    @StateObject private var loader = BaoDataLoader<[TodoItem]>()
+
+    var body: some View {
+        if let todos = appState.todos {
+            List(loader.data ?? []) { /* row */ }
+                .task {
+                    loader.bind(
+                        client: appState.client,
+                        subscribeTo: [.onModelChange(todos)]
+                    ) { _ in
+                        todos.findAll().sorted { $0.sortOrder < $1.sortOrder }
+                    }
+                }
+        } else {
+            ProgressView()
+        }
+    }
+}
+```
+
+`.onModelChange` fires whenever **any** record on the model is added, updated, or deleted — local writes (synchronous, on the same thread as the mutation) **and** remote writes (from the observer-drain queue). One trigger covers both reactivity sources. The loader debounces (default 50ms) so a burst of writes coalesces into one reload.
+
+**Don't** roll your own `@Published var items` + `refresh()` pattern. It silently drifts whenever you add a new mutation site and forget to call `refresh()`, and it forces every mutation method to know about the cached list. See the Helper Preference Order table.
+
+Under the loader, reads are **synchronous** against the local CRDT — no `async/await` — so the `load` closure is just a synchronous query:
 
 ```swift
 todos.find("todo_123")                                  // -> TodoItem?
@@ -383,16 +485,48 @@ The `query` path is SQLite-backed; for small collections `findAll()` + Swift `fi
 Writes are **local-first** — applied to the CRDT immediately, sync to server in the background:
 
 ```swift
-todos.create(TodoItem(text: "Buy milk"))
-todos.update("todo_123", ["completed": true])
-todos.delete("todo_123")
+try todos.create(TodoItem(text: "Buy milk"))      // throws on schema-validation failure
+todos.update("todo_123", ["completed": true])      // no throw — record already validated
+todos.delete("todo_123")                           // no throw
 ```
+
+`create` is the only CRUD method that throws — it has to validate the new record against the schema (required-field presence, type coercibility, unique-constraint conflicts) before inserting. `update` and `delete` operate on a record that's already on disk, so their inputs are pre-validated; if you mis-spell a field key in an `update` payload, the unknown key is dropped silently rather than thrown.
+
+Wrap `try todos.create(...)` in a `do/catch` and surface the error through your app-state's transient-error channel (a toast, an inline row error) — `errorMessage` / fatal alerts are an awkward fit for per-mutation save failures.
 
 A write is observable to local reads on the next line. Remote peers see it when the WS round-trip completes; a `.sync` event fires when the server acks.
 
 ## Documents
 
 API surface mirrors JS — see [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md) for conceptual model.
+
+### Pick the right helper
+
+| Shape | Use |
+|---|---|
+| Per-user singleton doc ("the user's library", "the user's inbox") | `client.documents.getOrCreateWithAlias(alias:title:)` |
+| Fresh doc whose contents you'll write immediately (local-first) | `client.createDocument(options:)` — returns `(documentId, doc: YDocument?)` |
+| Open an existing doc by id | `client.openDocument(id, options:)` |
+| Open by alias string (e.g. from a URL) | `client.openDocumentByAlias(alias)` |
+| Get an alias for an already-existing doc | `client.documents.aliases.set(scope:aliasKey:documentId:)` |
+
+The lower-level `aliases.resolve(...)` + `createWithAlias(options:)` two-step **exists** (and is documented below for completeness) but should not be your default path — see the Helper Preference Order at the top of this guide.
+
+### Canonical: resolve-or-create a per-user singleton doc
+
+```swift
+let result = try await client.documents.getOrCreateWithAlias(
+    alias: ["scope": "user", "aliasKey": "library"],
+    title: "Library"          // used only if creating
+)
+let documentId = result["documentId"] as! String
+let didCreate = result["created"] as? Bool ?? false
+
+// Then open it through the base class so onDocumentOpened fires:
+await appState.selectDocumentAwaiting(documentId)
+```
+
+### Lower-level building blocks
 
 ```swift
 // Open / close
@@ -402,20 +536,19 @@ let doc = try await client.openDocument(id, options: OpenDocumentOptions(
 ))
 await client.closeDocument(id)
 
-// Create
-let result = try await client.documents.create(options: [
-    "title": "My Document",
-    "tags": ["project"],
-])
-let documentId = result["documentId"] as? String
+// Create (local-first; returns a writable YDocument immediately,
+// server commit happens in the background)
+let (documentId, doc) = try await client.createDocument(options: CreateDocumentOptions(
+    title: "My Document",
+    tags: ["project"]
+))
 
-// Create + atomic alias (find this doc later without storing the ID anywhere)
+// Legacy two-step (DO NOT use as the default path — see Helper
+// Preference Order above)
 _ = try await client.documents.createWithAlias(options: [
     "title": "My Library",
     "alias": ["scope": "user", "aliasKey": "library"],
 ])
-
-// Resolve the alias on next launch
 let existing = try await client.documents.aliases.resolve(scope: "user", aliasKey: "library")
 let id = existing?["documentId"] as? String
 
@@ -427,23 +560,6 @@ try await client.documents.aliases.set(
     userId: nil,              // nil = current user
     mustNotExist: false
 )
-```
-
-### Common pattern: library doc on first launch
-
-```swift
-let existing = try await client.documents.aliases.resolve(scope: "user", aliasKey: "library")
-let libraryId: String
-if let id = existing?["documentId"] as? String {
-    libraryId = id
-} else {
-    let result = try await client.documents.createWithAlias(options: [
-        "title": "Library",
-        "alias": ["scope": "user", "aliasKey": "library"],
-    ])
-    libraryId = result["documentId"] as! String
-}
-let doc = try await client.openDocument(libraryId, options: OpenDocumentOptions(waitForLoad: .network, enableNetworkSync: true))
 ```
 
 ## Blobs
@@ -572,9 +688,35 @@ deinit {
 | `.status` | `StatusChangedEvent` | Connection state changed (connecting / connected / disconnected) |
 | `.authSuccess` | `AuthSuccessEvent` | Token obtained or refreshed |
 
-### Higher-level helper: BaoDataLoader
+### BaoDataLoader — the canonical view-data binding
 
-For most reactive-load patterns, use `BaoDataLoader` instead of subscribing manually — it takes a list of triggers (`.onSync`, `.onRemoteUpdate`, `.onDocumentEvents`) and re-runs a `load` closure when any fire. Cancels its own subscriptions on deinit.
+For **any** SwiftUI view that reads from a `TypedModel<T>`, use `BaoDataLoader` rather than subscribing to `client.events.on(...)` directly. The loader owns its subscriptions (cancelled on deinit), debounces bursts, and re-runs a `load` closure when triggered.
+
+Trigger options (`LoaderTrigger`):
+
+| Trigger | Fires on | Use when |
+|---|---|---|
+| `.onModelChange(TypedModel<T>)` | Any add/update/delete on **that specific model** | Reading from a single TypedModel — this is the default for model-backed views. Tighter than the doc-wide events. |
+| `.onSync` | `.sync` event on any doc | REST-backed loaders that need a refresh after every sync ack. |
+| `.onRemoteUpdate` | `.remoteUpdate` event on any doc | Doc-wide; coarser than `.onModelChange`. |
+| `.onDocumentEvents` | `documentLoaded` + `documentClosed` | Loaders that care about doc lifecycle, not data. |
+| `.onConnect` | Connection flips to `.connected` | REST-backed loaders that need to refresh after reconnect. |
+| `.custom((client, reload) -> EventSubscription?)` | Whatever you install | Escape hatch for triggers not covered above. |
+
+```swift
+@StateObject private var loader = BaoDataLoader<[TodoItem]>()
+
+.task {
+    loader.bind(
+        client: appState.client,
+        subscribeTo: [.onModelChange(todos)]
+    ) { _ in
+        todos.findAll().sorted { $0.createdAt > $1.createdAt }
+    }
+}
+```
+
+`loader.reloadNow()` after writes is **not** required when you use `.onModelChange` — local writes fire the trigger synchronously. You only need it when the load closure depends on something the loader can't subscribe to (e.g. a REST resource).
 
 ## Authentication
 
@@ -854,14 +996,26 @@ Idempotent, convergent (one pass reaches the right state from any starting state
 
 Before declaring Swift code complete:
 
+**Helper choice (the high-leverage checks):**
+- [ ] Used `documents.getOrCreateWithAlias(...)` for per-user singleton docs — NOT `aliases.resolve` + `createWithAlias` two-step.
+- [ ] View-data binding is `BaoDataLoader<[T]>` + `.onModelChange(typedModel)` — NOT `@Published var items` + manual `refresh()`.
+- [ ] Post-connect setup is `override func connectClient() async` — NOT a Combine sink on `$isConnected`.
+- [ ] TypedModel binding is inside `onDocumentOpened(doc:documentId:)` — NOT a second `openDocument(...)` call to fetch a YDocument.
+- [ ] Fresh-doc creation that immediately writes uses `createDocument(options:)` and its returned YDocument — NOT `createWithAlias` + `openDocument(.network)` (which can park 15s on an empty doc).
+
+**Codegen and schema:**
 - [ ] All models are in `schema.toml`, not hand-rolled `BaoModelRecord` structs.
 - [ ] `Package.swift` has `JsBaoCodegenPlugin` on the target + `exclude: ["Models/Generated"]`.
 - [ ] `run-ios.sh` invokes `swift run swift-bao-codegen` before `xcodegen generate`.
 - [ ] All `TypedModel<T>` instances are constructed via `appState.makeTypedModel(doc:documentId:)`.
+- [ ] Snake_case wire keys match what other clients (web) read/write — no rename without a migration plan.
+- [ ] No `nil` values in CRDT-backed fields — `""` / `0` / sentinel timestamps instead.
+- [ ] `Models/Generated/` is committed to source control.
+
+**Events and workflows:**
 - [ ] All `EventSubscription` handles are stored on a property and `[weak self]` is used in the closure.
 - [ ] Workflow `define(...)` is registered BEFORE the corresponding `workflows.start(...)`.
 - [ ] Workflow handlers have a `runKey`-match guard and `resolved` flag.
-- [ ] Snake_case wire keys match what other clients (web) read/write — no rename without a migration plan.
+
+**Build / ship:**
 - [ ] `DEVELOPMENT_TEAM` set in `project.yml` (not Xcode UI) if shipping to device.
-- [ ] No `nil` values in CRDT-backed fields — `""` / `0` / sentinel timestamps instead.
-- [ ] `Models/Generated/` is committed to source control.
