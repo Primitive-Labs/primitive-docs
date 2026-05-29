@@ -188,7 +188,7 @@ One `[models.X]` block per record type. Supported `type` values: `id`, `string`,
 There are two build paths and you need to handle both:
 
 - **SwiftPM** (`swift build`, `swift test`, macOS execution via `./run.sh`) — driven by `Package.swift`. SPM has a build plugin (`JsBaoCodegenPlugin`) shipped with swift-client that runs codegen automatically and feeds the output straight to the compiler.
-- **Xcode / iOS** (`./run-ios.sh`, archives, TestFlight) — driven by the `xcodegen`-generated `.xcodeproj`. The Xcode target compiles its source list from `.pbxproj` directly, so the SPM plugin **never fires** on this path. You run the codegen tool manually before `xcodegen generate` and let the output land in a checked-in `Models/Generated/` directory that xcodegen scans.
+- **Xcode / iOS** (`./run-ios.sh`, archives, TestFlight) — driven by the `xcodegen`-generated `.xcodeproj`. The Xcode target compiles its source list from `.pbxproj` directly, so the SPM plugin **never fires** on this path. You run the codegen tool manually before `xcodegen generate` and let the output land in a gitignored `Models/Generated/` directory that xcodegen scans.
 
 Both producers would otherwise emit the same files into the same SPM source list, so the target excludes the manual-output directory from SPM's view — the plugin is SPM's source of truth, the checked-in files are Xcode's.
 
@@ -235,7 +235,7 @@ For the Xcode/iOS path, add the codegen invocation near the top of `run-ios.sh`,
 # `swift build` runs JsBaoCodegenPlugin automatically. The Xcode app
 # target compiles its own source list from .pbxproj directly though, so
 # the SPM plugin never fires on this path. Run the codegen tool by hand
-# here, writing into a checked-in `Generated/` dir xcodegen picks up.
+# here, writing into a gitignored `Generated/` dir xcodegen picks up.
 GEN_DIR="Sources/MyApp/Models/Generated"
 SCHEMA_TOML="Sources/MyApp/Models/schema.toml"
 mkdir -p "$GEN_DIR"
@@ -244,7 +244,15 @@ swift run --package-path . swift-bao-codegen \
     --output "$GEN_DIR"
 ```
 
-The first `swift run swift-bao-codegen` invocation will build the codegen tool from the swift-client checkout (one-time cost, ~30s); subsequent runs are instant. Files in `Models/Generated/` are committed to source control — they're what Xcode actually compiles. Re-runs on an unchanged TOML are a no-op (the tool's `writeIfChanged` keeps mtimes stable so Xcode's incremental compile doesn't blow up).
+The first `swift run swift-bao-codegen` invocation will build the codegen tool from the swift-client checkout (one-time cost, ~30s); subsequent runs are instant. Re-runs on an unchanged TOML are a no-op (the tool's `writeIfChanged` keeps mtimes stable so Xcode's incremental compile doesn't blow up).
+
+`Models/Generated/` is **gitignored** — it's regenerated on every `swift build` / `./run-ios.sh`, so it's never committed (only the directory's `README.md` is tracked). Watch out for one footgun: if you change `schema.toml` and then build by hitting **Run in Xcode directly** rather than `./run-ios.sh`, Xcode compiles whatever stale or missing files are already in `Generated/`, with no error pointing at the cause. Build through `./run-ios.sh` (it regenerates first), or regenerate by hand before the Xcode build:
+
+```bash
+swift run --package-path . swift-bao-codegen \
+    --input  Sources/MyApp/Models/schema.toml \
+    --output Sources/MyApp/Models/Generated
+```
 
 ### 4c. What codegen emits
 

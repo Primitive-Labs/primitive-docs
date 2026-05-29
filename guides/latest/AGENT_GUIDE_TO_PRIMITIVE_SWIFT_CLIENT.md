@@ -17,7 +17,7 @@ When writing Swift code, fetch the conceptual JS guide for the feature you're wo
 
 1. **Define models in `schema.toml` and use codegen. NEVER hand-roll `BaoModelRecord` structs.** The legacy `BaoModel<T>` / `BaoModelRecord` path still compiles but is deprecated. New code uses `swift-bao-codegen` to emit `PrimitiveModel` structs from a TOML schema, then consumes them through `TypedModel<T>`. Drift between schema and Swift is impossible when codegen is the source of truth.
 
-2. **Wire codegen on both build paths.** `swift build` runs `JsBaoCodegenPlugin` automatically; the Xcode/iOS path does NOT. Invoke `swift run swift-bao-codegen` inline in `run-ios.sh` before `xcodegen generate`, write to a checked-in `Models/Generated/`, and add `exclude: ["Models/Generated"]` to the SPM target so the two producers don't collide. See [§4](#data-modeling-schematoml--codegen--typedmodelt).
+2. **Wire codegen on both build paths.** `swift build` runs `JsBaoCodegenPlugin` automatically; the Xcode/iOS path does NOT. Invoke `swift run swift-bao-codegen` inline in `run-ios.sh` before `xcodegen generate`, write to a gitignored `Models/Generated/` (regenerated on every build, never committed), and add `exclude: ["Models/Generated"]` to the SPM target so the two producers don't collide. See [§4](#data-modeling-schematoml--codegen--typedmodelt).
 
 3. **Wire `TypedModel<T>` instances through `appState.makeTypedModel(doc:documentId:)`.** Constructing `TypedModel<T>(doc:)` directly works but skips registration with the in-app debug inspector. Use `makeTypedModel` so the model shows up in the Debug Inspector tab.
 
@@ -332,7 +332,7 @@ Supported `type` values:
 Two build paths, both need wiring:
 
 - **SwiftPM** (`swift build`, `swift test`, `./run.sh` for macOS) — `JsBaoCodegenPlugin` from `swift-client` runs automatically and feeds output to the compiler.
-- **Xcode / iOS** (`./run-ios.sh`, archives, TestFlight) — Xcode compiles from `.pbxproj` directly, SPM plugin never fires. Invoke the codegen tool manually before `xcodegen generate`, write into a checked-in `Models/Generated/` so xcodegen scans it.
+- **Xcode / iOS** (`./run-ios.sh`, archives, TestFlight) — Xcode compiles from `.pbxproj` directly, SPM plugin never fires. Invoke the codegen tool manually before `xcodegen generate`, write into a gitignored `Models/Generated/` so xcodegen scans it.
 
 Both producers would emit the same files into the same SPM source list, so the SPM target excludes the manual-output directory.
 
@@ -381,7 +381,7 @@ let package = Package(
 # `swift build` runs JsBaoCodegenPlugin automatically. The Xcode app
 # target compiles its own source list from .pbxproj directly though, so
 # the SPM plugin never fires on this path. Run codegen by hand here,
-# writing into a checked-in Generated/ dir xcodegen picks up.
+# writing into a gitignored Generated/ dir xcodegen picks up.
 GEN_DIR="Sources/MyApp/Models/Generated"
 SCHEMA_TOML="Sources/MyApp/Models/schema.toml"
 mkdir -p "$GEN_DIR"
@@ -390,7 +390,15 @@ swift run --package-path . swift-bao-codegen \
     --output "$GEN_DIR"
 ```
 
-The first `swift run swift-bao-codegen` builds the codegen binary from the swift-client checkout (~30s one-time cost). Subsequent runs are instant. Files in `Models/Generated/` are committed to source control — they're what Xcode actually compiles. `writeIfChanged` keeps mtimes stable on no-op runs.
+The first `swift run swift-bao-codegen` builds the codegen binary from the swift-client checkout (~30s one-time cost). Subsequent runs are instant. `writeIfChanged` keeps mtimes stable on no-op runs.
+
+`Models/Generated/` is **gitignored** — it's regenerated on every `swift build` / `./run-ios.sh`, so it's never committed (only the directory's `README.md` is tracked). One footgun follows from this: if you edit `schema.toml` and then build by hitting **Run in Xcode directly** (instead of `./run-ios.sh`), Xcode compiles whatever stale or missing files are already in `Generated/` — there's no error pointing at the cause. Either build through `./run-ios.sh` (which regenerates first), or regenerate by hand before the Xcode build:
+
+```bash
+swift run --package-path . swift-bao-codegen \
+    --input  Sources/MyApp/Models/schema.toml \
+    --output Sources/MyApp/Models/Generated
+```
 
 ### 4c. What codegen emits
 
@@ -1267,7 +1275,7 @@ Before declaring Swift code complete:
 - [ ] All `TypedModel<T>` instances are constructed via `appState.makeTypedModel(doc:documentId:)`.
 - [ ] Snake_case wire keys match what other clients (web) read/write — no rename without a migration plan.
 - [ ] No `nil` values in CRDT-backed fields — `""` / `0` / sentinel timestamps instead.
-- [ ] `Models/Generated/` is committed to source control.
+- [ ] `Models/Generated/` is gitignored (regenerated on every build; only its `README.md` is tracked).
 
 **Events and workflows:**
 - [ ] All `EventSubscription` handles are stored on a property and `[weak self]` is used in the closure.
