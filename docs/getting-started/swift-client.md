@@ -331,10 +331,10 @@ final class MyAppState: PrimitiveAppState {
         // getOrCreateWithAlias is the race-free atomic upsert for
         // "one doc per user." Don't split this into resolve + create.
         let result = try? await client.documents.getOrCreateWithAlias(
-            alias: ["scope": "user", "aliasKey": "library"],
+            alias: DocumentAlias(scope: .user, aliasKey: "library"),
             title: "Library"
         )
-        guard let id = result?["documentId"] as? String else { return }
+        guard let id = result?.documentId else { return }
         await selectDocumentAwaiting(id)
     }
 
@@ -380,7 +380,7 @@ struct TaskListView: View {
 }
 ```
 
-Under the loader, reads are **synchronous** against the local CRDT — no async/await needed:
+Under the loader, reads are **synchronous** against the local CRDT — no async/await needed. The `load` closure is `@MainActor`-isolated, so a sync `TypedModel` read compiles under strict concurrency directly — no `await MainActor.run { … }` wrapper:
 
 ```swift
 tasks.find("task_123")                                  // -> TaskRecord?
@@ -442,10 +442,10 @@ The client is a façade over sub-APIs. You almost never construct `JsBaoClient` 
 ```swift
 // Resolve-or-create the user's library doc (idempotent, race-free)
 let result = try await client.documents.getOrCreateWithAlias(
-    alias: ["scope": "user", "aliasKey": "library"],
+    alias: DocumentAlias(scope: .user, aliasKey: "library"),
     title: "Library"        // used only on first create
 )
-let documentId = result["documentId"] as! String
+let documentId = result.documentId
 
 // Open / close
 let doc = try await client.openDocument(documentId, options: OpenDocumentOptions(

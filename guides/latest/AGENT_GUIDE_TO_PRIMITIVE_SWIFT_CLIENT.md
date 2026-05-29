@@ -199,10 +199,10 @@ final class MyAppState: PrimitiveAppState {
         guard let client else { return }
         do {
             let result = try await client.documents.getOrCreateWithAlias(
-                alias: ["scope": "user", "aliasKey": "library"],
+                alias: DocumentAlias(scope: .user, aliasKey: "library"),
                 title: "Library"
             )
-            guard let id = result["documentId"] as? String else { return }
+            let id = result.documentId
 
             // 3. selectDocumentAwaiting opens the doc, routes the
             //    base class's sync/remoteUpdate hooks at it, and
@@ -540,7 +540,7 @@ struct TodoListView: View {
 
 **Don't** roll your own `@Published var items` + `refresh()` pattern. It silently drifts whenever you add a new mutation site and forget to call `refresh()`, and it forces every mutation method to know about the cached list. See the Helper Preference Order table.
 
-Under the loader, reads are **synchronous** against the local CRDT — no `async/await` — so the `load` closure is just a synchronous query:
+Under the loader, reads are **synchronous** against the local CRDT — no `async/await` — so the `load` closure is just a synchronous query. The closure is `@MainActor`-isolated (it runs on the main actor, like the loader), so these sync reads compile under strict concurrency directly — no `await MainActor.run { … }` wrapper needed:
 
 ```swift
 todos.find("todo_123")                                  // -> TodoItem?
@@ -591,12 +591,14 @@ The lower-level `aliases.resolve(...)` + `createWithAlias(options:)` two-step **
 ### Canonical: resolve-or-create a per-user singleton doc
 
 ```swift
+// `DocumentAlias` / `AliasedDocument` are the typed forms from PrimitiveApp —
+// prefer them over the raw `[String: Any]` alias dict + `result["documentId"]`.
 let result = try await client.documents.getOrCreateWithAlias(
-    alias: ["scope": "user", "aliasKey": "library"],
+    alias: DocumentAlias(scope: .user, aliasKey: "library"),
     title: "Library"          // used only if creating
 )
-let documentId = result["documentId"] as! String
-let didCreate = result["created"] as? Bool ?? false
+let documentId = result.documentId
+let didCreate = result.created
 
 // Then open it through the base class so onDocumentOpened fires:
 await appState.selectDocumentAwaiting(documentId)
