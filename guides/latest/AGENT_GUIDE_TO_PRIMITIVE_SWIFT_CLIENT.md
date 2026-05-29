@@ -980,6 +980,18 @@ var body: some View {
 
 Prefer this over the raw `loader.data ?? []` shape — it collapses "not yet loaded" with "loaded, no items" and produces the empty-state flash that views written from older snippets exhibit.
 
+The first load runs **immediately** (the debounce only coalesces later reactive reloads), so instantly-available local CRDT data lands without a `.loading` spinner flash.
+
+**Gotcha — empty-vs-pending when a local index is hydrated by an async server fetch.** If the loader reads a local CRDT mirror that a `reconcile()` (or similar) fills from the server *after* the view binds, the first load completes against an empty store → `.empty` → your "nothing here yet" placeholder flashes before the server data arrives. `loader.phase` can't tell "genuinely empty" from "server fetch still pending" — only your app knows. Gate the empty state on a "first reconcile attempted" flag:
+
+```swift
+case .empty:
+    if appState.hasReconciled { EmptyState() }   // set true in a `defer` in reconcile()
+    else { ProgressView() }                       // still fetching the first server snapshot
+```
+
+(Set the flag on *attempt*, success or failure, so an offline brand-new user still reaches the empty state instead of spinning forever.)
+
 ## Authentication
 
 `AuthGateView` covers Google OAuth, Magic Link, OTP, and Passkeys out of the box. The auth manager (`appState.authManager`) exposes the underlying primitives if you need a custom UI:
@@ -1211,7 +1223,7 @@ The most common shape — one library document per user (alias-resolved on launc
 class_name = "LibraryItemRef"
 
 [models.library_item_refs.fields.id]
-type = "id"
+type = "id"    # set this to itemDocumentId — see "Key refs by the entity id" below
 
 [models.library_item_refs.fields.itemDocumentId]
 type = "string"
@@ -1225,6 +1237,29 @@ type = "string"
 ```
 
 Each item lives in its own document and is shared independently. The library doc holds a metadata-cached ref; mutations to the cache (`cachedTitle`, etc.) come from a hydrate step that opens the item doc, reads the live values, and writes back into the ref.
+
+#### Key refs by the entity id — not a random `UUID()`
+
+A ref's CRDT row id (its `id` field) is the map key: `model.create(record)` is `getOrInsertMap(key: record.id)` — an **upsert**. So whatever you put in `id` *is* the dedup key.
+
+The trap: minting `id = UUID().uuidString` in the ref's initializer (the obvious default, and what codegen-adjacent convenience inits tend to do). Now the row's identity is decoupled from the thing it points at, and the **same** server entity can land in two rows — one written by your create path, one by a reconcile pass that ran before the first row was visible (or on another device). Nothing knows the two rows are the same entity, so the duplicate is permanent and visible. A `Dictionary(uniquingKeysWith:)` defense over the *lookup* hides it during reconcile but never reconciles the rows back together.
+
+Fix: set `id` to the entity id the ref points at (the document id / collection id):
+
+```swift
+public extension LibraryItemRef {
+    init(itemDocumentId: String, title: String, sortOrder: Double) {
+        self.init(
+            id: itemDocumentId,        // row id == entity id ⇒ create is an idempotent upsert
+            itemDocumentId: itemDocumentId,
+            cachedTitle: title,
+            sortOrder: sortOrder
+        )
+    }
+}
+```
+
+Now two writes for the same entity converge on one CRDT key (the second merges into the first) — across reconcile races and across devices. Duplicates become *structurally impossible* rather than something you clean up. Reserve random `UUID()` ids for records *born* in the CRDT with no external identity (todos, notes, messages).
 
 ### Pattern: Tombstone instead of hard-delete
 
@@ -1242,10 +1277,18 @@ When sharing / unsharing / collection changes happen, run a single reconcile pas
 
 1. Enumerate every potential access channel (cascade collections, direct grants, per-ref probes).
 2. Compute the **max** permission across channels (server's resolution rule).
-3. Apply: create missing refs, update cached fields, tombstone stale ones.
+3. Apply: for each server entity, `find(entityId)`-or-update by that id (refs are keyed by the entity id, above); tombstone/delete refs whose `id` is no longer in the server set.
 4. Serialize reconcile passes — one body at a time, callers arriving mid-pass coalesce into a rerun.
 
-Idempotent, convergent (one pass reaches the right state from any starting state), atomic (single-collection failures bail the whole pass — no half-applied state).
+Idempotent, convergent (one pass reaches the right state from any starting state), atomic (single-collection failures bail the whole pass — no half-applied state). Because refs are keyed by the entity id, the create/update step is a plain upsert and the prune is `where !serverIds.contains(ref.id)` — no keep-first dedup defense, and a double-run can't duplicate. (Pruning by `ref.id` also sweeps out any legacy random-UUID rows on the first pass after adopting this keying.)
+
+**These list endpoints are NOT reactive — trigger reconcile explicitly.** Unlike a `TypedModel` read on an open document (where `.onModelChange` re-fires on local *and* remote writes), `me.accessibleDocuments`, `collections.list`, `documents.getPermissions`, and the invitation reads are plain server queries with no change feed. When someone shares a doc or collection *with* the user, nothing on the user's open documents changes, so no event fires and the home/list screen won't update on its own. Run reconcile on the triggers you control:
+
+- App launch / `connectClient`.
+- Foreground: `.onChange(of: scenePhase)` → `.active`.
+- Pull-to-refresh (`.refreshable { await reconcile() }`) — and keep the empty/loading states refreshable too (a `ContentUnavailableView` isn't scrollable, so the gesture is dead there unless you wrap it).
+
+(Realtime "shared-with-me" would need a server push that doesn't exist today; explicit refresh is the supported mechanism.)
 
 ## What's NOT Covered Here
 
@@ -1265,6 +1308,7 @@ Before declaring Swift code complete:
 - [ ] Post-connect setup is `override func connectClient() async` — NOT a Combine sink on `$isConnected`.
 - [ ] TypedModel binding is inside `onDocumentOpened(doc:documentId:)` — NOT a second `openDocument(...)` call to fetch a YDocument.
 - [ ] Multi-doc app: per-item detail views use `appState.openAuxiliaryDoc(_:modelType:)` / `closeAuxiliaryDoc(_:)` — NOT `selectDocumentAwaiting(_:)` (which closes the ambient library doc).
+- [ ] Index/pointer refs (`*Ref` mirroring a server document/collection) set `id` to the entity id — NOT a random `UUID()` — so create is an idempotent upsert and reconcile can't duplicate rows.
 - [ ] Fresh-doc creation that immediately writes uses `createDocument(options:)` and its returned YDocument — NOT `createWithAlias` + `openDocument(.network)` (which can park 15s on an empty doc).
 - [ ] Email-based sharing uses `documents.invite(...)` / `collections.invite(...)` — NOT the raw `[String: Any]` overloads.
 - [ ] Reconcile "every doc I can read" with `me.accessibleDocuments(tag:)` — NOT manual merge of `ownedDocuments` + `sharedDocuments`.
