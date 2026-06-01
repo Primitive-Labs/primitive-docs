@@ -60,8 +60,8 @@ The single most common way to write wrong-but-compiling Swift against Primitive 
 | `me.ownedDocuments(tag:)` + `me.sharedDocuments(tag:)` + manual merge for "every doc I can read" | `me.accessibleDocuments(tag:)` | One call, dedupes by `documentId`, attaches an `_origin: "owned"|"shared"` key so reconcile passes can keep the distinction. |
 | `selectDocumentAwaiting(_:)` for a per-item detail view in a multi-doc app | `appState.openAuxiliaryDoc(_:modelType:)` from `.task`, `appState.closeAuxiliaryDoc(_:)` from `.onDisappear` | `selectDocumentAwaiting` closes the previously-selected doc, so using it for a per-item detail view closes your library/index doc. Use the auxiliary helpers when there's an ambient doc + N transient docs. |
 | Subscribe to `.documentMetadataChanged` and filter on `action == "deleted"` in detail views | Subscribe to `.documentDeleted` directly | Derived event with the same trigger but no payload-filter boilerplate. |
-| Raw `documents.updatePermissions(documentId:params:[String: Any])` for the common email-share | `documents.invite(documentId:email:permission:)` | Typed shape, doesn't require knowing the key vocabulary. Returns the same dict so the response shape stays uniform. |
-| Raw `collections.addMember(collectionId:params:)` for the common email-invite | `collections.invite(collectionId:email:permission:)` | Same reason. |
+| Raw `documents.updatePermissions(documentId:params:[String: Any])` for the common email-share | `documents.invite(documentId:email:permission:sendEmail:)` (pass `sendEmail: false`, or `sendEmail: true` with a `documentUrl`) | Typed shape, doesn't require knowing the key vocabulary. Returns the same dict so the response shape stays uniform. |
+| Raw `collections.addMember(collectionId:params:)` for the common email-invite | `collections.invite(collectionId:email:permission:sendEmail:)` (pass `sendEmail: false`) | Same reason. |
 | Hand-rolled "list pending → find by email → revoke" for cancelling a collection invite | `collections.cancelPendingInvitation(collectionId:email:)` | One call, returns `Bool` (`false` = no pending invite matched, e.g. already accepted). |
 | `List(loader.data ?? []) { … }` for view-data binding | `switch loader.phase { case .loading: …; .empty: …; .loaded(let d): … }` | `?? []` collapses "not yet loaded" with "loaded, no items" — empty-state placeholders flash for ~50ms on every appearance. `LoaderPhase` makes the bug unreachable. |
 
@@ -648,8 +648,8 @@ Same shape on both surfaces: invite by email, list members, list pending invites
 
 | Shape | Use |
 |---|---|
-| Invite an email to a single document | `client.documents.invite(documentId:email:permission:)` |
-| Invite an email to a collection (cascades to all docs in it) | `client.collections.invite(collectionId:email:permission:)` |
+| Invite an email to a single document | `client.documents.invite(documentId:email:permission:sendEmail:)` — pass `sendEmail: false`, or `sendEmail: true` **with** a `documentUrl` |
+| Invite an email to a collection (cascades to all docs in it) | `client.collections.invite(collectionId:email:permission:sendEmail:)` — pass `sendEmail: false` |
 | Add a known user (by id) directly | `client.collections.addMember(collectionId:userId:permission:)` |
 | List live members of a document | `client.documents.getPermissions(documentId:)` |
 | List pending email invites on a document | `client.documents.listPendingInvitations(documentId:)` |
@@ -662,20 +662,47 @@ Avoid the raw `[String: Any]` overloads (`updatePermissions(documentId:params:)`
 
 ### Canonical: invite an email
 
+> **`sendEmail` defaults to `true`, and a `true` `sendEmail` REQUIRES a
+> `documentUrl`.** Omit both and the call fails at runtime with
+> `documentUrl is required when sendEmail is true`. Pick one of the two shapes
+> below — don't call `invite(documentId:email:permission:)` with no third
+> argument. (`collections.invite` takes `sendEmail` too but has **no**
+> `documentUrl` parameter, so a collection invite that sends email isn't wired
+> yet — pass `sendEmail: false`.)
+
 ```swift
-// Single document
+// Single document.
+//
+// Shape 1 — no notification email (simplest, and the right default for apps
+// without a web deep-link). The deferred grant still lands; the invitee gets
+// access the moment they sign in with this email, and shows up under
+// `listPendingInvitations` until then.
 _ = try await client.documents.invite(
     documentId: listDocId,
     email: "friend@example.com",
-    permission: .readWrite
+    permission: .readWrite,
+    sendEmail: false
+)
+
+// Shape 2 — send the notification email. Requires a `documentUrl`: the link
+// the email points at (your app's universal link / web route to the doc).
+_ = try await client.documents.invite(
+    documentId: listDocId,
+    email: "friend@example.com",
+    permission: .readWrite,
+    sendEmail: true,
+    documentUrl: "https://yourapp.example.com/d/\(listDocId)"
 )
 
 // Collection cascade — friend gets access to every doc in the collection,
-// and any doc added to the collection later inherits the grant.
+// and any doc added to the collection later inherits the grant. `sendEmail`
+// defaults to `true` here too; pass `sendEmail: false` (no `documentUrl`
+// param exists on this overload).
 _ = try await client.collections.invite(
     collectionId: collectionId,
     email: "friend@example.com",
-    permission: .reader
+    permission: .reader,
+    sendEmail: false
 )
 ```
 
