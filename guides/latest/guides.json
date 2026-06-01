@@ -266,6 +266,28 @@
       "concepts": ["DevTools", "Document Explorer", "Test Harness", "TestGroup", "test cases", "model inspection", "data validation"],
       "prerequisites": ["documents"],
       "relatedGuides": ["documents"]
+    },
+    {
+      "topic": "swift-client",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_SWIFT_CLIENT.md",
+      "description": "Building Primitive apps in Swift (iOS / macOS) — PrimitiveApp, JsBaoClient, codegen + TypedModel, Fastlane",
+      "keywords": ["swift", "apple", "ios", "macos", "iphone", "ipad", "mac", "swiftui", "xcode", "fastlane", "testflight", "app store", "PrimitiveApp", "PrimitiveAppState", "TypedModel", "swift-bao-codegen", "JsBaoCodegenPlugin", "schema.toml", "xcodegen", "AuthGateView", "BaoModel", "primitive init --platform apple"],
+      "useCases": [
+        "Scaffolding a new iOS or macOS app with `primitive init --platform apple`",
+        "Running on iOS Simulator, paired iPhone/iPad, or macOS",
+        "Defining data models in schema.toml and wiring swift-bao-codegen on both SwiftPM and Xcode build paths",
+        "Binding generated PrimitiveModel records to documents via TypedModel<T>",
+        "Reading and writing through TypedModel — synchronous reads, local-first writes",
+        "Subscribing to events (.sync / .remoteUpdate / .workflowStatus) with proper subscription lifetime",
+        "Implementing workflow apply handlers with CheckedContinuation + runKey guards",
+        "Using AuthGateView and PrimitiveAuthManager for sign-in",
+        "Code signing setup (DEVELOPMENT_TEAM in project.yml + xcodegen regen)",
+        "Shipping to TestFlight and the App Store with Fastlane lanes (beta / release / add_testers / bump)",
+        "Migrating from the legacy BaoModel<T> / BaoModelRecord path to TypedModel<T> + codegen"
+      ],
+      "concepts": ["PrimitiveAppState", "AuthGateView", "JsBaoClient", "TypedModel", "PrimitiveModel", "PrimitiveSchema", "swift-bao-codegen", "JsBaoCodegenPlugin", "makeTypedModel", "BaoDataLoader", "EventSubscription", "OpenDocumentOptions", "StartWorkflowOptions", "WorkflowStatusEvent", "primitive init --platform apple", "xcodegen", "project.yml", "primitive.json", "Fastfile", "upload_to_testflight", "upload_to_app_store"],
+      "prerequisites": [],
+      "relatedGuides": ["documents", "data-modeling", "workflows", "blobs", "authentication", "sharing-and-invitations"]
     }
   ]
 }
