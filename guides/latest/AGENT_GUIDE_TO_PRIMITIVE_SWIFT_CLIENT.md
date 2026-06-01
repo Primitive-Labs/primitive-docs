@@ -518,7 +518,14 @@ struct TodoListView: View {
                 ProgressView()
             }
         }
-        .task {
+        // `.task(id:)`, NOT a bare `.task`. `appState.todos` is bound
+        // asynchronously in `onDocumentOpened` (after connect + doc open),
+        // so it's nil when this view first appears. A bare
+        // `.task { guard let … else { return } }` runs ONCE, sees nil,
+        // bails, and never binds the loader — the screen sticks on its
+        // spinner until the view happens to be rebuilt. Keying the task on
+        // readiness re-runs it the instant the model arrives.
+        .task(id: appState.todos == nil) {
             guard let todos = appState.todos else { return }
             loader.bind(
                 client: appState.client,
@@ -530,6 +537,15 @@ struct TodoListView: View {
     }
 }
 ```
+
+> **Readiness, the load-bearing detail:** the `.task(id: appState.todos == nil)`
+> above is not optional polish. A bare `.task { guard let model = appState.x
+> else { return } }` is wrong-by-default here, because the model is bound a
+> beat after the view appears — the guard bails and the loader never binds.
+> Either key the task on readiness as shown, or gate the whole subtree so the
+> view only mounts once the model exists (`ReadyGate(appState.todos) { _ in … }`
+> from `PrimitiveApp`), and every screen below the gate can use a plain
+> `.task`.
 
 > **Anti-pattern:** `List(loader.data ?? []) { … }` followed by
 > `if loader.data?.isEmpty == true { Text("Empty") }`. The `?? []`
@@ -1004,7 +1020,10 @@ var body: some View {
         case .loaded(let items): List(items) { /* row */ }
         }
     }
-    .task {
+    // `.task(id:)` so the bind re-runs once `appState.todos` is non-nil;
+    // a bare `.task` would run before it's set and never bind (see §4f).
+    .task(id: appState.todos == nil) {
+        guard let todos = appState.todos else { return }
         loader.bind(
             client: appState.client,
             subscribeTo: [.onModelChange(todos)]
