@@ -321,11 +321,16 @@ Data can change from sync (another user edited it). Subscribe to keep your UI up
 const unsubscribe = Task.subscribe(() => {
   // Re-query and update UI
 });
+
+// Later, when you no longer need updates:
+unsubscribe();
 ```
+
+`Model.subscribe()` works **anywhere** — components, Pinia stores, plain services. It doesn't depend on the Vue component lifecycle. It returns an unsubscribe function; always call it when you're done (on unmount, on logout, or when tearing down a store) so the listener doesn't leak.
 
 ### Vue Data Loader
 
-The template includes a `useJsBaoDataLoader` composable that handles subscriptions, document readiness, and reactive query parameters:
+For components, the template includes a `useJsBaoDataLoader` composable that wraps the subscription above and also handles document readiness and reactive query parameters:
 
 ```typescript
 const { data, initialDataLoaded } = useJsBaoDataLoader<{
@@ -343,6 +348,45 @@ const { data, initialDataLoaded } = useJsBaoDataLoader<{
 ```
 
 Use `PrimitiveLoadingGate` in your template to show loading state until `initialDataLoaded` is true.
+
+::: warning useJsBaoDataLoader is component-only
+`useJsBaoDataLoader` registers its subscriptions in Vue's `onMounted` hook, which runs only inside mounted components. If you call it from a **Pinia store** or any other non-component context, it will load data once but never react to later changes. For those cases, subscribe directly instead (next section).
+:::
+
+### Subscribing in a Pinia store
+
+When the source of truth for some data lives in a store rather than a component, set up the subscription yourself with `Model.subscribe()` in the store's `setup()` function, and keep the unsubscribe handle:
+
+```typescript
+import { defineStore } from "pinia";
+import { ref } from "vue";
+import { Task } from "@/models";
+
+export const useTasksStore = defineStore("tasks", () => {
+  const tasks = ref<Task[]>([]);
+  let unsubscribe: (() => void) | null = null;
+
+  async function reload() {
+    const result = await Task.query({ completed: false }, { sort: { priority: -1 } });
+    tasks.value = result.data as Task[];
+  }
+
+  function start() {
+    if (unsubscribe) return;            // don't subscribe twice
+    unsubscribe = Task.subscribe(reload); // reacts to every Task change
+    void reload();                        // initial load
+  }
+
+  function stop() {
+    unsubscribe?.();
+    unsubscribe = null;
+  }
+
+  return { tasks, reload, start, stop };
+});
+```
+
+Call `start()` once the relevant documents are open (e.g. after login) and `stop()` when tearing down (e.g. on logout).
 
 ## Sharing Documents
 

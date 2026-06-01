@@ -680,7 +680,9 @@ Only one stringset facet field is allowed per aggregation. To check membership o
 
 ### useJsBaoDataLoader Pattern
 
-`useJsBaoDataLoader` is a composable provided by the primitive library that centralizes data loading for a component. It handles four key concerns:
+`useJsBaoDataLoader` is a composable provided by the primitive library that centralizes data loading for a component. **It is component-only**: it registers its model subscriptions and document-event listeners inside `onMounted`, which fires only for mounted Vue components. Calling it from a Pinia store's `setup()`, a router guard, or any other non-component context will load data once but **never react to subsequent changes** — the `onMounted` callback never runs there, so no subscriptions are registered. For those contexts, subscribe directly (see [Subscribing Outside a Component](#subscribing-outside-a-component) below).
+
+It handles four key concerns:
 
 1. **Waiting for documents to be ready** - The `documentReady` ref/computed tells the loader when all required documents have been opened. Queries won't run until `documentReady` is true, preventing errors from querying before documents are available.
 
@@ -727,6 +729,53 @@ const {
 - For side effects after load (like redirects), watch `initialDataLoaded` and act when it becomes true.
 - For sequences of mutations (save/delete/reorder), set `pauseUpdates` while mutating, then call `reload()` afterward to avoid flicker.
 
+### Subscribing Outside a Component
+
+`useJsBaoDataLoader` is the right tool inside a component. Outside one — a **Pinia store**, a singleton service, a router guard — do not reach for it: its `onMounted`-based subscriptions never register there, so reactive updates silently never fire.
+
+`Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle. It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). Wire it up directly in the store's `setup()` and keep the unsubscribe handle so you can tear it down:
+
+```typescript
+// stores/tasksStore.ts
+import { defineStore } from "pinia";
+import { ref } from "vue";
+import { Task } from "@/models";
+
+export const useTasksStore = defineStore("tasks", () => {
+  const tasks = ref<Task[]>([]);
+  let unsubscribe: (() => void) | null = null;
+
+  async function reload() {
+    const result = await Task.query({ completed: false }, { sort: { priority: -1 } });
+    tasks.value = result.data as Task[];
+  }
+
+  function start() {
+    if (unsubscribe) return;            // idempotent — don't double-subscribe
+    unsubscribe = Task.subscribe(reload); // fires on every Task change, in any context
+    void reload();                        // initial load
+  }
+
+  function stop() {
+    unsubscribe?.();
+    unsubscribe = null;
+  }
+
+  return { tasks, reload, start, stop };
+});
+```
+
+Call `start()` once when the store first comes into use (e.g. after login / first document open) and `stop()` when tearing down (e.g. on logout) to release the listener.
+
+Rules:
+
+- Make `subscribe` setup **idempotent** — guard with the stored unsubscribe handle so re-entry doesn't stack duplicate listeners that each trigger a reload.
+- Always keep and eventually call the unsubscribe function; an orphaned listener leaks and keeps reloading after the store is no longer needed.
+- The callback receives no arguments — re-run your query inside it; don't expect a changed-record payload.
+- Subscribe only after the relevant documents are open, or your initial `reload()` may query before data is available.
+
+This is the same `Model.subscribe()` that `useJsBaoDataLoader` calls internally — you are just registering it in a place that doesn't depend on `onMounted`.
+
 ## Saving Data
 
 ### Save to a Specific Document (when creating new objects)
@@ -755,12 +804,40 @@ todo.save();              // missing await
 router.push("/done");
 
 // DON'T: try to spread/clone a model object — instances are not POJOs.
-const copy = { ...todo }; // loses reactivity, getters, save method
-const copy2 = JSON.parse(JSON.stringify(todo)); // also broken
+const copy = { ...todo }; // drops every field; see "Model Instances Are Not Plain Objects"
 
-// DO: read fields directly, or call .toJSON() if defined.
+// DO: read fields directly into a plain object when you need a snapshot.
 const snapshot = { id: todo.id, title: todo.title, completed: todo.completed };
 ```
+
+### Model Instances Are Not Plain Objects
+
+A model instance is **not** a POJO, and you cannot spread or clone it. Each declared field is a getter/setter defined on the class **prototype** (backed internally by copy-on-write change tracking over the document's Yjs state) — *not* an own enumerable property on the instance. JavaScript's spread and rest operators only copy *own enumerable properties*, so they never invoke those getters and the field data is silently dropped.
+
+```typescript
+// ❌ All of these lose the model's field data — they do NOT throw, they just produce empty/partial objects:
+const copy            = { ...task };              // field data gone
+const { id, ...rest } = task;                     // `rest` is empty-ish
+const updated         = { ...task, done: true };  // task's other fields are gone
+await Message.create({ ...task });                // fields don't come along
+```
+
+There is no public `.attrs` bag and no public `.toJSON()` to spread either. To move a model's data into a plain object, read the fields you need explicitly:
+
+```typescript
+// ✅ Snapshot for serialization, an integration call, or structuredClone:
+const snapshot = { id: task.id, title: task.title, done: task.done, priority: task.priority };
+
+// ✅ Duplicate into a new record — list the fields; don't spread the source instance.
+const dup = new Task({ title: task.title, priority: task.priority });
+await dup.save({ targetDocument: docId });
+
+// ✅ Mutate in place, then save — no copy needed.
+task.done = true;
+await task.save();
+```
+
+Note the direction: constructors (`new Task({...})`), `save()`, and `query`/`find` filters all accept plain objects, so spreading a *plain object* into them is fine. Spread only fails when the **source** of the spread is a model instance.
 
 ### Choosing How to Target Documents for Saves
 
@@ -1286,7 +1363,8 @@ Export creates a directory per document containing `metadata.json`, `document.yj
 | ----------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | Need document from item                         | N/A                                                                      | Use `item.getDocumentId()`                                                                           |
 | Data doesn't update when route param changes    | Vue reuses components; `useJsBaoDataLoader` doesn't see the change       | Add the route param to `queryParams` in the data loader, OR use `:key="routeParam"` on the component |
-| Spread object missing data or reactivity broken | js-bao model objects don't support JavaScript spreading (`{ ...model }`) | Access properties directly or use explicit property copying: `{ id: model.id, title: model.title }`  |
+| Store loads once but never reacts to changes    | `useJsBaoDataLoader` called outside a component — its `onMounted` subscriptions never register | In a Pinia store / non-component context call `Model.subscribe(reload)` directly in `setup()`. See [Subscribing Outside a Component](#subscribing-outside-a-component) |
+| Spread/clone of a model is empty or missing fields | Fields are prototype getters, not own properties, so `{ ...model }` / `{ id, ...rest }` copy nothing | Read fields explicitly: `{ id: model.id, title: model.title }`. See [Model Instances Are Not Plain Objects](#model-instances-are-not-plain-objects) |
 | Query `field: false` misses items               | Items with `field: undefined` don't match `field: false`                 | Use a default value in schema, OR filter in JavaScript with `item.field ?? false`                    |
 | Document created but not in sidebar/list        | Created via `documents.create()` directly without updating tracked state | Use the demo `jsBaoDocumentsStore.createDocument()` (or your own tracker) so reactive lists update   |
 | HTTP 400 when sharing with email                | Missing `documentUrl` in invitation                                       | Pass `invite-url-template` prop to `PrimitiveShareDocumentDialog`                                    |
