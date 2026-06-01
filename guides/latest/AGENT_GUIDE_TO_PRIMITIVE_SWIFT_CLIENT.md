@@ -56,14 +56,11 @@ The single most common way to write wrong-but-compiling Swift against Primitive 
 | `@Published var items: [T]` + manual `refresh()` after every mutation | `BaoDataLoader<[T]>` bound with `.onModelChange(typedModel)` | The loader owns the subscription lifecycle, debounces reloads, and re-fetches on local **and** remote writes via one trigger. The `@Published` + refresh pattern silently drifts whenever you add a mutation site and forget to call `refresh()`. |
 | Combine sink on `appState.$isConnected` to run post-connect setup | `override func connectClient() async { await super.connectClient(); … }` | `connectClient()` is `open` — override it and call super. The Combine sink is the workaround you reach for when you forget that. |
 | `createDocument` then `openDocument` then start writing | `createDocument(options:)` returns `(documentId, doc: YDocument?)` — start writing on the returned doc | Local-first: the returned YDocument is writable immediately, the server commit happens in the background. Re-opening with `.network` blocks ~15s on a freshly-created empty doc waiting for a sync event that never has anything to deliver. |
-| `documents.list()` + filter by tag for a per-user singleton | `documents.getOrCreateWithAlias(...)` keyed by `scope: "user"` | Aliases were built for singletons; tag-filtering is fragile (the doc may not have the tag you assume, or may be filtered out for permission reasons). |
-| `me.ownedDocuments(tag:)` + `me.sharedDocuments(tag:)` + manual merge for "every doc I can read" | `me.accessibleDocumentSummaries(tag:)` → `[DocumentSummary]` | One call, dedupes by `documentId`, merges owned + shared. The typed `*Summaries` form decodes the `{ items: [...] }` envelope + `_origin` for you (`DocumentSummary.isOwned`); the raw `accessibleDocuments(tag:)` hands back `[String: Any]` you'd parse by hand. |
-| Hand-parsing `getPermissions` / `getAccess` / `listPendingInvitations` / `accessibleDocuments` / `collections.list` dicts (`result["items"]`, guessing `permission` vs `role`) | the typed `*Summaries` wrappers (`permissionSummaries`, `accessSummary`, `pendingInvitationSummaries`, `accessibleDocumentSummaries`, `listSummaries`) | Every read endpoint that returns `[String: Any]` has a typed companion in `PrimitiveApp` (TypedReadSummaries) with a server-verified field contract. See the **Sharing** section. |
+| `documents.list()` (deprecated) + filter by tag for a per-user singleton | `documents.getOrCreateWithAlias(...)` keyed by `scope: "user"` | Aliases were built for singletons; tag-filtering is fragile (the doc may not have the tag you assume, or may be filtered out for permission reasons). |
+| `me.ownedDocuments(tag:)` + `me.sharedDocuments(tag:)` + a hand-rolled merge for "every doc I can read" | `me.accessibleDocumentSummaries(tag:)` → `[DocumentSummary]` | Does the owned + shared merge for you and returns typed rows carrying `_origin` (`DocumentSummary.isOwned`). It's a `PrimitiveApp` app-level wrapper — the old `me.accessibleDocuments` client method was removed to keep the Swift client 1:1 with the JS client, so this wrapper is the path. |
+| Hand-parsing `getPermissions` / `getAccess` / `listPendingInvitations` / `collections.list` dicts (`result["items"]`, guessing `permission` vs `role`) | the typed `*Summaries` wrappers (`permissionSummaries`, `accessSummary`, `pendingInvitationSummaries`, `accessibleDocumentSummaries`, `listSummaries`) | Every read endpoint that returns `[String: Any]` has a typed companion in `PrimitiveApp` (TypedReadSummaries) with a server-verified field contract. See the **Sharing** section. |
 | `selectDocumentAwaiting(_:)` for a per-item detail view in a multi-doc app | `appState.openAuxiliaryDoc(_:modelType:)` from `.task`, `appState.closeAuxiliaryDoc(_:)` from `.onDisappear` | `selectDocumentAwaiting` closes the previously-selected doc, so using it for a per-item detail view closes your library/index doc. Use the auxiliary helpers when there's an ambient doc + N transient docs. |
 | Subscribe to `.documentMetadataChanged` and filter on `action == "deleted"` in detail views | Subscribe to `.documentDeleted` directly | Derived event with the same trigger but no payload-filter boilerplate. |
-| Raw `documents.updatePermissions(documentId:params:[String: Any])` for the common email-share | `documents.invite(documentId:email:permission:sendEmail:)` (pass `sendEmail: false`, or `sendEmail: true` with a `documentUrl`) | Typed shape, doesn't require knowing the key vocabulary. Returns the same dict so the response shape stays uniform. |
-| Raw `collections.addMember(collectionId:params:)` for the common email-invite | `collections.invite(collectionId:email:permission:sendEmail:)` (pass `sendEmail: false`) | Same reason. |
-| Hand-rolled "list pending → find by email → revoke" for cancelling a collection invite | `collections.cancelPendingInvitation(collectionId:email:)` | One call, returns `Bool` (`false` = no pending invite matched, e.g. already accepted). |
 | `List(loader.data ?? []) { … }` for view-data binding | `switch loader.phase { case .loading: …; .empty: …; .loaded(let d): … }` | `?? []` collapses "not yet loaded" with "loaded, no items" — empty-state placeholders flash for ~50ms on every appearance. `LoaderPhase` makes the bug unreachable. |
 
 When in doubt: `primitive guides get swift-client` (or read this guide) and search for the shape you want. Every section has a *"Pick the right helper"* card at the top.
@@ -113,7 +110,7 @@ struct ContentView: View {
 ## Scaffolding a New App
 
 ```bash
-primitive init my-app --platform apple
+primitive init my-app --platform ios
 ```
 
 This:
@@ -567,7 +564,7 @@ Under the loader, reads are **synchronous** against the local CRDT — no `async
 ```swift
 todos.find("todo_123")                                  // -> TodoItem?
 todos.findAll()                                         // -> [TodoItem]
-todos.filter { !$0.completed }                           // -> [TodoItem]
+todos.findAll().filter { !$0.completed }                 // -> [TodoItem] (in-memory)
 todos.query(["completed": false])                       // MongoDB-style predicate
 todos.query(
     ["completed": false],
@@ -667,7 +664,7 @@ try await client.documents.aliases.set(
 Same shape on both surfaces: invite by email, list members, list pending invites, cancel an invite. Email-targeted invites route through the unified **deferred-grant** flow — if the email already corresponds to an app user the grant lands as a live permission; otherwise it sits as a `DeferredDocumentPermission` / `DeferredGroupAdd` row that resolves the moment that user signs up. Same `inviteToken` works across the signup boundary.
 
 > **Member invitations are admin-only by default — a non-admin user's invites
-> silently 403.** Inviting (`documents.invite`, `collections.invite`,
+> silently 403.** Inviting (`documents.updatePermissions`, `collections.addMember`,
 > `invitations.create`) requires the caller to be an app **admin/owner** *unless*
 > the app has `memberInvitationsEnabled = true`. A regular "member" calling any
 > invite path gets `403` with `HttpError.serverCode == "MEMBER_INVITATIONS_DISABLED"`
@@ -687,17 +684,17 @@ Same shape on both surfaces: invite by email, list members, list pending invites
 
 | Shape | Use |
 |---|---|
-| Invite an email to a single document | `client.documents.invite(documentId:email:permission:sendEmail:)` — pass `sendEmail: false`, or `sendEmail: true` **with** a `documentUrl` |
-| Invite an email to a collection (cascades to all docs in it) | `client.collections.invite(collectionId:email:permission:sendEmail:)` — pass `sendEmail: false` |
-| Add a known user (by id) directly | `client.collections.addMember(collectionId:userId:permission:)` |
+| Invite an email to a single document | `client.documents.updatePermissions(documentId:, params: ["email": …, "permission": …, "sendEmail": false])` — add `"documentUrl"` when `sendEmail: true` |
+| Invite an email to a collection (cascades to all docs in it) | `client.collections.addMember(collectionId:, params: ["email": …, "permission": …, "sendEmail": false])` |
+| Add a known user (by id) directly | `client.collections.addMember(collectionId:, params: ["userId": …, "permission": …])` |
 | List live members of a document | `client.documents.permissionSummaries(documentId:)` → `[PermissionEntry]` (raw: `getPermissions`) |
 | List pending email invites on a document | `client.documents.pendingInvitationSummaries(documentId:)` → `[PendingInvitation]` (raw: `listPendingInvitations`) |
 | List live members + pending invites of a collection | `client.collections.accessSummary(collectionId:)` → `CollectionAccess` / `pendingInvitationSummaries(collectionId:)` |
 | Remove a member from a document (by email or userId) | `client.documents.removePermission(documentId:email:)` / `(userId:)` |
 | Remove a member from a collection (by userId) | `client.collections.removeMember(collectionId:userId:)` |
-| Cancel a pending email invite on a collection | `client.collections.cancelPendingInvitation(collectionId:email:)` |
+| Cancel a pending email invite on a collection | list with `pendingInvitationSummaries(collectionId:)`, grab the row's `deferredId`, then `client.invitations.revokeDeferredGrant(deferredId:, type: "group")` |
 
-Avoid the raw `[String: Any]` overloads (`updatePermissions(documentId:params:)`, `addMember(collectionId:params:)`) unless you genuinely need a key not exposed by the typed wrapper. The wrappers exist precisely because the raw shape's contract is opaque from Swift.
+For **reads**, prefer the typed `*Summaries` wrappers above over hand-parsing the raw `[String: Any]`. For **writes** (invite / add a member), the params-dict methods `updatePermissions(documentId:params:)` / `addMember(collectionId:params:)` are the path — you pass the documented keys directly (`email`, `permission`, `sendEmail`, `documentUrl`). The typed `invite(...)` / `cancelPendingInvitation(...)` convenience wrappers were removed to keep the Swift client 1:1 with the JS client.
 
 > **The read endpoints return raw `[String: Any]` — but a typed `*Summaries`
 > companion exists for each; prefer it.** Don't hand-parse `result["items"]`
@@ -708,24 +705,23 @@ Avoid the raw `[String: Any]` overloads (`updatePermissions(documentId:params:)`
 >
 > | Raw read | Typed companion | Returns |
 > |---|---|---|
-> | `me.accessibleDocuments(tag:)` | `me.accessibleDocumentSummaries(tag:)` | `[DocumentSummary]` (`.isOwned`, `.title`, `.tags`) |
+> | `me.ownedDocuments` + `me.sharedDocuments` | `me.accessibleDocumentSummaries(tag:)` | `[DocumentSummary]` (`.isOwned`, `.title`, `.tags`) — the wrapper does the owned+shared merge for you |
 > | `collections.list(options:)` | `collections.listSummaries(options:)` | `[CollectionSummary]` |
 > | `collections.listDocuments(_:)` | `collections.listDocumentSummaries(_:)` | `[DocumentSummary]` |
 > | `documents.getPermissions(_:)` | `documents.permissionSummaries(_:)` | `[PermissionEntry]` (`email`/`name` resolved) |
 > | `collections.getAccess(_:)` | `collections.accessSummary(_:)` | `CollectionAccess` (`.members: [MemberAccess]` — userId + permission only, **no** email/name) |
 > | `documents`/`collections.listPendingInvitations(_:)` | `…pendingInvitationSummaries(_:)` | `[PendingInvitation]` |
 >
-> The raw methods stay for edge cases; reach for `*Summaries` by default.
+> Reach for `*Summaries` by default. (`accessibleDocumentSummaries` has no raw single-call equivalent — the `me.accessibleDocuments` convenience method was removed; the wrapper is the way to get the merged owned+shared set.)
 
 ### Canonical: invite an email
 
-> **`sendEmail` defaults to `true`, and a `true` `sendEmail` REQUIRES a
-> `documentUrl`.** Omit both and the call fails at runtime with
-> `documentUrl is required when sendEmail is true`. Pick one of the two shapes
-> below — don't call `invite(documentId:email:permission:)` with no third
-> argument. (`collections.invite` takes `sendEmail` too but has **no**
-> `documentUrl` parameter, so a collection invite that sends email isn't wired
-> yet — pass `sendEmail: false`.)
+> **If `sendEmail` is `true`, you MUST also pass `documentUrl`.** The server
+> rejects an email-sending invite with no link (`documentUrl is required when
+> sendEmail is true`). For apps without a web deep-link, pass `sendEmail: false`
+> — the deferred grant still lands; the invitee gets access the moment they sign
+> in with this email. For collections, `documentUrl` isn't supported, so a
+> collection invite that sends email isn't wired yet — pass `sendEmail: false`.
 
 ```swift
 // Single document.
@@ -734,32 +730,37 @@ Avoid the raw `[String: Any]` overloads (`updatePermissions(documentId:params:)`
 // without a web deep-link). The deferred grant still lands; the invitee gets
 // access the moment they sign in with this email, and shows up under
 // `listPendingInvitations` until then.
-_ = try await client.documents.invite(
+_ = try await client.documents.updatePermissions(
     documentId: listDocId,
-    email: "friend@example.com",
-    permission: .readWrite,
-    sendEmail: false
+    params: [
+        "email": "friend@example.com",
+        "permission": "read-write",
+        "sendEmail": false,
+    ]
 )
 
 // Shape 2 — send the notification email. Requires a `documentUrl`: the link
 // the email points at (your app's universal link / web route to the doc).
-_ = try await client.documents.invite(
+_ = try await client.documents.updatePermissions(
     documentId: listDocId,
-    email: "friend@example.com",
-    permission: .readWrite,
-    sendEmail: true,
-    documentUrl: "https://yourapp.example.com/d/\(listDocId)"
+    params: [
+        "email": "friend@example.com",
+        "permission": "read-write",
+        "sendEmail": true,
+        "documentUrl": "https://yourapp.example.com/d/\(listDocId)",
+    ]
 )
 
 // Collection cascade — friend gets access to every doc in the collection,
-// and any doc added to the collection later inherits the grant. `sendEmail`
-// defaults to `true` here too; pass `sendEmail: false` (no `documentUrl`
-// param exists on this overload).
-_ = try await client.collections.invite(
+// and any doc added to the collection later inherits the grant. No
+// `documentUrl` on this path, so pass `sendEmail: false`.
+_ = try await client.collections.addMember(
     collectionId: collectionId,
-    email: "friend@example.com",
-    permission: .reader,
-    sendEmail: false
+    params: [
+        "email": "friend@example.com",
+        "permission": "reader",
+        "sendEmail": false,
+    ]
 )
 ```
 
@@ -796,16 +797,20 @@ let access = try await client.collections.accessSummary(collectionId: cid)
 let collMembers = access.members
 let collPending = try await client.collections.pendingInvitationSummaries(collectionId: cid)
 
-// Revoke:
+// Revoke a live member:
 _ = try await client.collections.removeMember(collectionId: cid, userId: someUserId)
-let cancelled = try await client.collections.cancelPendingInvitation(
-    collectionId: cid,
-    email: "friend@example.com"
-)
-// `cancelled == false` if no pending invite for that email exists.
+
+// Cancel a pending (not-yet-accepted) email invite: find its deferred grant
+// by email, then revoke it. (There's no one-call helper — the old
+// `cancelPendingInvitation` wrapper was removed to keep parity with the JS
+// client.)
+if let row = collPending.first(where: { $0.email == "friend@example.com" }),
+   let deferredId = row.deferredId {
+    _ = try await client.invitations.revokeDeferredGrant(deferredId: deferredId, type: "group")
+}
 ```
 
-`cancelPendingInvitation` wraps the two-step "list pending → find by email → delete deferred grant" dance internally — under the hood it calls the global `DELETE /deferred-grants/:id?type=group` verb.
+`revokeDeferredGrant(deferredId:type:)` hits the global `DELETE /deferred-grants/:id?type=group` verb (`type: "document"` for a per-document pending invite, `"group"` for a collection one).
 
 ### Watching for permission changes / access loss
 
@@ -836,7 +841,7 @@ Collections are server-side folders that cascade permissions to every document t
 
 | Shape | Use |
 |---|---|
-| Create a named collection | `client.collections.create(name:description:)` |
+| Create a named collection | `client.collections.create(params: ["name": …, "description": …])` |
 | List collections the user can see | `client.collections.listSummaries(options:)` → `[CollectionSummary]` (raw: `list`) |
 | Get a collection's metadata | `client.collections.get(collectionId:)` |
 | Rename / change metadata | `client.collections.update(collectionId:params:)` |
@@ -1400,9 +1405,9 @@ When sharing / unsharing / collection changes happen, run a single reconcile pas
 
 Idempotent, convergent (one pass reaches the right state from any starting state), atomic (single-collection failures bail the whole pass — no half-applied state). Because refs are keyed by the entity id, the create/update step is a plain upsert and the prune is `where !serverIds.contains(ref.id)` — no keep-first dedup defense, and a double-run can't duplicate. (Pruning by `ref.id` also sweeps out any legacy random-UUID rows on the first pass after adopting this keying.)
 
-> **Guard freshly-created docs from the prune.** `createDocument(...)` is local-first: it returns a `documentId` immediately but commits to the server in the background, so a doc you just created is **not yet** in `me.accessibleDocuments` / `documents.list`. If a reconcile fires in that window (pull-to-refresh, foreground), step 3's prune (`where !serverIds.contains(ref.id)`) will **delete the brand-new ref** and the item vanishes from the UI until the commit lands and a later reconcile re-adds it. The guide's tombstone pattern covers the *delete*-then-recreate race; this is the inverse *create*-then-prune race. Fix: track locally-created ids in a `pendingCreateIds: Set<String>` (add on create, remove once the id shows up in the server set) and exclude them from the prune: `where !serverIds.contains(ref.id) && !pendingCreateIds.contains(ref.id)`.
+> **Guard freshly-created docs from the prune.** `createDocument(...)` is local-first: it returns a `documentId` immediately but commits to the server in the background, so a doc you just created is **not yet** in `me.accessibleDocumentSummaries` (or `me.ownedDocuments`). If a reconcile fires in that window (pull-to-refresh, foreground), step 3's prune (`where !serverIds.contains(ref.id)`) will **delete the brand-new ref** and the item vanishes from the UI until the commit lands and a later reconcile re-adds it. The guide's tombstone pattern covers the *delete*-then-recreate race; this is the inverse *create*-then-prune race. Fix: track locally-created ids in a `pendingCreateIds: Set<String>` (add on create, remove once the id shows up in the server set) and exclude them from the prune: `where !serverIds.contains(ref.id) && !pendingCreateIds.contains(ref.id)`.
 
-**These list endpoints are NOT reactive — trigger reconcile explicitly.** Unlike a `TypedModel` read on an open document (where `.onModelChange` re-fires on local *and* remote writes), `me.accessibleDocuments`, `collections.list`, `documents.getPermissions`, and the invitation reads are plain server queries with no change feed. (Read them through the typed `*Summaries` wrappers — `accessibleDocumentSummaries`, `listSummaries`, `permissionSummaries`, … — see **Sharing**; the raw dict form is never the right default.) When someone shares a doc or collection *with* the user, nothing on the user's open documents changes, so no event fires and the home/list screen won't update on its own. Run reconcile on the triggers you control:
+**These list endpoints are NOT reactive — trigger reconcile explicitly.** Unlike a `TypedModel` read on an open document (where `.onModelChange` re-fires on local *and* remote writes), `me.accessibleDocumentSummaries`, `collections.list`, `documents.getPermissions`, and the invitation reads are plain server queries with no change feed. (Read them through the typed `*Summaries` wrappers — `accessibleDocumentSummaries`, `listSummaries`, `permissionSummaries`, … — see **Sharing**; the raw dict form is never the right default.) When someone shares a doc or collection *with* the user, nothing on the user's open documents changes, so no event fires and the home/list screen won't update on its own. Run reconcile on the triggers you control:
 
 - App launch / `connectClient`.
 - Foreground: `.onChange(of: scenePhase)` → `.active`.
@@ -1430,8 +1435,8 @@ Before declaring Swift code complete:
 - [ ] Multi-doc app: per-item detail views use `appState.openAuxiliaryDoc(_:modelType:)` / `closeAuxiliaryDoc(_:)` — NOT `selectDocumentAwaiting(_:)` (which closes the ambient library doc).
 - [ ] Index/pointer refs (`*Ref` mirroring a server document/collection) set `id` to the entity id — NOT a random `UUID()` — so create is an idempotent upsert and reconcile can't duplicate rows.
 - [ ] Fresh-doc creation that immediately writes uses `createDocument(options:)` and its returned YDocument — NOT `createWithAlias` + `openDocument(.network)` (which can park 15s on an empty doc).
-- [ ] Email-based sharing uses `documents.invite(...)` / `collections.invite(...)` — NOT the raw `[String: Any]` overloads.
-- [ ] Reconcile "every doc I can read" with `me.accessibleDocumentSummaries(tag:)` (typed) — NOT manual merge of `ownedDocuments` + `sharedDocuments`, and NOT hand-parsing the raw `accessibleDocuments` dict.
+- [ ] Email-based sharing uses `documents.updatePermissions(documentId:params:)` / `collections.addMember(collectionId:params:)` with the documented keys (`email`, `permission`, `sendEmail`, `documentUrl`).
+- [ ] Reconcile "every doc I can read" with `me.accessibleDocumentSummaries(tag:)` (typed; does the owned + shared merge for you) — NOT a hand-rolled merge of `ownedDocuments` + `sharedDocuments`.
 - [ ] Sharing/permission/collection reads use the typed `*Summaries` wrappers (`permissionSummaries`, `accessSummary`, `pendingInvitationSummaries`, `listSummaries`) — NOT raw `getPermissions` / `getAccess` / `result["items"]` dict parsing.
 - [ ] Detail views subscribe to `.documentDeleted` to pop on delete/revoke — NOT `.documentMetadataChanged` filtered by `action == "deleted"`.
 

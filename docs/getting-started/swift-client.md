@@ -2,16 +2,7 @@
 
 The Primitive Swift client is a SwiftUI-first port of the JavaScript stack. You get the same `JsBaoClient` surface (documents, blobs, workflows, collections, events, auth) plus a `PrimitiveApp` library that owns the client lifecycle and ships ready-made views for sign-in, profile, and connection status.
 
-This page walks you from `primitive init --platform apple` through a working app, then into data modeling, the API surface, and shipping.
-
-::: tip One scaffold, two platform tracks
-`primitive init --platform apple` produces a **single multi-platform project** (`project.yml` declares one target with `platform: [iOS, macOS]`). But iOS and macOS build, run, and ship through **different toolchains**, so this guide splits at each fork:
-
-- **iOS** — Xcode + [xcodegen](https://github.com/yonsm/XcodeGen) (`*.xcodeproj`), run with `./run-ios.sh`, codegen invoked manually, ship with Fastlane `platform :ios`.
-- **macOS** — SwiftPM (`swift build`), run with `./run.sh`, codegen via the automatic SPM plugin, ship with Fastlane `platform :mac`.
-
-Everything else — scaffolding, the app skeleton, data modeling, the API surface — is shared. Look for the **iOS** / **macOS** track markers in the Run, codegen, and Shipping sections.
-:::
+This page walks you from `primitive init --platform ios` through a working app, then into data modeling, the API surface, and shipping.
 
 ::: tip Prerequisites
 - Xcode 15+ (iOS 17 / macOS 14 minimum deployment).
@@ -22,12 +13,12 @@ Everything else — scaffolding, the app skeleton, data modeling, the API surfac
 ## 1. Scaffold the App
 
 ```bash
-primitive init my-app --platform apple
+primitive init my-app --platform ios
 ```
 
 This will:
 
-1. Download the Apple SwiftUI template.
+1. Download the iOS SwiftUI template.
 2. Prompt for an app name and create it on the Primitive server (or accept an existing app with `--use-existing-app-id`).
 3. Write `primitive.json` with your `appId` and `serverUrl`.
 4. Resolve Swift packages with `swift package resolve`.
@@ -172,7 +163,7 @@ struct ContentView: View {
 Define your models in a single `schema.toml`, run `swift-bao-codegen` at build time, and consume the generated `PrimitiveModel` types through `TypedModel<T>`. This replaces the older hand-rolled `BaoModelRecord` / `BaoModel<T>` path — the schema is the single source of truth for field names, Swift types, and wire format, so drift between the layers can't happen.
 
 ::: warning Template scaffolding
-`primitive init --platform apple` doesn't currently wire codegen for you. The steps below add it once (TOML, build script, `project.yml` hook); after that, every TOML edit regenerates the Swift records on the next build.
+`primitive init --platform ios` doesn't currently wire codegen for you. The steps below add it once (TOML, build script, `project.yml` hook); after that, every TOML edit regenerates the Swift records on the next build.
 :::
 
 ### 4a. Author the schema
@@ -404,7 +395,7 @@ Under the loader, reads are **synchronous** against the local CRDT — no async/
 ```swift
 tasks.find("task_123")                                  // -> TaskRecord?
 tasks.findAll()                                         // -> [TaskRecord]
-tasks.filter { !$0.completed }                           // -> [TaskRecord]
+tasks.findAll().filter { !$0.completed }                 // -> [TaskRecord] (in-memory)
 tasks.query(["completed": false])                       // MongoDB-style predicate
 tasks.query(
     ["completed": false],
