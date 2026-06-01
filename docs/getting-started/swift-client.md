@@ -2,7 +2,16 @@
 
 The Primitive Swift client is a SwiftUI-first port of the JavaScript stack. You get the same `JsBaoClient` surface (documents, blobs, workflows, collections, events, auth) plus a `PrimitiveApp` library that owns the client lifecycle and ships ready-made views for sign-in, profile, and connection status.
 
-This page walks you from `primitive init --platform apple` through a working app on simulator, device, and Mac, then into data modeling, the API surface, and shipping to TestFlight / App Store with Fastlane.
+This page walks you from `primitive init --platform apple` through a working app, then into data modeling, the API surface, and shipping.
+
+::: tip One scaffold, two platform tracks
+`primitive init --platform apple` produces a **single multi-platform project** (`project.yml` declares one target with `platform: [iOS, macOS]`). But iOS and macOS build, run, and ship through **different toolchains**, so this guide splits at each fork:
+
+- **iOS** — Xcode + [xcodegen](https://github.com/yonsm/XcodeGen) (`*.xcodeproj`), run with `./run-ios.sh`, codegen invoked manually, ship with Fastlane `platform :ios`.
+- **macOS** — SwiftPM (`swift build`), run with `./run.sh`, codegen via the automatic SPM plugin, ship with Fastlane `platform :mac`.
+
+Everything else — scaffolding, the app skeleton, data modeling, the API surface — is shared. Look for the **iOS** / **macOS** track markers in the Run, codegen, and Shipping sections.
+:::
 
 ::: tip Prerequisites
 - Xcode 15+ (iOS 17 / macOS 14 minimum deployment).
@@ -49,7 +58,13 @@ my-app/
 
 ## 2. Run It
 
-### iOS Simulator (default — fastest loop)
+The scaffold is one multi-platform target, but the two platforms build through different toolchains. Pick your track.
+
+### iOS track
+
+iOS builds go through **Xcode + xcodegen**. `run-ios.sh` regenerates the `*.xcodeproj` (so new Swift files get picked up), builds the iOS scheme, and installs to a simulator or device.
+
+**Simulator (default — fastest loop):**
 
 ```bash
 ./run-ios.sh
@@ -64,7 +79,7 @@ The script:
 
 No code signing required — simulator builds run unsigned.
 
-### Physical iPhone / iPad
+**Physical iPhone / iPad:**
 
 ```bash
 ./run-ios.sh --device
@@ -77,9 +92,9 @@ You need:
 
 The script auto-picks the first paired device, builds with `-allowProvisioningUpdates` (so Xcode requests provisioning profiles for you), installs via `devicectl`, launches with `--console` so `print` and NSLog output stream to your terminal.
 
-### macOS
+### macOS track
 
-The template is a multi-platform target — the same scheme runs on Mac.
+macOS builds go through **SwiftPM** — the same multi-platform target's Mac scheme, no simulator and no provisioning for dev builds.
 
 ```bash
 ./run.sh
@@ -87,7 +102,11 @@ The template is a multi-platform target — the same scheme runs on Mac.
 
 This builds a real `.app` bundle (proper icon, Dock name, `Info.plist`) and `open`s it. Logs go to Console.app rather than the terminal — use `log stream --predicate 'subsystem BEGINSWITH "com.primitivelabs"'` if you want them in the shell.
 
+Because the Mac path is SwiftPM-driven, `swift build` / `swift test` also work directly against the package — handy for fast unit-test loops that don't need the app bundle.
+
 ### Signing and Team ID
+
+Applies to **both tracks** for anything beyond a dev build — iOS device / TestFlight / App Store, and notarized or Mac-App-Store macOS builds. Simulator and unsigned local macOS builds need no team ID.
 
 Simulator builds are happy unsigned. Anything else — physical device, TestFlight, App Store, notarized Mac build — needs a team ID.
 
@@ -185,10 +204,10 @@ One `[models.X]` block per record type. Supported `type` values: `id`, `string`,
 
 ### 4b. Wire the codegen build step
 
-There are two build paths and you need to handle both:
+Codegen wiring is where the two platform tracks diverge most sharply — you handle each path differently:
 
-- **SwiftPM** (`swift build`, `swift test`, macOS execution via `./run.sh`) — driven by `Package.swift`. SPM has a build plugin (`JsBaoCodegenPlugin`) shipped with swift-client that runs codegen automatically and feeds the output straight to the compiler.
-- **Xcode / iOS** (`./run-ios.sh`, archives, TestFlight) — driven by the `xcodegen`-generated `.xcodeproj`. The Xcode target compiles its source list from `.pbxproj` directly, so the SPM plugin **never fires** on this path. You run the codegen tool manually before `xcodegen generate` and let the output land in a gitignored `Models/Generated/` directory that xcodegen scans.
+- **macOS track — SwiftPM** (`swift build`, `swift test`, `./run.sh`): driven by `Package.swift`. The `JsBaoCodegenPlugin` build plugin shipped with swift-client runs codegen automatically and feeds the output straight to the compiler. Nothing to invoke by hand.
+- **iOS track — Xcode** (`./run-ios.sh`, archives, TestFlight): driven by the `xcodegen`-generated `.xcodeproj`. The Xcode target compiles its source list from `.pbxproj` directly, so the SPM plugin **never fires** on this path. You run the codegen tool manually before `xcodegen generate` and let the output land in a gitignored `Models/Generated/` directory that xcodegen scans.
 
 Both producers would otherwise emit the same files into the same SPM source list, so the target excludes the manual-output directory from SPM's view — the plugin is SPM's source of truth, the checked-in files are Xcode's.
 
@@ -543,6 +562,8 @@ The Swift client source is the ground truth. After `swift package resolve`, it's
 
 The Apple template doesn't include Fastlane by default — it's a few minutes to add and you get one-command builds to TestFlight, internal tester provisioning, and version bumping in the bargain.
 
+The setup (install, App Store Connect API key, app registration) is **shared across both tracks**; only the build lanes differ — `platform :ios` archives an `.ipa` against the iOS scheme, `platform :mac` archives a `.pkg` against the Mac scheme. The **iOS track** is shown in full below; the **[macOS track](#macos-track-shipping)** at the end lists the deltas.
+
 ### 6a. Install
 
 Add a `Gemfile` to your project root:
@@ -736,9 +757,41 @@ bundle exec fastlane ios release
 
 `upload_to_app_store` uploads the binary and submits it for review. The lane above sets `skip_metadata: true` and `skip_screenshots: true` — fill those in manually in App Store Connect (description, screenshots, keywords, age rating, privacy answers) before the build can actually be reviewed. Once metadata is complete and the build is processed, the review queue takes 24–72 hours typically.
 
-### macOS via TestFlight
+### macOS track (shipping) {#macos-track-shipping}
 
-Add a `platform :mac` block to the Fastfile, scheme `MyApp_macOS`, destination `generic/platform=macOS`, output a `.pkg`. The rest of the flow is identical. You'll also need a Mac App Store distribution profile (Automatic signing handles this when `DEVELOPMENT_TEAM` is set).
+Everything above (Gemfile, API key, `bump`, App Store Connect registration) is identical for Mac. The only difference is a `platform :mac` lane that targets the Mac scheme and exports a `.pkg` instead of an `.ipa`. Add this block to the same `fastlane/Fastfile`:
+
+```ruby
+platform :mac do
+  desc "Build and upload macOS app to TestFlight"
+  lane :beta do
+    api_key = load_api_key
+
+    build_app(
+      project: "MyApp.xcodeproj",
+      scheme: "MyApp_macOS",                 # the Mac scheme xcodegen emits from the multi-platform target
+      destination: "generic/platform=macOS",
+      export_method: "app-store",
+      export_options: { signingStyle: "automatic" },
+      xcargs: "-allowProvisioningUpdates",
+      output_directory: ".build/archives",
+      output_name: "MyApp-macOS.pkg",
+      clean: true,
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true,
+      skip_submission: true,
+    )
+  end
+end
+```
+
+Run it with `bundle exec fastlane mac beta`. Two macOS-specific notes:
+
+- **Add the macOS platform to the listing.** On the app's **App Information** page in App Store Connect, add macOS so the same app record accepts Mac builds (do this once, after the iOS app registration in step 6d).
+- **Distribution profile.** Mac App Store uploads need a Mac App Store distribution profile; Automatic signing provisions it for you when `DEVELOPMENT_TEAM` is set in `project.yml`.
 
 ## 7. What's Not in This Guide
 

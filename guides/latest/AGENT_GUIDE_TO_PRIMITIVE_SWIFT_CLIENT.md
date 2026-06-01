@@ -154,11 +154,16 @@ my-app/
 
 ### Run paths
 
-| Target | Command | Notes |
+One multi-platform target (`project.yml` declares `platform: [iOS, macOS]`), but two toolchains. The platform decides which path you take for running, codegen, and shipping:
+
+- **iOS track** — Xcode + xcodegen (`*.xcodeproj`), `run-ios.sh`, manual codegen, Fastlane `platform :ios`.
+- **macOS track** — SwiftPM (`swift build`), `run.sh`, automatic SPM-plugin codegen, Fastlane `platform :mac`.
+
+| Track | Command | Notes |
 |---|---|---|
 | iOS Simulator | `./run-ios.sh` | Auto-boots latest iPhone simulator if none running. Logs stream filtered to app + PrimitiveApp library. Pass `--verbose` for raw stream. |
-| Physical iPhone/iPad | `./run-ios.sh --device` | Requires paired device (`xcrun devicectl list devices`) + `DEVELOPMENT_TEAM` set in `project.yml`. Uses `-allowProvisioningUpdates`. |
-| macOS | `./run.sh` | Builds a real `.app` bundle and `open`s it. Logs go to Console.app, not the terminal. |
+| iOS device | `./run-ios.sh --device` | Requires paired device (`xcrun devicectl list devices`) + `DEVELOPMENT_TEAM` set in `project.yml`. Uses `-allowProvisioningUpdates`. |
+| macOS | `./run.sh` | SwiftPM build of a real `.app` bundle, then `open`s it. Logs go to Console.app, not the terminal. `swift build` / `swift test` also work directly on this track. |
 
 ### Signing setup (device / TestFlight / App Store)
 
@@ -331,8 +336,8 @@ Supported `type` values:
 
 Two build paths, both need wiring:
 
-- **SwiftPM** (`swift build`, `swift test`, `./run.sh` for macOS) — `JsBaoCodegenPlugin` from `swift-client` runs automatically and feeds output to the compiler.
-- **Xcode / iOS** (`./run-ios.sh`, archives, TestFlight) — Xcode compiles from `.pbxproj` directly, SPM plugin never fires. Invoke the codegen tool manually before `xcodegen generate`, write into a gitignored `Models/Generated/` so xcodegen scans it.
+- **macOS track — SwiftPM** (`swift build`, `swift test`, `./run.sh`) — `JsBaoCodegenPlugin` from `swift-client` runs automatically and feeds output to the compiler. Nothing manual.
+- **iOS track — Xcode** (`./run-ios.sh`, archives, TestFlight) — Xcode compiles from `.pbxproj` directly, SPM plugin never fires. Invoke the codegen tool manually before `xcodegen generate`, write into a gitignored `Models/Generated/` so xcodegen scans it.
 
 Both producers would emit the same files into the same SPM source list, so the SPM target excludes the manual-output directory.
 
@@ -1043,7 +1048,7 @@ When in doubt, the source is the ground truth. After `swift build` / `swift pack
 
 ## Shipping with Fastlane
 
-The Apple template doesn't include Fastlane by default. Standard setup:
+The Apple template doesn't include Fastlane by default. Setup (Gemfile, API key, app registration, `bump`) is shared across both tracks; only the build lane differs — **iOS track** archives an `.ipa` against the iOS scheme (`platform :ios`), **macOS track** archives a `.pkg` against the Mac scheme (`platform :mac`). iOS is shown in full; the macOS lane is the delta at the end.
 
 ### Install
 
@@ -1210,6 +1215,32 @@ bundle exec fastlane ios release
 ```
 
 `upload_to_app_store` uploads + submits for review. The lane skips metadata/screenshots — fill those in App Store Connect before submission can actually be reviewed.
+
+### macOS track (delta)
+
+Same Gemfile, API key, and `bump`. Add a `platform :mac` lane targeting the Mac scheme and exporting a `.pkg`:
+
+```ruby
+platform :mac do
+  lane :beta do
+    api_key = load_api_key
+    build_app(
+      project: "MyApp.xcodeproj",
+      scheme: "MyApp_macOS",                 # Mac scheme from the multi-platform target
+      destination: "generic/platform=macOS",
+      export_method: "app-store",
+      export_options: { signingStyle: "automatic" },
+      xcargs: "-allowProvisioningUpdates",
+      output_directory: ".build/archives",
+      output_name: "MyApp-macOS.pkg",
+      clean: true,
+    )
+    upload_to_testflight(api_key: api_key, skip_waiting_for_build_processing: true, skip_submission: true)
+  end
+end
+```
+
+Run `bundle exec fastlane mac beta`. Two macOS-only requirements: add the **macOS platform** to the app listing (App Information page, one-time), and ensure a **Mac App Store distribution profile** exists (Automatic signing provisions it when `DEVELOPMENT_TEAM` is set).
 
 ## Common Patterns
 
