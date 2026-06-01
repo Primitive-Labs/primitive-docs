@@ -661,6 +661,23 @@ try await client.documents.aliases.set(
 
 Same shape on both surfaces: invite by email, list members, list pending invites, cancel an invite. Email-targeted invites route through the unified **deferred-grant** flow — if the email already corresponds to an app user the grant lands as a live permission; otherwise it sits as a `DeferredDocumentPermission` / `DeferredGroupAdd` row that resolves the moment that user signs up. Same `inviteToken` works across the signup boundary.
 
+> **Member invitations are admin-only by default — a non-admin user's invites
+> silently 403.** Inviting (`documents.invite`, `collections.invite`,
+> `invitations.create`) requires the caller to be an app **admin/owner** *unless*
+> the app has `memberInvitationsEnabled = true`. A regular "member" calling any
+> invite path gets `403` with `HttpError.serverCode == "MEMBER_INVITATIONS_DISABLED"`
+> ("Regular (non-admin) users cannot invite users to this app"). This is the first
+> wall you hit shipping a share-by-email feature: in dev you're usually signed in as
+> a member, so the invite UI looks wired but **every send fails** — and the only
+> visible signal is the 403 in the network log unless you inspect the typed error.
+>
+> Three things to do:
+> 1. **Enable it on the app** (one-time, admin): `primitive apps update --member-invitations-enabled --member-invitation-limit 5` (sets `memberInvitationsEnabled` / `memberInvitationLimit`). Admins/owners are exempt from the quota.
+> 2. **Gate the invite UI on quota.** Before showing an invite button to a possibly-non-admin user, call `client.invitations.quota()` → `["used": …, "limit": …, "remaining": …, "unlimited": …]`. A member with member-invites off comes back `remaining: 0`, `unlimited: false` — hide the button instead of letting the send fail. Admins/owners always get `unlimited: true`.
+> 3. **Map the error.** `HttpError` carries a typed `serverCode` + `serverMessage` (see [Errors](#reading-the-swift-source)); switch on `serverCode == "MEMBER_INVITATIONS_DISABLED"` and surface product copy ("Sharing by invite isn't enabled for this app yet"), never the raw 403.
+>
+> Full server-side detail (quotas, the `MEMBER_INVITATIONS_DISABLED` / quota-exceeded codes, `invitations.create` for app-level invites) lives in the [Sharing & Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md).
+
 ### Pick the right helper
 
 | Shape | Use |
