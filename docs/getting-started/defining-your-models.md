@@ -176,6 +176,38 @@ const open = await Todo.query({ completed: false });
 
 The barrel runs `attachAndRegisterModel` for every model exactly once — that's why importing from `@/models` is essential. Importing directly from `Todo.generated.ts` skips registration, which fails at runtime with "Model not properly initialized" on the first save or query.
 
+## Working with Model Instances
+
+A model instance behaves like a normal object when you read and write individual fields:
+
+```typescript
+const todo = await Todo.find(id);
+console.log(todo.title);   // read
+todo.completed = true;     // write
+await todo.save();
+```
+
+But a model instance is **not** a plain object, and this trips people up: you cannot spread or clone it. Under the hood, each field is a getter/setter on the model's prototype rather than a value sitting directly on the instance, so the spread (`...`) and rest operators — which only copy a value's own properties — skip every field and quietly give you back an empty object.
+
+```typescript
+const copy = { ...todo };            // ❌ has none of todo's fields
+const { id, ...rest } = todo;        // ❌ `rest` is empty
+const next = { ...todo, done: true } // ❌ todo's other fields are lost
+```
+
+None of these throw — they just hand back partial data, which usually surfaces later as a confusing "missing field" bug. When you genuinely need a plain object — to serialize a record, send it to an integration, or copy it into a new record — read the fields you want explicitly:
+
+```typescript
+// Snapshot a record as a plain object
+const snapshot = { id: todo.id, title: todo.title, completed: todo.completed };
+
+// Duplicate into a new record — list the fields you want to carry over
+const dup = new Todo({ title: todo.title, priority: todo.priority });
+await dup.save({ targetDocument: documentId });
+```
+
+The reverse direction is fine: constructors, `save()`, and `query()` filters all take plain objects, so spreading a plain object *into* them works as expected. The pitfall is only when the model instance is the thing being spread.
+
 ## Iterating on the Schema
 
 You're free to evolve the schema as the app grows. A few rules of thumb:
