@@ -2,10 +2,11 @@
 
 ## Props
 
-| Prop name  | Description | Type   | Values | Default |
-| ---------- | ----------- | ------ | ------ | ------- |
-| testGroups |             | Array  | -      |         |
-| appName    |             | string | -      |         |
+| Prop name      | Description | Type   | Values | Default |
+| -------------- | ----------- | ------ | ------ | ------- |
+| testGroups     |             | Array  | -      |         |
+| testLoadErrors |             | Array  | -      |         |
+| appName        |             | string | -      |         |
 
 ## Events
 

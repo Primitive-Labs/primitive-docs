@@ -10,14 +10,16 @@ Manages its own checkbox selection state for bulk delete/leave operations.
 
 ## Props
 
-| Prop name          | Description                                                           | Type    | Values | Default |
-| ------------------ | --------------------------------------------------------------------- | ------- | ------ | ------- |
-| documents          | Full list of documents (used for permission checks on selected items) | Array   | -      |         |
-| filteredDocuments  | Filtered subset of documents to display                               | Array   | -      |         |
-| selectedDocId      | Currently selected document ID (for highlight)                        | union   | -      |         |
-| isExpanded         | Whether the documents accordion section is expanded                   | boolean | -      |         |
-| documentListLoaded | Whether the document list has finished loading                        | boolean | -      |         |
-| searchQuery        | Current search query (used for empty-state messaging)                 | string  | -      |         |
+| Prop name          | Description | Type    | Values | Default     |
+| ------------------ | ----------- | ------- | ------ | ----------- |
+| documents          |             | Array   | -      |             |
+| filteredDocuments  |             | Array   | -      |             |
+| selectedDocId      |             | union   | -      |             |
+| isExpanded         |             | boolean | -      |             |
+| documentListLoaded |             | boolean | -      |             |
+| searchQuery        |             | string  | -      |             |
+| sectionLabel       |             | string  | -      | "Documents" |
+| showCreateButton   |             | boolean | -      | true        |
 
 ## Events
 
@@ -28,4 +30,3 @@ Manages its own checkbox selection state for bulk delete/leave operations.
 | bulk-delete       |            |
 | bulk-leave        |            | Emitted for pure non-owned selections (leave only)                    |
 | bulk-delete-mixed |            | Emitted for mixed selections containing both owned and non-owned docs |
-| toggle-section    |            |

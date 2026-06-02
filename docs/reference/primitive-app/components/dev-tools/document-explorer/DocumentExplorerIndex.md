@@ -4,6 +4,6 @@
 
 Document Explorer - V2 unified three-panel layout.
 
-Left panel: Document list with search, permission badges, pending invitations
+Left panel: Document list with search, permission badges
 Middle panel: Records table with model selector dropdown, filter chips, pagination
-Right panel: Collapsible document properties (tags, aliases, sharing, metadata)
+Right panel: Collapsible document properties (tags, aliases, sharing, collections, metadata)

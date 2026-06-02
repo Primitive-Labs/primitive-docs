@@ -6,14 +6,18 @@
 
 # Interface: SharedDocumentListResult
 
+Issue #858: unified with DocumentListPage (`{ items, cursor }`,
+raw-JSON cursor) — was previously `{ documents, nextCursor }` with a
+base64url cursor. **Breaking change** vs. earlier client versions.
+
 ## Properties
 
-### documents
+### cursor?
 
-> **documents**: [`SharedDocument`](SharedDocument.md)[]
+> `optional` **cursor**: `string`
 
 ***
 
-### nextCursor
+### items
 
-> **nextCursor**: `string` \| `null`
+> **items**: [`SharedDocument`](SharedDocument.md)[]

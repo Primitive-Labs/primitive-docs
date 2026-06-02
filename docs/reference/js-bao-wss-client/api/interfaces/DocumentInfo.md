@@ -6,6 +6,10 @@
 
 # Interface: DocumentInfo
 
+## Extended by
+
+- [`SharedDocument`](SharedDocument.md)
+
 ## Properties
 
 ### createdAt

@@ -1297,10 +1297,6 @@
                           "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/FilterBar"
                         },
                         {
-                          "text": "InvitationPropertiesPanel",
-                          "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/InvitationPropertiesPanel"
-                        },
-                        {
                           "text": "ModelHeader",
                           "link": "/reference/primitive-app/components/dev-tools/document-explorer/components/ModelHeader"
                         },

@@ -37,6 +37,21 @@ still overwrite the value if they wish (last writer wins).
 
 ***
 
+### enum?
+
+> `optional` **enum**: `string`[]
+
+Allowed-value set for a `string` field. When present, the codegen
+generators (database-type codegen + doc-model v2 codegen) emit a
+TypeScript string-literal union (`"a" | "b" | "c"`) instead of a bare
+`string` for this field.
+
+Advisory / codegen-only: this is a TS-emission hint. The runtime and the
+server do NOT enforce enum membership on write (see #843). Only valid on
+`string` fields, and must be a non-empty array of strings.
+
+***
+
 ### indexed?
 
 > `optional` **indexed**: `boolean`

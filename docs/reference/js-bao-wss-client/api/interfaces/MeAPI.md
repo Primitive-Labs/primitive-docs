@@ -151,6 +151,12 @@ Includes individually-shared documents (`DocumentPermission`, non-owner)
 and pending legacy `DocumentInvitation`s. Pass `tag` to filter by a
 document tag (issue #628 — parity with `documents.list({ tag })`).
 
+Issue #858: returns the unified `{ items, cursor }` envelope (was
+`{ documents, nextCursor }`) with a raw-JSON cursor (was base64url),
+matching [MeAPI.ownedDocuments](#owneddocuments). Each row carries the base
+`Document` fields plus the shared extras (`source`/`grantedBy`/
+`invitationId`). **Breaking change** vs. earlier client versions.
+
 #### Parameters
 
 ##### options?

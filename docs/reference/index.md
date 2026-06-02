@@ -331,7 +331,6 @@ Generated reference documentation for each project.
       - [DocumentSidebar](/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentSidebar)
       - [DocumentTagsSection](/reference/primitive-app/components/dev-tools/document-explorer/components/DocumentTagsSection)
       - [FilterBar](/reference/primitive-app/components/dev-tools/document-explorer/components/FilterBar)
-      - [InvitationPropertiesPanel](/reference/primitive-app/components/dev-tools/document-explorer/components/InvitationPropertiesPanel)
       - [ModelHeader](/reference/primitive-app/components/dev-tools/document-explorer/components/ModelHeader)
       - [ModelPaginationBar](/reference/primitive-app/components/dev-tools/document-explorer/components/ModelPaginationBar)
       - [RecordFormFields](/reference/primitive-app/components/dev-tools/document-explorer/components/RecordFormFields)
