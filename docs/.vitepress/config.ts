@@ -429,10 +429,6 @@ export default defineConfig({
         collapsed: false,
       },
       {
-        text: 'Changelog',
-        link: '/getting-started/changelog',
-      },
-      {
         text: 'Reference',
         items: buildReferenceSidebar(readGeneratedReferenceTree()),
         collapsed: false,
