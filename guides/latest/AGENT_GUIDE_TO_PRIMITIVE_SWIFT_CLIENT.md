@@ -19,7 +19,7 @@ When writing Swift code, fetch the conceptual JS guide for the feature you're wo
 
 2. **Wire codegen on both build paths.** `swift build` runs `JsBaoCodegenPlugin` automatically; the Xcode/iOS path does NOT. Invoke `swift run swift-bao-codegen` inline in `run-ios.sh` before `xcodegen generate`, write to a gitignored `Models/Generated/` (regenerated on every build, never committed), and add `exclude: ["Models/Generated"]` to the SPM target so the two producers don't collide. See [§4](#data-modeling-schematoml--codegen--typedmodelt).
 
-3. **Wire `TypedModel<T>` instances through `appState.makeTypedModel(doc:documentId:)`.** Constructing `TypedModel<T>(doc:)` directly works but skips registration with the in-app debug inspector. Use `makeTypedModel` so the model shows up in the Debug Inspector tab.
+3. **Don't bind per-doc models — use the codegen'd model statics.** Read with `TodoItem.query()` (all open docs) / `TodoItem.query(options: .init(documents: [docId]))` (one doc) and write with `try TodoItem.create(value, in: docId)`. For reactive views, bind a `BaoDataLoader` with `.onModel(subscribe: TodoItem.subscribe)`. (`makeTypedModel` / `TypedModel<T>(doc:)` are deprecated — they built a separate per-doc mirror; the debug inspector now surfaces the shared store on its own.)
 
 4. **Wire field names are forever.** TOML keys are wire field names. Once data is on disk, renaming a key orphans every existing record (both Swift and JS clients reading the same doc). Style is your call: **snake_case is the cross-client convention** (web/Node + Swift speaking the same Primitive doc); **camelCase is fine for Swift-only docs**. The codegen tool preserves whatever you write — `text` stays `text`, `created_at` stays `created_at`, `createdAt` stays `createdAt`. If you went snake_case for cross-client reasons and the call sites read awkwardly, add camelCase aliases in a hand-written `+Extensions.swift` companion — but the underlying stored property keeps the wire key.
 
@@ -53,7 +53,7 @@ The single most common way to write wrong-but-compiling Swift against Primitive 
 |---|---|---|
 | `aliases.resolve` + `createWithAlias` two-step | `documents.getOrCreateWithAlias(alias:title:)` | Single atomic upsert. The two-step has a TOCTOU window where two clients onboarding simultaneously both fall into the `createWithAlias` branch and lose one of the docs. |
 | `client.openDocument(...)` in a subclass to get a YDocument for a `TypedModel` | Override `onDocumentOpened(doc:documentId:)` and bind there | The base class already opens the doc once via `selectDocumentAwaiting` and hands you the `YDocument`. Re-opening duplicates the work and races with `selectedDocId` routing. |
-| `@Published var items: [T]` + manual `refresh()` after every mutation | `BaoDataLoader<[T]>` bound with `.onModelChange(typedModel)` | The loader owns the subscription lifecycle, debounces reloads, and re-fetches on local **and** remote writes via one trigger. The `@Published` + refresh pattern silently drifts whenever you add a mutation site and forget to call `refresh()`. |
+| `@Published var items: [T]` + manual `refresh()` after every mutation | `BaoDataLoader<[T]>` bound with `.onModel(subscribe: TodoItem.subscribe)`, reading `TodoItem.query(...)` | The loader owns the subscription lifecycle, debounces reloads, and re-fetches on local **and** remote writes via one trigger — no per-doc model to bind. The `@Published` + refresh pattern silently drifts whenever you add a mutation site and forget to call `refresh()`. |
 | Combine sink on `appState.$isConnected` to run post-connect setup | `override func connectClient() async { await super.connectClient(); … }` | `connectClient()` is `open` — override it and call super. The Combine sink is the workaround you reach for when you forget that. |
 | `createDocument` then `openDocument` then start writing | `createDocument(options:)` returns `(documentId, doc: YDocument?)` — start writing on the returned doc | Local-first: the returned YDocument is writable immediately, the server commit happens in the background. Re-opening with `.network` blocks ~15s on a freshly-created empty doc waiting for a sync event that never has anything to deliver. |
 | `documents.list()` (deprecated) + filter by tag for a per-user singleton | `documents.getOrCreateWithAlias(...)` keyed by `scope: "user"` | Aliases were built for singletons; tag-filtering is fragile (the doc may not have the tag you assume, or may be filtered out for permission reasons). |
@@ -498,7 +498,7 @@ One `TypedModel` per record type per document.
 
 ### 4f. Read
 
-**For view-data binding, use `BaoDataLoader<[T]>` with `.onModelChange`, and render through `loader.phase` — this is the canonical view-reactivity pattern**:
+**For view-data binding, use `BaoDataLoader<[T]>` with `.onModel(subscribe:)`, reading through the codegen'd model statics, and render through `loader.phase` — this is the canonical view-reactivity pattern**:
 
 ```swift
 struct TodoListView: View {
@@ -507,42 +507,32 @@ struct TodoListView: View {
 
     var body: some View {
         Group {
-            if let todos = appState.todos {
-                // `loader.phase` is a trinary that distinguishes
-                // "still loading" from "loaded but empty" — avoids the
-                // empty-state flash that `List(loader.data ?? [])`
-                // produces for ~50ms on first appearance.
-                switch loader.phase {
-                case .loading:
-                    ProgressView()
-                case .empty:
-                    Text("No todos yet")
-                case .loaded(let todos):
-                    List(todos) { /* row */ }
-                }
-            } else {
-                ProgressView()
+            // `loader.phase` is a trinary that distinguishes "still loading"
+            // from "loaded but empty" — avoids the empty-state flash that
+            // `List(loader.data ?? [])` produces for ~50ms on first appearance.
+            switch loader.phase {
+            case .loading:           ProgressView()
+            case .empty:             Text("No todos yet")
+            case .loaded(let todos): List(todos) { /* row */ }
             }
         }
-        // `.task(id:)`, NOT a bare `.task`. `appState.todos` is bound
-        // asynchronously in `onDocumentOpened` (after connect + doc open),
-        // so it's nil when this view first appears. A bare
-        // `.task { guard let … else { return } }` runs ONCE, sees nil,
-        // bails, and never binds the loader — the screen sticks on its
-        // spinner until the view happens to be rebuilt. Keying the task on
-        // readiness re-runs it the instant the model arrives.
-        .task(id: appState.todos == nil) {
-            guard let todos = appState.todos else { return }
+        // No per-doc model to wait for — the statics read the shared store,
+        // so a plain `.task` is fine (no `.task(id:)` readiness dance).
+        .task {
             loader.bind(
                 client: appState.client,
-                subscribeTo: [.onModelChange(todos)]
+                subscribeTo: [.onModel(subscribe: TodoItem.subscribe)]
             ) { _ in
-                todos.findAll().sorted { $0.sortOrder < $1.sortOrder }
+                TodoItem.query().sorted { $0.sortOrder < $1.sortOrder }
+                // one open doc → that doc's todos; scope with
+                // TodoItem.query(options: .init(documents: [docId]))
             }
         }
     }
 }
 ```
+
+This reads/writes the one shared store, so there's nothing to bind in `onDocumentOpened` and no `appState.todos` to wait on. (The older pattern — `makeTypedModel` + `.onModelChange(typedModel)` — is deprecated; it built a separate per-doc mirror.)
 
 > **Readiness, the load-bearing detail:** the `.task(id: appState.todos == nil)`
 > above is not optional polish. A bare `.task { guard let model = appState.x
