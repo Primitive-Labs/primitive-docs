@@ -351,7 +351,7 @@ final class MyAppState: PrimitiveAppState {
 }
 ```
 
-No `onDocumentOpened` binding, no `@Published var tasks: TypedModel<…>` — `selectDocumentAwaiting` opens the doc and the static `TaskRecord.*` API reads/writes the shared store. (`makeTypedModel` / `TypedModel<T>(doc:)` are deprecated; the debug inspector surfaces the store automatically.)
+No `onDocumentOpened` binding, no `@Published var tasks: TypedModel<…>` — `selectDocumentAwaiting` opens the doc and the static `TaskRecord.*` API reads/writes the shared store. (`makeTypedModel` / `TypedModel<T>` were removed; the debug inspector surfaces the store automatically.)
 
 ::: tip Why getOrCreateWithAlias?
 Splitting this into `client.documents.aliases.resolve(...)` followed by `client.documents.createWithAlias(...)` looks fine but has a race: two devices onboarding at the same moment both fall into the create branch and you lose one of the docs. `getOrCreateWithAlias` is a single atomic server-side upsert.
@@ -527,7 +527,7 @@ The Swift client source is the ground truth. After `swift package resolve`, it's
 | File | What's in it |
 |---|---|
 | `JsBaoClient.swift` | Top-level client, connection, document open/close, auth |
-| `TypedModel.swift` / `DynamicModel.swift` | `PrimitiveModel` protocol, `TypedModel<T>` CRUD, runtime-schema model |
+| `PrimitiveModel.swift` / `DynamicModel.swift` | `PrimitiveModel` protocol + codegen'd `Model.*` facade; `DynamicModel` is the untyped runtime model |
 | `Sources/SwiftBaoCodegen/` | `swift-bao-codegen` tool — input TOML schema, output `PrimitiveModel` structs |
 | `BaoModel.swift` | Legacy `BaoModelRecord` / `BaoModel<T>` — still works, not recommended for new code |
 | `API/DocumentsAPI.swift` | Create / list / update / delete / invitations / permissions / tags / aliases |
