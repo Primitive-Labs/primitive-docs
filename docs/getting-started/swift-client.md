@@ -406,6 +406,18 @@ tasks.count(["completed": true])
 
 The `query` path is SQLite-backed and indexed; for small collections, `findAll()` + `filter` is fine.
 
+A `TypedModel<T>` reads **one** document. When records of the same model span **multiple open documents**, use the generated **static** facade — the Swift mirror of the JS client's `Model.query()`, which spans every open document by default:
+
+```swift
+TaskRecord.query(["completed": false])   // across all open docs
+TaskRecord.count()
+TaskRecord.findAll()                      // -> [TaskRecord]
+TaskRecord.subscribe { reload() }         // reacts to writes in any open doc
+TaskRecord.query(nil, options: QueryOptions(documents: [docId]))  // scope to one doc
+```
+
+The client auto-connects each document to a shared cross-document store on open and disconnects on close. In a `PrimitiveApp` host this works out of the box — `PrimitiveAppState` sets the default client during `initialize()`; override `crossDocumentModels` to pre-register your models. `DynamicModel` is internal plumbing for these layers, not an app-facing API.
+
 ::: tip Why BaoDataLoader and not @Published?
 You could keep a `@Published var items: [TaskRecord]` on the state class and call a `refresh()` method after every mutation. It works — but it drifts silently the moment you add a new mutation site and forget to call `refresh()`. `BaoDataLoader` + `.onModelChange` removes the bookkeeping entirely: every add/update/delete on the model fires the trigger.
 :::

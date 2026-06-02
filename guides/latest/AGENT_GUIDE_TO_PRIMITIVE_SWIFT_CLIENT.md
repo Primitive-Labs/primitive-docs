@@ -591,6 +591,51 @@ Wrap `try todos.create(...)` in a `do/catch` and surface the error through your 
 
 A write is observable to local reads on the next line. Remote peers see it when the WS round-trip completes; a `.sync` event fires when the server acks.
 
+### 4h. Cross-document queries: `Model.query()`
+
+A `TypedModel<T>` reads **one** document — the one it was bound to. When records of the same model live across **several open documents** (an ambient library doc plus N detail docs you `openAuxiliaryDoc`'d), use the generated **static** facade instead. It mirrors the JS client's `Model.query()`: it spans **every open document by default**.
+
+```swift
+// Spans all open documents — no per-doc model needed.
+let open   = TodoItem.query(["completed": false])
+let total  = TodoItem.count()
+let all    = TodoItem.findAll()                          // -> [TodoItem]
+
+// Reactivity across every open doc (local + remote writes):
+let unsubscribe = TodoItem.subscribe { reload() }
+```
+
+How it works: the client keeps one shared cross-document store per model and auto-connects every document on `openDocument`/`createDocument` and disconnects it on `closeDocument`. Opening an auxiliary doc therefore makes its rows visible to `TodoItem.query()` automatically — no extra wiring.
+
+**Two setup requirements** (both handled for you in a `PrimitiveApp` host):
+
+1. **A default client.** The static facade resolves to the process-wide default. `PrimitiveAppState` calls `JsBaoClient.configureDefault(client)` during `initialize()`. (Standalone `JsBaoClient` users call it themselves.) A missing default is a `preconditionFailure` with remediation — it never silently returns no rows.
+2. **Model registration (optional pre-warm).** Override `crossDocumentModels` on your `PrimitiveAppState` subclass to list your models so a document opened *before* the first query is already mirrored:
+
+   ```swift
+   override var crossDocumentModels: [any PrimitiveModel.Type] {
+       [TodoItem.self, TodoList.self]
+   }
+   ```
+
+   The facade also lazily registers on first use, so this is an optimization, not a requirement.
+
+**Single-document opt-in.** To scope a cross-document query back to specific docs (the JS `options.documents` equivalent):
+
+```swift
+TodoItem.query(nil, options: QueryOptions(documents: [docId]))
+```
+
+**Which read API?**
+
+| You want | Use |
+|---|---|
+| Records in one specific document | a `TypedModel<T>` bound to that doc (`todos.query(...)`) |
+| Records across every open document | the static facade (`TodoItem.query(...)`) |
+| Records across a chosen subset of open docs | `TodoItem.query(nil, options: QueryOptions(documents: [...]))` |
+
+> `DynamicModel` is **internal plumbing** for `TypedModel<T>` and the static facade — not an app-facing API. Its direct initializer is deprecated. If you genuinely need untyped, runtime-schema access, reach it through `TypedModel.dynamic`; don't construct a `DynamicModel` yourself.
+
 ## Documents
 
 API surface mirrors JS — see [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md) for conceptual model.
@@ -1124,8 +1169,9 @@ When in doubt, the source is the ground truth. After `swift build` / `swift pack
 | File | Contents |
 |---|---|
 | `.build/checkouts/swift-client/Sources/JsBaoClient/JsBaoClient.swift` | Top-level client, connection, document open/close, auth methods |
-| `.build/checkouts/swift-client/Sources/JsBaoClient/TypedModel.swift` | `PrimitiveModel` protocol, `TypedModel<T>` CRUD |
-| `.build/checkouts/swift-client/Sources/JsBaoClient/DynamicModel.swift` | Runtime-schema model (when codegen can't be used) |
+| `.build/checkouts/swift-client/Sources/JsBaoClient/TypedModel.swift` | `PrimitiveModel` protocol, `TypedModel<T>` CRUD; generated `Model.query()` cross-document facade |
+| `.build/checkouts/swift-client/Sources/JsBaoClient/Schema/MultiDocModel.swift` | Shared cross-document store backing `Model.query()` |
+| `.build/checkouts/swift-client/Sources/JsBaoClient/DynamicModel.swift` | Internal runtime-schema engine under `TypedModel`/`MultiDocModel` — not app-facing; reach via `TypedModel.dynamic`. Direct construction deprecated. |
 | `.build/checkouts/swift-client/Sources/SwiftBaoCodegen/` | `swift-bao-codegen` tool — input TOML schema, output structs |
 | `.build/checkouts/swift-client/Sources/JsBaoClient/BaoModel.swift` | Legacy `BaoModelRecord` / `BaoModel<T>` — deprecated, don't use for new code |
 | `.build/checkouts/swift-client/Sources/JsBaoClient/API/DocumentsAPI.swift` | Create / list / update / delete / invitations / permissions / tags / aliases |
