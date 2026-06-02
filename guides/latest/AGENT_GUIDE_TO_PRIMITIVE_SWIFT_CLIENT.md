@@ -15,7 +15,7 @@ When writing Swift code, fetch the conceptual JS guide for the feature you're wo
 
 ## Critical Rules
 
-1. **Define models in `schema.toml` and use codegen. NEVER hand-roll `BaoModelRecord` structs.** The legacy `BaoModel<T>` / `BaoModelRecord` path still compiles but is deprecated. New code uses `swift-bao-codegen` to emit `PrimitiveModel` structs from a TOML schema, then consumes them through `TypedModel<T>`. Drift between schema and Swift is impossible when codegen is the source of truth.
+1. **Define models in `schema.toml` and use codegen.** `swift-bao-codegen` emits a `PrimitiveModel` struct per model **plus a static `Model.*` API** — read/write through that (`TodoItem.query()`, `try TodoItem.create(value, in: docId)`). Drift between schema and Swift is impossible when codegen is the source of truth. (`BaoModel`/`BaoModelRecord` and `TypedModel<T>` have been **removed** — there is no per-doc model to bind anymore.)
 
 2. **Wire codegen on both build paths.** `swift build` runs `JsBaoCodegenPlugin` automatically; the Xcode/iOS path does NOT. Invoke `swift run swift-bao-codegen` inline in `run-ios.sh` before `xcodegen generate`, write to a gitignored `Models/Generated/` (regenerated on every build, never committed), and add `exclude: ["Models/Generated"]` to the SPM target so the two producers don't collide. See [§4](#data-modeling-schematoml--codegen--typedmodelt).
 
@@ -632,7 +632,7 @@ How it works: the client keeps **one shared store per model** and auto-connects 
 | Write a record to a document | `try TodoItem.create(value, in: docId)` (also `update` / `delete`) |
 | React to changes anywhere | `TodoItem.subscribe { … }` |
 
-> **`TypedModel<T>`, `MultiDocModel`, and `DynamicModel` are internal plumbing**, not app-facing APIs — `MultiDocModel`/`DynamicModel` are not part of the public surface, and `TypedModel` is a lower-level handle the reactive `BaoDataLoader` pattern still uses (it will move to `Model.subscribe`). New app code should use the `Model.*` statics above for everything.
+> **`TypedModel<T>` and `BaoModel` have been removed.** `MultiDocModel` is internal plumbing (the client-owned shared store). `DynamicModel` is the public **untyped / runtime-schema** model — use it only when you don't have a codegen'd type (generic tooling, schema-from-the-wire). For a known model, the `Model.*` statics above are the whole app-facing API.
 
 ## Documents
 
@@ -1167,18 +1167,17 @@ When in doubt, the source is the ground truth. After `swift build` / `swift pack
 | File | Contents |
 |---|---|
 | `.build/checkouts/swift-client/Sources/JsBaoClient/JsBaoClient.swift` | Top-level client, connection, document open/close, auth methods |
-| `.build/checkouts/swift-client/Sources/JsBaoClient/TypedModel.swift` | `PrimitiveModel` protocol + the codegen'd `Model.*` static facade (the one app-facing API). `TypedModel<T>` itself is a lower-level handle. |
+| `.build/checkouts/swift-client/Sources/JsBaoClient/Schema/PrimitiveModel.swift` | `PrimitiveModel` protocol (every codegen'd model conforms). The codegen'd `Model.*` static facade is emitted into each generated model file. |
 | `.build/checkouts/swift-client/Sources/JsBaoClient/Schema/MultiDocModel.swift` | Internal shared cross-document store behind `Model.*` (reached via `JsBaoClient.queryShared`/`createShared`/etc.) |
-| `.build/checkouts/swift-client/Sources/JsBaoClient/DynamicModel.swift` | Internal runtime-schema engine under `TypedModel`/`MultiDocModel` — not app-facing; reach via `TypedModel.dynamic`. Direct construction deprecated. |
-| `.build/checkouts/swift-client/Sources/SwiftBaoCodegen/` | `swift-bao-codegen` tool — input TOML schema, output structs |
-| `.build/checkouts/swift-client/Sources/JsBaoClient/BaoModel.swift` | Legacy `BaoModelRecord` / `BaoModel<T>` — deprecated, don't use for new code |
+| `.build/checkouts/swift-client/Sources/JsBaoClient/Schema/DynamicModel.swift` | Public untyped / runtime-schema model (generic tooling, schema-from-the-wire); also the internal per-doc engine `MultiDocModel` connects into the shared store. |
+| `.build/checkouts/swift-client/Sources/SwiftBaoCodegen/` | `swift-bao-codegen` tool — input TOML schema, output structs + the `Model.*` facade |
 | `.build/checkouts/swift-client/Sources/JsBaoClient/API/DocumentsAPI.swift` | Create / list / update / delete / invitations / permissions / tags / aliases |
 | `.build/checkouts/swift-client/Sources/JsBaoClient/API/WorkflowsAPI.swift` | `start`, `define`, `claimApply`, pending-apply delivery |
 | `.build/checkouts/swift-client/Sources/JsBaoClient/API/CollectionsAPI.swift` | Folders |
 | `.build/checkouts/swift-client/Sources/JsBaoClient/Types/Events.swift` | Event enum + payload structs |
 | `.build/checkouts/swift-client/Sources/JsBaoClient/Types/Options.swift` | Client / document / workflow option structs |
 | `.build/checkouts/swift-client/Sources/JsBaoClient/Types/Errors.swift` | `JsBaoError`, `JsBaoErrorCode`, `AuthError`, `HttpError` |
-| `.build/checkouts/swift-primitive-app/Sources/PrimitiveApp/State/PrimitiveAppState.swift` | App-state lifecycle, `makeTypedModel`, inspector registration |
+| `.build/checkouts/swift-primitive-app/Sources/PrimitiveApp/State/PrimitiveAppState.swift` | App-state lifecycle, document open/close + select, inspector (reads the shared store) |
 | `.build/checkouts/swift-primitive-app/Sources/PrimitiveApp/State/BaoDataLoader.swift` | Reactive-load helper |
 | `.build/checkouts/swift-primitive-app/Sources/PrimitiveApp/Views/PrimitiveLoginView.swift` | `AuthGateView` source |
 
@@ -1475,7 +1474,6 @@ Before declaring Swift code complete:
 - [ ] View-data binding is `BaoDataLoader<[T]>` + `.onModelChange(typedModel)` — NOT `@Published var items` + manual `refresh()`.
 - [ ] Views render through `switch loader.phase` (`.loading | .empty | .loaded`) — NOT `List(loader.data ?? []) { … }` (which flashes the empty state for ~50ms on every appearance).
 - [ ] Post-connect setup is `override func connectClient() async` — NOT a Combine sink on `$isConnected`.
-- [ ] TypedModel binding is inside `onDocumentOpened(doc:documentId:)` — NOT a second `openDocument(...)` call to fetch a YDocument.
 - [ ] Multi-doc app: per-item detail views use `appState.openDocument(_:modelType:)` / `closeDocument(_:)` — NOT `selectDocumentAwaiting(_:)` (the fused open+select, which closes the ambient library doc). Open and select are separate (`openDocument` + `setSelectedDocument`).
 - [ ] Index/pointer refs (`*Ref` mirroring a server document/collection) set `id` to the entity id — NOT a random `UUID()` — so create is an idempotent upsert and reconcile can't duplicate rows.
 - [ ] Fresh-doc creation that immediately writes uses `createDocument(options:)` and its returned YDocument — NOT `createWithAlias` + `openDocument(.network)` (which can park 15s on an empty doc).
@@ -1485,10 +1483,9 @@ Before declaring Swift code complete:
 - [ ] Detail views subscribe to `.documentDeleted` to pop on delete/revoke — NOT `.documentMetadataChanged` filtered by `action == "deleted"`.
 
 **Codegen and schema:**
-- [ ] All models are in `schema.toml`, not hand-rolled `BaoModelRecord` structs.
+- [ ] All models are in `schema.toml` (codegen emits the type + `Model.*` API) — no hand-rolled model structs.
 - [ ] `Package.swift` has `JsBaoCodegenPlugin` on the target + `exclude: ["Models/Generated"]`.
 - [ ] `run-ios.sh` invokes `swift run swift-bao-codegen` before `xcodegen generate`.
-- [ ] All `TypedModel<T>` instances are constructed via `appState.makeTypedModel(doc:documentId:)`.
 - [ ] Snake_case wire keys match what other clients (web) read/write — no rename without a migration plan.
 - [ ] No `nil` values in CRDT-backed fields — `""` / `0` / sentinel timestamps instead.
 - [ ] `Models/Generated/` is gitignored (regenerated on every build; only its `README.md` is tracked).
