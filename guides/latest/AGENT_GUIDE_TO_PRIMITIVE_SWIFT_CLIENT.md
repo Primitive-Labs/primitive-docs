@@ -59,7 +59,7 @@ The single most common way to write wrong-but-compiling Swift against Primitive 
 | `documents.list()` (deprecated) + filter by tag for a per-user singleton | `documents.getOrCreateWithAlias(...)` keyed by `scope: "user"` | Aliases were built for singletons; tag-filtering is fragile (the doc may not have the tag you assume, or may be filtered out for permission reasons). |
 | `me.ownedDocuments(tag:)` + `me.sharedDocuments(tag:)` + a hand-rolled merge for "every doc I can read" | `me.accessibleDocumentSummaries(tag:)` → `[DocumentSummary]` | Does the owned + shared merge for you and returns typed rows carrying `_origin` (`DocumentSummary.isOwned`). It's a `PrimitiveApp` app-level wrapper — the old `me.accessibleDocuments` client method was removed to keep the Swift client 1:1 with the JS client, so this wrapper is the path. |
 | Hand-parsing `getPermissions` / `getAccess` / `listPendingInvitations` / `collections.list` dicts (`result["items"]`, guessing `permission` vs `role`) | the typed `*Summaries` wrappers (`permissionSummaries`, `accessSummary`, `pendingInvitationSummaries`, `accessibleDocumentSummaries`, `listSummaries`) | Every read endpoint that returns `[String: Any]` has a typed companion in `PrimitiveApp` (TypedReadSummaries) with a server-verified field contract. See the **Sharing** section. |
-| `selectDocumentAwaiting(_:)` for a per-item detail view in a multi-doc app | `appState.openAuxiliaryDoc(_:modelType:)` from `.task`, `appState.closeAuxiliaryDoc(_:)` from `.onDisappear` | `selectDocumentAwaiting` closes the previously-selected doc, so using it for a per-item detail view closes your library/index doc. Use the auxiliary helpers when there's an ambient doc + N transient docs. |
+| `selectDocumentAwaiting(_:)` for a per-item detail view in a multi-doc app | `appState.openDocument(_:modelType:)` from `.task`, `appState.closeDocument(_:)` from `.onDisappear` | `selectDocumentAwaiting` (the fused open+select) closes the previously-selected doc, so using it for a per-item detail view closes your library/index doc. Use plain `openDocument`/`closeDocument` (open ≠ select) when there's an ambient doc + N transient docs. |
 | Subscribe to `.documentMetadataChanged` and filter on `action == "deleted"` in detail views | Subscribe to `.documentDeleted` directly | Derived event with the same trigger but no payload-filter boilerplate. |
 | `List(loader.data ?? []) { … }` for view-data binding | `switch loader.phase { case .loading: …; .empty: …; .loaded(let d): … }` | `?? []` collapses "not yet loaded" with "loaded, no items" — empty-state placeholders flash for ~50ms on every appearance. `LoaderPhase` makes the bug unreachable. |
 
@@ -229,9 +229,13 @@ That's the whole shape: subclass, override `connectClient` to drive the doc setu
 
 ### Multi-doc apps: library + per-item docs
 
-`selectDocumentAwaiting(_:)` is the single-selected-doc lifecycle — it closes the previously selected doc before opening the new one. Right for "one document per user" apps; **wrong** for apps that keep one ambient doc open (e.g. a library/index doc) while opening N other docs alongside it.
+**Open and select are separate** (matching the JS client, where `openDocument` and `setDefaultDocumentId` are distinct calls):
 
-For the multi-doc shape, use **`appState.openAuxiliaryDoc(_:modelType:)`** (and `closeAuxiliaryDoc(_:)`). These go through the same `JsBaoClient.openDocument(...)` path — DocumentManager registers the doc for sync, the inspector picks up the `TypedModel` — but they don't touch `selectedDocId` or call `onDocumentOpened`. The caller (typically a SwiftUI detail view) owns the lifecycle:
+- `appState.openDocument(_:modelType:)` — opens a doc and binds a `TypedModel`, **without** touching `selectedDocId` or calling `onDocumentOpened`. The plain "open a doc" primitive.
+- `appState.setSelectedDocument(_:)` — marks an already-open doc as the selected/default one.
+- `appState.selectDocument(_:)` / `selectDocumentAwaiting(_:)` — the fused convenience (open + select + close-the-previous-selection + fire `onDocumentOpened`). Right for "one document per user" apps; **wrong** for apps that keep one ambient doc open (e.g. a library/index doc) while opening N other docs alongside it, since it would close the library doc.
+
+For the multi-doc shape, use **`appState.openDocument(_:modelType:)`** (and `closeDocument(_:)`) directly — they go through the same `JsBaoClient.openDocument(...)` path (DocumentManager registers the doc for sync, the inspector picks up the `TypedModel`) but don't disturb the selected doc. The caller (typically a SwiftUI detail view) owns the lifecycle:
 
 ```swift
 struct ItemDetailView: View {
@@ -246,7 +250,7 @@ struct ItemDetailView: View {
         }
         .task {
             do {
-                let (_, model) = try await appState.openAuxiliaryDoc(
+                let (_, model) = try await appState.openDocument(
                     documentId,
                     modelType: TodoItem.self
                 )
@@ -256,13 +260,13 @@ struct ItemDetailView: View {
             }
         }
         .onDisappear {
-            Task { await appState.closeAuxiliaryDoc(documentId) }
+            Task { await appState.closeDocument(documentId) }
         }
     }
 }
 ```
 
-The library doc stays the `selectedDocId` (so the debug inspector points there); the auxiliary doc is open in parallel for the duration of the detail view.
+The library doc stays the `selectedDocId` (so the debug inspector points there); the detail doc is open in parallel for the duration of the detail view. (`openDocument`/`closeDocument` were named `openAuxiliaryDoc`/`closeAuxiliaryDoc` before — those still work as deprecated aliases.)
 
 `AuthGateView` is the built-in sign-in screen — it wraps your signed-in UI and shows OAuth / Magic Link / OTP / Passkey options until the user authenticates. To customize the UI, build a custom gate around `appState.authManager` directly instead of using `AuthGateView`.
 
@@ -593,7 +597,7 @@ A write is observable to local reads on the next line. Remote peers see it when 
 
 ### 4h. Cross-document queries: `Model.query()`
 
-A `TypedModel<T>` reads **one** document — the one it was bound to. When records of the same model live across **several open documents** (an ambient library doc plus N detail docs you `openAuxiliaryDoc`'d), use the generated **static** facade instead. It mirrors the JS client's `Model.query()`: it spans **every open document by default**.
+A `TypedModel<T>` reads **one** document — the one it was bound to. When records of the same model live across **several open documents** (an ambient library doc plus N detail docs you `openDocument`'d), use the generated **static** facade instead. It mirrors the JS client's `Model.query()`: it spans **every open document by default**.
 
 ```swift
 // Spans all open documents — no per-doc model needed.
@@ -605,7 +609,7 @@ let all    = TodoItem.findAll()                          // -> [TodoItem]
 let unsubscribe = TodoItem.subscribe { reload() }
 ```
 
-How it works: the client keeps one shared cross-document store per model and auto-connects every document on `openDocument`/`createDocument` and disconnects it on `closeDocument`. Opening an auxiliary doc therefore makes its rows visible to `TodoItem.query()` automatically — no extra wiring.
+How it works: the client keeps one shared cross-document store per model and auto-connects every document on `openDocument`/`createDocument` and disconnects it on `closeDocument`. Opening any doc therefore makes its rows visible to `TodoItem.query()` automatically — no extra wiring.
 
 **Two setup requirements** (both handled for you in a `PrimitiveApp` host):
 
@@ -1478,7 +1482,7 @@ Before declaring Swift code complete:
 - [ ] Views render through `switch loader.phase` (`.loading | .empty | .loaded`) — NOT `List(loader.data ?? []) { … }` (which flashes the empty state for ~50ms on every appearance).
 - [ ] Post-connect setup is `override func connectClient() async` — NOT a Combine sink on `$isConnected`.
 - [ ] TypedModel binding is inside `onDocumentOpened(doc:documentId:)` — NOT a second `openDocument(...)` call to fetch a YDocument.
-- [ ] Multi-doc app: per-item detail views use `appState.openAuxiliaryDoc(_:modelType:)` / `closeAuxiliaryDoc(_:)` — NOT `selectDocumentAwaiting(_:)` (which closes the ambient library doc).
+- [ ] Multi-doc app: per-item detail views use `appState.openDocument(_:modelType:)` / `closeDocument(_:)` — NOT `selectDocumentAwaiting(_:)` (the fused open+select, which closes the ambient library doc). Open and select are separate (`openDocument` + `setSelectedDocument`).
 - [ ] Index/pointer refs (`*Ref` mirroring a server document/collection) set `id` to the entity id — NOT a random `UUID()` — so create is an idempotent upsert and reconcile can't duplicate rows.
 - [ ] Fresh-doc creation that immediately writes uses `createDocument(options:)` and its returned YDocument — NOT `createWithAlias` + `openDocument(.network)` (which can park 15s on an empty doc).
 - [ ] Email-based sharing uses `documents.updatePermissions(documentId:params:)` / `collections.addMember(collectionId:params:)` with the documented keys (`email`, `permission`, `sendEmail`, `documentUrl`).
