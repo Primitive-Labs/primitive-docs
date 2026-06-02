@@ -428,8 +428,10 @@ const owned = await client.me.ownedDocuments();
 // Documents shared directly with the user (non-owner permission grants and
 // pending document invitations). Doesn't include group- or collection-shared
 // documents — those are listed through the group or collection.
-const { documents } = await client.me.sharedDocuments();
+const { items } = await client.me.sharedDocuments();
 ```
+
+`me.sharedDocuments()` returns a `{ items, cursor }` envelope — the same shape as the paginated owned-documents page — and each row in `items` carries the base document fields (`title`, `createdBy`, `createdAt`, `lastModified`, plus `tags`/`metadata`/`thumbnailBlobId` when set) alongside the share-specific extras `permission`, `source` (`"permission"` or `"invitation"`), `grantedBy`, and `invitationId` (pending invitations only).
 
 Both accept `tag`, `limit`, and `cursor` for filtering and pagination. `me.ownedDocuments()` also has an `includeRoot` flag (the user's root document is excluded by default) and a `returnPage: true` overload that returns a paginated `DocumentListPage` instead of a flat array.
 

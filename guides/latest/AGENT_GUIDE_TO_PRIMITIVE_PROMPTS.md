@@ -589,9 +589,12 @@ primitive sync push --dir ./config                  # apply
 
 ```toml
 provider = "gemini"
+model = "models/gemini-3.5-flash"         # fast/cheap (GA)
 model = "models/gemini-3-flash-preview"   # fast/cheap
 model = "models/gemini-3-pro-preview"     # higher quality
 ```
+
+The `gemini` provider enforces a server-side allowlist of model names; a model not on the allowlist is rejected at execution time. `models/gemini-3.5-flash` is on the allowlist.
 
 ### OpenRouter (everything else)
 

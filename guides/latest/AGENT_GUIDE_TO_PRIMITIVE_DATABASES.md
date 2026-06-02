@@ -6,18 +6,18 @@ Guidelines for building apps with Primitive's server-side database storage.
 
 A **database** is:
 
-1. A server-side data store backed by a Cloudflare Durable Object with SQLite
+1. An isolated, server-side data store (SQLite-backed)
 2. Accessed through server-configured **registered operations** with CEL-based access control
 3. Schemaless — save any JSON records without upfront schema definition
 
 **Properties:**
 
-- Each database is an isolated Durable Object with its own SQLite instance — Strong consistency, zero-config scaling
+- Each database is an isolated instance with its own SQLite storage — strong consistency, zero-config scaling
 - All data access goes through **registered operations** with per-operation authorization
 - Databases can be organized by **type** — a named configuration shared across many database instances
 - Supports queries, mutations, counts, aggregates, multi-step pipelines, atomic operations, batch writes, apply-to-query, and real-time subscriptions
 
-**Size Guidelines:** Individual databases can hold up to ~5GB of data. For larger needs, split data across multiple databases (one per tenant, project, or domain) — each is a separate Durable Object that scales independently.
+**Size Guidelines:** Individual databases can hold up to ~5GB of data. For larger needs, split data across multiple databases (one per tenant, project, or domain) — each is a separate isolated instance that scales independently.
 
 ## When to Use Databases vs. Documents
 
@@ -248,14 +248,22 @@ primitive databases codegen --sync-dir ./config --output ./src/generated/db
 # Data migration (records + indexes + constraints; type config excluded — run sync push on target first)
 primitive databases export <id> --output ./out
 primitive databases import ./out --overwrite [--dry-run]
+
+# CSV bulk import — load a CSV file into a database via a batch save operation
+primitive databases import-csv <database-id> <file.csv> --model <name> \
+  [--operation seed_save] [--column-map '{"CSV Header":"field"}'] \
+  [--types '{"price":"number"}'] [--id-column <col>] [--batch-size 5000] \
+  [--delimiter ,] [--dry-run] [--stop-on-error] [--json]
 ```
+
+**Codegen enum / union / required typing.** When a field or an operation param restricts a string to a fixed set of values, codegen emits a TypeScript string-literal union (e.g. `status: "open" | "in-progress" | "closed"`) instead of `string`, and enum params are validated server-side as well. Fields that operation params mark `required` are emitted as non-optional on the generated record interface. This keeps generated types aligned with the server's validation instead of widening everything to `string`.
 
 ## Database Types
 
 A **database type** is a named configuration shared across many databases. It provides:
 
 - **Registered operations** (`type` is one of `query`, `mutation`, `count`, `aggregate`, `pipeline`, `applyToQuery`) with per-operation CEL `access`
-- **Triggers** — computed fields evaluated in the DO before each save
+- **Triggers** — computed fields evaluated server-side before each save
 - **`celContextAccess`** — CEL expression that lets non-owner/manager users read and update the database's CEL context (defaults to deny when unset; owner/manager always have access)
 - **`autoPopulatedFields`** — declarative server-side field stamping on writes (see below)
 - **`defaultAccess`** — fallback CEL access rule applied to operations that omit their own `access`
@@ -267,7 +275,7 @@ Real-time subscriptions are also part of the type config — see [Real-Time Subs
 
 ### Triggers
 
-Triggers are computed fields that run server-side in the Durable Object before a record is saved. Configured per model in the `[triggers.<modelName>]` block of the database type TOML.
+Triggers are computed fields that run server-side before a record is saved. Configured per model in the `[triggers.<modelName>]` block of the database type TOML.
 
 **Trigger fields:**
 
@@ -397,7 +405,7 @@ Adding the `[models.product.fields.*]` blocks above means any future `[[operatio
 primitive databases schema generate <database-type>
 ```
 
-It calls a server-side endpoint that inspects existing ops + introspects the live DO, infers field types where it can, and splices a `[models.*]` block into the local `config/database-types/<type>.toml` file (just before the first `[[operations]]` block). Review the result — the generator guesses types from observed values, and you may need to fix what it got wrong — then run `primitive sync push` (or `primitive sync push --dry-run` first) to attach it.
+It calls a server-side endpoint that inspects existing ops + introspects the live database, infers field types where it can, and splices a `[models.*]` block into the local `config/database-types/<type>.toml` file (just before the first `[[operations]]` block). The scaffold is enriched so the output is directly pushable: in addition to sampling live records, it infers field types from how operation params are used, marks fields that operation params require as `required = true`, and emits string enum constraints for fields whose params restrict them to a fixed value set. Review the result — the generator still guesses from observed values, and you may need to fix what it got wrong — then run `primitive sync push` (or `primitive sync push --dry-run` first) to attach it.
 
 **Schemaless types.** A type without any `[models.*]` block is unchanged from the pre-gate behavior — ops are accepted without static consistency checks. Once you add a schema, the consistency invariant holds: the schema-edit gate prevents removing it while ops remain, so future op edits stay aligned with the schema.
 
@@ -744,8 +752,8 @@ const result = await client.databases.executeBatch(databaseId, "createTask", [
 - Only `type = "mutation"` operations are accepted (400 otherwise).
 - All items in the batch must satisfy the operation's `access` and per-param `access` rules. If **any** item fails authorization, the **whole batch is rejected with 403** before any writes happen.
 - Param schema validation is also per-item; the first invalid item rejects the batch with 400.
-- Save/patch/delete ops from successfully-resolved items are funneled through one DO `/batch` call (transactional at the DO layer); increment / addToSet / removeFromSet ops are dispatched in parallel afterwards.
-- Response is `{ imported, failed }` — `failed` counts items whose individual write succeeded at the auth/validation stage but was rejected by the DO (e.g., `ifNotExists` conflict).
+- Save/patch/delete ops from successfully-resolved items are funneled through one `/batch` call (transactional at the storage layer); increment / addToSet / removeFromSet ops are dispatched in parallel afterwards.
+- Response is `{ imported, failed }` — `failed` counts items whose individual write succeeded at the auth/validation stage but was rejected by the storage layer (e.g., `ifNotExists` conflict).
 
 **Don't:** there is no per-item `itemAccess` field on registered operations. To restrict what params a caller can pass per item, put the rule on the operation's `access` (referencing `params.*`) or on individual `params.<name>.access` (referencing `value`) — both are re-evaluated for every batch item.
 
@@ -966,7 +974,7 @@ await db.removeFromSet("products", "prod-1", { tags: ["sale"] });
 
 ## Batch Writes (direct)
 
-`db.batch` executes multiple writes atomically at the DO layer. Returns one `BatchOperationResult` per input op (`{success, id, error?, values?}` — `values` for increment ops); a per-item failure does NOT throw, so check `.success` on each result.
+`db.batch` executes multiple writes atomically at the storage layer. Returns one `BatchOperationResult` per input op (`{success, id, error?, values?}` — `values` for increment ops); a per-item failure does NOT throw, so check `.success` on each result.
 
 ```typescript
 const results = await db.batch([
@@ -1347,11 +1355,19 @@ const result = await client.databases.importCsv(databaseId, {
 // result: { imported: number, failed: number, errors: [...], indexesCreated: number, durationMs: number }
 ```
 
-## Best Practices
+For one-off, non-programmatic bulk loads there's also a CLI path:
+
+```bash
+primitive databases import-csv <database-id> <file.csv> --model products \
+  --column-map '{"Product Name":"name","Unit Price":"price"}' \
+  --types '{"price":"number"}' --id-column SKU
+```
+
+The CLI imports through a registered batch (bulk) save operation — `--operation` defaults to `seed_save`, so the database type needs a save-like op (`{ modelName, id, data }`) by that name (or pass your own). `--batch-size` defaults to 5000, `--delimiter` to `,`; use `--dry-run` to report row/batch counts without writing and `--stop-on-error` to abort on the first failing chunk (default is best-effort continue). Use `importCsv()` from app code when you need per-row `transform` or progress callbacks; use the CLI for ad-hoc imports from a terminal.
 
 ### Database design
 
-- **Create multiple databases for isolation.** Each database is a separate Durable Object. Use separate databases for separate tenants, projects, or data domains to leverage per-database scaling.
+- **Create multiple databases for isolation.** Each database is a separate isolated instance. Use separate databases for separate tenants, projects, or data domains to leverage per-database scaling.
 - **Use database types** to share operation definitions and triggers across databases of the same kind.
 - **Keep CEL context minimal — use groups for access control.** The CEL context is meant for a few identifying fields (e.g. a `teamId`) used as lookup keys in CEL — `isMemberOf('team', database.celContext.teamId)`. Group membership controls access; the CEL context just provides the key. Don't replicate data into metadata for field-by-field CEL checks — model that with groups. For runtime-toggleable settings, store them as records and read them in a pipeline (see [Settings record pattern](#settings-record-pattern)).
 - **Use triggers** to enforce server-side invariants (created timestamps, audit fields) — don't trust client-provided values.
@@ -1391,7 +1407,7 @@ For broader access-control patterns (group-based access, per-parameter access, r
 
 ### Performance
 
-- **Register indexes** on every field used in `filter` or `sort`. Without an index, the DO falls back to scanning all records of that model.
+- **Register indexes** on every field used in `filter` or `sort`. Without an index, the database falls back to scanning all records of that model.
 - **Cap with `limit`.** Definition `limit` clamps caller-supplied `limit` to its own value (effective limit = `min(definition.limit, callerLimit)`).
 - **`count` ops are much cheaper than `query` for "how many".**
 - **Use `executeBatch`** for client-side bulk writes (up to 100,000 items per call); use `applyToQuery` to mutate every record matching a server-side filter without shipping the IDs across the wire.
@@ -1470,7 +1486,7 @@ Any field starting with `_` (underscore) is reserved for internal use. The inter
 | `$params.x` not substituted (filter key dropped, save field missing) | Parameter not declared in `params` schema | Add `x` to the operation's `params` schema; otherwise `$params.x` resolves to `undefined` and the surrounding key is silently dropped |
 | 400 "ID conflict in save operation" | Both `opDef.id` and `data.id` were provided and differ | Set the id in one place only |
 | 400 "applyToQuery matched more than 1000 records" | Default cap hit because `source.limit` was not set | Narrow `source.filter`, or set `source.limit` explicitly to opt into truncation |
-| 409 from a mutation operation | One or more sub-ops in the batch failed (e.g., `ifNotExists` conflict) | Inspect the error message; mutation operations bundle all sub-ops into one DO `/batch` call and surface the first failure |
+| 409 from a mutation operation | One or more sub-ops in the batch failed (e.g., `ifNotExists` conflict) | Inspect the error message; mutation operations bundle all sub-ops into one `/batch` call and surface the first failure |
 | `executeBatch` rejected with 400 "executeBatch only supports mutation operations" | Operation type is not `mutation` | Only `type = "mutation"` operations work with `executeBatch` |
 | Records not found after save | Querying wrong `modelName` | Model names are case-sensitive collection identifiers |
 | 422 `OPERATION_REFERENCES_UNDEFINED` on op create/edit | The op references a model or field not present in the type's `[models.*]` schema | Check the response's `refs` list; either fix the typo, or add the field to the schema. See [Schema gate](#schema-gate) |

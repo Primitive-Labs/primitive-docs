@@ -142,7 +142,7 @@ The document blob download endpoint supports two HTTP behaviors useful when stre
 - **Range requests.** Send `Range: bytes=START-END` and the server replies with `206 Partial Content` and the requested slice. Out-of-range requests return `416`. This is what `<video>`/`<audio>` elements use to seek; you usually don't issue these manually, but if you build a custom player it works as expected.
 - **Conditional GET.** The server emits an `ETag` (the blob's sha256). Send `If-None-Match: <etag>` on subsequent requests and the server returns `304 Not Modified` with no body when the bytes are unchanged. The browser's HTTP cache honors this automatically when you load the same `downloadUrl(...)` more than once.
 
-Both behaviors are on the document blob path only. Bucket blobs go through signed URLs straight to R2, which has its own range/etag semantics handled by the storage layer.
+Both behaviors are on the document blob path only. Bucket blobs go through signed URLs straight to the object store, which has its own range/etag semantics handled by the storage layer.
 
 ---
 
@@ -392,7 +392,7 @@ A `ruleSetId` field is accepted at bucket creation but is currently **not enforc
 
 ### TTL tiers
 
-R2 lifecycle automatically expires objects based on the bucket's `ttlTier`. Pick the shortest tier that fits.
+The storage layer automatically expires objects based on the bucket's `ttlTier`. Pick the shortest tier that fits.
 
 | Tier        | Lifetime                          |
 |-------------|-----------------------------------|
@@ -444,7 +444,7 @@ imgEl.src = signed.url;
 // Direct download (returns ArrayBuffer; uses authenticated request)
 const buf: ArrayBuffer = await client.blobBuckets.download("avatars", blobId);
 
-// List blobs in a bucket (R2 cursor pagination; default limit 100, max 1000)
+// List blobs in a bucket (cursor pagination; default limit 100, max 1000)
 const { items, cursor } = await client.blobBuckets.list("avatars", { limit: 50 });
 
 // Metadata only
@@ -479,7 +479,7 @@ await client.blobBuckets.getSignedUrl("avatars", blobId, 3600);
 
 // DON'T: attach `metadata: {...}` at upload time. The bucket upload API only
 // accepts `tags: string[]`. There is no arbitrary metadata field, and even
-// `tags` are stored in R2 customMetadata — they don't gate access on their own.
+// `tags` are stored as object metadata — they don't gate access on their own.
 await client.blobBuckets.upload("k", { filename, data, metadata: {} }); // ignored
 
 // DON'T: ask for a >24h signed URL — the server clamps to 86400s.
@@ -518,8 +518,8 @@ The `blob.upload`, `blob.download`, and `blob.signedUrl` workflow steps write to
 ## Anti-patterns
 
 - Storing user-uploaded documents in a bucket when they should be document-scoped blobs with permission inheritance.
-- Leaving a bucket on `permanent` when blobs are only needed briefly. R2 storage is billed; pick the shortest tier.
+- Leaving a bucket on `permanent` when blobs are only needed briefly. Object storage is billed; pick the shortest tier.
 - Using `public-read` and then trying to enforce per-user access. `public-read` bypasses all per-user checks at read time. Use `authenticated` and gate access in your own code before issuing signed URLs.
 - Calling `getSignedUrl` on every render. Each call is a network round-trip; cache the URL until `expiresAt - 60s`.
-- Writing to R2 outside of Primitive. Side-channel objects don't appear in `list()` and won't be cleaned up by bucket deletion.
+- Writing to the underlying object store outside of Primitive. Side-channel objects don't appear in `list()` and won't be cleaned up by bucket deletion.
 - Reusing a `documentId` as a `bucketKey`. Different namespaces; offers no benefit and is confusing.

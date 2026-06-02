@@ -508,7 +508,7 @@ Pick the call that answers the question you're actually asking. The most common 
 | Question | Call |
 |----------|------|
 | Documents the user owns (created or had ownership transferred to) | `client.me.ownedDocuments({ tag?, limit?, cursor?, returnPage? })` |
-| Documents directly shared with the user (`DocumentPermission` + pending `DocumentInvitation`) | `client.me.sharedDocuments({ tag?, cursor?, limit? })` |
+| Documents directly shared with the user (`DocumentPermission` + pending `DocumentInvitation`) | `client.me.sharedDocuments({ tag?, cursor?, limit? })` → `{ items, cursor }` (each row extends `DocumentInfo`; raw-JSON cursor) |
 | Pending document invitations the user can accept | `client.me.pendingDocumentInvitations()` |
 | Documents inside a collection | `client.collections.listDocuments(collectionId, { limit?, cursor? })` |
 | Documents shared with a group | `client.groups.listDocuments(groupType, groupId)` |

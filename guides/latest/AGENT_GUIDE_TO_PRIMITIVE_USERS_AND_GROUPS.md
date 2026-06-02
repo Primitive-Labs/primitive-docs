@@ -162,7 +162,11 @@ const owned = await client.me.ownedDocuments({
 // Documents shared directly with the user (non-owner `DocumentPermission`
 // rows + pending `DocumentInvitation`s). Group- and collection-scoped
 // shares do NOT appear here — those are accessed via the group or collection.
-const { documents, nextCursor } = await client.me.sharedDocuments({
+// Returns the unified `{ items, cursor }` envelope (raw-JSON cursor, NOT
+// base64url). Each `SharedDocument` extends `DocumentInfo`, so rows carry the
+// base document fields plus the share extras (`permission`, `source`,
+// `grantedBy`, `invitationId`).
+const { items, cursor } = await client.me.sharedDocuments({
   limit: 50,
   cursor: prevCursor,
   tag: "shared",

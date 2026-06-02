@@ -50,7 +50,7 @@
         "Choosing access control patterns",
         "Planning for scale and performance"
       ],
-      "concepts": ["documents", "databases", "local-first", "server-side storage", "access control", "CEL", "sharing", "collaboration", "Durable Objects"],
+      "concepts": ["documents", "databases", "local-first", "server-side storage", "access control", "CEL", "sharing", "collaboration"],
       "prerequisites": [],
       "relatedGuides": ["documents", "databases", "users-and-groups"]
     },
@@ -116,7 +116,7 @@
       "topic": "databases",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md",
       "description": "Server-side database storage with CEL-based access control, registered operations, triggers, real-time subscriptions, and group permissions",
-      "keywords": ["databases", "database", "server-side", "CEL", "access control", "operations", "triggers", "autoPopulatedFields", "defaultAccess", "query", "mutation", "aggregate", "pipeline", "Durable Objects", "SQLite", "permissions", "groups", "subscription", "subscriptions", "real-time", "applyToQuery", "DatabaseTypeSubscription", "DatabaseGroupPermission"],
+      "keywords": ["databases", "database", "server-side", "CEL", "access control", "operations", "triggers", "autoPopulatedFields", "defaultAccess", "query", "mutation", "aggregate", "pipeline", "permissions", "groups", "subscription", "subscriptions", "real-time", "applyToQuery", "DatabaseTypeSubscription", "DatabaseGroupPermission"],
       "useCases": [
         "Creating and managing server-side databases",
         "Defining registered operations with access control",

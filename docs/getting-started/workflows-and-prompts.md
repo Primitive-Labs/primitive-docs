@@ -55,6 +55,8 @@ Every step has an `id` (unique within the workflow) and a `kind` (the step type)
 | Kind | Purpose |
 |---|---|
 | `transform` | Shape a value with the templated `output` field — typically used for the workflow's final result |
+| `script` | Run a sandboxed, deterministic Rhai script to transform JSON (see [Script transforms](#script-transforms)) |
+| `iterate-users` | Restartable per-user fan-out: run sub-steps once for every app user, with bounded memory and singleton locking |
 | `noop` | Return `{ message, payload }`; useful as a placeholder |
 | `switch` | First-match branching across CEL `when` cases |
 | `delay` | Pause execution (`ms = 5000` or `"5 seconds"`) |
@@ -195,6 +197,14 @@ client.on("workflowStatus", (event) => {
   }
 });
 ```
+
+### Script Transforms
+
+For data shaping that's more involved than a templated `transform` step — reshaping nested JSON, computing derived fields, filtering and mapping arrays — a `script` step runs a sandboxed [Rhai](https://rhai.rs/) script over its JSON input and returns JSON.
+
+Script steps are **deterministic and side-effect-free**: the sandbox has no network, no clock, and no storage access, so the same input always produces the same output. That makes them safe to retry and easy to test.
+
+You author script bodies as `.rhai` files in your sync directory (`transforms/<name>.rhai`) and push them with `primitive sync push` alongside the rest of your config — there's no separate command. A `script` step then references a script by name and passes it a JSON input context. Each `script`-step execution records per-step telemetry on the `WorkflowRun` (`scriptMetrics`) so you can see operation counts and timing in run detail.
 
 ## Email Steps
 

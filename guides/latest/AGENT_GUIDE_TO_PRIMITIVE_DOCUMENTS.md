@@ -28,7 +28,7 @@ A **document** is:
 
 ## Documents vs. Databases
 
-Primitive also provides **Databases** — server-side storage backed by Cloudflare Durable Objects. Documents are best for personal data, real-time collaboration, and offline access. Databases are best for app-wide shared data, large datasets, and fine-grained access control. Many apps use both.
+Primitive also provides **Databases** — isolated, server-side storage. Documents are best for personal data, real-time collaboration, and offline access. Databases are best for app-wide shared data, large datasets, and fine-grained access control. Many apps use both.
 
 See the [Data Modeling guide](AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.md) for a full decision framework, comparison table, and example app architectures. See the [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) for database API documentation.
 
@@ -97,16 +97,18 @@ const owned = await jsBaoClient.me.ownedDocuments({
 // Documents shared directly with the user — non-owner DocumentPermissions
 // plus pending DocumentInvitations. Group- and collection-shared documents
 // do NOT appear here.
-const { documents, nextCursor } = await jsBaoClient.me.sharedDocuments({
+const { items, cursor } = await jsBaoClient.me.sharedDocuments({
   limit: 50,
 });
 ```
+
+`sharedDocuments` returns the unified `{ items, cursor }` envelope (raw-JSON `cursor`, NOT base64url) — the same shape as the owned-documents page. Each `SharedDocument` in `items` extends `DocumentInfo`: it carries the base document fields (`title`, `createdBy`, `createdAt`, `lastModified`, plus `tags`/`metadata`/`thumbnailBlobId` when set) and the share-only extras `permission` (the granted level, never `"owner"`), `source` (`"permission"` | `"invitation"`), `grantedBy`, and `invitationId` (invitation rows only).
 
 For an "everything I can access" surface, combine these two calls with group and collection memberships:
 
 ```typescript
 const owned  = await jsBaoClient.me.ownedDocuments();
-const shared = (await jsBaoClient.me.sharedDocuments()).documents;
+const shared = (await jsBaoClient.me.sharedDocuments()).items;
 const collections = await jsBaoClient.collections.list();
 // then iterate collections / groups.listUserMemberships and call
 // collections.listDocuments / groups.listDocuments.
@@ -211,7 +213,7 @@ export const useChannelDocs = defineStore("channelDocs", () => {
     loadError.value = null;
     try {
       const owned = await client.me.ownedDocuments({ tag: "channel" });
-      const shared = (await client.me.sharedDocuments({ tag: "channel" })).documents;
+      const shared = (await client.me.sharedDocuments({ tag: "channel" })).items;
       documentIds.value = [...owned, ...shared].map((d) => d.documentId);
       await Promise.all(
         documentIds.value.map(async (id) => {

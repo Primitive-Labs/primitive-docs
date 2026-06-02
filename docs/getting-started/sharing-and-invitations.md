@@ -363,7 +363,10 @@ const owned = await client.me.ownedDocuments();
 // Options: { includeRoot, tag, limit, cursor, forward, returnPage } — pass returnPage: true for a paginated DocumentListPage.
 
 // Documents shared directly with the user.
-const { documents } = await client.me.sharedDocuments();
+const { items } = await client.me.sharedDocuments();
+// Returns a { items, cursor } envelope (same shape as the owned-documents page).
+// Each row carries the base document fields plus the share extras
+// (permission, source, grantedBy, invitationId).
 // Options: { tag, limit, cursor }. Includes non-owner DocumentPermissions and
 // pending DocumentInvitations. Does NOT include group- or collection-shared docs —
 // those are listed through the group (groups.listDocuments) or the collection

@@ -72,9 +72,11 @@ The Swift stack has two layers:
 | Layer | Purpose | Where it lives |
 |---|---|---|
 | `PrimitiveApp` | SwiftUI integration — owns the client lifecycle, ships built-in views (`AuthGateView`, `PrimitiveProfileView`, `ConnectionStatusView`), provides `PrimitiveAppState` as the `@StateObject` your app holds | `swift-primitive-app` package |
-| `JsBaoClient` | The low-level SDK — sub-APIs (`.documents`, `.blobs`, `.workflows`, `.collections`, `.events`, `.me`, `.groups`), event emitter, auth primitives. Direct port of `js-bao-wss-client` | `swift-client` package (re-exported by `PrimitiveApp`) |
+| `JsBaoClient` | The low-level SDK — a direct, 1:1 port of `js-bao-wss-client`, plus an event emitter and auth primitives | `swift-client` package (re-exported by `PrimitiveApp`) |
 
 You almost never construct `JsBaoClient` directly. `PrimitiveAppState` owns it as `public private(set) var client: JsBaoClient?` and exposes the lifecycle through `appState.client`.
+
+The Swift client now has **full sub-API parity** with the JS client. The sub-APIs are: `.documents` (+ `.documents.aliases`, `.documents.blobs`), `.me`, `.session`, `.users`, `.groups`, `.collections`, `.databases`, `.invitations`, `.blobBuckets`, `.workflows`, `.cronTriggers`, `.prompts`, `.integrations`, `.llm`, `.gemini`, `.ruleSets`, `.groupTypeConfigs`, `.collectionTypeConfigs`, and `.databaseTypeConfigs`. Each mirrors the same-named JS sub-API method-for-method (wire format, params, and events match), so when a helper isn't documented below, follow the corresponding JS guide — the call shape is the same, adapted to Swift's `async throws` + labeled-argument conventions. `me.ownedDocuments(...)` and `me.sharedDocuments(...)` return the JS `{ items, cursor }` envelope as `[String: Any]`.
 
 ```swift
 import SwiftUI
@@ -112,6 +114,8 @@ struct ContentView: View {
 ```bash
 primitive init my-app --platform ios
 ```
+
+`--platform` values: `web` (default) and `ios`. The old `apple` value is removed; `macos` is still accepted but unadvertised — use `ios` for the SwiftUI template.
 
 This:
 

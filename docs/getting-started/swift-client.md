@@ -16,6 +16,8 @@ This page walks you from `primitive init --platform ios` through a working app, 
 primitive init my-app --platform ios
 ```
 
+`--platform` accepts `web` (the default) and `ios`; use `ios` for the SwiftUI template covered here. (The former `apple` value has been removed; `macos` is still accepted but not advertised.)
+
 This will:
 
 1. Download the iOS SwiftUI template.

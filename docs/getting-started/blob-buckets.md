@@ -119,7 +119,7 @@ await client.blobBuckets.bucket("team-exports").upload(bytes, {
 
 ## TTL Tiers
 
-Each bucket has a **TTL tier** that governs how long blobs live before R2 deletes them. Pick the shortest tier that fits — short-lived blobs are cheaper and safer.
+Each bucket has a **TTL tier** that governs how long blobs live before the storage layer deletes them. Pick the shortest tier that fits — short-lived blobs are cheaper and safer.
 
 | Tier | Retention | Use case |
 |---|---|---|
@@ -132,7 +132,7 @@ TTL is set at the bucket level — every blob in the bucket inherits it. To mix 
 
 ## Signed URLs
 
-Buckets don't expose raw R2 URLs. Reads go through either the Primitive Worker (authenticated) or a time-limited **signed URL** you generate on demand:
+Buckets don't expose raw storage URLs. Reads go through either the Primitive API (authenticated) or a time-limited **signed URL** you generate on demand:
 
 ```typescript
 const url = await client.blobBuckets
@@ -236,7 +236,7 @@ primitive blob-buckets delete avatars --force
 
 - **Max object size** — 100MB per blob (upload).
 - **Signed URL expiry** — capped at 7 days.
-- **Tracking is R2-only** — Primitive tracks objects it creates in R2. Objects written directly to R2 outside the Primitive API aren't indexed.
+- **Primitive-managed objects only** — Primitive tracks objects it creates. Objects written directly to the underlying object store outside the Primitive API aren't indexed.
 
 ## Next Steps
 

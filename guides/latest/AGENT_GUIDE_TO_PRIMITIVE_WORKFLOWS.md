@@ -113,7 +113,7 @@ ms = 5000               # number, or "5 seconds" / "200ms"
 
 ### `event.wait`
 
-Suspends the workflow until a matching event arrives via the Cloudflare Workflow `sendEvent` API.
+Suspends the workflow until a matching event is delivered to the run via the engine's event API.
 
 ```toml
 [[steps]]
@@ -429,6 +429,54 @@ filters = [
 saveAs = "billingUpgrades"
 ```
 
+### `script`
+
+Runs a sandboxed [Rhai](https://rhai.rs/) script over JSON input and returns JSON. Use it for transforms too involved for a templated `transform` step (nested reshaping, derived fields, array map/filter/reduce). The sandbox is **deterministic and side-effect-free** — no network, clock, or storage access — so script steps are safe to retry and easy to test.
+
+```toml
+[[steps]]
+id = "normalize"
+kind = "script"
+ref = "normalize-order"     # required — the Script name (unique per app)
+saveAs = "order"
+[steps.with]                # input context passed to the script (templated by the engine)
+raw = "{{ steps.fetch.body }}"
+currency = "{{ input.currency }}"
+```
+
+- `ref` (required) names a `Script` — a stored Rhai body, unique per app. Script bodies live in `transforms/<name>.rhai` in your sync directory and are mirrored to the server by `primitive sync push` (and pulled back by `primitive sync pull`); the `<name>` is the filename without `.rhai`. There is no separate `transforms` CLI command — scripts ride the normal sync flow.
+- `with` is the JSON context handed to the script. The body is resolved from the published snapshot at run time, so the run path does no extra lookup.
+- `limits` (optional) lets a step lower the per-run ceilings (`maxOperations`, `wallMsHint`, `maxOutputBytes`, `maxArrayLength`, `maxObjectKeys`, `maxNestingDepth`, `maxStringSize`, `maxCallDepth`, `maxLogBytes`); requested values are clamped at the app ceiling, never raised.
+- Deterministic failures (parse / compile / runtime / limit / validation) come back as a non-retryable step error so durable retries don't re-run a guaranteed failure; transient/transport errors throw and retry normally. The runtime fails closed — it never silently passes input through.
+- Each execution records per-step telemetry on the `WorkflowRun.scriptMetrics` array (operation counts, input/output byte sizes, runtime version), visible in run detail.
+
+### `iterate-users`
+
+Fans a child workflow out across **every user in the app**, once per user, as a restartable singleton. Built for large per-user batch jobs (backfills, per-user digests, recomputations) that must survive restarts without re-processing completed users or holding the whole user set in memory.
+
+```toml
+[[steps]]
+id = "backfill"
+kind = "iterate-users"
+iterationName = "2026-06-prefs-backfill"   # required — stable name; identifies this iteration
+saveAs = "backfillResult"
+pageSize = 100                # users fetched per page (default 100)
+concurrency = 25             # per-page fan-out (default 25, max 100)
+onConflict = "skip"          # "skip" (default) | "refuse" if an iteration is already running
+onPartialFailure = "continue" # "continue" (default) | "fail"
+[steps.source]
+mode = "app"                 # "app" (all app users) | "analytics"
+[steps.perUser]
+workflowKey = "process-one-user"   # the per-user workflow to run
+[steps.perUser.input]               # static input merged into each child run
+reason = "preferences backfill"
+```
+
+- **Bounded memory**: users are paged (`pageSize`) rather than loaded all at once, so the step scales to large user counts.
+- **Singleton per app**: a per-app lock (`iterationName` keys it) guarantees only one iteration runs at a time and tracks aggregate progress, so a restarted run resumes where it left off instead of starting over. `onConflict` decides whether a second start `skip`s or `refuse`s while one is live.
+- Each user is processed by the `perUser.workflowKey` child workflow (the user id plus any `perUser.input` is passed as its input). `onPartialFailure` controls whether per-user failures stop the whole iteration or are tallied and skipped.
+- Prefer `iterate-users` over a hand-rolled `forEach` across a `users.list` query when the fan-out is app-wide and long-running; `forEach` is better for bounded, in-run collections.
+
 ## Templating
 
 `{{ ... }}` resolves paths into the run context. Context vars:
@@ -577,7 +625,9 @@ subject = "Update"
 htmlBody = "<p>Hi {{ member.name }}</p>"
 ```
 
-When `concurrency = 1` (the default), iterations are sequential. When `concurrency > 1`, the engine fans them out in parallel batches — durable mode uses child workflow instances so restarts don't re-run completed items. For very large fan-outs, `workflow.start` + `workflow.await` gives finer control.
+When `concurrency = 1` (the default), iterations are sequential. When `concurrency > 1`, the engine fans them out in parallel batches — in durable mode each batch runs as a child workflow so restarts don't re-run completed items. For very large fan-outs, `workflow.start` + `workflow.await` gives finer control.
+
+When a parallel `forEach` batch's combined output exceeds the inline size limit (~1 MB), the engine automatically offloads the batch result to managed object storage and rehydrates it transparently for the next step. You don't need to handle this — large per-iteration outputs no longer fail the step — but it does add a storage round-trip, so keep per-iteration outputs lean when you can.
 
 ### Zip mode (parallel arrays by index)
 
@@ -639,7 +689,7 @@ runIf = "steps.deduct-token != null"
 # ...
 ```
 
-Per-step retries are handled by Cloudflare's `step.do()` and are not configurable from TOML. Mark errors non-retryable by ensuring upstream calls return 4xx (the engine wraps 4xx≠429 as non-retryable).
+Per-step retries on transient errors are handled by the workflow engine automatically and are not configurable from TOML. Mark errors non-retryable by ensuring upstream calls return 4xx (the engine wraps 4xx≠429 as non-retryable).
 
 ## Output contract
 
@@ -682,6 +732,8 @@ Behavior:
 - `admin`/`owner` always bypass.
 - Otherwise, evaluate against `user.userId`, `user.role`, plus `hasRole(role)`, `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`.
 
+Set `accessRule` once in the `[workflow]` TOML block and it sticks: `primitive sync push` and `primitive workflows create --from-file` both apply it (an absent/empty rule is sent as "no rule" rather than dropped). To change it later without re-pushing the file, `primitive workflows update <id> --access-rule "<CEL>"` sets it (pass `--access-rule ""` to clear; omitting the flag leaves the existing rule untouched).
+
 ## Client apply (footgun)
 
 By default, `requiresClientApply = true`. After the workflow completes, status becomes `apply_pending` and a connected client must call `claimApply` → run `onApply` → `confirmApply` to finalize. If no client is listening, the run sits in `apply_pending` indefinitely.
@@ -708,7 +760,7 @@ Opt a workflow into synchronous invocation by setting `syncCallable = true` in t
 Constraints:
 
 - **Step kinds are restricted.** The server validates step kinds against a sync-compatible list when the flag is set (or when steps are pushed against a sync-callable workflow). Long-running or suspending kinds (`event.wait`, `workflow.await`, `delay` over the timeout) reject at save time with `Workflow contains sync-incompatible steps`.
-- **Timeout.** `timeoutMs` defaults to 5s and is capped server-side at 30s (Cloudflare Workers CPU budget). Exceeding it resolves with `status: "timeout"`.
+- **Timeout.** `timeoutMs` defaults to 5s and is capped server-side at 30s (the server CPU budget per request). Exceeding it resolves with `status: "timeout"`.
 - **Apply still applies.** A sync-callable workflow may still have `requiresClientApply = true`, in which case `runSync` resolves with `status: "apply_pending"` and the normal `claimApply`/`confirmApply` flow takes over. Most sync-callable workflows want `requiresClientApply = false`.
 
 Long-running workflows should keep using `start()` plus the WebSocket / polling lifecycle.
@@ -972,7 +1024,7 @@ filename = "{{ now }}.pdf"
 
 ### Wrong: re-running an idempotent step inside a retry loop
 
-`continueOnError = true` does not retry — it captures the error and moves on. To retry, the workflow has to re-invoke the step explicitly (e.g., another workflow run, or a `workflow.start` fan-out with retries). Cloudflare's `step.do()` already retries on transient errors automatically; don't add a second layer.
+`continueOnError = true` does not retry — it captures the error and moves on. To retry, the workflow has to re-invoke the step explicitly (e.g., another workflow run, or a `workflow.start` fan-out with retries). The engine already retries transient errors per step automatically; don't add a second layer.
 
 ### Wrong: leaking secrets/PII via `saveAs`
 

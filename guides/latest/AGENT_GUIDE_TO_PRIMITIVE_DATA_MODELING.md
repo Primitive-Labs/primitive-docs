@@ -6,7 +6,7 @@ How to choose between **documents** and **databases**, and how to combine them. 
 
 | | **Documents** (js-bao) | **Databases** (js-bao-wss) |
 |---|---|---|
-| Backed by | Yjs CRDT + IndexedDB cache, synced over WebSocket | Cloudflare Durable Object + SQLite, called over HTTPS |
+| Backed by | Yjs CRDT + IndexedDB cache, synced over WebSocket | Isolated server-side store (SQLite), called over HTTPS |
 | Where data lives | On every client that has access, plus the server | Server only |
 | Reads | Local, synchronous after `documents.open()` | Network round-trip per call |
 | Writes | Local first, async sync to server, automatic CRDT merge | Network round-trip; last-write-wins per field |
@@ -15,7 +15,7 @@ How to choose between **documents** and **databases**, and how to combine them. 
 | Offline | Yes — reads/writes work offline, sync resumes on reconnect (`offline: true` on the client) | No — every call requires the network |
 | Access control | Whole-document grant: `reader`, `read-write`, `owner` | Per-operation CEL on registered operations |
 | Per-record access for end users | Not possible — anyone with the doc gets everything | Yes — operation CEL + filters scope what each caller sees |
-| Practical size | ~10 MB per document (soft) | ~5 GB per database (one DO each) |
+| Practical size | ~10 MB per document (soft) | ~5 GB per database (one isolated instance each) |
 | Server-enforced fields | No (client writes Yjs updates directly) | Yes — `autoPopulatedFields` and per-model triggers |
 | Aggregates / multi-step reads | Client-side over local data | `aggregate`, `pipeline`, `count` operations |
 
@@ -193,9 +193,9 @@ Documents only. One document per workspace. Owner shares with teammates via grou
 
 ## Design principles
 
-### One Durable Object per logical boundary
+### One database per logical boundary
 
-Each database is one DO. Split by tenant, project, or domain. Don't put everything in one giant database — multiple smaller databases scale better and isolate failures.
+Each database is one isolated instance. Split by tenant, project, or domain. Don't put everything in one giant database — multiple smaller databases scale better and isolate failures.
 
 ### Operations are your API
 
@@ -245,7 +245,7 @@ Where the data should live instead: a record inside the database itself. Read it
 | Use direct record access (`db.connect(...).query(...)`) from end-user clients | Use `client.databases.executeOperation(...)`; direct access requires owner/manager |
 | Switch `setDefaultDocumentId()` repeatedly when the user changes context | Pass `targetDocument` explicitly on each `.save()` |
 | Put any application state in `database.celContext` (settings, flags, UI fields, anything not read by a CEL rule) | Store as a record; read via a pipeline `$steps.*` reference. `celContext` is rule-evaluation infrastructure, not a KV store |
-| Put one giant database for the whole app | One DO per tenant/project/domain |
+| Put one giant database for the whole app | One database per tenant/project/domain |
 | Hardcode IDs in operation `definition` | Use `$user.userId`, `$params.*`, `$database.celContext.*` |
 | Trust client-provided `createdAt`, `createdBy`, role fields | Set them with `autoPopulatedFields` or `[triggers.<model>]` |
 | One operation per filter combination (`listPosts`, `listPostsByAuthor`, `listPostsByStatus`...) | One operation with `params` declared `required: false` |

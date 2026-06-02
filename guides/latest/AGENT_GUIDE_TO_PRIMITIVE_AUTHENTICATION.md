@@ -350,7 +350,7 @@ Admins can disable a user's access to a single app without deleting their global
 When `status === "disabled"`:
 
 - Every auth-completion endpoint (passkey, OAuth callback, magic-link verify, OTP verify) rejects with `AUTH_USER_DISABLED` before issuing tokens.
-- The user's open WebSocket connections are force-disconnected via the connection-worker DO.
+- The user's open WebSocket connections are force-disconnected by the server's connection layer.
 - Existing access tokens are revoked; in-flight workflow runs the user started are terminated.
 
 Admin endpoints (admin token required):
@@ -576,6 +576,8 @@ Guardrails:
 - The derived user must already exist as an `AppUser` in this app — bypass never auto-provisions.
 - Issued tokens are short-lived (~30 minutes) and carry a `primitiveBypass: true` claim that gets re-checked on every request, so removing the base from the whitelist revokes sessions immediately.
 - `+primitivetest*` accounts can sign in as ordinary members but are reserved at admin / owner / invitation boundaries — they cannot hold those roles.
+
+Manage the whitelist with `primitive apps update --test-account-bases …` (max 50 bases per app), or in the web-admin settings UI — both edit the same `testAccountBaseEmails` list.
 
 **Don't use this in production user flows.**
 

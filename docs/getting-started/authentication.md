@@ -126,7 +126,7 @@ Guardrails worth knowing:
 
 Use this for integration tests and local dev. Do not rely on it for staging or production flows.
 
-See [Primitive CLI](./primitive-cli.md#test-users-for-automated-testing) for managing the whitelist and signing in from a test.
+Manage the `testAccountBaseEmails` whitelist either from the [Primitive CLI](./primitive-cli.md#test-users-for-automated-testing) (`primitive apps update --test-account-bases …`) or in the [Admin Console](./admin-console.md) settings UI. See the CLI page for managing the whitelist and signing in from a test.
 
 ## How It Works Under the Hood
 

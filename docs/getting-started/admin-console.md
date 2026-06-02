@@ -9,6 +9,7 @@ The Primitive Admin Console is a web-based dashboard for managing your apps, use
 - Configure authentication providers (Google OAuth credentials, Magic Link, OTP, Passkeys)
 - Manage email templates for authentication flows
 - Set invite-only mode for controlled access
+- Manage the `testAccountBaseEmails` whitelist for `+primitivetest` automated-testing sign-ins (see [Authentication](./authentication.md#test-user-sign-in-for-automated-testing))
 
 ### Users & Groups
 - View all users in your app

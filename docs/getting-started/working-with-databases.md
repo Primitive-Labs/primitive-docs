@@ -1,6 +1,6 @@
 # Working with Databases
 
-A database is a server-side data store backed by a Cloudflare Durable Object with SQLite. Each database is an isolated instance with its own storage — strong consistency and zero-config scaling. Unlike documents (which are local-first and collaborative), databases run entirely on the server — ideal for shared data, cross-user queries, and admin-controlled content.
+A database is an isolated, server-side data store (SQLite-backed). Each database is its own instance with its own storage — strong consistency and zero-config scaling. Unlike documents (which are local-first and collaborative), databases run entirely on the server — ideal for shared data, cross-user queries, and admin-controlled content.
 
 ## Key Properties
 
@@ -379,7 +379,7 @@ To add a schema to an existing type that already has ops and live data, scaffold
 primitive databases schema generate inventory
 ```
 
-This inspects existing ops and introspects the live Durable Object, then splices a `[models.*]` block into the local TOML. Review the inferred types, fix anything the generator guessed wrong, and run `primitive sync push`.
+This inspects existing ops and introspects the live database, then splices a `[models.*]` block into the local TOML. The scaffold is enriched so it's directly pushable: the generator infers field types from how your operation params use them (not just from sampled records), marks fields that operation params require as `required`, and emits string enum/union types for fields whose params restrict them to a fixed set of values. Review the inferred types, fix anything the generator guessed wrong, and run `primitive sync push`.
 
 Ops with dynamic references (e.g. `modelName = "$params.kind"`) can't be statically verified. The op-edit gate accepts them as warnings, and the schema-edit gate flags them with `SCHEMA_HAS_UNCHECKABLE_OPS` — re-run with `primitive sync push --accept-warnings` to commit once you've reviewed them.
 
@@ -396,6 +396,27 @@ primitive databases codegen --sync-dir ./config --output ./src/generated/db
 ```
 
 This reads the `[models.*]` schema blocks and `[[operations]]` definitions from your TOML and emits typed interfaces — one per model, plus typed params and result shapes for each operation. Keeps your client-side types aligned with the server-authoritative schema without hand-maintaining parallel `.ts` files.
+
+Fields and operation params that declare a fixed set of allowed string values are emitted as TypeScript string-literal unions, so invalid values are caught at compile time:
+
+```typescript
+// from a status field / param restricted to these values
+status: "open" | "in-progress" | "closed";
+```
+
+Enum params are also validated server-side, and fields that operation params require are typed as non-optional on the generated record interface.
+
+## Bulk CSV Import
+
+To load a lot of records at once, you have two paths. From app code, `client.databases.importCsv(databaseId, { csv, model, columnMap, ... })` imports a CSV string with column mapping, optional per-row transforms, and progress callbacks. For ad-hoc loads from a terminal, the CLI has a bulk importer:
+
+```bash
+primitive databases import-csv <database-id> ./products.csv --model products \
+  --column-map '{"Product Name":"name","Unit Price":"price"}' \
+  --types '{"price":"number"}' --id-column SKU
+```
+
+The CLI loads rows through a registered batch save operation (`--operation`, default `seed_save`), in batches (`--batch-size`, default 5000). Add `--dry-run` to preview row and batch counts without writing.
 
 ## Pipelines
 
