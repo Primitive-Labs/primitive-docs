@@ -2,6 +2,79 @@
 
 Guidelines for building apps with Primitive's server-side database storage.
 
+> **Swift parity:** the database **client** calls below exist in both languages (Swift takes `name:` + an `options:` dict, e.g. `executeOperation(databaseId:name:options:)`). **`client.databases.subscribe(...)` is JavaScript-only** — Swift has no DB subscriptions; poll via `executeOperation`. Operation/model definitions are TOML (language-neutral).
+
+## Client operations (JavaScript + Swift)
+
+### Run a registered operation
+
+JavaScript:
+<!-- example:start databases/db-execute-operation lang=ts -->
+```typescript
+  const result = await client.databases.executeOperation(databaseId, "list-products", {
+    params: { search: "widget" },
+  });
+  // result: { data: [...records], hasMore: boolean, nextCursor?: string }
+```
+<!-- example:end -->
+Swift:
+<!-- example:start databases/db-execute-operation lang=swift -->
+```swift
+  let result = try await client.databases.executeOperation(
+    databaseId: databaseId,
+    name: "list-products",
+    options: ["params": ["search": "widget"]]
+  )
+  // result: { data: [...records], hasMore, nextCursor? }
+```
+<!-- example:end -->
+
+### List / get databases
+
+JavaScript:
+<!-- example:start databases/db-list-get lang=ts -->
+```typescript
+  // Databases where you're owner or manager
+  const databases = await client.databases.list();
+
+  // Any authenticated user can resolve a database by id
+  const db = await client.databases.get(databaseId);
+```
+<!-- example:end -->
+Swift:
+<!-- example:start databases/db-list-get lang=swift -->
+```swift
+  // Databases where you're owner or manager
+  let databases = try await client.databases.list()
+
+  // Any authenticated user can resolve a database by id
+  let db = try await client.databases.get(databaseId: databaseId)
+```
+<!-- example:end -->
+
+### Grant a group access
+
+JavaScript:
+<!-- example:start databases/db-grant-group lang=ts -->
+```typescript
+  await client.databases.grantGroupPermission(databaseId, {
+    groupType: "team",
+    groupId: "engineering",
+    permission: "manager",
+  });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start databases/db-grant-group lang=swift -->
+```swift
+  _ = try await client.databases.grantGroupPermission(
+    databaseId: databaseId,
+    params: ["groupType": "team", "groupId": "engineering", "permission": "manager"]
+  )
+```
+<!-- example:end -->
+
+
 ## Core Concept: Databases
 
 A **database** is:

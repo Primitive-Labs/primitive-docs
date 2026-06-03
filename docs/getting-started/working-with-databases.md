@@ -133,12 +133,15 @@ params = '{"search":{"type":"string","required":true}}'
 
 Callers can override `limit`, `cursor`, and `direction` at call time:
 
-```typescript
-const { data, hasMore, nextCursor } = await client.databases.executeOperation(
-  databaseId, "search-products",
-  { params: { search: "widget" }, limit: 20, cursor: previousCursor }
-);
-```
+::: code-group
+
+<<< ../../examples/databases/db-execute-operation.ts#example{ts} [JavaScript]
+
+<<< ../../examples/databases/db-execute-operation.swift#example{swift} [Swift]
+
+:::
+
+Callers can also override `limit`, `cursor`, and `direction` in the third argument (e.g. `{ params, limit: 20, cursor: previousCursor }`).
 
 ### Mutations
 Create, update, or delete records. Supports `save`, `patch`, `delete`, `increment`, `addToSet`, and `removeFromSet`.
@@ -513,6 +516,10 @@ A missing CEL context key (`$database.celContext.nonExistent` → `null`) natura
 
 ## Real-Time Subscriptions
 
+::: warning JavaScript-only
+`client.databases.subscribe(...)` is currently **JavaScript-only** — the Swift client's `databases` API exposes `executeOperation` (and create/list/get/grant) but not subscriptions. Swift apps poll via `executeOperation` until the subscription API lands.
+:::
+
 Databases can push changes to connected clients over WebSocket — your app doesn't have to poll. Subscriptions are scoped to a *database type*, so one definition serves every database of that type. Define them in TOML alongside your operations, push with `primitive sync push`, and the server fans out matching change events.
 
 ```toml
@@ -565,36 +572,31 @@ See [Scheduled and Real-Time Automation](./scheduled-and-realtime-automation.md)
 If your app relies on `databases.list()` to populate a dashboard or workspace list, invited team members who interact with databases solely through registered operations will not see those databases — even if they have full operational access. This can cause databases to appear "missing" for non-owner users.
 :::
 
-```typescript
-// Only returns databases where the user is owner or manager
-const databases = await client.databases.list();
+::: code-group
 
-// Filter to one databaseType — wire shape: ?type=<databaseType>
-const projects = await client.databases.list({ databaseType: "project" });
-```
+<<< ../../examples/databases/db-list-get.ts#example{ts} [JavaScript]
 
-The same `{ databaseType }` filter applies for app-level admins, who otherwise see every database in the app.
+<<< ../../examples/databases/db-list-get.swift#example{swift} [Swift]
+
+:::
+
+In JavaScript you can also pass `{ databaseType }` to `list()` to filter to one type (the same filter applies for app-level admins, who otherwise see every database).
 
 ### `databases.get()` — Any Authenticated User
 
-Unlike `list()`, `databases.get(databaseId)` is available to any authenticated user who knows the database ID. It does not require owner or manager permission. `databases.get()` also resolves **group-based** access via `DatabaseGroupPermission` (see below), so users who only have access through a shared group can still load database metadata.
-
-```typescript
-// Works for any authenticated user — no owner/manager permission required
-const db = await client.databases.get(databaseId);
-```
+Unlike `list()`, `databases.get(databaseId)` (shown above) is available to any authenticated user who knows the database ID — no owner/manager permission required. It also resolves **group-based** access via `DatabaseGroupPermission` (see below), so users who only have access through a shared group can still load database metadata.
 
 ### Group-Based Database Access
 
 Alongside direct permission grants, a database can be shared with an entire group using `DatabaseGroupPermission`. This mirrors the document-sharing model:
 
-```typescript
-await client.databases.grantGroupPermission(databaseId, {
-  groupType: "team",
-  groupId: "engineering",
-  permission: "manager",
-});
-```
+::: code-group
+
+<<< ../../examples/databases/db-grant-group.ts#example{ts} [JavaScript]
+
+<<< ../../examples/databases/db-grant-group.swift#example{swift} [Swift]
+
+:::
 
 Members of the group can then call `databases.get(databaseId)` and execute operations. Note that `databases.list()` deliberately does **not** include group-access databases — this matches the documents semantics, where the list is "things I directly own" and discovery of shared things happens through another channel (group memberships, collections, or a shared link).
 
