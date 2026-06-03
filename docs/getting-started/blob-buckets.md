@@ -45,28 +45,23 @@ primitive blob-buckets create \
 
 ### 2. Upload
 
-```typescript
-const { blobId } = await client.blobBuckets
-  .bucket("avatars")
-  .upload(fileBytes, {
-    filename: "alice.jpg",
-    contentType: "image/jpeg",
-  });
-```
+::: code-group
+
+<<< ../../examples/blobs/bucket-upload.ts#example{ts} [JavaScript]
+
+<<< ../../examples/blobs/bucket-upload.swift#example{swift} [Swift]
+
+:::
 
 ### 3. Read
 
-```typescript
-// Signed URL (for <img> tags, etc.)
-const url = await client.blobBuckets
-  .bucket("avatars")
-  .signedUrl(blobId, { expiresInSeconds: 3600 });
+::: code-group
 
-// Direct read
-const bytes = await client.blobBuckets
-  .bucket("avatars")
-  .read(blobId, { as: "arrayBuffer" });
-```
+<<< ../../examples/blobs/bucket-read.ts#example{ts} [JavaScript]
+
+<<< ../../examples/blobs/bucket-read.swift#example{swift} [Swift]
+
+:::
 
 ## Access Policies
 
@@ -132,13 +127,7 @@ TTL is set at the bucket level — every blob in the bucket inherits it. To mix 
 
 ## Signed URLs
 
-Buckets don't expose raw storage URLs. Reads go through either the Primitive API (authenticated) or a time-limited **signed URL** you generate on demand:
-
-```typescript
-const url = await client.blobBuckets
-  .bucket("avatars")
-  .signedUrl(blobId, { expiresInSeconds: 3600 });
-```
+Buckets don't expose raw storage URLs. Reads go through either the Primitive API (authenticated) or a time-limited **signed URL** you generate on demand with `client.blobBuckets.getSignedUrl(...)` (shown in [Read](#_3-read) above).
 
 Signed URLs:
 
@@ -151,18 +140,13 @@ Use a short expiry (minutes to hours) for user-facing URLs, and regenerate as ne
 
 ## Listing and Managing Blobs
 
-```typescript
-const bucket = client.blobBuckets.bucket("avatars");
+::: code-group
 
-// List
-const { items, cursor } = await bucket.list({ limit: 50 });
+<<< ../../examples/blobs/bucket-manage.ts#example{ts} [JavaScript]
 
-// Metadata
-const meta = await bucket.get(blobId);
+<<< ../../examples/blobs/bucket-manage.swift#example{swift} [Swift]
 
-// Delete
-await bucket.delete(blobId);
-```
+:::
 
 ## Using Buckets in Workflows
 

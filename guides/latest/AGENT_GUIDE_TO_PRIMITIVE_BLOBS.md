@@ -2,6 +2,93 @@
 
 Guidelines for AI agents implementing file storage in Primitive apps.
 
+## Bucket operations (JavaScript + Swift)
+
+The bucket-blob client calls in both languages, compiled against the real clients. The API is **flat** (`client.blobBuckets.upload(bucketIdOrKey, …)`), not a `.bucket(key)` builder, and accepts `tags: string[]` — there is no arbitrary `metadata` field on upload.
+
+### Upload
+
+JavaScript:
+<!-- example:start blobs/bucket-upload lang=ts -->
+```typescript
+  const { blobId } = await client.blobBuckets.upload("avatars", {
+    filename: "alice.jpg",
+    contentType: "image/jpeg",
+    data,
+    tags: ["profile"],
+  });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start blobs/bucket-upload lang=swift -->
+```swift
+  let result = try await client.blobBuckets.upload(
+    bucketIdOrKey: "avatars",
+    data: data,
+    filename: "alice.jpg",
+    contentType: "image/jpeg",
+    tags: ["profile"]
+  )
+  let blobId = result["blobId"] as? String
+```
+<!-- example:end -->
+
+### Read (signed URL / download)
+
+JavaScript:
+<!-- example:start blobs/bucket-read lang=ts -->
+```typescript
+  // Signed URL (for <img> tags, etc.)
+  const { url } = await client.blobBuckets.getSignedUrl("avatars", blobId, 3600);
+
+  // Or download the bytes directly
+  const bytes = await client.blobBuckets.download("avatars", blobId);
+```
+<!-- example:end -->
+Swift:
+<!-- example:start blobs/bucket-read lang=swift -->
+```swift
+  // Signed URL (for <img> tags, etc.)
+  let signed = try await client.blobBuckets.getSignedUrl(
+    bucketIdOrKey: "avatars", blobId: blobId, expiresInSeconds: 3600
+  )
+  let url = signed["url"] as? String
+
+  // Or download the bytes directly
+  let bytes = try await client.blobBuckets.download(bucketIdOrKey: "avatars", blobId: blobId)
+```
+<!-- example:end -->
+
+### List / metadata / delete
+
+JavaScript:
+<!-- example:start blobs/bucket-manage lang=ts -->
+```typescript
+  // List blobs in the bucket
+  const { items, cursor } = await client.blobBuckets.list("avatars", { limit: 50 });
+
+  // One blob's metadata
+  const meta = await client.blobBuckets.getMetadata("avatars", blobId);
+
+  // Delete a blob
+  await client.blobBuckets.delete("avatars", blobId);
+```
+<!-- example:end -->
+Swift:
+<!-- example:start blobs/bucket-manage lang=swift -->
+```swift
+  // List blobs in the bucket
+  let page = try await client.blobBuckets.list(bucketIdOrKey: "avatars", limit: 50)
+  let items = page["items"] as? [[String: Any]] ?? []
+
+  // One blob's metadata
+  let meta = try await client.blobBuckets.getMetadata(bucketIdOrKey: "avatars", blobId: blobId)
+
+  // Delete a blob
+  _ = try await client.blobBuckets.delete(bucketIdOrKey: "avatars", blobId: blobId)
+```
+<!-- example:end -->
+
 ## Overview
 
 Two kinds of blob storage:
