@@ -32,6 +32,21 @@ Each method must be enabled in the Admin Console. Check availability with `getAu
 
 `getAuthConfig()` returns the effective map. Configure passkeys via `passkeyRpConfig`.
 
+## Server App Settings ↔ Client Contract
+
+Server-side app settings must align with the origin the client app is served from. Inspect with `primitive apps get`; the relevant fields:
+
+| Server field | Contract | Set via |
+|---|---|---|
+| `corsAllowedOrigins` | Must contain the exact serving origin (scheme+host+port). `corsMode` defaults to `custom` — an empty list blocks every browser request. | `primitive apps update --cors-origins "<o1>,<o2>"` |
+| `redirectUris` | OAuth callbacks are validated against this whitelist — a non-listed callback URL returns 400 `Invalid redirect URI`. | Admin Console only (no CLI flag) |
+| `baseUrl` | Used for links in auth emails / redirects. | `primitive apps update --base-url <url>` |
+| Provider toggles | `--google-oauth`/`--magic-link`/`--otp`/`--passkey <bool>` — what `getAuthConfig()` reports. | `primitive apps update` |
+
+**Blank-login failure mode (CORS).** When the serving origin is missing from `corsAllowedOrigins`, the browser blocks the client's bootstrap refresh (`POST …/api/auth/refresh` → 403, no `access-control-allow-origin`). The refresh classifies as a **network** outcome: `initializeClient` throws `initializeClient refresh failed (network)`, no `auth-failed` event fires (bootstrap-cause failures are deliberately suppressed), `getAuthConfig()` is never reached, and a login UI that gates methods on a loaded auth config renders **blank with no error**. Diagnose with the network tab (403 on `auth/refresh` with no CORS headers) and `primitive apps get`; fix by adding the origin. Common triggers: serving on a non-default port, or a newly deployed domain.
+
+Dev → prod checklist: add the production origin to `corsAllowedOrigins`, add the production OAuth callback to `redirectUris` (Admin Console), update `baseUrl`, and re-check `getAuthConfig()` reports the expected methods.
+
 ---
 
 ## OAuth (Google)

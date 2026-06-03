@@ -7,6 +7,26 @@ The two things you may want to configure are:
 1. **Email sign-in method** — Magic Link (default) or One-Time Password, controlled by a prop on the login component
 2. **Google OAuth** — Optional, requires setting up a Google OAuth client
 
+## Server App Settings Must Match Your App's Origin
+
+Authentication runs against server-side **app settings** that must line up with where your client app is actually served. Three settings matter, and a mismatch in the first one fails in a particularly confusing way:
+
+| Setting | What it does | How to set |
+|---|---|---|
+| **CORS allowed origins** | The whitelist of origins allowed to call the Primitive API from a browser. Your serving origin (scheme + host + port) must be listed. | `primitive apps update --cors-origins "http://localhost:5173,https://myapp.com"` or Admin Console |
+| **Redirect URIs** | The whitelist of OAuth callback URLs. The callback your app uses must match exactly, or the OAuth callback fails with `Invalid redirect URI`. | Admin Console (no CLI flag) |
+| **Base URL** | Where the app is served — used for links in auth emails and redirects. | `primitive apps update --base-url "https://myapp.com"` |
+
+Inspect all three anytime with `primitive apps get`.
+
+::: warning The blank-login failure mode
+If the origin your app is served from is **not** in the CORS allowed origins, every request to the Primitive server is blocked by the browser — including the client's very first auth bootstrap call. `initializeClient()` fails with a network error before the auth config ever loads, and because the login UI gates every sign-in method on a loaded auth config, **the login screen renders completely blank with no error**.
+
+Symptoms: blank login UI; the network tab shows an `OPTIONS` or `POST` to `…/api/auth/refresh` returning **403** with no `access-control-allow-origin` header.
+
+Fix: add the serving origin to the app's CORS allowed origins. This bites most often when running on a non-default port (e.g. `:4001` when only `:5173` is listed) or when deploying to a new domain.
+:::
+
 ## Choosing Your Email Sign-In Method
 
 The `PrimitiveLogin` component supports two email-based sign-in methods:
@@ -49,7 +69,7 @@ When deploying to production, add your production domain to these settings along
 
 ### 2. Configure in Primitive
 
-Enter your **Client ID** and **Client Secret** in the [Admin Console](https://admin.primitiveapi.com/login) under your app's Google OAuth settings, then enable the provider and allow your dev origin:
+Enter your **Client ID** and **Client Secret** in the [Admin Console](https://admin.primitiveapi.com/login) under your app's Google OAuth settings, then enable the provider and allow your dev origin (see [Server App Settings](#server-app-settings-must-match-your-apps-origin) — the OAuth callback URL must also be in the app's **Redirect URIs**, set in the Admin Console):
 
 ```bash
 primitive apps update --google-oauth true

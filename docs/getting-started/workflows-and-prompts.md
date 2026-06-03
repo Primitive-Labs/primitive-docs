@@ -207,6 +207,14 @@ Script steps are **deterministic and side-effect-free**: the sandbox has no netw
 
 You author script bodies as `.rhai` files in your sync directory (`transforms/<name>.rhai`) and push them with `primitive sync push` alongside the rest of your config — there's no separate command. A `script` step then references a script by name and passes it a JSON input context. Each `script`-step execution records per-step telemetry on the `WorkflowRun` (`scriptMetrics`) so you can see operation counts and timing in run detail.
 
+Three things to know when wiring a script step:
+
+- The step's `with` table is exposed to the script as `input.*` (alias `ctx.*`) — not as bare variables. Use `input.payload`, not `payload`. (`with` is also a reserved Rhai keyword.)
+- The script's return value appears to later steps under `steps.<id>.output.*` — unlike a `transform` step, whose result fields sit directly on `steps.<id>`.
+- Script bodies are frozen into the referencing workflow at publish time. Pushing a changed `.rhai` alone doesn't change a workflow's behavior — republish the workflow to pick up the new body.
+
+Useful in-script patterns: `parse_json(input.field)` to parse JSON stored in string fields, `value != ()` to test for missing keys, and returning a sentinel instead of `Infinity`/`NaN` (they serialize as `null`).
+
 ## Email Steps
 
 The `email.send` step sends an email from inside a workflow. It has two modes.

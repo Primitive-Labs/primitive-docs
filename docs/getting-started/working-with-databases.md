@@ -361,7 +361,7 @@ access = "true"
 definition = '{"filter":{"priceCents":{"$gt":0}}}'
 ```
 
-With the schema in place, a future op that filters on `nameTypo` instead of `name` is rejected at push time with `OPERATION_REFERENCES_UNDEFINED` — before it can return broken data. Schema edits are checked in the reverse direction: a change that would invalidate an existing op is rejected with `SCHEMA_BREAKS_OPERATIONS`.
+With the schema in place, a future op that filters on `nameTypo` instead of `name` is rejected at push time with `OPERATION_REFERENCES_UNDEFINED` — before it can return broken data. (The error message itself doesn't name the field — look at the `refs` array in the response for the unresolved references.) Schema edits are checked in the reverse direction: a change that would invalidate an existing op is rejected with `SCHEMA_BREAKS_OPERATIONS`.
 
 To add a schema to an existing type that already has ops and live data, scaffold it from the server:
 
@@ -374,8 +374,12 @@ This inspects existing ops and introspects the live database, then splices a `[m
 Ops with dynamic references (e.g. `modelName = "$params.kind"`) can't be statically verified. The op-edit gate accepts them as warnings, and the schema-edit gate flags them with `SCHEMA_HAS_UNCHECKABLE_OPS` — re-run with `primitive sync push --accept-warnings` to commit once you've reviewed them.
 
 ::: tip
-Types without any `[models.*]` block keep the pre-gate behavior — ops are accepted without static consistency checks. Once you add a schema, the gate also prevents removing it while ops are still registered (`OPS_EXIST`).
+Types without any `[models.*]` block keep the pre-gate behavior — ops are accepted without static consistency checks. The moment you declare *any* fields for a model, the gate switches on for every op edit. Once you add a schema, the gate also prevents removing it while ops are still registered (`OPS_EXIST`).
 :::
+
+### Field Types
+
+`[models.*.fields.*]` accepts `string`, `number`, `boolean`, `date`, `id`, and `stringset`. There's **no object or array type** — `type = "object"` is rejected at push time, even though operation *params* do accept `"object"`. To store a structured payload (a nested JSON snapshot, for example), declare the field as a `string`, write JSON-encoded values, and parse it wherever it's consumed — for instance with `parse_json(...)` in a workflow script step.
 
 ## TypeScript Codegen
 

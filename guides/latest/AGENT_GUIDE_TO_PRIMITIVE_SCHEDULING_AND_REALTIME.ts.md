@@ -48,7 +48,7 @@ Two independent capabilities. They often combine, but they answer different ques
 
 8. **`unsub()` leaks if not called.** Each `subscribe()` returns an `unsub` function. Call it on view teardown or you accumulate `ConnectionMapping` rows and dead callbacks.
 
-9. **Subscriptions are type-scoped.** A single subscription definition serves every database of that type. CRUD lives on the admin HTTP API; `primitive sync push` does not manage subscriptions.
+9. **Subscriptions are type-scoped.** A single subscription definition serves every database of that type. Manage them as `[[subscriptions]]` blocks in the database-type TOML — `primitive sync push` creates, updates, and deletes them (see Database Subscriptions below).
 
 10. **In the subscription `filter`, record fields live under `record.data.*`.** The CEL `record` namespace exposes `record.modelName`, `record.op`, `record.id`, `record.data.<fieldName>`, and `record.previousData.<fieldName>`. Don't write `record.<fieldName>` — record payload fields are nested under `data`.
 
@@ -472,7 +472,6 @@ const unsub = client.databases.subscribe(metricsDbId, "hourly-rollups", {
 - Putting `isMemberOf()` or per-user logic in subscription `filter` — `filter` has no membership data. Put it in `access`.
 - Writing `record.fieldName` in `filter` — record payload fields live under `record.data.fieldName`. Only `record.modelName`, `record.op`, `record.id` are top-level.
 - Sending an empty / missing `filter` on POST or PUT — both `access` and `filter` are required non-empty CEL strings. Use `"true"` if you don't want filter narrowing.
-- Defining subscriptions in TOML / `primitive sync push` — the CLI does not manage subscriptions. CRUD is admin-HTTP only.
 - Sending the body field `accessRule` — the wire-format field name is `access`. POSTing `accessRule` is rejected with `access (CEL expression) is required`.
 - Assuming the writer's own mutation comes back through THEIR subscription on the SAME connection — it doesn't. (Other connections of the same user DO receive it.)
 - Relying on replay after disconnect. There is none. Re-load if you need consistency.

@@ -432,7 +432,9 @@ access = "true"
 definition = '{"filter":{"priceCents":{"$gt":0}}}'
 ```
 
-Adding the `[models.product.fields.*]` blocks above means any future `[[operations]]` that references `product.nameTypo` (instead of `name`) is rejected at push time, before it can return broken data.
+Adding the `[models.product.fields.*]` blocks above means any future `[[operations]]` that references `product.nameTypo` (instead of `name`) is rejected at push time, before it can return broken data. Note the 422 *message* doesn't name the offending field — the unresolved refs are in the response payload's `refs` array.
+
+**Field types — no object/JSON type.** `[models.*.fields.*]` accepts `string`, `number`, `boolean`, `date`, `id`, `stringset` only. `type = "object"` fails with `TOML_PARSE_ERROR: Invalid field type` — even though operation **params** do accept `"object"`. To store a structured payload (nested objects/arrays), declare the field as `string`, write JSON-encoded values, and parse on the consumer side — e.g. `parse_json(input.payload)` in a workflow `script` step.
 
 **Dynamic references.** Some refs can't be statically checked — for example, `modelName = "$params.kind"` (model determined at call time), a raw `filter` or `projection` lifted from `$params`, `record[expr]` field access, or lambda bodies inside pipelines. These are surfaced as *warnings*, not errors. The op is accepted, but the schema-edit gate later flags them so the operator can review whether the dynamic reference is still consistent with the new schema.
 
@@ -601,7 +603,7 @@ params = '{"title":{"type":"string","required":true}}'
 
 **Response:** `{ results: [{ success: true, id: "..." }] }`
 
-**`upsertOn`** — pass `"upsertOn": "$params.email"` in a `save` op to create-or-update by a unique field value instead of requiring an explicit `id`. The server looks up a record where that field equals the provided value; if found, it patches it; if not, it inserts a new record. Useful for "ensure this user exists with these attributes" patterns:
+**`upsertOn`** — pass the **field name** (`"upsertOn": "email"`, NOT a `$params.*` substitution) in a `save` op to create-or-update by a unique field instead of requiring an explicit `id`. The match **value** comes from `data` — the server looks up a record where that field equals `data.<field>`; if found, it patches it; if not, it inserts a new record. Useful for "ensure this user exists with these attributes" patterns:
 
 ```toml
 [[operations]]
@@ -609,9 +611,14 @@ name = "ensureContact"
 type = "mutation"
 modelName = "contacts"
 access = "hasRole('admin')"
-definition = '{"operations":[{"op":"save","upsertOn":"$params.email","data":{"email":"$params.email","name":"$params.name","updatedAt":"$now"}}]}'
+definition = '{"operations":[{"op":"save","upsertOn":"email","data":{"email":"$params.email","name":"$params.name","updatedAt":"$now"}}]}'
 params = '{"email":{"type":"string","required":true},"name":{"type":"string","required":true}}'
 ```
+
+Two failure modes to know:
+
+- `"upsertOn": "$params.email"` gets **value-substituted** like any other definition string, so the server receives the email *value* as the field name and rejects with `upsertOn field 'alice@example.com' must be present in data and not null/empty`.
+- `upsertOn` requires a registered **unique index** on the field at runtime — `unique = true` in the type schema is not sufficient. Without one, saves fail with `upsertOn field '<field>' does not have a registered unique index`. Create it once per database: `primitive databases indexes create <database-id> --model <model> --field <field> --unique`.
 
 #### Count — count matching records
 
@@ -1118,7 +1125,7 @@ export { Task };
 
 This produces the same runtime artifact as codegen output, but you lose the auto-registered barrel and the boot-time TOML/code consistency check. Reach for it only if TOML+codegen genuinely doesn't fit your build setup; the migration path back to TOML is `npx js-bao-codegen-v2 migrate`.
 
-Database field types: `id` (primary key, use `auto_assign = true` for ULIDs), `string`, `number`, `boolean`, `date`, `stringset` (set-of-strings field — use with `addToSet`/`removeFromSet`).
+Database field types: `id` (primary key, use `auto_assign = true` for ULIDs), `string`, `number`, `boolean`, `date`, `stringset` (set-of-strings field — use with `addToSet`/`removeFromSet`). There is no object/JSON field type — store structured payloads as JSON strings and parse on read.
 
 ### Indexes
 
