@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 // Compile-check the example corpus so the docs can't drift from the real
-// clients. Each `examples/**/*.ts` (and, in a follow-up, `.swift`) is a
-// COMPLETE, self-contained module — real imports + a typed function — so it
-// compiles on its own. What the docs show is a `#region example` slice of a
-// file that actually type-checks against the vendored client.
+// clients. Each corpus file is a COMPLETE, self-contained module — real
+// imports + a typed function — so it compiles on its own. What the docs show
+// is a `#region example` slice of a file that actually type-checks against the
+// vendored client.
 //
-// TypeScript: type-checks every example file against
-// `library_repos/js-bao-wss/src/client` (resolved as `js-bao-wss-client`).
-// A snippet that calls a non-existent client method or passes the wrong shape
-// fails the build.
+// Files are grouped by their variant's `harness` (scripts/variants.mjs):
+//
+//   "ts"          — type-checks against `js-bao-wss-client` + `js-bao` from
+//                   the docs project's node_modules
+//   "swift-macos" — `swift build` in examples/_harness/swift
+//   null          — no compile gate declared yet; loudly enumerated as
+//                   uncompiled (never silently skipped)
 //
 // A file may opt out with a `// nocompile` line (e.g. framework-glue snippets
 // that depend on app-template types not present in this repo) — those are
@@ -17,9 +20,10 @@
 // Usage:  node scripts/compile-examples.mjs
 
 import { readdirSync, readFileSync, writeFileSync, statSync, mkdirSync, rmSync, cpSync } from "node:fs";
-import { join, dirname, relative, extname, basename } from "node:path";
+import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import { parseExampleFile } from "./variants.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EXAMPLES_DIR = join(ROOT, "examples");
@@ -35,12 +39,28 @@ function walk(dir) {
   return out;
 }
 
-const allFiles = walk(EXAMPLES_DIR);
 const isSkipped = (f) => readFileSync(f, "utf-8").includes("// nocompile");
 const failures = [];
 
-// ── TypeScript ──────────────────────────────────────────────────────────────
-const tsAll = allFiles.filter((f) => extname(f) === ".ts");
+// ── Group corpus files by compile harness ──────────────────────────────────
+const byHarness = new Map(); // harnessId | null -> file[]
+for (const file of walk(EXAMPLES_DIR)) {
+  let parsed;
+  try {
+    parsed = parseExampleFile(relative(EXAMPLES_DIR, file));
+  } catch (err) {
+    failures.push("corpus");
+    console.error(`✘ ${err.message}`);
+    continue;
+  }
+  if (!parsed) continue; // not a corpus file
+  const harness = parsed.variant.harness;
+  if (!byHarness.has(harness)) byHarness.set(harness, []);
+  byHarness.get(harness).push(file);
+}
+
+// ── Harness: ts ─────────────────────────────────────────────────────────────
+const tsAll = byHarness.get("ts") ?? [];
 const tsCompile = tsAll.filter((f) => !isSkipped(f));
 console.log(`TypeScript: ${tsCompile.length} file(s) to compile, ${tsAll.length - tsCompile.length} skipped (// nocompile)`);
 
@@ -79,8 +99,8 @@ if (tsCompile.length > 0) {
   }
 }
 
-// ── Swift ───────────────────────────────────────────────────────────────────
-const swiftAll = allFiles.filter((f) => extname(f) === ".swift");
+// ── Harness: swift-macos ────────────────────────────────────────────────────
+const swiftAll = byHarness.get("swift-macos") ?? [];
 const swiftCompile = swiftAll.filter((f) => !isSkipped(f));
 const haveSwift = (() => {
   try { execFileSync("swift", ["--version"], { stdio: "ignore" }); return true; }
@@ -108,6 +128,14 @@ if (swiftCompile.length > 0 && !haveSwift) {
     failures.push("Swift");
     console.error("✘ Swift example compilation failed (see errors above).\n");
   }
+}
+
+// ── Harness: none declared ──────────────────────────────────────────────────
+const unharnessed = byHarness.get(null) ?? [];
+if (unharnessed.length > 0) {
+  console.log(`Uncompiled (no harness declared in variants.mjs): ${unharnessed.length} file(s)`);
+  for (const f of unharnessed) console.log(`  - ${relative(ROOT, f)}`);
+  console.log("");
 }
 
 if (failures.length) {

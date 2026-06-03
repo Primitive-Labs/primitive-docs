@@ -4,12 +4,17 @@
 //
 //   • Human docs (docs/, VitePress)  — transclude with native `<<<` + code-group
 //     tabs at build time. Nothing to do here.
-//   • Agent guides (guides/, served as static single-language markdown by
+//   • Agent guides (guides/, served as static single-variant markdown by
 //     `primitive guides get`) — can't transclude at serve time, so the corpus
 //     code is injected into marked regions of the committed guide. This script
 //     does that injection, and `--check` verifies the guides are in sync (CI).
 //
-// Agent-guide marker syntax (the `lang` is the guide's served language):
+// Corpus shape (see scripts/variants.mjs): every example id must exist for
+// every base language (`<op>.ts`, `<op>.swift`); platform-override files
+// (`<op>.ios.swift` → variant swift_ios) are optional and only valid for
+// declared variants.
+//
+// Agent-guide marker syntax (the `lang` is a variant id from variants.mjs):
 //
 //     <!-- example:start documents/list-shared lang=ts -->
 //     ```typescript
@@ -22,8 +27,9 @@
 //   node scripts/examples.mjs --check    # verify only; non-zero on drift/missing (CI)
 
 import { readdirSync, readFileSync, writeFileSync, statSync } from "node:fs";
-import { join, relative, extname, basename, dirname } from "node:path";
+import { join, relative, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { baseLanguages, parseExampleFile, variantById } from "./variants.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EXAMPLES_DIR = join(ROOT, "examples");
@@ -31,12 +37,7 @@ const GUIDES_DIR = join(ROOT, "guides", "latest");
 
 const CHECK = process.argv.includes("--check");
 
-// Languages required for every example, and their file ext + markdown fence.
-const LANGS = {
-  ts: { ext: "ts", fence: "typescript" },
-  swift: { ext: "swift", fence: "swift" },
-};
-const REQUIRED_LANGS = Object.keys(LANGS);
+const BASE_LANGUAGES = baseLanguages();
 const REGION = "example";
 
 const problems = [];
@@ -63,35 +64,54 @@ function extractRegion(file, region) {
   return lines.slice(start + 1, end).join("\n");
 }
 
-const wantExts = new Set(REQUIRED_LANGS.map((l) => LANGS[l].ext));
-const corpus = new Map(); // id -> { lang -> {file, code} }
-for (const file of walk(EXAMPLES_DIR).filter((f) => wantExts.has(extname(f).slice(1)))) {
-  const ext = extname(file).slice(1);
-  const lang = REQUIRED_LANGS.find((l) => LANGS[l].ext === ext);
-  const id = join(relative(EXAMPLES_DIR, dirname(file)), basename(file, `.${ext}`));
+// id -> { base: Map<language, {file, code}>, overrides: Map<variantId, {file, code}> }
+const corpus = new Map();
+let overrideCount = 0;
+for (const file of walk(EXAMPLES_DIR)) {
+  let parsed;
+  try {
+    parsed = parseExampleFile(relative(EXAMPLES_DIR, file));
+  } catch (err) {
+    problems.push(`✘ ${err.message}`);
+    continue;
+  }
+  if (!parsed) continue; // not a corpus file (e.g. README.md)
   const code = extractRegion(file, REGION);
   if (code === null) {
     problems.push(`✘ ${relative(ROOT, file)}: missing/unbalanced '#region ${REGION}'`);
   }
-  if (!corpus.has(id)) corpus.set(id, {});
-  corpus.get(id)[lang] = { file, code };
+  if (!corpus.has(parsed.id)) corpus.set(parsed.id, { base: new Map(), overrides: new Map() });
+  const entry = corpus.get(parsed.id);
+  if (parsed.platform === null) entry.base.set(parsed.language, { file, code });
+  else { entry.overrides.set(parsed.variant.id, { file, code }); overrideCount++; }
 }
 
-for (const [id, byLang] of [...corpus].sort()) {
-  const missing = REQUIRED_LANGS.filter((l) => !byLang[l]);
+for (const [id, entry] of [...corpus].sort()) {
+  const missing = BASE_LANGUAGES.filter((l) => !entry.base.has(l));
   if (missing.length) problems.push(`✘ ${id}: missing language(s): ${missing.join(", ")}`);
 }
 
-console.log(`Corpus: ${corpus.size} example(s) × [${REQUIRED_LANGS.join(", ")}]`);
+console.log(
+  `Corpus: ${corpus.size} example(s) × [${BASE_LANGUAGES.join(", ")}]` +
+    (overrideCount ? ` + ${overrideCount} platform override(s)` : ""),
+);
 
 // ── 2. Inject / verify agent-guide regions ──────────────────────────────────
+// NOTE: no committed guide currently uses these markers (the rendered builds
+// come from render-guides.mjs templates instead) — this mode is kept working
+// but is a candidate for removal in a future cleanup.
 const MARKER = /<!--\s*example:start\s+(\S+)\s+lang=(\w+)\s*-->\n[\s\S]*?<!--\s*example:end\s*-->/g;
 
-function buildBlock(id, lang) {
+function buildBlock(id, variantId) {
+  const variant = variantById.get(variantId);
   const entry = corpus.get(id);
-  if (!entry || !entry[lang]) throw new Error(`unknown example '${id}' lang=${lang}`);
-  const fence = LANGS[lang].fence;
-  return `<!-- example:start ${id} lang=${lang} -->\n\`\`\`${fence}\n${entry[lang].code}\n\`\`\`\n<!-- example:end -->`;
+  const slot = variant && entry
+    ? (variant.platform === null
+        ? entry.base.get(variant.language)
+        : entry.overrides.get(variant.id) ?? entry.base.get(variant.language))
+    : undefined;
+  if (!slot) throw new Error(`unknown example '${id}' lang=${variantId}`);
+  return `<!-- example:start ${id} lang=${variantId} -->\n\`\`\`${variant.fence}\n${slot.code}\n\`\`\`\n<!-- example:end -->`;
 }
 
 const guideFiles = walk(GUIDES_DIR).filter((f) => f.endsWith(".md"));

@@ -1,4 +1,8 @@
 {
+  "defaults": {
+    "language": "ts",
+    "platform": "web"
+  },
   "guides": [
     {
       "topic": "authentication",
@@ -40,10 +44,16 @@
       "relatedGuides": [
         "documents"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.swift.md"
+        }
+      ]
     },
     {
       "topic": "blobs",
@@ -102,10 +112,16 @@
         "documents",
         "workflows"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_BLOBS.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_BLOBS.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_BLOBS.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_BLOBS.swift.md"
+        }
+      ]
     },
     {
       "topic": "data-modeling",
@@ -143,10 +159,16 @@
         "databases",
         "users-and-groups"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.swift.md"
+        }
+      ]
     },
     {
       "topic": "users-and-groups",
@@ -202,10 +224,16 @@
         "authentication",
         "sharing-and-invitations"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.swift.md"
+        }
+      ]
     },
     {
       "topic": "sharing-and-invitations",
@@ -262,10 +290,16 @@
         "users-and-groups",
         "authentication"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.swift.md"
+        }
+      ]
     },
     {
       "topic": "scheduling-and-realtime",
@@ -318,10 +352,16 @@
         "workflows",
         "databases"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.swift.md"
+        }
+      ]
     },
     {
       "topic": "databases",
@@ -398,10 +438,16 @@
         "users-and-groups",
         "scheduling-and-realtime"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.swift.md"
+        }
+      ]
     },
     {
       "topic": "documents",
@@ -451,10 +497,16 @@
         "databases",
         "data-modeling"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.swift.md"
+        }
+      ]
     },
     {
       "topic": "workflows",
@@ -539,10 +591,16 @@
         "blobs",
         "analytics"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.swift.md"
+        }
+      ]
     },
     {
       "topic": "prompts",
@@ -584,10 +642,16 @@
       "relatedGuides": [
         "workflows"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_PROMPTS.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_PROMPTS.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_PROMPTS.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_PROMPTS.swift.md"
+        }
+      ]
     },
     {
       "topic": "integrations",
@@ -626,10 +690,16 @@
       "relatedGuides": [
         "workflows"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_INTEGRATIONS.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_INTEGRATIONS.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_INTEGRATIONS.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_INTEGRATIONS.swift.md"
+        }
+      ]
     },
     {
       "topic": "analytics",
@@ -678,10 +748,16 @@
         "integrations",
         "blobs"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.swift.md"
+        }
+      ]
     },
     {
       "topic": "performance",
@@ -737,10 +813,16 @@
         "workflows",
         "scheduling-and-realtime"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_PERFORMANCE.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_PERFORMANCE.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_PERFORMANCE.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_PERFORMANCE.swift.md"
+        }
+      ]
     },
     {
       "topic": "devtools",
@@ -778,10 +860,16 @@
       "relatedGuides": [
         "documents"
       ],
-      "files": {
-        "ts": "AGENT_GUIDE_TO_PRIMITIVE_DEVTOOLS.ts.md",
-        "swift": "AGENT_GUIDE_TO_PRIMITIVE_DEVTOOLS.swift.md"
-      }
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_DEVTOOLS.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_DEVTOOLS.swift.md"
+        }
+      ]
     },
     {
       "topic": "swift-client",
@@ -855,6 +943,12 @@
         "blobs",
         "authentication",
         "sharing-and-invitations"
+      ],
+      "variants": [
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_SWIFT_CLIENT.md"
+        }
       ]
     }
   ]
