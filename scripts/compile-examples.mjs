@@ -102,14 +102,17 @@ if (tsCompile.length > 0) {
 // ── Harness: swift-macos ────────────────────────────────────────────────────
 const swiftAll = byHarness.get("swift-macos") ?? [];
 const swiftCompile = swiftAll.filter((f) => !isSkipped(f));
-const haveSwift = (() => {
+// The harness depends on the vendored swift-client, whose yswift/UniFFI
+// scaffold only builds on Apple platforms — a Linux swift toolchain (present
+// on GitHub ubuntu runners) can't compile it. Require a macOS host.
+const haveSwift = process.platform === "darwin" && (() => {
   try { execFileSync("swift", ["--version"], { stdio: "ignore" }); return true; }
   catch { return false; }
 })();
 
 console.log(`Swift: ${swiftCompile.length} file(s) to compile, ${swiftAll.length - swiftCompile.length} skipped (// nocompile)`);
 if (swiftCompile.length > 0 && !haveSwift) {
-  console.log("  (swift toolchain not found — skipping Swift compile gate)\n");
+  console.log("  (Swift compile gate needs a macOS host with the swift toolchain — SKIPPED here; covered locally and by the macOS CI job)\n");
 } else if (swiftCompile.length > 0) {
   const pkgDir = join(EXAMPLES_DIR, "_harness", "swift");
   const srcDir = join(pkgDir, "Sources", "DocsExamples");
