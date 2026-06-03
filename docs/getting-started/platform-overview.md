@@ -38,28 +38,9 @@ Share documents and databases with other users — by user ID, by email (grants 
 ### Analytics
 Automatic lifecycle event tracking (daily active users, session end, network recovery) plus custom event logging. Query metrics via the CLI or REST API.
 
-## Architecture at a Glance
-
-```
-┌────────────────────────────────────────────────┐
-│            Your App (Web or iOS)               │
-│  ┌──────────┐    ┌──────────────────────────┐  │
-│  │  Your UI │ ◄► │  Primitive client        │  │
-│  └──────────┘    │   · local document store │  │
-│                  │   · background sync      │  │
-│                  └────────────┬─────────────┘  │
-└───────────────────────────────│────────────────┘
-                                ▼
-               ┌────────────────────────────────┐
-               │       Primitive Platform       │
-               │   Auth · Documents · Databases │
-               │   Workflows · Blobs · LLM/API  │
-               └────────────────────────────────┘
-```
-
-Your app runs on the user's device — in the browser or on an iPhone. The Primitive Platform is a managed service — you interact with it through the client library, the CLI, and the Admin Console, never directly with the underlying infrastructure.
-
 ## The Stack
+
+Your app runs on the user's device — in the browser or on an iPhone. The Primitive Platform is a managed service: you interact with it through the client library, the CLI, and the Admin Console, never directly with the underlying infrastructure.
 
 ### The Primitive Platform
 
