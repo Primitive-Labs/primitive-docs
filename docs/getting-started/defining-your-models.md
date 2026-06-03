@@ -178,7 +178,13 @@ The barrel runs `attachAndRegisterModel` for every model exactly once — that's
 
 ## Working with Model Instances
 
-A model instance behaves like a normal object when you read and write individual fields:
+CRUD on model instances (create / read / update / delete, queries, aggregation) is shown side-by-side in JavaScript and Swift in [Working with Documents](./working-with-documents.md#crud-operations).
+
+::: tip JavaScript-specific
+The value-handling caveats in this section apply to the **JavaScript** client only. In Swift, generated models are value-type `struct`s (Codable), so spreading/copying works normally and the gotchas below don't arise.
+:::
+
+A JavaScript model instance behaves like a normal object when you read and write individual fields:
 
 ```typescript
 const todo = await Todo.find(id);
@@ -187,7 +193,7 @@ todo.completed = true;     // write
 await todo.save();
 ```
 
-But a model instance is **not** a plain object, and this trips people up: you cannot spread or clone it. Under the hood, each field is a getter/setter on the model's prototype rather than a value sitting directly on the instance, so the spread (`...`) and rest operators — which only copy a value's own properties — skip every field and quietly give you back an empty object.
+But a JavaScript model instance is **not** a plain object, and this trips people up: you cannot spread or clone it. Under the hood, each field is a getter/setter on the model's prototype rather than a value sitting directly on the instance, so the spread (`...`) and rest operators — which only copy a value's own properties — skip every field and quietly give you back an empty object.
 
 ```typescript
 const copy = { ...todo };            // ❌ has none of todo's fields

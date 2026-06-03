@@ -2,6 +2,10 @@
 
 Primitive includes browser-based development tools for inspecting data, managing files, and running tests. They're provided by the `primitiveDevTools` Vite plugin and only appear in development mode.
 
+::: info Web (Vite) only
+This overlay is part of the web template's Vite tooling. Swift/iOS apps use the Swift client's built-in **Debug Inspector** instead (registered automatically when you create typed models through `PrimitiveAppState`) — the examples on this page are Vite/JavaScript-specific.
+:::
+
 ## Accessing Dev Tools
 
 A floating button showing the Primitive logo appears at the edge of your app during development. Click it to open the dev tools overlay. The button is draggable and its position persists across sessions.
