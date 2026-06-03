@@ -41,10 +41,16 @@ the same effect ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)
 
 ## uploadAvatar(imageData, contentType)
 
-Upload an avatar image and get back the new avatar URL. In JS `contentType` is a
-typed union (`image/png | image/jpeg | image/gif | image/webp`); Swift takes a
-bare `String`, so an invalid MIME type fails at runtime rather than compile-time
+Upload an avatar image and get back the new avatar URL.
+
+::: warning Swift parity gap
+In JS `contentType` is a typed union
+(`image/png | image/jpeg | image/gif | image/webp`); Swift takes a bare `String`,
+so an invalid MIME type fails at runtime rather than compile-time. JS also returns
+a typed `{ avatarUrl }`, whereas Swift returns an untyped `[String: Any]` you must
+hand-parse (`result["avatarUrl"] as? String`)
 ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+:::
 
 ::: code-group
 <<< ./snippets/me/upload-avatar.ts#example{ts} [JavaScript]
@@ -106,9 +112,14 @@ Swift returns `[[String: Any]]` ([#954](https://github.com/Primitive-Labs/js-bao
 
 ## cacheInfo()
 
-Read cache metadata for the current user's profile entry. JS returns
-`{ updatedAt?, ageMs? }`; Swift returns the typed tuple
-`(updatedAt: String?, ageMs: Double?)`.
+Read cache metadata for the current user's profile entry.
+
+::: tip Divergent shape
+JS returns `{ updatedAt?, ageMs? }`; Swift returns the typed tuple
+`(updatedAt: String?, ageMs: Double?)`. This is the one spot on the `me` surface
+where Swift is typed rather than an untyped dictionary — a benign access-pattern
+difference, not a drift.
+:::
 
 ::: code-group
 <<< ./snippets/me/cache-info.ts#example{ts} [JavaScript]

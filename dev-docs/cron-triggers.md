@@ -14,10 +14,12 @@ shapes are unenforced (sweep cron D1–D4,
 :::
 
 ::: warning Swift parity gap
-The Swift client silently casts a non-dict or decode-failed response to an empty
-`[:]` rather than throwing, so a malformed body reads as a (misleadingly)
-**successful empty result** — there is no equivalent silent-success path in JS
-(sweep cron D5, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+Every Swift `cronTriggers` method silently casts a non-dict or decode-failed
+response to an empty `[:]` (`result as? [String: Any] ?? [:]`) rather than
+throwing, so a malformed body reads as a (misleadingly) **successful empty
+result** — there is no equivalent silent-success path in JS (sweep cron D5;
+no tracking issue filed — this is the behavioral contract, not the `[String: Any]`
+typedness umbrella #954).
 :::
 
 ## list()

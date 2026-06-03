@@ -9,10 +9,12 @@ with `client.document(id).blobs()` (JS) or `client.documents.blobs(documentId:)`
 
 Upload a blob attached to the document, hashing and deduplicating automatically.
 
-::: tip Divergent shape
+::: warning Swift parity gap
 JS accepts `File | Blob | Uint8Array | ArrayBuffer` and the `retainLocal` option;
 Swift's `upload(data:options:)` takes only `Data` (filename/contentType must be
-passed explicitly) and has no `retainLocal` ([#965](https://github.com/Primitive-Labs/js-bao-wss/issues/965)).
+passed explicitly) and has no `retainLocal` (sweep blob D12). The `Data`-only source
+is web-vs-native by design, but `retainLocal` has no Swift equivalent and is not
+tracked by an issue.
 :::
 
 ::: code-group
@@ -28,7 +30,7 @@ List blobs attached to this document.
 JS returns a typed `BlobListResult<T>` (`{ items, cursor? }`) and accepts a
 `cursor` for pagination. Swift returns an untyped `[[String: Any]]` and drops the
 cursor entirely — callers stringly-key into each dict and there is no way to page
-(sweep D7, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#965](https://github.com/Primitive-Labs/js-bao-wss/issues/965)).
+(sweep blob D7, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group
@@ -42,7 +44,7 @@ Retrieve metadata for a single blob.
 
 ::: warning Swift parity gap
 JS returns a typed `T` / `BlobInfo` (blob metadata). Swift returns an untyped `[String: Any]`,
-so callers stringly-key into the dict (sweep D8, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#965](https://github.com/Primitive-Labs/js-bao-wss/issues/965)).
+so callers stringly-key into the dict (sweep blob D8, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group
@@ -54,10 +56,11 @@ so callers stringly-key into the dict (sweep D8, [#954](https://github.com/Primi
 
 Build a direct, authenticated download URL for a blob (synchronous).
 
-::: tip Divergent shape
+::: warning Swift parity gap
 JS accepts both `disposition` and `attachmentFilename`. Swift's
-`downloadUrl(blobId:disposition:)` supports `disposition` only
-([#965](https://github.com/Primitive-Labs/js-bao-wss/issues/965)).
+`downloadUrl(blobId:disposition:)` supports `disposition` only — there is no way to
+override the download filename from the Swift client (sweep blob D-downloadUrl; not
+tracked by an issue).
 :::
 
 ::: code-group
@@ -87,14 +90,14 @@ Delete a blob from the document.
 
 ::: warning Swift parity gap
 JS returns a typed `{ deleted: boolean }`. Swift returns an untyped
-`[String: Any]` (sweep D9, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#965](https://github.com/Primitive-Labs/js-bao-wss/issues/965)).
+`[String: Any]` (sweep blob D9, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: warning Swift parity gap
 Beyond the result shape, JS `delete` also evicts the blob's local cache, cancels any
 queued upload for it, and emits `queue-drained`. Swift's `delete` does none of this —
 a deleted blob can be served stale from the local cache, and a delete issued mid-upload
-won't cancel the in-flight transfer (sweep D10, [#965](https://github.com/Primitive-Labs/js-bao-wss/issues/965)).
+won't cancel the in-flight transfer (sweep blob D10; not tracked by an issue).
 :::
 
 ::: code-group
@@ -108,7 +111,8 @@ Upload a file and queue it for background transfer when the upload queue is acti
 
 ::: warning No Swift equivalent
 JavaScript-only — the Swift document-blob context exposes only `upload(data:)`, with
-no separate queued-upload entry point ([#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957)).
+no separate queued-upload entry point. Part of the upload-queue facade that is absent
+on Swift (sweep blob D13; not tracked by an issue).
 :::
 
 <<< ./snippets/document-blob/upload-file.ts#example{ts} [JavaScript]
@@ -119,7 +123,7 @@ Build a service-worker-proxied URL for a blob (useful for inline display).
 
 ::: warning No Swift equivalent
 JavaScript-only — relies on a browser service worker, which has no Swift counterpart
-([#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957)).
+(web-only by platform constraint).
 :::
 
 <<< ./snippets/document-blob/proxy-url.ts#example{ts} [JavaScript]
@@ -129,7 +133,7 @@ JavaScript-only — relies on a browser service worker, which has no Swift count
 Report whether a service worker is registered and controlling blob proxy requests.
 
 ::: warning No Swift equivalent
-JavaScript-only — service-worker-specific ([#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957)).
+JavaScript-only — service-worker-specific (web-only by platform constraint).
 :::
 
 <<< ./snippets/document-blob/has-service-worker-control.ts#example{ts} [JavaScript]
@@ -139,8 +143,8 @@ JavaScript-only — service-worker-specific ([#957](https://github.com/Primitive
 Pre-download multiple blobs into the local cache for offline access.
 
 ::: warning No Swift equivalent
-JavaScript-only — the Swift document-blob context doesn't expose `prefetch` yet
-([#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957)).
+JavaScript-only — the Swift document-blob context doesn't expose `prefetch` yet,
+though the underlying `BlobManager.prefetch` already exists internally ([#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957)).
 :::
 
 <<< ./snippets/document-blob/prefetch.ts#example{ts} [JavaScript]
@@ -151,7 +155,7 @@ Return the current status of all tracked uploads for this document.
 
 ::: warning No Swift equivalent
 JavaScript-only — the upload-queue facade is not re-exported on the Swift
-document-blob context ([#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957)).
+document-blob context (sweep blob D13; not tracked by an issue).
 :::
 
 <<< ./snippets/document-blob/uploads.ts#example{ts} [JavaScript]
@@ -161,7 +165,8 @@ document-blob context ([#957](https://github.com/Primitive-Labs/js-bao-wss/issue
 Pause an in-progress upload by blob ID.
 
 ::: warning No Swift equivalent
-JavaScript-only — upload-queue control ([#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957)).
+JavaScript-only — upload-queue control, part of the queue facade absent on Swift
+(sweep blob D13; not tracked by an issue).
 :::
 
 <<< ./snippets/document-blob/pause-upload.ts#example{ts} [JavaScript]
@@ -171,7 +176,8 @@ JavaScript-only — upload-queue control ([#957](https://github.com/Primitive-La
 Resume a paused upload by blob ID.
 
 ::: warning No Swift equivalent
-JavaScript-only — upload-queue control ([#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957)).
+JavaScript-only — upload-queue control, part of the queue facade absent on Swift
+(sweep blob D13; not tracked by an issue).
 :::
 
 <<< ./snippets/document-blob/resume-upload.ts#example{ts} [JavaScript]
@@ -181,7 +187,8 @@ JavaScript-only — upload-queue control ([#957](https://github.com/Primitive-La
 Pause all in-progress uploads for this document.
 
 ::: warning No Swift equivalent
-JavaScript-only — upload-queue control ([#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957)).
+JavaScript-only — upload-queue control, part of the queue facade absent on Swift
+(sweep blob D13; not tracked by an issue).
 :::
 
 <<< ./snippets/document-blob/pause-all.ts#example{ts} [JavaScript]
@@ -191,7 +198,8 @@ JavaScript-only — upload-queue control ([#957](https://github.com/Primitive-La
 Resume all paused uploads for this document.
 
 ::: warning No Swift equivalent
-JavaScript-only — upload-queue control ([#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957)).
+JavaScript-only — upload-queue control, part of the queue facade absent on Swift
+(sweep blob D13; not tracked by an issue).
 :::
 
 <<< ./snippets/document-blob/resume-all.ts#example{ts} [JavaScript]

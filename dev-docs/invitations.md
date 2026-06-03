@@ -25,6 +25,13 @@ Check the caller's invitation quota. Admins/owners always get `unlimited: true`.
 
 Create an app-level invitation. Only `email` is required.
 
+::: warning Swift parity gap
+JS takes a typed `CreateInvitationParams` object and returns a typed `AppInvitationInfo`; Swift
+takes an untyped `params: [String: Any]` dictionary and returns `[String: Any]`, so neither the
+input nor the `invitationId` it reads back is checked at compile time
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), sweep invitations D1).
+:::
+
 ::: code-group
 <<< ./snippets/invitations/create.ts#example{ts} [JavaScript]
 <<< ./snippets/invitations/create.swift#example{swift} [Swift]
@@ -70,8 +77,9 @@ Accept an invitation via its invite token. Marks the invitation accepted (write-
 
 ::: warning Swift parity gap
 JS hands back a typed `AcceptInviteResult` including the nested `grantsResolved` counts
-(`{ groups, documents }`); Swift returns `[String: Any]` and the example discards the result
-entirely, so callers can't read how many grants resolved
+(`{ groups, documents }`); Swift returns `[String: Any]`, so callers must dig the `grantsResolved`
+counts out via chained dictionary casts (`result["grantsResolved"]` → `["groups"]`/`["documents"]`)
+with no compile-time field names
 ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), sweep invitations D3).
 :::
 

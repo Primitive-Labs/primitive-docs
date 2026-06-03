@@ -25,6 +25,13 @@ silent product-analytics blackout for everything except events you `logEvent` by
 
 Emit a custom analytics event. `action` and `user_ulid` are required.
 
+::: warning Swift parity gap
+"Required" holds for JS only. JS takes a typed object (`client.analytics.logEvent({ action, user_ulid, … })`)
+where the compiler enforces the required keys; Swift takes an untyped `[String: Any]`
+(`client.logAnalyticsEvent([...])`) with no compile-time check, so a missing `action`/`user_ulid` is
+not caught (sweep analytics D5; [#951](https://github.com/Primitive-Labs/js-bao-wss/issues/951)).
+:::
+
 ::: code-group
 <<< ./snippets/analytics/log-event.ts#example{ts} [JavaScript]
 <<< ./snippets/analytics/log-event.swift#example{swift} [Swift]

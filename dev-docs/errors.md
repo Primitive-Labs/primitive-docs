@@ -27,6 +27,12 @@ Catch a `JsBaoError` thrown by a client call and read its `code`. JS narrows wit
 
 Branch on one error code (here `NOT_FOUND`) to drive UI — show an empty state instead of failing.
 
+::: tip Divergent shape
+JS compares `code` against the wire string (`e.code === "NOT_FOUND"`); Swift matches the
+`JsBaoErrorCode` enum case (`err.code == .notFound`). Use `.rawValue` if you need the wire string in
+Swift. (Same enum-vs-string split described under "The error code enum" above.)
+:::
+
 ::: code-group
 <<< ./snippets/errors/match-code.ts#example{ts} [JavaScript]
 <<< ./snippets/errors/match-code.swift#example{swift} [Swift]

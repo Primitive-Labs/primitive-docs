@@ -17,7 +17,8 @@ interfaces (`CreateBlobBucketParams`, `BlobBucketInfo`, `BlobInfo`,
 `BucketBlobListResult`, `BlobSignedUrlResult`) and closed enums
 (`BlobBucketTtlTier`, `BlobBucketAccessPolicy`). Mutation methods that resolve
 to `{ deleted: boolean }` in JS hand back an untyped dict in Swift, and
-`upload`/`list` flatten the JS options object into positional arguments.
+`upload`/`list` flatten the JS options object into separate (labeled)
+arguments.
 `upload` also narrows the body type to `Data` (Swift) vs
 `ArrayBuffer | Uint8Array | Blob | string` (JS), and `download` returns `Data`
 vs `ArrayBuffer`. Both compile; the shapes differ
@@ -101,7 +102,7 @@ Upload a blob into a bucket. Returns metadata including the server-minted
 Swift client narrows it to `Data` and takes the options as positional args.
 
 ::: warning Swift parity gap
-Beyond the `Data`-only body and flattened positional options, Swift returns an
+Beyond the `Data`-only body and flattened (labeled) options, Swift returns an
 untyped `[String: Any]` (`result["blobId"] as? String`) where JS resolves to a
 typed `BlobInfo` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954),
 sweep blobBuckets D5).
@@ -152,6 +153,15 @@ blobBuckets D2).
 
 Download a blob's raw bytes. JS resolves to an `ArrayBuffer`; Swift returns
 `Data`.
+
+::: tip Divergent shape
+Swift hands back a `Data` value where JS resolves to an `ArrayBuffer` — the
+idiomatic raw-bytes type on each platform (Swift has no `ArrayBuffer`; JS has no
+`Data`). This is a by-design binary-type mapping, the read-side mirror of the
+`Data`-only body that `upload` accepts
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), sweep
+blobBuckets D5).
+:::
 
 ::: code-group
 <<< ./snippets/blob-buckets/download.ts#example{ts} [JavaScript]

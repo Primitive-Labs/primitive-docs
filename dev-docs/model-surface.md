@@ -23,6 +23,13 @@ JS targets the active document by default (or `{ targetDocument }`); Swift's `Ty
 
 Look up a single record by its id. Resolves to null/nil when nothing matches.
 
+::: tip Divergent shape
+JS `Task.find` is `async` (returns a `Promise`); Swift `tasks.find(_:)` is synchronous
+(reads from the local store, no `await`/`throws`). Swift also returns `nil` when the
+stored row has drifted from the typed shape — a decode miss is silently indistinguishable
+from "not found" (sweep model D-find).
+:::
+
 ::: code-group
 <<< ./snippets/model-surface/find.ts#example{ts} [JavaScript]
 <<< ./snippets/model-surface/find.swift#example{swift} [Swift]
@@ -31,6 +38,12 @@ Look up a single record by its id. Resolves to null/nil when nothing matches.
 ## findAll()
 
 Load every record of this model (no filter, no pagination).
+
+::: tip Divergent shape
+JS `Task.findAll()` is `async`; Swift `tasks.findAll()` is synchronous (local-store
+read). Swift silently drops rows that have drifted from the typed shape, so the
+returned count can be smaller than what's actually stored (sweep model D-findAll).
+:::
 
 ::: code-group
 <<< ./snippets/model-surface/find-all.ts#example{ts} [JavaScript]
@@ -42,7 +55,7 @@ Load every record of this model (no filter, no pagination).
 Look up a record by a registered unique constraint without knowing its id. Pass an array for a compound constraint.
 
 ::: tip Divergent shape
-JS takes a bare value (`"alice@example.com"`); Swift takes a typed `PrimitiveValue` (`.string(...)`) via `findByUnique(constraint:value:)`.
+JS takes a bare value (`"alice@example.com"`) and an array for a compound constraint, all on one `async` `findByUnique`; Swift takes a typed `PrimitiveValue` (`.string(...)`) via `findByUnique(constraint:value:)` and a separate `values:` overload for compound constraints (synchronous, `throws`).
 :::
 
 ::: code-group

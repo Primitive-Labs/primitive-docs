@@ -26,9 +26,10 @@ Create a new database of a given type.
 
 List the databases the current user can access.
 
-::: tip Divergent shape
+::: warning Swift parity gap
 JavaScript accepts a `{ databaseType }` filter; the Swift `list()` takes no
-arguments and returns every accessible database
+arguments and returns **every** accessible database, so you must filter
+client-side. This is a tracked Swift gap, not a platform constraint
 ([#962](https://github.com/Primitive-Labs/js-bao-wss/issues/962)).
 :::
 
@@ -96,9 +97,10 @@ List all permission entries for a database.
 
 Add a user as a manager of a database.
 
-::: tip Divergent shape
+::: warning Swift parity gap
 JavaScript wraps the user in an `AddManagerParams` object (`{ userId }`); Swift
-takes `userId` as a direct argument
+flattens it to a direct `userId` argument, so the two signatures diverge. A
+tracked parity gap, not a deliberate convention
 ([#962](https://github.com/Primitive-Labs/js-bao-wss/issues/962)).
 :::
 

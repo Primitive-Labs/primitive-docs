@@ -17,6 +17,15 @@ where JS returns typed result structs (`StartWorkflowResult`,
 read Swift fields by key. Tracked in [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).
 :::
 
+::: warning Swift parity gap
+Every Swift `workflows` method coerces a non-dictionary / undecodable response
+body to an empty `[:]` (the `result as? [String: Any] ?? [:]` pattern, applied
+across `start` / `getStatus` / `terminate` / `listRuns` / `listStepRuns` /
+`claimApply` / `confirmApply` / `releaseApply`). A malformed body therefore
+surfaces as a silent empty success rather than a thrown error — JS rejects
+instead. Don't treat an empty result as "no data"; it can mean a decode failure.
+:::
+
 ## start(options)
 
 Start a workflow run and get back `{ runId, runKey, status, existing }`. In
@@ -65,10 +74,10 @@ Poll the status of a run. The Swift envelope adds a `normalizedStatus` field
 that reconciles the Cloudflare-workflow and DB status shapes.
 
 ::: tip Divergent shape
-`normalizedStatus` is Swift-only — JS `getStatus` has no such field, so code
-that reads it won't port across clients (sweep workflows D4). Tracked for
-documenting (or porting to JS) under
-[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).
+`normalizedStatus` is Swift-only — JS `getStatus` returns `WorkflowStatusResult`
+with no such field, so code that reads `status["normalizedStatus"]` won't port
+across clients. It's a Swift-side convenience (reconciles the CF-workflow and DB
+status shapes), not a JS gap.
 :::
 
 ::: code-group
@@ -81,6 +90,13 @@ documenting (or porting to JS) under
 Terminate a running workflow. Pass the same `contextDocId` the run was started
 with so the server can route to the right per-document instance.
 
+::: tip Divergent shape
+JS carries `contextDocId` inside the `TerminateWorkflowOptions` object; Swift
+takes it as a third optional positional parameter
+(`terminate(workflowKey:runKey:contextDocId:)`, defaulting to `nil`). The
+example omits it; supply it for runs started with a `contextDocId`.
+:::
+
 ::: code-group
 <<< ./snippets/workflows/terminate.ts#example{ts} [JavaScript]
 <<< ./snippets/workflows/terminate.swift#example{swift} [Swift]
@@ -90,6 +106,13 @@ with so the server can route to the right per-document instance.
 
 List runs for the current user, with optional filtering (`workflowKey`,
 `status`, `contextDocId`) and cursor pagination.
+
+::: tip Divergent shape
+JS passes the filters as a flat inline object (`listRuns({ workflowKey, status,
+limit })`); Swift wraps them in a named `ListWorkflowRunsOptions` struct passed
+as `options:`. Same fields, different call shape — consistent with the Swift
+workflows options-struct convention.
+:::
 
 ::: code-group
 <<< ./snippets/workflows/list-runs.ts#example{ts} [JavaScript]

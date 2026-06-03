@@ -18,8 +18,8 @@ Swift's request shape is narrower and over-eager: `query` is `[String: String]`
 only (JS accepts `Record<string, any>`), and `method`/`path` default to `"GET"`
 /`""` and are always sent. JS omits them when unset so the server applies the
 integration's configured `defaultMethod`/base path — so a Swift call that leaves
-them unset can hit `DISALLOWED_METHOD` where the JS call succeeds (sweep
-integrations D2, [#958](https://github.com/Primitive-Labs/js-bao-wss/issues/958)).
+them unset can hit `DISALLOWED_METHOD` where the JS call succeeds
+([#958](https://github.com/Primitive-Labs/js-bao-wss/issues/958)).
 :::
 
 ::: code-group
@@ -32,7 +32,8 @@ integrations D2, [#958](https://github.com/Primitive-Labs/js-bao-wss/issues/958)
 List the integrations configured for the current app.
 
 ::: warning No JavaScript equivalent
-Swift-only — the JS client doesn't expose a catalog `list()` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+Swift-only — the JS `integrations` surface is `call`-only and exposes no catalog
+`list()`. Sweep integrations D1 (Swift-added surface) — no tracking issue filed.
 :::
 
 <<< ./snippets/integrations/list.swift#example{swift} [Swift]
@@ -42,7 +43,8 @@ Swift-only — the JS client doesn't expose a catalog `list()` ([#954](https://g
 Fetch a single integration by id or key.
 
 ::: warning No JavaScript equivalent
-Swift-only — the JS client doesn't expose a catalog `get()` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+Swift-only — the JS `integrations` surface is `call`-only and exposes no catalog
+`get()`. Sweep integrations D1 (Swift-added surface) — no tracking issue filed.
 :::
 
 <<< ./snippets/integrations/get.swift#example{swift} [Swift]

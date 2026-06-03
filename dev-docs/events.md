@@ -43,7 +43,8 @@ Fires when a document's metadata (title, tags, etc.) is created, updated, evicte
 
 ::: tip Divergent shape
 The `source` vocabulary differs: JS reports `"local" | "server" | "idb"`, Swift reports
-`"local" | "remote"` (sweep events D6). Both deliver
+`"local" | "remote"` (sweep events D6). `source` is also **optional** in Swift (`event.source?`)
+but always present in JS, so cross-platform code must handle a nil `source`. Both deliver
 `documentId`, `action`, `metadata`, and `changedFields`.
 :::
 
@@ -55,6 +56,11 @@ The `source` vocabulary differs: JS reports `"local" | "server" | "idb"`, Swift 
 ### permission
 
 Fires when this client's permission level on a document changes.
+
+::: tip Divergent shape
+`permission` is a plain string in JS (`payload.permission`) but a typed enum in Swift — read its
+`.rawValue` to get the wire string (`event.permission.rawValue`).
+:::
 
 ::: code-group
 <<< ./snippets/events/permission.ts#example{ts} [JavaScript]
