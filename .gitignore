@@ -16,3 +16,4 @@ examples/_harness/ts/.build/
 examples/_harness/swift/.build/
 examples/_harness/swift/Package.resolved
 examples/_harness/swift/Sources/
+examples/_harness/ts/.build-dev/
