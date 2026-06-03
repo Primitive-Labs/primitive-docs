@@ -874,7 +874,7 @@
     {
       "topic": "swift-client",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_SWIFT_CLIENT.md",
-      "description": "Building Primitive apps in Swift (iOS / macOS) — PrimitiveApp, JsBaoClient, codegen + TypedModel, Fastlane",
+      "description": "Building Primitive apps in Swift (iOS) — PrimitiveApp, JsBaoClient, codegen + TypedModel, Fastlane",
       "keywords": [
         "swift",
         "apple",

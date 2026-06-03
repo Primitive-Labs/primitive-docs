@@ -1,4 +1,4 @@
-# Building Primitive apps in Swift (iOS / macOS)
+# Building Primitive apps in Swift (iOS)
 
 This guide is for agents writing Swift code against the Primitive platform. The Swift stack is `PrimitiveApp` (the high-level SwiftUI integration) sitting on top of `JsBaoClient` (the Swift port of `js-bao-wss-client`). The conceptual model is identical to the JS path — documents, databases, blobs, workflows, events, auth — so this guide focuses on **Swift-specific deltas** and cross-references the conceptual JS guides for everything else.
 
@@ -17,7 +17,7 @@ When writing Swift code, fetch the conceptual JS guide for the feature you're wo
 
 1. **Define models in `schema.toml` and use codegen. NEVER hand-roll `BaoModelRecord` structs.** The legacy `BaoModel<T>` / `BaoModelRecord` path still compiles but is deprecated. New code uses `swift-bao-codegen` to emit `PrimitiveModel` structs from a TOML schema, then consumes them through `TypedModel<T>`. Drift between schema and Swift is impossible when codegen is the source of truth.
 
-2. **Wire codegen on both build paths.** `swift build` runs `JsBaoCodegenPlugin` automatically; the Xcode/iOS path does NOT. Invoke `swift run swift-bao-codegen` inline in `run-ios.sh` before `xcodegen generate`, write to a gitignored `Models/Generated/` (regenerated on every build, never committed), and add `exclude: ["Models/Generated"]` to the SPM target so the two producers don't collide. See [§4](#data-modeling-schematoml--codegen--typedmodelt).
+2. **Build through `./run-ios.sh` (or `swift build`) so codegen runs.** The scaffold wires codegen on both paths — `swift build` runs `JsBaoCodegenPlugin` automatically, and `run-ios.sh` invokes `swift run swift-bao-codegen` before `xcodegen generate`, writing to a gitignored `Models/Generated/` (with `exclude: ["Models/Generated"]` on the SPM target so the two producers don't collide). Hitting **Run in Xcode directly** after a `schema.toml` edit compiles stale `Generated/` files with no error pointing at the cause. See [§4](#data-modeling-schematoml--codegen--typedmodelt).
 
 3. **Wire `TypedModel<T>` instances through `appState.makeTypedModel(doc:documentId:)`.** Constructing `TypedModel<T>(doc:)` directly works but skips registration with the in-app debug inspector. Use `makeTypedModel` so the model shows up in the Debug Inspector tab.
 
@@ -115,7 +115,7 @@ struct ContentView: View {
 primitive init my-app --platform ios
 ```
 
-`--platform` values: `web` (default) and `ios`. The old `apple` value is removed; `macos` is still accepted but unadvertised — use `ios` for the SwiftUI template.
+`--platform` values: `web` (default) and `ios` — use `ios` for the SwiftUI template.
 
 This:
 
@@ -140,32 +140,28 @@ my-app/
 │       ├── MyAppApp.swift        # @main entry, owns PrimitiveAppState
 │       └── Views/
 │           └── ContentView.swift # AuthGate → TabView
-├── run.sh                        # Build + launch macOS app bundle
 ├── run-ios.sh                    # Build + launch on iOS simulator or device
 ├── build.sh                      # Generic xcodebuild wrapper
 └── archive.sh                    # Archive + export for TestFlight / App Store
 ```
 
-**The fresh scaffold does NOT include codegen wiring or a `schema.toml` — you add those in [§4](#data-modeling-schematoml--codegen--typedmodelt) before defining models.**
+**The scaffold ships `Models/schema.toml` with codegen wired on both build paths** — `run-ios.sh` runs `swift-bao-codegen` before `xcodegen generate`, and `Package.swift` carries the `JsBaoCodegenPlugin` for `swift build`. [§4](#data-modeling-schematoml--codegen--typedmodelt) documents the wiring.
 
 ### Required tools
 
-- Xcode 15+ (iOS 17 / macOS 14 minimum deployment).
+- Xcode 15+ (iOS 17 minimum deployment).
 - `brew install xcodegen` — `run-ios.sh` calls `xcodegen generate` on every run so new source files get picked up.
-- Apple Developer account ($99/year) for physical devices, TestFlight, App Store. Simulator + macOS dev builds work unsigned.
+- Apple Developer account ($99/year) for physical devices, TestFlight, App Store. Simulator builds run unsigned.
 
 ### Run paths
 
-One multi-platform target (`project.yml` declares `platform: [iOS, macOS]`), but two toolchains. The platform decides which path you take for running, codegen, and shipping:
+App builds go through Xcode + xcodegen (`*.xcodeproj`) via `run-ios.sh`; SwiftPM (`swift build` / `swift test`) works directly against the package for fast compile/test loops (and is where the codegen plugin fires automatically).
 
-- **iOS track** — Xcode + xcodegen (`*.xcodeproj`), `run-ios.sh`, manual codegen, Fastlane `platform :ios`.
-- **macOS track** — SwiftPM (`swift build`), `run.sh`, automatic SPM-plugin codegen, Fastlane `platform :mac`.
-
-| Track | Command | Notes |
+| Target | Command | Notes |
 |---|---|---|
 | iOS Simulator | `./run-ios.sh` | Auto-boots latest iPhone simulator if none running. Logs stream filtered to app + PrimitiveApp library. Pass `--verbose` for raw stream. |
 | iOS device | `./run-ios.sh --device` | Requires paired device (`xcrun devicectl list devices`) + `DEVELOPMENT_TEAM` set in `project.yml`. Uses `-allowProvisioningUpdates`. |
-| macOS | `./run.sh` | SwiftPM build of a real `.app` bundle, then `open`s it. Logs go to Console.app, not the terminal. `swift build` / `swift test` also work directly on this track. |
+| Compile/test only | `swift build` / `swift test` | SwiftPM path — no app bundle; runs `JsBaoCodegenPlugin` automatically. |
 
 ### Signing setup (device / TestFlight / App Store)
 
@@ -336,14 +332,14 @@ Supported `type` values:
 
 ### 4b. Dual-path codegen wiring
 
-Two build paths, both need wiring:
+Two build paths, both wired by the scaffold:
 
-- **macOS track — SwiftPM** (`swift build`, `swift test`, `./run.sh`) — `JsBaoCodegenPlugin` from `swift-client` runs automatically and feeds output to the compiler. Nothing manual.
-- **iOS track — Xcode** (`./run-ios.sh`, archives, TestFlight) — Xcode compiles from `.pbxproj` directly, SPM plugin never fires. Invoke the codegen tool manually before `xcodegen generate`, write into a gitignored `Models/Generated/` so xcodegen scans it.
+- **SwiftPM path** (`swift build`, `swift test`) — `JsBaoCodegenPlugin` from `swift-client` runs automatically and feeds output to the compiler. Nothing manual.
+- **Xcode path** (`./run-ios.sh`, archives, TestFlight) — Xcode compiles from `.pbxproj` directly, so the SPM plugin never fires. `run-ios.sh` runs the codegen tool before `xcodegen generate`, writing into a gitignored `Models/Generated/` that xcodegen scans.
 
 Both producers would emit the same files into the same SPM source list, so the SPM target excludes the manual-output directory.
 
-**Update `Package.swift`:**
+**The scaffold's `Package.swift`:**
 
 ```swift
 // swift-tools-version: 5.9
@@ -381,7 +377,7 @@ let package = Package(
 )
 ```
 
-**Add to `run-ios.sh` (near the top, before `xcodegen generate`):**
+**And `run-ios.sh` runs the tool before `xcodegen generate`:**
 
 ```bash
 # Model codegen (Xcode build path).
@@ -1003,7 +999,7 @@ When in doubt, the source is the ground truth. After `swift build` / `swift pack
 
 ## Shipping with Fastlane
 
-The Apple template doesn't include Fastlane by default. Setup (Gemfile, API key, app registration, `bump`) is shared across both tracks; only the build lane differs — **iOS track** archives an `.ipa` against the iOS scheme (`platform :ios`), **macOS track** archives a `.pkg` against the Mac scheme (`platform :mac`). iOS is shown in full; the macOS lane is the delta at the end.
+The iOS template doesn't include Fastlane by default — it's a few minutes to add, and you get one-command TestFlight and App Store builds, internal tester provisioning, and version bumping.
 
 ### Install
 
@@ -1151,7 +1147,6 @@ end
 2. Pick iOS, set name, primary language, bundle ID (must match `PRODUCT_BUNDLE_IDENTIFIER` in `project.yml`), SKU.
 3. Full Access.
 
-For macOS on the same listing, add the macOS platform from the app's **App Information** page.
 
 ### Ship a TestFlight build
 
@@ -1171,31 +1166,6 @@ bundle exec fastlane ios release
 
 `upload_to_app_store` uploads + submits for review. The lane skips metadata/screenshots — fill those in App Store Connect before submission can actually be reviewed.
 
-### macOS track (delta)
-
-Same Gemfile, API key, and `bump`. Add a `platform :mac` lane targeting the Mac scheme and exporting a `.pkg`:
-
-```ruby
-platform :mac do
-  lane :beta do
-    api_key = load_api_key
-    build_app(
-      project: "MyApp.xcodeproj",
-      scheme: "MyApp_macOS",                 # Mac scheme from the multi-platform target
-      destination: "generic/platform=macOS",
-      export_method: "app-store",
-      export_options: { signingStyle: "automatic" },
-      xcargs: "-allowProvisioningUpdates",
-      output_directory: ".build/archives",
-      output_name: "MyApp-macOS.pkg",
-      clean: true,
-    )
-    upload_to_testflight(api_key: api_key, skip_waiting_for_build_processing: true, skip_submission: true)
-  end
-end
-```
-
-Run `bundle exec fastlane mac beta`. Two macOS-only requirements: add the **macOS platform** to the app listing (App Information page, one-time), and ensure a **Mac App Store distribution profile** exists (Automatic signing provisions it when `DEVELOPMENT_TEAM` is set).
 
 ## Common Patterns
 
@@ -1280,7 +1250,6 @@ Idempotent, convergent (one pass reaches the right state from any starting state
 
 ## What's NOT Covered Here
 
-- **Notarized DMG / standalone macOS distribution** — `archive.sh dmg` builds the bundle; notarization (`xcrun notarytool submit ... --wait`, then `stapler staple`) is an Apple-side flow not specific to Primitive.
 - **CI** — both `./run-ios.sh` and `bundle exec fastlane ios beta` work in GitHub Actions on a macOS runner. Base64-encode `api_key.p8` into a secret, decode before the lane runs.
 - **Custom auth UI** — build around `appState.authManager` instead of `AuthGateView`. See [Authentication guide](AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.md).
 - **Per-prompt / per-database / per-integration / per-analytics specifics** — Swift API mirrors JS; consult the linked conceptual guides for behavior, then the Swift source under `.build/checkouts/swift-client/Sources/JsBaoClient/API/` for the typed signatures.

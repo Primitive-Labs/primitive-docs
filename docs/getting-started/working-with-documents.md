@@ -2,10 +2,6 @@
 
 Documents are Primitive's local-first collaborative storage. A document is a container that holds your data models — synced across devices, shared with other users, and available offline. This guide covers document concepts, data modeling, and CRUD operations.
 
-::: tip Two clients, one API
-The examples below are shown in both **JavaScript** (`js-bao` / `js-bao-wss-client`) and **Swift** (the iOS client) — pick the tab for your platform. The API shape and semantics line up across both; where they differ, the text calls it out. Every snippet is compiled against the real client as part of the docs build.
-:::
-
 ## Document Concepts
 
 ### Private by Default

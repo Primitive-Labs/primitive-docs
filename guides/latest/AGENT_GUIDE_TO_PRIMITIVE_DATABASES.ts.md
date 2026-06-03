@@ -1054,11 +1054,11 @@ const result = await db.aggregate("orders", {
 });
 ```
 
-## Defining Models
+## Client-Side Models (Direct Record Access Only)
 
-Databases are schemaless on the server — you can save any JSON records without defining models. Defining models gives you type safety, autoregistration, and automatic index syncing on connect.
+**Registered operations are the primary client interface for databases and need no client-side models** — the operation layer is typed by `primitive databases codegen` (see TypeScript codegen above). The models below apply only to the **direct record access** path (owner/manager `DoDb` handles): there, defining js-bao models gives you type safety, autoregistration, and automatic index syncing on connect. The database itself stays schemaless — `modelName` is a collection label and the server accepts any JSON for it.
 
-The canonical workflow is TOML + codegen, the same one used for document-backed models. Declare each model in `src/models/models.toml`, run `npx js-bao-codegen-v2`, and import the generated class from `@/models`:
+The TOML dialect is the same one documents use. Declare each model in `src/models/models.toml`, run `npx js-bao-codegen-v2`, and import the generated class from `@/models`:
 
 ```toml
 # src/models/models.toml

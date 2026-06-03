@@ -41,93 +41,42 @@ Automatic lifecycle event tracking (daily active users, session end, network rec
 ## Architecture at a Glance
 
 ```
-┌──────────────────────────────────────────────────┐
-│                Your App (Browser)                │
-│  ┌──────────┐  ┌─────────┐  ┌────────────────┐  │
-│  │  Your UI │◄►│ js-bao  │◄►│ Local Database │  │
-│  └──────────┘  └─────────┘  └───────┬────────┘  │
-│                                     │            │
-│  js-bao-wss-client ◄───────────────►│            │
-└──────────────────────────────────────│────────────┘
-                                      │
-                               Background Sync
-                                      │
-                                      ▼
-                    ┌─────────────────────────────────┐
-                    │        Primitive Backend         │
-                    │                                  │
-                    │  Auth · Sync · Databases          │
-                    │  Workflows · Blobs · LLM/API     │
-                    │                                  │
-                    └─────────────────────────────────┘
+┌────────────────────────────────────────────────┐
+│            Your App (Web or iOS)               │
+│  ┌──────────┐    ┌──────────────────────────┐  │
+│  │  Your UI │ ◄► │  Primitive client        │  │
+│  └──────────┘    │   · local document store │  │
+│                  │   · background sync      │  │
+│                  └────────────┬─────────────┘  │
+└───────────────────────────────│────────────────┘
+                                ▼
+               ┌────────────────────────────────┐
+               │       Primitive Platform       │
+               │   Auth · Documents · Databases │
+               │   Workflows · Blobs · LLM/API  │
+               └────────────────────────────────┘
 ```
 
-Your app runs in the browser. The Primitive backend is a managed service that runs on edge infrastructure — you interact with it through the client library and CLI, never directly with the underlying infrastructure.
+Your app runs on the user's device — in the browser or on an iPhone. The Primitive Platform is a managed service — you interact with it through the client library, the CLI, and the Admin Console, never directly with the underlying infrastructure.
 
 ## The Stack
 
-Primitive provides three libraries that work together:
+### The Primitive Platform
 
-### js-bao — Data Layer
-A JavaScript ORM for defining data models and performing queries. Works with any framework. When used with documents, it reads and writes to a local in-browser database for instant operations.
+A managed backend providing data storage — **documents** (local-first, synced, accessed through models) and **databases** (server-side, accessed through registered operations) — plus the rest of the platform services: authentication, users and groups, blob storage, workflows, managed prompts, integrations, and analytics. No APIs to build, no servers to manage.
 
-You declare models in `src/models/models.toml` and let codegen produce the TypeScript classes — one source of truth, auto-registered at startup:
+### The Client
 
-```toml
-# src/models/models.toml
-[models.tasks.fields.id]
-type = "id"
-auto_assign = true
-indexed = true
+Your app talks to the platform through a client library — **js-bao-wss-client** for JavaScript (any framework: Vue, React, Svelte, vanilla) and the **Swift client** for iOS. Both expose the same surface: authentication, documents with a local store and background sync, database operations, blobs, workflows, and events.
 
-[models.tasks.fields.title]
-type = "string"
-indexed = true
+### CLI and Admin Console
 
-[models.tasks.fields.completed]
-type = "boolean"
-default = false
-```
+The `primitive` CLI manages your app's backend configuration — auth settings, users, workflows, prompts, integrations — as version-controlled TOML you push with `primitive sync`. It's also the interface AI coding agents use to manage your app. The web [Admin Console](https://admin.primitiveapi.com/login) covers the same ground interactively, plus a few console-only settings (like OAuth client credentials).
 
-```bash
-npx js-bao-codegen-v2
-```
+### Starter Templates
 
-```typescript
-import { Task } from "@/models";
-const task = new Task({ title: "Review PR" });
-await task.save();
-```
+Optional, but the fastest start: a **web template** (Vue 3 + TypeScript) and an **iOS template** (Swift + SwiftUI), each wrapping the client with login UI, data-binding helpers, and dev tooling. See the [Quick Start](./template-app.md).
 
-See [Working with Documents](./working-with-documents.md#defining-models) for the full TOML reference (field types, relationships, unique constraints, the `migrate` tool for older projects).
-
-### js-bao-wss-client — Backend Client
-Manages all interaction with the Primitive backend: authentication, document sync, database operations, blob storage, workflows, LLM calls, integrations, and analytics.
-
-```typescript
-import { JsBaoClient } from "js-bao-wss-client";
-
-const client = new JsBaoClient({
-  apiUrl: "https://api.primitiveapi.com",
-  wsUrl: "wss://api.primitiveapi.com",
-  appId: "your-app-id",
-  models: [Task],
-});
-```
-
-### App Templates & UI Layers
-
-Primitive ships starter templates for two platforms, each with a UI layer over the same client surface:
-
-- **primitive-app (Vue 3, web)** — components, services, and dev tools for web apps: pre-built UI (forms, tables, dialogs, login), a singleton client service, and a Vite plugin for development tools (Document Explorer, Test Harness, Blob Explorer).
-- **PrimitiveApp (SwiftUI, iOS)** — the Swift counterpart: `PrimitiveAppState` owns the client lifecycle, with ready-made views for sign-in (`AuthGateView`/`PrimitiveLoginView`), profile, and connection status, plus `BaoDataLoader` for reactive data binding and a built-in Debug Inspector. See the [Quick Start](./template-app.md).
-
-::: tip Framework Flexibility
-js-bao and js-bao-wss-client are plain JavaScript — they work with React, Svelte, Solid, or vanilla JS, and the Swift client mirrors the same API surface for any Swift app. The primitive-app / PrimitiveApp packages add Vue- and SwiftUI-specific helpers, but the core platform is framework-agnostic.
-:::
-
-### Primitive CLI
-A command-line tool for managing your app's backend configuration. Configure authentication, manage users, define workflows and prompts, set up integrations, and sync configuration as version-controlled TOML files. Also serves as the interface AI coding agents use to manage your app.
 
 ## What Runs Where
 
