@@ -426,9 +426,9 @@ tasks.delete("task_123")                                // no throw
 
 A write is visible to local reads on the next line. Remote peers see it when the WebSocket round-trip completes; a `.sync` event fires when the server acks.
 
-## 5. Navigating the API
+## 5. Navigating the rest of the API
 
-The client is a façade over sub-APIs. You almost never construct `JsBaoClient` yourself — read it off `appState.client` (`public private(set) var client: JsBaoClient?`).
+Beyond data modeling, the client is a façade over sub-APIs. You almost never construct `JsBaoClient` yourself — read it off `appState.client` (`public private(set) var client: JsBaoClient?`).
 
 | Sub-API | What it covers |
 |---|---|
@@ -440,88 +440,29 @@ The client is a façade over sub-APIs. You almost never construct `JsBaoClient` 
 | `client.groups` | Group / membership management |
 | `client.events` | Typed event emitter — `.sync`, `.remoteUpdate`, `.workflowStatus`, `.status`, `.authSuccess` |
 
-### Documents
-
-**Pick the right helper:**
-
-| Shape | Use |
-|---|---|
-| Per-user singleton doc | `client.documents.getOrCreateWithAlias(alias:title:)` |
-| Fresh doc you'll write to immediately | `client.createDocument(options:)` — returns `(documentId, YDocument?)` |
-| Open by id | `client.openDocument(id, options:)` |
-| Open by alias string | `client.openDocumentByAlias(alias)` |
-
-```swift
-// Resolve-or-create the user's library doc (idempotent, race-free)
-let result = try await client.documents.getOrCreateWithAlias(
-    alias: DocumentAlias(scope: .user, aliasKey: "library"),
-    title: "Library"        // used only on first create
-)
-let documentId = result.documentId
-
-// Open / close
-let doc = try await client.openDocument(documentId, options: OpenDocumentOptions(
-    waitForLoad: .network,            // or .local / .localIfAvailableElseNetwork
-    enableNetworkSync: true
-))
-await client.closeDocument(documentId)
-
-// Local-first creation: write to `doc` immediately, server commits in
-// the background.
-let (newId, newDoc) = try await client.createDocument(options: CreateDocumentOptions(
-    title: "My Document",
-    tags: ["project"]
-))
-```
+Each of these mirrors the platform concepts documented elsewhere — the sections below cover only the Swift-specific access shape and idioms; follow the links for the full feature walkthroughs.
 
 ::: warning Loose return types
-API responses come back as `[String: Any]` — you cast fields with `as? String` etc. There's no strong typing on response shapes yet.
+Many API responses come back as `[String: Any]` — you cast fields with `as? String` etc. There's no strong typing on response shapes yet.
 :::
+
+### Documents
+
+Documents are opened and created off `client` (`client.openDocument(id, options:)`, `client.createDocument(options:)`, `client.documents.getOrCreateWithAlias(alias:title:)`). Creation is local-first: you write to the returned `YDocument` immediately and the server commits in the background. See [Working with Documents](./working-with-documents.md) for the concepts — opening, aliases, sharing, and querying — all of which have Swift examples there.
 
 ### Blobs
 
-Blobs are scoped to a document:
-
-```swift
-let blobs = client.document(documentId).blobs()
-
-let result = try await blobs.upload(mimeType: "image/jpeg", data: jpegData)
-let blobId = result["blobId"] as? String
-
-let data = try await blobs.read(blobId: blobId, force: false)
-let url = blobs.downloadUrl(blobId: blobId, disposition: .inline)
-```
-
-Concurrency defaults to 2 parallel uploads. Override with `client.setBlobUploadConcurrency(4)`.
+Document files are fetched per-document via `client.document(documentId).blobs()`, which exposes `upload`, `read`, and `downloadUrl`; the API mirrors the rest of the platform. Concurrency defaults to 2 parallel uploads — override with `client.setBlobUploadConcurrency(4)`. See [Blobs and Files](./blobs-and-files.md) for the full model.
 
 ### Workflows
 
-Workflows are server-side jobs delivered back to the client via *apply* handlers. Register the handler before you start the run — otherwise the server may push the result before you've subscribed.
-
-```swift
-// 1. Register the handler keyed by workflow name
-client.workflows.define("summarize") { ctx in
-    // ctx.runKey identifies this invocation; ctx.output is the result
-    print("Got result for", ctx.runKey, ctx.output)
-}
-
-// 2. Start the run, pinning it to a runKey you control
-let runKey = "sum-\(UUID().uuidString.prefix(12))"
-_ = try await client.workflows.start(
-    workflowKey: "summarize",
-    input: ["text": longString],
-    options: StartWorkflowOptions(runKey: runKey, contextDocId: documentId)
-)
-```
-
-The framework claims and confirms the apply lease for you. If the device was offline when the server finished, a reconnect calls `client.workflows.deliverPendingApplies(contextDocId:)` and your handler fires then.
+Workflows are started with `client.workflows.start(...)` and their results are delivered back through *apply* handlers registered with `client.workflows.define(...)`. **Register the handler before you start the run** — otherwise the server may push the result before you've subscribed. The framework claims and confirms the apply lease for you; if the device was offline when the server finished, a reconnect calls `client.workflows.deliverPendingApplies(contextDocId:)` and your handler fires then. See [Workflows and Prompts](./workflows-and-prompts.md) for what workflows are and how to author them.
 
 ### Events
 
-`client.events.on(...)` returns an `EventSubscription` — **store it on a property** or it gets dropped. Always `[weak self]` the closure.
+`client.events.on(...)` returns an `EventSubscription` — **store it on a property** or it gets dropped, and always `[weak self]` the closure. Cancel on teardown with `syncSub?.cancel()`.
 
 ```swift
-@StateObject var appState: PrimitiveAppState
 var syncSub: EventSubscription?
 
 syncSub = client.events.on(.sync) { [weak self] (event: SyncEvent) in
@@ -532,7 +473,7 @@ syncSub = client.events.on(.sync) { [weak self] (event: SyncEvent) in
 }
 ```
 
-Cancel on teardown with `syncSub?.cancel()`.
+In practice most views don't subscribe to events directly — they use the `BaoDataLoader` SwiftUI helper, which wraps document change subscriptions for you. See [Working with Documents](./working-with-documents.md) for how real-time sync and reacting to changes work across the platform.
 
 ### Reading the source
 

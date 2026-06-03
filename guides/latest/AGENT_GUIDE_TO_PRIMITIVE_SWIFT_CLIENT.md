@@ -629,39 +629,7 @@ await appState.selectDocumentAwaiting(documentId)
 
 ### Lower-level building blocks
 
-```swift
-// Open / close
-let doc = try await client.openDocument(id, options: OpenDocumentOptions(
-    waitForLoad: .network,
-    enableNetworkSync: true
-))
-await client.closeDocument(id)
-
-// Create (local-first; returns a writable YDocument immediately,
-// server commit happens in the background)
-let (documentId, doc) = try await client.createDocument(options: CreateDocumentOptions(
-    title: "My Document",
-    tags: ["project"]
-))
-
-// Legacy two-step (DO NOT use as the default path — see Helper
-// Preference Order above)
-_ = try await client.documents.createWithAlias(options: [
-    "title": "My Library",
-    "alias": ["scope": "user", "aliasKey": "library"],
-])
-let existing = try await client.documents.aliases.resolve(scope: "user", aliasKey: "library")
-let id = existing?["documentId"] as? String
-
-// Set an alias on an existing doc
-try await client.documents.aliases.set(
-    scope: "user",
-    aliasKey: "library",
-    documentId: docId,
-    userId: nil,              // nil = current user
-    mustNotExist: false
-)
-```
+`client.openDocument(id, options:)` / `closeDocument(id)`, `createDocument(options:)` (local-first; returns `(documentId, doc: YDocument?)` you can write immediately), and the `documents.aliases.resolve/set/createWithAlias` primitives all exist as the escape hatches behind the helpers above. The call shapes mirror JS adapted to `async throws` + labeled args — see the [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md) for the full per-operation walkthrough (now with Swift examples), and reach for the high-level helpers in the table above as the default path.
 
 ## Sharing (documents + collections)
 
@@ -718,103 +686,24 @@ For **reads**, prefer the typed `*Summaries` wrappers above over hand-parsing th
 >
 > Reach for `*Summaries` by default. (`accessibleDocumentSummaries` has no raw single-call equivalent — the `me.accessibleDocuments` convenience method was removed; the wrapper is the way to get the merged owned+shared set.)
 
-### Canonical: invite an email
+### Inviting, listing, and revoking
 
-> **If `sendEmail` is `true`, you MUST also pass `documentUrl`.** The server
-> rejects an email-sending invite with no link (`documentUrl is required when
-> sendEmail is true`). For apps without a web deep-link, pass `sendEmail: false`
-> — the deferred grant still lands; the invitee gets access the moment they sign
-> in with this email. For collections, `documentUrl` isn't supported, so a
-> collection invite that sends email isn't wired yet — pass `sendEmail: false`.
+The invite-by-email flow, the `sendEmail`/`documentUrl` rules, the grant-status
+keys, and listing/removing members are platform behavior covered (with Swift
+examples) in the [Sharing & Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md).
+Swift-specific notes when you get there:
 
-```swift
-// Single document.
-//
-// Shape 1 — no notification email (simplest, and the right default for apps
-// without a web deep-link). The deferred grant still lands; the invitee gets
-// access the moment they sign in with this email, and shows up under
-// `listPendingInvitations` until then.
-_ = try await client.documents.updatePermissions(
-    documentId: listDocId,
-    params: [
-        "email": "friend@example.com",
-        "permission": "read-write",
-        "sendEmail": false,
-    ]
-)
-
-// Shape 2 — send the notification email. Requires a `documentUrl`: the link
-// the email points at (your app's universal link / web route to the doc).
-_ = try await client.documents.updatePermissions(
-    documentId: listDocId,
-    params: [
-        "email": "friend@example.com",
-        "permission": "read-write",
-        "sendEmail": true,
-        "documentUrl": "https://yourapp.example.com/d/\(listDocId)",
-    ]
-)
-
-// Collection cascade — friend gets access to every doc in the collection,
-// and any doc added to the collection later inherits the grant. No
-// `documentUrl` on this path, so pass `sendEmail: false`.
-_ = try await client.collections.addMember(
-    collectionId: collectionId,
-    params: [
-        "email": "friend@example.com",
-        "permission": "reader",
-        "sendEmail": false,
-    ]
-)
-```
-
-Both return a dict carrying the grant status. Keys to look for:
-
-| Key | Meaning |
-|---|---|
-| `status` | `"added"` / `"already_member"` / `"pending_signup"` |
-| `userId` | Present when `status != "pending_signup"` |
-| `inviteToken` | Present when `status == "pending_signup"` — pass to a recipient via your own out-of-band channel if you need a deep-link |
-| `invitationId` / `deferredId` | Server ids; `deferredId` is required to revoke before signup |
-| `expiresAt` | ISO-8601, when the deferred grant times out |
-
-### Listing + revoking
-
-```swift
-// Live document members — typed. PermissionEntry { userId, email?, name?,
-// permission, grantedAt, displayLabel }. email/name are resolved here.
-let members = try await client.documents.permissionSummaries(documentId: docId)
-
-// Pending email invites on a document — typed. PendingInvitation
-// { email, permission, invitationId?, expiresAt, invitedBy }.
-let pending = try await client.documents.pendingInvitationSummaries(documentId: docId)
-
-// Remove either kind:
-_ = try await client.documents.removePermission(documentId: docId, email: "friend@example.com")
-_ = try await client.documents.removePermission(documentId: docId, userId: someUserId)
-
-// Collection access — typed. CollectionAccess { members: [MemberAccess],
-// groups: [GroupAccess] }. NOTE: collection members carry userId + permission
-// only — NO email/name (unlike document PermissionEntry). To leave a shared
-// collection you need your own userId from `me.get()`, not a member match.
-let access = try await client.collections.accessSummary(collectionId: cid)
-let collMembers = access.members
-let collPending = try await client.collections.pendingInvitationSummaries(collectionId: cid)
-
-// Revoke a live member:
-_ = try await client.collections.removeMember(collectionId: cid, userId: someUserId)
-
-// Cancel a pending (not-yet-accepted) email invite: find its deferred grant
-// by email, then revoke it. (There's no one-call helper — the old
-// `cancelPendingInvitation` wrapper was removed to keep parity with the JS
-// client.)
-if let row = collPending.first(where: { $0.email == "friend@example.com" }),
-   let deferredId = row.deferredId {
-    _ = try await client.invitations.revokeDeferredGrant(deferredId: deferredId, type: "group")
-}
-```
-
-`revokeDeferredGrant(deferredId:type:)` hits the global `DELETE /deferred-grants/:id?type=group` verb (`type: "document"` for a per-document pending invite, `"group"` for a collection one).
+- For **reads**, use the typed `*Summaries` wrappers from the table above
+  (`permissionSummaries`, `accessSummary`, `pendingInvitationSummaries`) rather
+  than hand-parsing the raw `[String: Any]`.
+- For **writes**, the params-dict methods `documents.updatePermissions(documentId:params:)`
+  / `collections.addMember(collectionId:params:)` are the path (the typed
+  `invite(...)`/`cancelPendingInvitation(...)` wrappers were removed to keep the
+  Swift client 1:1 with JS).
+- To cancel a pending email invite there's no one-call helper: find the row's
+  `deferredId` via `pendingInvitationSummaries(...)`, then
+  `client.invitations.revokeDeferredGrant(deferredId:, type:)` (`type: "document"`
+  for a per-doc invite, `"group"` for a collection one).
 
 ### Watching for permission changes / access loss
 
@@ -856,46 +745,16 @@ Collections are server-side folders that cascade permissions to every document t
 | Find which collections a doc belongs to | `client.collections.listCollectionsForDocument(documentId:)` |
 | Invite / list / remove members | See **Sharing** section above |
 
-### Add and remove a document
+### Add/remove docs and permission cascade
 
-`addDocument` and `removeDocument` are idempotent — calling `addDocument` on a doc that's already in the collection is a no-op (no error), and `removeDocument` on a doc that isn't in the collection is also a no-op.
-
-```swift
-// Move a doc INTO a collection
-_ = try await client.collections.addDocument(
-    collectionId: collectionId,
-    documentId: docId
-)
-
-// Move it OUT (back to "loose"). Other collections it belongs to are
-// untouched — a doc can be in multiple collections.
-_ = try await client.collections.removeDocument(
-    collectionId: collectionId,
-    documentId: docId
-)
-```
-
-### What happens to permissions on add/remove
-
-| Action | Effect on the doc's permissions |
-|---|---|
-| `addDocument` | Cascade members of the collection gain access to the doc immediately. Direct permissions on the doc are unaffected. |
-| `removeDocument` | Cascade members lose access **only if** they don't have any other channel (direct grant, another collection that contains the doc). Server resolves the max across remaining channels. |
-| `collections.delete` | All docs in the collection survive. Cascade members lose access through this collection (same "max across remaining channels" rule). |
-
-### Who can add what
-
-`addDocument` requires:
-- The caller has at least `read-write` on **the document being added**, AND
-- The caller is at least a `read-write` member of **the collection**.
-
-A `reader`-only collection member cannot add docs (they can only see them). A `reader`-only doc permission can never put the doc into a collection.
-
-`removeDocument` requires the same level of access.
-
-### Multi-collection membership
-
-A single document can live in any number of collections at once. The local app-state pattern in this template assumes **one collection per doc** (the `ListRef` has a single `collectionId` field) for UI simplicity; if you need multi-membership, model it as a separate `[String]` field or skip the local cache and query `listCollectionsForDocument(documentId:)` on demand.
+`addDocument`/`removeDocument` are idempotent, and the cascade rules (collection
+members gain/lose access as the max permission across all channels, docs survive
+`collections.delete`, a `reader` member can't add docs, a doc can live in multiple
+collections at once) are platform behavior — see the [Sharing & Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md)
+for the full model with examples. Swift note: the local app-state pattern in the
+template assumes one collection per doc (`ListRef.collectionId`); for
+multi-membership, model a `[String]` field or query `listCollectionsForDocument(documentId:)`
+on demand.
 
 ## Blobs
 
@@ -1114,12 +973,12 @@ See [Authentication guide](AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.md) for OAuth
 | Sub-API | Swift access | Conceptual guide |
 |---|---|---|
 | Collections (folders) | `client.collections.list/create/addDocument/removeDocument` | [Sharing](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md) |
-| Databases | `client.databases.connect/operation/subscribe` | [Databases](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) |
+| Databases | `client.databases.list/get/executeOperation/executeBatch` (the JS `databases.subscribe` change feed is **not in the Swift client** — see the guide) | [Databases](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) |
 | Prompts | `client.prompts.execute` | [Prompts](AGENT_GUIDE_TO_PRIMITIVE_PROMPTS.md) |
 | Integrations | `client.integrations.call` | [Integrations](AGENT_GUIDE_TO_PRIMITIVE_INTEGRATIONS.md) |
-| Users | `client.me`, `client.users.lookup/get` | [Users & Groups](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) |
+| Users | `client.me`, `client.users.lookup/getBasic/getProfiles` | [Users & Groups](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) |
 | Groups | `client.groups.list/create/addMember/...` | [Users & Groups](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) |
-| Analytics | `client.analytics.log/...` | [Analytics](AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.md) |
+| Analytics | The typed `client.analytics.*` event API is **JavaScript-only** today — see the guide | [Analytics](AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.md) |
 
 ## Reading the Swift source
 
