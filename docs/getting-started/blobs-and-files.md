@@ -8,24 +8,15 @@ This page covers **document-scoped blobs** — files attached to a specific docu
 
 ## Uploading Files
 
-```typescript
-import { jsBaoClientService } from "primitive-app";
+::: code-group
 
-const client = await jsBaoClientService.getClientAsync();
-const blobs = client.document(documentId).blobs();
+<<< ../../examples/blobs/doc-blob-upload.ts#example{ts} [JavaScript]
 
-// Upload from a file input
-const file = inputElement.files[0];
-const fileData = await file.arrayBuffer();
+<<< ../../examples/blobs/doc-blob-upload.swift#example{swift} [Swift]
 
-const { blobId, numBytes } = await blobs.upload(
-  new Uint8Array(fileData),
-  {
-    filename: file.name,
-    contentType: file.type,
-  }
-);
-```
+:::
+
+The blob context comes from the document: `client.document(documentId).blobs()` in JavaScript, `client.documents.blobs(documentId:)` in Swift.
 
 ## Displaying Images
 
@@ -44,16 +35,15 @@ The URL includes authentication, so it only works for signed-in users with docum
 
 ## Downloading Files
 
-```typescript
-// Trigger browser download
-const url = blobs.downloadUrl(blobId, { disposition: "attachment" });
-window.open(url);
+::: code-group
 
-// Or read content directly
-const text = await blobs.read(blobId, { as: "text" });
-const buffer = await blobs.read(blobId, { as: "arrayBuffer" });
-const blob = await blobs.read(blobId, { as: "blob" });
-```
+<<< ../../examples/blobs/doc-blob-read.ts#example{ts} [JavaScript]
+
+<<< ../../examples/blobs/doc-blob-read.swift#example{swift} [Swift]
+
+:::
+
+`downloadUrl` is synchronous and authenticated. In JavaScript, `read(blobId, { as })` returns `text` / `arrayBuffer` / `blob`; Swift's `read(blobId:)` returns `Data`.
 
 ## Listing and Managing Blobs
 
@@ -78,7 +68,7 @@ Blob storage works offline:
 
 - **Uploads queue** when offline and complete automatically when back online
 - **Downloaded files cache** locally for offline access
-- **Prefetch files** proactively for offline use:
+- **Prefetch files** proactively for offline use (JavaScript-only — the Swift document-blob context doesn't expose `prefetch` yet):
 
 ```typescript
 await blobs.prefetch([blobId1, blobId2], { concurrency: 4 });

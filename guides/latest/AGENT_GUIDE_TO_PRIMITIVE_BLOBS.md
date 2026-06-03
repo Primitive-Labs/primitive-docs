@@ -89,6 +89,57 @@ Swift:
 ```
 <!-- example:end -->
 
+## Document-scoped blob operations (JavaScript + Swift)
+
+Context accessor differs: `client.document(documentId).blobs()` (JS) vs `client.documents.blobs(documentId:)` (Swift). `prefetch` is JS-only.
+
+### Upload
+
+JavaScript:
+<!-- example:start blobs/doc-blob-upload lang=ts -->
+```typescript
+  const blobs = client.document(documentId).blobs();
+  const { blobId } = await blobs.upload(data, {
+    filename: "notes.txt",
+    contentType: "text/plain",
+  });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start blobs/doc-blob-upload lang=swift -->
+```swift
+  let blobs = client.documents.blobs(documentId: documentId)
+  let result = try await blobs.upload(
+    data: data,
+    options: BlobUploadSourceOptions(filename: "notes.txt", contentType: "text/plain")
+  )
+  let blobId = result.blobId
+```
+<!-- example:end -->
+
+### List / URL / read
+
+JavaScript:
+<!-- example:start blobs/doc-blob-read lang=ts -->
+```typescript
+  const blobs = client.document(documentId).blobs();
+
+  const list = await blobs.list();
+  const url = blobs.downloadUrl(blobId);              // synchronous, authenticated
+  const bytes = await blobs.read(blobId, { as: "arrayBuffer" });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start blobs/doc-blob-read lang=swift -->
+```swift
+  let blobs = client.documents.blobs(documentId: documentId)
+
+  let list = try await blobs.list()
+  let url = blobs.downloadUrl(blobId: blobId)          // synchronous, authenticated
+  let bytes = try await blobs.read(blobId: blobId)
+```
+<!-- example:end -->
+
 ## Overview
 
 Two kinds of blob storage:
