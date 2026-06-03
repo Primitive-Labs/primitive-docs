@@ -7,8 +7,6 @@ The fastest way to build on Primitive is to start from an official template. Pri
 | Web (default) | `npx create-primitive-app my-app` | Vue 3 + TypeScript + Tailwind |
 | iOS | `npx create-primitive-app my-app --platform ios` | Swift + SwiftUI (`PrimitiveApp` package) |
 
-`create-primitive-app` is a thin wrapper around `primitive init` and forwards every flag, so the two are interchangeable — use `npx create-primitive-app` when you don't have the CLI installed yet, or `primitive init my-app --platform <web|ios>` if you do.
-
 ## 1. Create Your App
 
 Run the command for your platform, replacing `my-app` with your desired app name:
