@@ -88,31 +88,17 @@ primitive sync push --dir ./config
 
 ### 4. Use in Your App
 
-```typescript
-import { jsBaoClientService } from "primitive-app";
+Every data access — queries, mutations, counts, aggregates — goes through `executeOperation(databaseId, operationName, { params })`. The operation name selects what runs; the operation's CEL `access` is the authorization point.
 
-const client = await jsBaoClientService.getClientAsync();
+::: code-group
 
-// List products
-const { data: products } = await client.databases.executeOperation(databaseId, "list-products");
+<<< ../../examples/databases/db-execute-operation.ts#example{ts} [JavaScript]
 
-// Get a single product
-const { data: [product] } = await client.databases.executeOperation(
-  databaseId, "get-product",
-  { params: { id: "prod-123" } }
-);
+<<< ../../examples/databases/db-execute-operation.swift#example{swift} [Swift]
 
-// Create a product (requires admin group membership)
-await client.databases.executeOperation(databaseId, "create-product", {
-  params: {
-    name: "Widget",
-    price: 29.99,
-  },
-});
+:::
 
-// Count products
-const { count } = await client.databases.executeOperation(databaseId, "count-products");
-```
+The same call shape runs a mutation (`"create-product"`), a count (`"count-products"`), or any other registered op — just change the operation name and params.
 
 ## Operation Types
 
@@ -193,14 +179,15 @@ itemAccess = "params.createdBy == user.userId"
 
 Each item in the batch is checked against `itemAccess` independently — a single failing item doesn't fail the whole batch.
 
-```typescript
-await client.databases.executeOperation(databaseId, "import-contacts", {
-  items: [
-    { op: "save", data: { name: "Alice", email: "alice@example.com", createdBy: userId } },
-    { op: "save", data: { name: "Bob", email: "bob@example.com", createdBy: userId } },
-  ],
-});
-```
+::: code-group
+
+<<< ../../examples/databases/db-batch.ts#example{ts} [JavaScript]
+
+<<< ../../examples/databases/db-batch.swift#example{swift} [Swift]
+
+:::
+
+Batch writes use `executeBatch(databaseId, operationName, batch)` — each item is `{ params }` (the per-item `op`/model is fixed by the operation definition, not set per item).
 
 ### Aggregates
 Return grouped or summarized data.
@@ -604,40 +591,25 @@ Members of the group can then call `databases.get(databaseId)` and execute opera
 
 For apps where databases are shared with teams through registered operations (not direct permissions), use group memberships to discover accessible databases. The common pattern is to use the database ID as the group ID, so the user's group memberships directly give you the database IDs.
 
-```typescript
-import { jsBaoClientService } from "primitive-app";
+::: code-group
 
-const client = await jsBaoClientService.getClientAsync();
+<<< ../../examples/databases/db-discover.ts#example{ts} [JavaScript]
 
-// 1. Get the current user's group memberships
-const memberships = await client.groups.listUserMemberships(currentUser.userId);
+<<< ../../examples/databases/db-discover.swift#example{swift} [Swift]
 
-// 2. Filter to the group type that represents your workspaces/projects
-const workspaceGroups = memberships.filter(m => m.groupType === "workspace");
+:::
 
-// 3. Each group ID is also the database ID — load them directly
-const databases = await Promise.all(
-  workspaceGroups.map(group => client.databases.get(group.groupId))
-);
-```
+(In Swift, `listUserMemberships` returns untyped rows and there's no `Promise.all` — load sequentially or with a `TaskGroup`.)
 
 This works because the group ID and database ID share the same value by convention. When setting up a workspace, create the group using the database ID returned from `databases.create()`:
 
-```typescript
-// Create the database (ID is assigned by the server)
-const db = await client.databases.create({
-  title: "Team Workspace",
-  databaseType: "workspace",
-});
+::: code-group
 
-// Create the group using the database ID as the group ID
-await client.groups.create({
-  groupType: "workspace",
-  groupId: db.databaseId,
-  name: "Team Workspace Members",
-});
-await client.groups.addMember("workspace", db.databaseId, { userId: currentUser.userId });
-```
+<<< ../../examples/databases/db-create-workspace.ts#example{ts} [JavaScript]
+
+<<< ../../examples/databases/db-create-workspace.swift#example{swift} [Swift]
+
+:::
 
 This pattern is especially useful in multi-tenant apps where each team or project has its own database and group, and users are granted access through group membership rather than direct database permissions.
 
