@@ -78,14 +78,13 @@ console.log(response.body);
 
 ### POST Requests
 
-```typescript
-const response = await client.integrations.call({
-  integrationKey: "crm-api",
-  method: "POST",
-  path: "/contacts",
-  body: { email: "user@example.com", name: "Alice" },
-});
-```
+::: code-group
+
+<<< ../../examples/integrations/integration-call.ts#example{ts} [JavaScript]
+
+<<< ../../examples/integrations/integration-call.swift#example{swift} [Swift]
+
+:::
 
 ### Error Handling
 

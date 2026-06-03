@@ -2,6 +2,30 @@
 
 How to author, test, and execute LLM prompts on Primitive using the `primitive` CLI, TOML files, and the client SDK.
 
+## Execute a managed prompt (JavaScript + Swift)
+
+JavaScript:
+<!-- example:start prompts/prompt-execute lang=ts -->
+```typescript
+  const result = await client.prompts.execute("my-summarizer", {
+    variables: { text: documentText, style: "concise" },
+    modelOverride: "gpt-4o", // optional; defaults to the active config's model
+  });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start prompts/prompt-execute lang=swift -->
+```swift
+  let result = try await client.prompts.execute(
+    promptKey: "my-summarizer",
+    options: ExecutePromptOptions(
+      variables: ["text": documentText, "style": "concise"],
+      modelOverride: "gpt-4o" // optional; defaults to the active config's model
+    )
+  )
+```
+<!-- example:end -->
+
 ## Quick Mental Model
 
 A **prompt** is a named template (e.g. `summarizer`) plus 1+ **configs**. Each config is a `(provider, model, systemPrompt, userPromptTemplate, ...)` tuple. One config is the **active** config — that's what gets used when you don't pass `--config` / `configId`. Test cases are attached to the prompt and verify outputs (regex / contains / JSON subset / LLM evaluator).

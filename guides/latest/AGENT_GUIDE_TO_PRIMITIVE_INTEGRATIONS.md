@@ -2,6 +2,31 @@
 
 Integrations let tenant apps call third-party APIs through a server-side proxy without exposing credentials to clients. The proxy enforces an allowlist of methods and paths, injects credentials from App Secrets, and returns the upstream response to the caller.
 
+## Call an integration (JavaScript + Swift)
+
+JavaScript:
+<!-- example:start integrations/integration-call lang=ts -->
+```typescript
+  const response = await client.integrations.call({
+    integrationKey: "crm-api",
+    method: "POST",
+    path: "/contacts",
+    body: { email: "user@example.com", name: "Alice" },
+  });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start integrations/integration-call lang=swift -->
+```swift
+  let response = try await client.integrations.call(IntegrationCallRequest(
+    integrationKey: "crm-api",
+    method: "POST",
+    path: "/contacts",
+    body: ["email": "user@example.com", "name": "Alice"]
+  ))
+```
+<!-- example:end -->
+
 This guide is verified against `js-bao-wss` source. Anything not described here is unsupported.
 
 ## Architecture

@@ -144,6 +144,10 @@ const { items } = await client.workflows.listRuns({
 
 For short, latency-sensitive workflows (validation, enrichment, webhook responses), opt the workflow into synchronous invocation by setting `syncCallable = true` in the workflow TOML (pushed by `primitive sync push`) or via `primitive workflows update --sync-callable true`. Clients can then `await` the final result in one round-trip:
 
+::: warning JavaScript-only
+`client.workflows.runSync(...)` is currently **JavaScript-only** — the Swift client exposes `workflows.start(...)` and `runAndApply(...)` but not `runSync`. Swift apps use `start` + status polling, or `runAndApply` for the client-apply flow.
+:::
+
 ```typescript
 const result = await client.workflows.runSync({
   workflowKey: "validate-coupon",
@@ -400,15 +404,15 @@ Verification types include substring `contains`, regex pattern, JSON subset, and
 
 ### Using Prompts in Your App
 
-```typescript
-const result = await client.prompts.execute("my-summarizer", {
-  variables: { text: documentText, style: "concise" },
-  configId: "<config-id>",         // optional — defaults to the active config
-  modelOverride: "gpt-4o",          // optional
-});
+::: code-group
 
-console.log(result.output);
-```
+<<< ../../examples/prompts/prompt-execute.ts#example{ts} [JavaScript]
+
+<<< ../../examples/prompts/prompt-execute.swift#example{swift} [Swift]
+
+:::
+
+The result carries `output` (the generated text); pass `configId` to target a specific config instead of the active one.
 
 ### Using Prompts in Workflows
 
@@ -457,14 +461,13 @@ primitive sync push --dir ./config
 
 ### Calling from Your App
 
-```typescript
-const response = await client.integrations.call({
-  integrationKey: "weather-api",
-  method: "GET",
-  path: "/forecast/san-francisco",
-  query: { units: "metric" },
-});
-```
+::: code-group
+
+<<< ../../examples/integrations/integration-call.ts#example{ts} [JavaScript]
+
+<<< ../../examples/integrations/integration-call.swift#example{swift} [Swift]
+
+:::
 
 ## CLI Workflow
 

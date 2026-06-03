@@ -1,5 +1,7 @@
 # Workflow Agent Guide
 
+> **Swift parity:** workflow *definitions* are TOML (language-neutral). On the client, `workflows.start` exists in both languages, but **`client.workflows.runSync(...)` is JavaScript-only** — Swift has `start` + `runAndApply`. Prompt/integration calls used from app code are dual-language (see the Prompts and Integrations guides).
+
 Workflows are multi-step server-side automations defined in TOML. Each step is one of a fixed set of `kind`s (LLM call, integration call, prompt execute, database op, email, blob, etc.). Steps run sequentially with template-rendered inputs and a shared output context.
 
 This guide is the source of truth for what's actually in `src/workflows/`. Examples are kept short and load-bearing.
