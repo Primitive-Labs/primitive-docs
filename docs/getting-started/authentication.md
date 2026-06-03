@@ -19,13 +19,6 @@ Authentication runs against server-side **app settings** that must line up with 
 
 Inspect all three anytime with `primitive apps get`.
 
-::: warning The blank-login failure mode
-If the origin your app is served from is **not** in the CORS allowed origins, every request to the Primitive server is blocked by the browser — including the client's very first auth bootstrap call. `initializeClient()` fails with a network error before the auth config ever loads, and because the login UI gates every sign-in method on a loaded auth config, **the login screen renders completely blank with no error**.
-
-Symptoms: blank login UI; the network tab shows an `OPTIONS` or `POST` to `…/api/auth/refresh` returning **403** with no `access-control-allow-origin` header.
-
-Fix: add the serving origin to the app's CORS allowed origins. This bites most often when running on a non-default port (e.g. `:4001` when only `:5173` is listed) or when deploying to a new domain.
-:::
 
 ## Choosing Your Email Sign-In Method
 
