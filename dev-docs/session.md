@@ -2,10 +2,10 @@
 
 Inspect the current authenticated session.
 
-::: tip Divergent shape
-The Swift `session.get()` returns an **untyped `[String: Any]`** where JS returns a typed
-`SessionInfo` (`sessionId`, `userId`, `expiresAt`, `createdAt`, `lastActivity`). Both compile;
-the shapes differ ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+::: tip Now typed
+Swift `session.get()` returns a typed `SessionInfo` (`sessionId`, `userId`, `expiresAt`,
+`createdAt`, `lastActivity`), matching JS field-for-field
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ## get()

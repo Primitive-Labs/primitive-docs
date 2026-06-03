@@ -125,3 +125,14 @@ After typing, the remaining documents divergences were triaged. **Implemented** 
 ## 6. How to verify what's done now
 - Client library: `cd js-bao-wss/swift-client && swift build` → Build complete.
 - Dev cookbook: `cd primitive-docs && node scripts/compile-dev-examples.mjs` → All dev snippets compile (requires the mirrored submodule).
+
+## 7. Parity waves — additional typed surfaces (beyond documents)
+
+Per-sub-api agents are typing the rest of the client (#954) + fixing their tracker rows. Each wave: client typed → cookbook updated → user-facing follow-ups recorded here.
+
+### Wave 1 (done) — session, users, gemini, llm, database/collection/group-type-configs
+Client typed + cookbook updated; clone builds and the dev gate is green. **No *required* user-facing `docs/` changes** — none of these surfaces have untyped Swift snippets in `docs/getting-started/` or `guides/latest/` (their untyped examples lived only in the cookbook, now typed). Optional editorial only:
+- `guides/latest/AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.swift.md` — `users` call sites already compile against the typed API; an editorial pass could show typed field access (`user.name`, `result.exists`, `profiles.map { $0.name }`) and name the `GetUserOptions` / `BasicUserInfo` / `UserLookupResult` types. The `groupTypeConfigs`/`collectionTypeConfigs` mentions there are prose/TOML only.
+- If a Swift tab is ever added for `users.lookup` in `docs/getting-started/sharing-and-invitations.md` / `users-and-groups.md`, use the typed `UserLookupResult`.
+
+Also landed (bounded behavioral fixes, separate from typing): `JsBaoErrorCode.workflowApplyNotConfirmed` ([#959](https://github.com/Primitive-Labs/js-bao-wss/issues/959)), `groups.listUserMemberships(groupType:)` ([#960](https://github.com/Primitive-Labs/js-bao-wss/issues/960)), `databases.list(databaseType:)` ([#962](https://github.com/Primitive-Labs/js-bao-wss/issues/962)), `collectionTypeConfigs`/`groupTypeConfigs` path-encoding ([#596](https://github.com/Primitive-Labs/js-bao-wss/issues/596)/[#590](https://github.com/Primitive-Labs/js-bao-wss/issues/590)).

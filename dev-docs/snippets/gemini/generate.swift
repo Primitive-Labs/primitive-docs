@@ -1,18 +1,17 @@
 import JsBaoClient
 
-// Send a structured prompt to Gemini. Swift takes an untyped `[String: Any]`
-// and returns an untyped dictionary; read fields with dict access.
+// Send a structured prompt to Gemini and return the generated response.
 func generate(client: JsBaoClient) async throws {
   // #region example
-  let result = try await client.gemini.generate(options: [
-    "model": "gemini-1.5-pro",
-    "system": [["type": "text", "text": "You are a concise assistant."]],
-    "messages": [
-      ["role": "user", "parts": [["type": "text", "text": "Summarize photosynthesis."]]],
+  let result = try await client.gemini.generate(options: GeminiGenerateOptions(
+    model: "gemini-1.5-pro",
+    system: [.text("You are a concise assistant.")],
+    messages: [
+      GeminiMessage(role: .user, parts: [.text("Summarize photosynthesis.")]),
     ],
-    "generationConfig": ["temperature": 0.4, "maxOutputTokens": 256],
-  ])
-  let message = result["message"] as? [String: Any]
+    generationConfig: GeminiGenerationConfig(temperature: 0.4, maxOutputTokens: 256)
+  ))
+  let message = result.message
   // #endregion example
   _ = (result, message)
 }

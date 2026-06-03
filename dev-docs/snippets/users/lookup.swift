@@ -3,7 +3,10 @@ import JsBaoClient
 // Find a user by email address.
 func lookup(client: JsBaoClient, email: String) async throws {
   // #region example
-  let user = try await client.users.lookup(email: email)
+  let result = try await client.users.lookup(email: email)
+  if result.exists, let user = result.user {
+    print(user.name)
+  }
   // #endregion example
-  _ = user
+  _ = result
 }

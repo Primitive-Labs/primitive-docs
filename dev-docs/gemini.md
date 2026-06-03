@@ -2,8 +2,8 @@
 
 Generate content with Google Gemini models: structured prompts, raw passthrough, model discovery, and token counting.
 
-::: tip Divergent shape
-Every Swift `GeminiAPI` method takes and returns **untyped `[String: Any]` / `Any`** where JS exposes named interfaces (`GeminiGenerateOptions`, `GeminiGenerateResult`, `GeminiPromptOptions`, …). Both compile; the Swift examples use dict access. Tracked under [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954). Per-method divergences (`models()` return shape, `generateRaw` error code) are noted inline.
+::: tip Now typed
+The Swift `GeminiAPI` is fully typed, mirroring the JS interfaces field-for-field: `generate` takes `GeminiGenerateOptions` and returns `GeminiGenerateResult`; `countTokens` takes `GeminiPromptOptions` and returns `GeminiCountTokensResult`; `models()` returns `GeminiModelsResult`; `generateRaw` takes `GeminiGenerateRawOptions` and returns a `JSONValue`. Content parts use the `GeminiContentPart` enum (`.text` / `.image` / `.file`); opaque fields (response schemas, raw provider payloads) are `JSONValue` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). One remaining per-method divergence (`generateRaw` error code) is noted inline.
 :::
 
 ::: warning Swift parity gap — no analytics, no error normalization
@@ -23,8 +23,8 @@ Send a structured prompt to Gemini and return the generated response.
 
 Send a raw request body to a specified model, bypassing structured prompt formatting. `model` and `body` are required.
 
-::: tip Divergent shape
-Beyond the untyped options ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)), the client-side argument validation throws a **different error code**: Swift throws `INVALID_ARGUMENT`, JS throws `GEMINI_ERROR`. Catch accordingly when validating raw requests.
+::: tip Divergent error code
+The client-side argument validation throws a **different error code**: Swift throws `INVALID_ARGUMENT`, JS throws `GEMINI_ERROR`. Catch accordingly when validating raw requests.
 :::
 
 ::: code-group
@@ -34,11 +34,7 @@ Beyond the untyped options ([#954](https://github.com/Primitive-Labs/js-bao-wss/
 
 ## models()
 
-List available Gemini models and the server default.
-
-::: tip Divergent shape
-Swift returns an untyped `[String: Any]` envelope; JS returns a typed `{ models: string[]; defaultModel: string }` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
+List available Gemini models and the server default. Swift returns a typed `GeminiModelsResult` (`models: [String]`, `defaultModel: String`), matching JS.
 
 ::: code-group
 <<< ./snippets/gemini/models.ts#example{ts} [JavaScript]

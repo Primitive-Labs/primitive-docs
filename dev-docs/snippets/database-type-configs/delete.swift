@@ -1,12 +1,11 @@
 import JsBaoClient
 
-// Delete a database type configuration. Where JS resolves to a typed
-// `{ success: boolean }`, Swift returns an untyped `[String: Any]` — read
-// `success` out of the dict.
+// Delete a database type configuration. Resolves to a typed `SuccessResult`
+// (`{ success }`).
 func delete(client: JsBaoClient, databaseType: String) async throws {
   // #region example
   let result = try await client.databaseTypeConfigs.delete(databaseType: databaseType)
-  let success = result["success"] as? Bool ?? false
+  let success = result.success
   // #endregion example
   _ = success
 }

@@ -1,11 +1,11 @@
 import JsBaoClient
 
-// Retrieve information about the current authenticated session. Swift returns
-// an untyped `[String: Any]` (no `SessionInfo` struct), so fields are hand-cast.
+// Retrieve information about the current authenticated session as a typed
+// `SessionInfo`.
 func get(client: JsBaoClient) async throws {
   // #region example
   let session = try await client.session.get()
-  let sessionId = session["sessionId"] as? String
+  let sessionId = session.sessionId
   // #endregion example
   _ = sessionId
 }

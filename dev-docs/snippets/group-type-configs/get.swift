@@ -1,13 +1,11 @@
 import JsBaoClient
 
-// Fetch the configuration for one group type. Swift returns an untyped
-// `[String: Any]` instead of the typed `GroupTypeConfigInfo`. Note: the Swift
-// client interpolates `groupType` into the path WITHOUT percent-encoding it
-// (#590), so prefer ASCII-safe group type identifiers.
+// Fetch the configuration for one group type. Returns the typed
+// `GroupTypeConfigInfo`. The `groupType` path segment is percent-encoded.
 func get(client: JsBaoClient, groupType: String) async throws {
   // #region example
   let config = try await client.groupTypeConfigs.get(groupType: groupType)
-  let autoAddCreator = config["autoAddCreator"] as? Bool ?? false
+  let autoAddCreator = config.autoAddCreator
   // #endregion example
   _ = (config, autoAddCreator)
 }

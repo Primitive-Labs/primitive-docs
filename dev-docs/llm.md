@@ -2,8 +2,8 @@
 
 Send chat completions to the configured LLM provider and discover available models.
 
-::: tip Divergent shape
-Both Swift `LlmAPI` methods take and return **untyped `[String: Any]`** where JS exposes typed interfaces — notably `chat` accepts a typed `LlmChatOptions` with structured `attachments` and `reasoning` unions that Swift represents as plain dictionaries. Both compile; the Swift examples use dict access. Tracked under [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).
+::: tip Now typed
+Both Swift `LlmAPI` methods are fully typed ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). `chat` takes a typed `LlmChatOptions` — structured `ChatMessage`s, a `ChatAttachment` union (`.image`/`.audio`/`.pdf`), and `ReasoningOptions` — and returns an `LlmChatResponse`. `any` fields (`content`, `tools`, `tool_choice`, `plugins`, `annotations`, `raw`) carry as `JSONValue`.
 :::
 
 ::: warning Swift parity gap — no analytics events
@@ -21,11 +21,7 @@ Send a chat completion request to the configured LLM provider. Supports image/au
 
 ## models()
 
-List available LLM models and the server default.
-
-::: tip Divergent shape
-Swift returns an untyped `[String: Any]` envelope; JS returns a typed `{ models: string[]; defaultModel: string }` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
+List available LLM models and the server default. Returns a typed `LlmModelsResponse` (`models: [String]`, `defaultModel: String`), matching JS's `{ models, defaultModel }`.
 
 ::: code-group
 <<< ./snippets/llm/models.ts#example{ts} [JavaScript]

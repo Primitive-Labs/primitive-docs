@@ -1,9 +1,8 @@
-import Foundation
 import JsBaoClient
 
 // Update an existing database type configuration. To clear a field, pass
-// `NSNull()` (the untyped dict equivalent of JS `null`); omit a key to leave
-// it unchanged.
+// `.clear` (the typed equivalent of JS `null`); omit a field to leave it
+// unchanged.
 func update(
   client: JsBaoClient,
   databaseType: String,
@@ -12,11 +11,11 @@ func update(
   // #region example
   let config = try await client.databaseTypeConfigs.update(
     databaseType: databaseType,
-    params: [
-      "ruleSetId": ruleSetId,
-      "triggers": NSNull(),
-      "metadataAccess": "user.role == 'admin'",
-    ]
+    params: UpdateDatabaseTypeConfigParams(
+      ruleSetId: .value(ruleSetId),
+      triggers: .clear,
+      metadataAccess: .value("user.role == 'admin'")
+    )
   )
   // #endregion example
   _ = config

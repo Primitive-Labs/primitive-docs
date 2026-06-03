@@ -2,18 +2,15 @@
 
 Bind a rule set, CEL trigger rules, and a metadata-access gate to a `databaseType` tag. A small CRUD surface over `/databases/types`.
 
-::: warning Swift parity gap
-Every method on the Swift client takes and returns untyped `[String: Any]` /
-`[[String: Any]]` where JS uses the named `DatabaseTypeConfigInfo`,
-`CreateDatabaseTypeConfigParams`, and `UpdateDatabaseTypeConfigParams`
-interfaces (sweep databaseTypeConfigs D1/D2,
-[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-In particular `delete` resolves to a typed `{ success: boolean }` in JS but a
-bare dict in Swift, and the Swift client swallows decode failures with
-`?? [:]` / `?? []` — a failed cast surfaces as an empty result rather than an
-error (borders on a silent-empty bug, so check for an expected key rather than
-trusting an empty dict). Read fields out of the dictionary, and pass `NSNull()`
-where JS would pass `null`.
+::: tip Now typed (Swift)
+The Swift client is now fully typed in parity with JS
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). Every method
+takes and returns named models: `DatabaseTypeConfigInfo`,
+`CreateDatabaseTypeConfigParams`, `UpdateDatabaseTypeConfigParams`, and `delete`
+resolves to a typed `SuccessResult` (`{ success }`). Decoding now throws on a
+shape mismatch instead of swallowing it to an empty dict. To clear a field on
+`update`, pass `.clear` (the typed equivalent of JS `null`); omit it to leave it
+unchanged. Opaque blobs like `triggers` are `[String: JSONValue]`.
 :::
 
 ## list()
@@ -45,7 +42,7 @@ Create a new database type configuration. `databaseType` is required; `ruleSetId
 
 ## update(databaseType, params)
 
-Update an existing configuration. Pass `null` (JS) / `NSNull()` (Swift) for any field to clear it; omit a field to leave it unchanged.
+Update an existing configuration. Pass `null` (JS) / `.clear` (Swift) for any field to clear it; omit a field to leave it unchanged.
 
 ::: code-group
 <<< ./snippets/database-type-configs/update.ts#example{ts} [JavaScript]

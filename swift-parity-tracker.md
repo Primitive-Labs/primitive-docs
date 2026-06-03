@@ -21,6 +21,12 @@ Legend: ✅ fixed · 📝 documented-only (code pending) · 🟦 by-design/defer
 
 Also added four manager-backed `DocumentsAPI` methods: `openAlias`, `isReadOnly`, `listOpen`, `isSynced`.
 
+### Parity waves (typing the rest of the client via per-sub-api agents)
+**Wave 1 ✅ (clone builds, dev gate green):** typed `session`, `users`, `gemini`, `llm`, `databaseTypeConfigs`, `collectionTypeConfigs`, `groupTypeConfigs` → addresses **#954** for those surfaces; also resolves **#590** (groupType encoding), **#596** (collectionType encoding), and the named `GetUserOptions` (users D1). Bounded behavioral fixes landed alongside: **#959** (`WORKFLOW_APPLY_NOT_CONFIRMED`), **#960** (`listUserMemberships(groupType:)`), **#962** (`databases.list(databaseType:)`, partial — `importCsv` still pending).
+Deferred features noted by agents: gemini/llm analytics events (#963).
+
+**Remaining waves:** me · invitations · rule-sets · cron · groups · collections · databases · workflows · analytics · auth · blob-buckets · integrations · cache · model-surface — plus the feature-sized issues (#963 auto-events, #964 auth, #952 subscribe, #956 runSync, #962a importCsv, #946/#947 model paging) and the 6 new bug issues (#991–#996).
+
 ## ⚪ Stale / invalid → comment recommending close
 | Issue | State | Why |
 |---|---|---|
@@ -53,11 +59,15 @@ Also added four manager-backed `DocumentsAPI` methods: `openAlias`, `isReadOnly`
 | [#596](https://github.com/Primitive-Labs/js-bao-wss/issues/596) | collection-type-configs | `collectionType` percent-encoding path divergence |
 
 ## 🟦 By-design / deferred (no action, or already-closed issue)
-- inSync/includesWrites sync-local (async = `waitFor*`); `getDocumentPermission` typed enum; `getLocalMetadata` sync (SQLite vs IndexedDB) — by design (#961 / #954).
-- Local-first `create` + `commitOfflineCreate` — [#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852) (CLOSED); deferred.
-- `documents.list` pagination — deferred; `list` is slated for removal ([#859](https://github.com/Primitive-Labs/js-bao-wss/issues/859)).
-- `open` returns `YDocument` (not `{doc, metadata}`); awareness/presence API not in v1 — deferred, no issue.
-- Benign: removePermission overloads, waitForWriteConfirmation throws-vs-bool, evict/evictAll/cancelPendingCreate no-options, getOwner (Swift-only), listPendingCreates `[String]`, me.cacheInfo tuple, errors enum-vs-string, blob `download` `Data` vs `ArrayBuffer`, KvCache (Swift-only), service-worker (web-only).
+| Item | Issue | Disposition |
+|---|---|---|
+| `inSync`/`includesWrites` sync-local (async = `waitFor*`) | [#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961) | by design |
+| `getDocumentPermission` typed enum; `getLocalMetadata` sync (SQLite vs IndexedDB) | [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954) | by design |
+| Local-first `create` + `commitOfflineCreate` | [#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852) (CLOSED) | deferred |
+| `documents.list` pagination (`list` is slated for removal) | [#859](https://github.com/Primitive-Labs/js-bao-wss/issues/859) | deferred |
+| `open` returns `YDocument` (not `{doc, metadata}`) | — (no issue) | deferred, by design |
+| Awareness/presence API not in v1 | — (no issue) | deferred |
+| Benign shape diffs: `removePermission` overloads, `waitForWriteConfirmation` throws-vs-bool, `evict`/`evictAll`/`cancelPendingCreate` no-options, `getOwner` (Swift-only), `listPendingCreates` `[String]`, `me.cacheInfo` tuple, errors enum-vs-string, blob `download` `Data` vs `ArrayBuffer`, `KvCache` (Swift-only), service-worker (web-only) | — (no issue) | by design |
 
 ## ➕ New issues filed (surfaced by the direct-diff pass — had no existing issue)
 Filed 2026-06-03, all labelled `ios`:

@@ -1,9 +1,9 @@
 import JsBaoClient
 
-// Update a group type configuration. Swift takes an untyped `[String: Any]`
-// params dict; pass `NSNull()` for `ruleSetId` to remove the current rule set.
-// Note: the Swift client does NOT percent-encode the `groupType` path segment
-// (#590), unlike the JS client — prefer ASCII-safe identifiers.
+// Update a group type configuration with the typed
+// `UpdateGroupTypeConfigParams`. `ruleSetId` is tri-state: `.value(...)` to
+// set, `.clear` to remove the current rule set (where JS passes `null`), or
+// omit to leave unchanged. The `groupType` path segment is percent-encoded.
 func update(
   client: JsBaoClient,
   groupType: String,
@@ -12,10 +12,10 @@ func update(
   // #region example
   let config = try await client.groupTypeConfigs.update(
     groupType: groupType,
-    params: [
-      "ruleSetId": ruleSetId,
-      "autoAddCreator": false,
-    ]
+    params: UpdateGroupTypeConfigParams(
+      ruleSetId: .value(ruleSetId),
+      autoAddCreator: false
+    )
   )
   // #endregion example
   _ = config
