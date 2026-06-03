@@ -11,7 +11,7 @@ const DEV_DOCS = resolve(__dirname, '..')
 // during the build-out (no dead links).
 const ORDER = [
   // Documents & data
-  'documents', 'document-blob', 'model-surface', 'collections',
+  'documents', 'document-blob', 'model-surface', 'codegen', 'collections',
   'databases', 'database-type-configs',
   // People & access
   'me', 'users', 'groups', 'group-type-configs', 'collection-type-configs',
