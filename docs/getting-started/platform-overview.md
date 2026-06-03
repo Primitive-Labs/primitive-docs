@@ -99,7 +99,7 @@ const task = new Task({ title: "Review PR" });
 await task.save();
 ```
 
-See [Defining Your Models](./defining-your-models.md) for the full TOML reference (field types, relationships, unique constraints, the `migrate` tool for older projects).
+See [Working with Documents](./working-with-documents.md#defining-models) for the full TOML reference (field types, relationships, unique constraints, the `migrate` tool for older projects).
 
 ### js-bao-wss-client — Backend Client
 Manages all interaction with the Primitive backend: authentication, document sync, database operations, blob storage, workflows, LLM calls, integrations, and analytics.

@@ -402,7 +402,6 @@ export default defineConfig({
         text: 'Data Persistence',
         items: [
           { text: 'Choosing Your Data Model', link: '/getting-started/choosing-your-data-model' },
-          { text: 'Defining Your Models', link: '/getting-started/defining-your-models' },
           { text: 'Working with Documents', link: '/getting-started/working-with-documents' },
           { text: 'Working with Databases', link: '/getting-started/working-with-databases' },
           { text: 'Blobs and Files', link: '/getting-started/blobs-and-files' },

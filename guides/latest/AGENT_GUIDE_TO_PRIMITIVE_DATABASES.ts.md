@@ -1089,7 +1089,7 @@ const db = client.databases.connect(databaseId);
 await db.syncIndexes(Task);
 ```
 
-The same TOML powers documents and client-side database models. See the [Defining Your Models guide](https://docs.primitive.com/getting-started/defining-your-models) (or the [Documents agent guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#defining-models)) for the full TOML reference: field types, options, relationships, unique constraints, and schema iteration.
+The same TOML powers documents and client-side database models. See the [Documents agent guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#defining-models) for the full TOML reference: field types, options, relationships, unique constraints, and schema iteration.
 
 If you want the server to enforce that registered operations only reference fields you've declared, declare those same models *inside the database type config* (`config/database-types/<type>.toml`) using `[models.<Name>.fields.<field>]` blocks. The CLI sync push extracts that subtree and stores it as the type's `schema`, which the op-edit and schema-edit gates check against — see [Schema gate](#schema-gate).
 

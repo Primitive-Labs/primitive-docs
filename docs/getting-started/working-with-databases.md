@@ -7,7 +7,7 @@ A database is an isolated, server-side data store (SQLite-backed). Each database
 ### Schemaless on the Server
 Save any JSON records without upfront schema definition. There's no `CREATE TABLE` step — collections are created implicitly when you first write to them, and you can add new fields at any time without migrations. This means you can iterate fast, ship changes without coordinating schema updates, and let your data model evolve naturally alongside your application.
 
-That said, registered operations refer to model collections by `modelName`. The recommended pattern is to declare those models once in `src/models/models.toml` so the same names — and the same field shapes — are typed end-to-end on the client, even though the server itself imposes no schema. See [Defining Your Models](./defining-your-models.md) for the TOML authoring loop.
+Databases work differently from documents: there are no client-side model classes here. **Registered operations are the client interface** — every read and write goes through an operation you define in the database-type TOML, and client-side codegen (`primitive databases codegen`) generates types over those *operations*, not over models. The database itself is **schemaless**: `modelName` is a collection label, and the server accepts any JSON for it. You can optionally declare a `[models.*]` schema in the database-type TOML — not an enforced contract like a traditional database schema, but a map of the data for users and agents, which the server also uses to validate registered operations against your expectations whenever they're updated (see [Schema Gate](#schema-gate-optional)).
 
 ### Organized by Type
 A **database type** is a named configuration (operations, triggers, access rules) shared across many database instances. Think of it as a template: if you have one database per tenant, project, or team, they all share the same type — update the type once, and every instance inherits the changes. When you create a database with a type that doesn't exist yet, the type is auto-created.
@@ -334,7 +334,7 @@ defaultAccess = "isMemberOf('team', database.celContext.teamId)"
 
 ## Schema Gate (Optional)
 
-Add `[models.<Name>.fields.<field>]` blocks to your `config/database-types/<type>.toml` to declare which models and fields the type's registered operations may reference. When a schema is present, the server checks every op edit against it:
+Add `[models.<Name>.fields.<field>]` blocks to your `config/database-types/<type>.toml` to declare which models and fields the type's registered operations may reference. This is **not** an enforced database schema — the database stays schemaless and direct record writes aren't validated against it. It's a map of the data (for people and agents) plus a consistency check on the operations layer: when a schema is present, the server checks every op edit against it:
 
 ```toml
 # config/database-types/inventory.toml
@@ -671,7 +671,6 @@ Timing is available on all operation types: query, mutation, count, aggregate, a
 ## Next Steps
 
 - **[Choosing Your Data Model](./choosing-your-data-model.md)** — When to use databases vs. documents
-- **[Defining Your Models](./defining-your-models.md)** — TOML model authoring shared with documents
 - **[Users and Groups](./users-and-groups.md)** — Set up groups for database access control
 - **[Scheduled and Real-Time Automation](./scheduled-and-realtime-automation.md)** — Subscriptions and cron-triggered workflows
 - **[Primitive CLI](./primitive-cli.md)** — Full CLI reference for database management
