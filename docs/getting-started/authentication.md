@@ -1,10 +1,10 @@
 # Authentication
 
-The template app comes with a complete authentication flow out of the box — login UI, token management, session handling, and multiple sign-in methods. You don't need to build any auth screens or wire up the client yourself.
+The starter templates — web (Vue) and iOS (SwiftUI) — come with a complete authentication flow out of the box: login UI, token management, session handling, and multiple sign-in methods. You don't need to build auth screens or wire up the client yourself. Not using a template? Every flow is also available directly on the client — see [Using the Client Directly](#using-the-client-directly).
 
 The two things you may want to configure are:
 
-1. **Email sign-in method** — Magic Link (default) or One-Time Password, controlled by a prop on the login component
+1. **Email sign-in method** — Magic Link or One-Time Password
 2. **Google OAuth** — Optional, requires setting up a Google OAuth client
 
 ## Server App Settings Must Match Your App's Origin
@@ -19,19 +19,86 @@ Authentication runs against server-side **app settings** that must line up with 
 
 Inspect all three anytime with `primitive apps get`.
 
+## Using the Client Directly
 
-## Choosing Your Email Sign-In Method
+The templates are optional. Everything they do runs on public client APIs, so any web framework (React, Svelte, vanilla JS) or any Swift app can implement the same flows directly. Install the client — `npm install js-bao-wss-client`, or add the Swift package — and initialize it:
 
-The `PrimitiveLogin` component supports two email-based sign-in methods:
+::: code-group
 
-| Method | Value | How It Works |
-|---|---|---|
-| **Magic Link** (default) | `"magic_link"` | User receives a clickable sign-in link via email |
-| **One-Time Password** | `"one_time_code"` | User receives a 6-digit code to enter in the app |
+<<< ../../examples/auth/initialize-client.ts#example{ts} [JavaScript]
 
-Set this via the `emailAuthMethod` prop on the `PrimitiveLogin` component in your login page:
+<<< ../../examples/auth/initialize-client.swift#example{swift} [Swift]
 
-```vue
+:::
+
+Discover which sign-in methods are enabled before rendering any UI:
+
+::: code-group
+
+<<< ../../examples/auth/get-auth-config.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/get-auth-config.swift#example{swift} [Swift]
+
+:::
+
+**Google OAuth** — start the flow, then handle the callback (`?code=&state=`) on your redirect route. On iOS, present the URL in an `ASWebAuthenticationSession` (the iOS template's `PrimitiveAuthManager.startOAuth()` is a complete reference implementation):
+
+::: code-group
+
+<<< ../../examples/auth/oauth.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/oauth.swift#example{swift} [Swift]
+
+:::
+
+**Magic Link** — request a link, then verify the token your callback page receives:
+
+::: code-group
+
+<<< ../../examples/auth/magic-link.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/magic-link.swift#example{swift} [Swift]
+
+:::
+
+**One-Time Password** — request a 6-digit code, then verify it:
+
+::: code-group
+
+<<< ../../examples/auth/otp.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/otp.swift#example{swift} [Swift]
+
+:::
+
+Inspect session state and gate work on auth being ready:
+
+::: code-group
+
+<<< ../../examples/auth/session-state.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/session-state.swift#example{swift} [Swift]
+
+:::
+
+And sign out:
+
+::: code-group
+
+<<< ../../examples/auth/logout.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/logout.swift#example{swift} [Swift]
+
+:::
+
+
+## The Template Login
+
+Both starter templates ship a drop-in login flow:
+
+::: code-group
+
+```vue [Web (Vue)]
 <PrimitiveLogin
   appName="My App"
   defaultContinueRoute="home"
@@ -39,7 +106,37 @@ Set this via the `emailAuthMethod` prop on the `PrimitiveLogin` component in you
 />
 ```
 
-If you don't specify `emailAuthMethod`, it defaults to `"magic_link"`.
+```swift [iOS (SwiftUI)]
+// AuthGateView shows PrimitiveLoginView until the user is signed in
+// and connected, then renders your content.
+AuthGateView(
+  appState: appState,
+  appName: "My App",
+  authManager: appState.authManager
+) {
+  MainTabView()
+}
+```
+
+:::
+
+| | Web (Vue) | iOS (SwiftUI) |
+|---|---|---|
+| Component | `PrimitiveLogin` | `PrimitiveLoginView`, wrapped by `AuthGateView` |
+| Email sign-in | `emailAuthMethod`: `"magic_link"` (default) or `"one_time_code"` | One-time code |
+| Google OAuth | Button appears automatically when configured | Pass `showGoogleOAuth: true` (runs in an `ASWebAuthenticationSession` sheet) |
+| After sign-in | Navigates to `defaultContinueRoute` | Renders the `AuthGateView` content closure |
+
+### Choosing Your Email Sign-In Method (Web)
+
+The Vue `PrimitiveLogin` component supports two email-based methods:
+
+| Method | Value | How It Works |
+|---|---|---|
+| **Magic Link** (default) | `"magic_link"` | User receives a clickable sign-in link via email |
+| **One-Time Password** | `"one_time_code"` | User receives a 6-digit code to enter in the app |
+
+The iOS `PrimitiveLoginView` signs users in with a one-time email code.
 
 ## Setting Up Google OAuth (Optional)
 
@@ -140,11 +237,11 @@ Manage the `testAccountBaseEmails` whitelist either from the [Primitive CLI](./p
 
 ## How It Works Under the Hood
 
-For reference, here's what the template handles for you:
+For reference, here's what the starter templates handle for you:
 
 - **Token management** — Access tokens are short-lived and refreshed automatically in the background. Refresh tokens are stored securely.
-- **Auth state** — The client emits `authStateChanged` events that the template's router uses to redirect between login and app pages.
-- **Logout** — Calling `client.auth.logout()` clears tokens, closes documents, and fires the auth state event. The template's UI includes a logout button.
+- **Auth state** — The client emits `authStateChanged` events that the templates use to switch between login and app UI (the web template's router guard; `AuthGateView` on iOS).
+- **Logout** — Calling `client.auth.logout()` clears tokens, closes documents, and fires the auth state event. Both templates include a logout button (`PrimitiveProfileView` on iOS).
 - **Safari compatibility** — The template's production deployment includes a first-party refresh proxy for Safari's strict cookie policies.
 
 ## Next Steps

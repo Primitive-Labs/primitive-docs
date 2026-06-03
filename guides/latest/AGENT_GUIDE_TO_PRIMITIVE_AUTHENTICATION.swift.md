@@ -13,6 +13,27 @@ Implementing auth flows for Primitive apps. All methods live on `JsBaoClient` (p
 
 Each method must be enabled in the Admin Console. Check availability with `getAuthConfig()` before showing UI.
 
+## Client Setup (no template required)
+
+All flows below run on a plain client — no starter template needed:
+
+```swift
+  let client = JsBaoClient(options: JsBaoClientOptions(
+    apiUrl: "https://primitiveapi.com",
+    wsUrl: "wss://primitiveapi.com",
+    appId: "YOUR_APP_ID"
+  ))
+
+  // Wait for the bootstrap to restore a persisted session (if any).
+  try await client.waitForAuthBootstrap()
+  if client.isAuthenticated() {
+    let userId = try await client.waitForUserId(timeout: 5)
+    print("signed in as \(userId)")
+  }
+```
+
+In the starter templates this wiring is owned for you (web: the template's `userStore`; iOS: `PrimitiveAppState.initialize()` + `PrimitiveAuthManager`).
+
 ## Discovering Available Methods
 
 ```swift
@@ -505,11 +526,15 @@ The Swift client takes only `wipeLocal` (`redirectTo`, `revokeOffline`, `clearOf
 
 ---
 
-## Auth State in Apps (Vue/template-aware)
+## Auth State in Apps
 
-The [primitive-app-template](https://github.com/AnchorPal/primitive-app-template) provides a `userStore` (Pinia) and `AppLayout` that implement these patterns. If you're not using the template, replicate the same gates.
+The web template ([primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template)) provides a `userStore` (Pinia) and `AppLayout`; the iOS template ([swift-primitive-app-dev](https://github.com/Primitive-Labs/swift-primitive-app-dev)) provides `PrimitiveAppState` + `PrimitiveAuthManager` (`@Published isAuthenticated/userId/loginState`) and `AuthGateView`. Both implement the same gates; if you're not using a template, replicate them.
 
-### Two key flags
+### iOS (SwiftUI) shape
+
+`AuthGateView(appState:appName:authManager:) { content }` is the layout gate — it walks initializing → login (`PrimitiveLoginView`) → connecting → connected and only renders `content` when connected, so views inside never null-check the user. Downstream reactions subscribe to `authManager.$isAuthenticated` (Combine) instead of Vue watchers. The initialization order below is identical on both platforms.
+
+### Two key flags (web template store)
 
 - **`isInitialized`** — one-way. Becomes `true` once the store has wired listeners and loaded auth config. Does not mean the user is signed in. Used by router guards.
 - **`isAuthenticated`** — live reactive. Can flip in either direction at any time (token expiry, server invalidation, login).
