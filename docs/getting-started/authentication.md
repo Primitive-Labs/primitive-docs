@@ -19,79 +19,6 @@ Authentication runs against server-side **app settings** that must line up with 
 
 Inspect all three anytime with `primitive apps get`.
 
-## Using the Client Directly
-
-The templates are optional. Everything they do runs on public client APIs, so any web framework (React, Svelte, vanilla JS) or any Swift app can implement the same flows directly. Install the client — `npm install js-bao-wss-client`, or add the Swift package — and initialize it:
-
-::: code-group
-
-<<< ../../examples/auth/initialize-client.ts#example{ts} [JavaScript]
-
-<<< ../../examples/auth/initialize-client.swift#example{swift} [Swift]
-
-:::
-
-Discover which sign-in methods are enabled before rendering any UI:
-
-::: code-group
-
-<<< ../../examples/auth/get-auth-config.ts#example{ts} [JavaScript]
-
-<<< ../../examples/auth/get-auth-config.swift#example{swift} [Swift]
-
-:::
-
-**Google OAuth** — start the flow, then handle the callback (`?code=&state=`) on your redirect route. On iOS, present the URL in an `ASWebAuthenticationSession` (the iOS template's `PrimitiveAuthManager.startOAuth()` is a complete reference implementation):
-
-::: code-group
-
-<<< ../../examples/auth/oauth.ts#example{ts} [JavaScript]
-
-<<< ../../examples/auth/oauth.swift#example{swift} [Swift]
-
-:::
-
-**Magic Link** — request a link, then verify the token your callback page receives:
-
-::: code-group
-
-<<< ../../examples/auth/magic-link.ts#example{ts} [JavaScript]
-
-<<< ../../examples/auth/magic-link.swift#example{swift} [Swift]
-
-:::
-
-**One-Time Password** — request a 6-digit code, then verify it:
-
-::: code-group
-
-<<< ../../examples/auth/otp.ts#example{ts} [JavaScript]
-
-<<< ../../examples/auth/otp.swift#example{swift} [Swift]
-
-:::
-
-Inspect session state and gate work on auth being ready:
-
-::: code-group
-
-<<< ../../examples/auth/session-state.ts#example{ts} [JavaScript]
-
-<<< ../../examples/auth/session-state.swift#example{swift} [Swift]
-
-:::
-
-And sign out:
-
-::: code-group
-
-<<< ../../examples/auth/logout.ts#example{ts} [JavaScript]
-
-<<< ../../examples/auth/logout.swift#example{swift} [Swift]
-
-:::
-
-
 ## The Template Login
 
 Both starter templates ship a drop-in login flow:
@@ -243,6 +170,79 @@ For reference, here's what the starter templates handle for you:
 - **Auth state** — The client emits `authStateChanged` events that the templates use to switch between login and app UI (the web template's router guard; `AuthGateView` on iOS).
 - **Logout** — Calling `client.auth.logout()` clears tokens, closes documents, and fires the auth state event. Both templates include a logout button (`PrimitiveProfileView` on iOS).
 - **Safari compatibility** — The template's production deployment includes a first-party refresh proxy for Safari's strict cookie policies.
+
+## Using the Client Directly
+
+The templates are optional. Everything they do runs on public client APIs, so any web framework (React, Svelte, vanilla JS) or any Swift app can implement the same flows directly. Install the client — `npm install js-bao-wss-client`, or add the Swift package — and initialize it:
+
+::: code-group
+
+<<< ../../examples/auth/initialize-client.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/initialize-client.swift#example{swift} [Swift]
+
+:::
+
+Discover which sign-in methods are enabled before rendering any UI:
+
+::: code-group
+
+<<< ../../examples/auth/get-auth-config.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/get-auth-config.swift#example{swift} [Swift]
+
+:::
+
+**Google OAuth** — start the flow, then handle the callback (`?code=&state=`) on your redirect route. On iOS, present the URL in an `ASWebAuthenticationSession` (the iOS template's `PrimitiveAuthManager.startOAuth()` is a complete reference implementation):
+
+::: code-group
+
+<<< ../../examples/auth/oauth.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/oauth.swift#example{swift} [Swift]
+
+:::
+
+**Magic Link** — request a link, then verify the token your callback page receives:
+
+::: code-group
+
+<<< ../../examples/auth/magic-link.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/magic-link.swift#example{swift} [Swift]
+
+:::
+
+**One-Time Password** — request a 6-digit code, then verify it:
+
+::: code-group
+
+<<< ../../examples/auth/otp.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/otp.swift#example{swift} [Swift]
+
+:::
+
+Inspect session state and gate work on auth being ready:
+
+::: code-group
+
+<<< ../../examples/auth/session-state.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/session-state.swift#example{swift} [Swift]
+
+:::
+
+And sign out:
+
+::: code-group
+
+<<< ../../examples/auth/logout.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/logout.swift#example{swift} [Swift]
+
+:::
+
 
 ## Next Steps
 
