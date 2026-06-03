@@ -54,6 +54,12 @@ override exists, add another hand-authored include line with the variant's tab
 label from `scripts/variants.mjs` (e.g.
 `<<< ../../examples/auth/oauth.ios.swift#example{swift} [Swift (iOS)]`).
 
+Two tab-label conventions, by what the code is:
+
+- **Client-API examples** (compile-verified) → `[JavaScript]` / `[Swift]`.
+- **Template / UI-layer glue** (`// nocompile` — depends on the Vue or
+  SwiftUI template packages) → `[Web (Vue)]` / `[iOS (SwiftUI)]`.
+
 **Agent guides (`guides/`).** Served as static, single-variant markdown by
 `primitive guides get`, so they can't transclude at serve time. Each
 `AGENT_GUIDE_TO_PRIMITIVE_<TOPIC>.template.md` carries
