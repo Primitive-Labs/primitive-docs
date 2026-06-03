@@ -2,8 +2,8 @@
 
 Documents are Primitive's local-first collaborative storage. A document is a container that holds your data models — synced across devices, shared with other users, and available offline. This guide covers document concepts, data modeling, and CRUD operations.
 
-::: tip Framework Agnostic
-The js-bao library is plain JavaScript/TypeScript and works with any framework. The Vue-specific examples (like `useJsBaoDataLoader`) are helpers from the template; the core APIs work everywhere.
+::: tip Two clients, one API
+The examples below are shown in both **JavaScript** (`js-bao` / `js-bao-wss-client`) and **Swift** (the iOS/macOS client) — pick the tab for your platform. The API shape and semantics line up across both; where they differ, the text calls it out. Every snippet is compiled against the real client as part of the docs build.
 :::
 
 ## Document Concepts
@@ -21,442 +21,255 @@ Documents belong to a user and are private until explicitly shared. Sharing gran
 When multiple users have access to the same document, changes sync instantly. The system uses conflict-free data structures (CRDTs), so simultaneous edits merge cleanly.
 
 ### Offline Access
-Data lives in a local browser database. Your app works without a network connection — changes queue and sync when connectivity returns.
+Data lives in a local database on the device. Your app works without a network connection — changes queue and sync when connectivity returns.
 
 ### Size Guidelines
 Documents work best under ~10MB each. For most apps this means thousands of records per document. If you need more, split data across multiple documents.
 
-## Document Patterns
-
-### Single Document (Personal Apps)
-Each user gets one document that holds all their data. No document management UI needed.
-
-**Best for:** Personal task managers, habit trackers, journal apps, budgeting tools.
-
-```typescript
-// Use getOrCreateWithAlias for atomic get-or-create
-const result = await jsBaoClient.documents.getOrCreateWithAlias({
-  title: "My Data",
-  alias: { scope: "user", aliasKey: "default-doc" },
-});
-await jsBaoClient.documents.open(result.documentId);
-```
-
-### One Document at a Time (Workspaces)
-Users have multiple documents but work in one at a time. They create, switch between, and share each independently.
-
-**Best for:** Project management, accounting (one per company), shared shopping lists.
-
-The `primitive-app` library provides `PrimitiveDocumentSwitcher` and `PrimitiveDocumentList` components for this pattern.
-
-```typescript
-const documents = await jsBaoClient.me.ownedDocuments();
-await jsBaoClient.documents.open(selectedDocumentId);
-```
-
-### Multiple Documents
-The app manages multiple open documents simultaneously. Queries run across all open documents by default.
-
-**Best for:** Chat apps (one document per channel), multi-tenant dashboards.
-
-```typescript
-// Open multiple documents
-await Promise.all(
-  channels.map((ch) => jsBaoClient.documents.open(ch.documentId))
-);
-
-// Query runs across all open documents
-const messages = await Message.query({});
-```
-
-### The Root Document
-Every user has a root document opened automatically by primitive-app. Use it only for user preferences (theme, last-used document ID). Never store application data in the root document.
-
 ## Defining Models
 
-Models define the shape of your data. Each model corresponds to a record type — like `Task`, `Project`, or `Contact`. Models are authored in TOML and TypeScript classes are generated from that file.
+Models define the shape of your data — like `Task`, `Project`, or `Contact`. Models are authored in TOML (`models.toml` for JavaScript, `schema.toml` for Swift — same format) and typed classes are generated from that file: `npx js-bao-codegen-v2` for JavaScript, `swift-bao-codegen` for Swift.
 
-The full authoring loop — field types, options, relationships, uniqueness, schema evolution, and the migration tool from older `defineModelSchema()`-based projects — is covered in [Defining Your Models](./defining-your-models.md). The summary below is enough to start using models in CRUD code on this page.
-
-### Quick Reference
-
-**Step 1:** Add the model to `src/models/models.toml`:
-
-```toml
-[models.tasks.fields.id]
-type = "id"
-auto_assign = true
-indexed = true
-
-[models.tasks.fields.title]
-type = "string"
-indexed = true
-
-[models.tasks.fields.completed]
-type = "boolean"
-default = false
-
-[models.tasks.fields.priority]
-type = "number"
-default = 0
-
-[models.tasks.fields.due_date]
-type = "date"
-
-[models.tasks.fields.tags]
-type = "stringset"
-max_count = 10
-```
-
-**Step 2:** Run `pnpm codegen` to regenerate `src/models/Task.generated.ts` and the `src/models/index.ts` barrel.
-
-**Step 3:** Import from the barrel and use the model:
-
-```typescript
-import { Task } from "@/models";
-
-const task = new Task({ title: "Review PR", priority: 2 });
-await task.save();
-```
-
-::: warning
-Never edit `*.generated.ts` files or `src/models/index.ts` — they are overwritten on every `pnpm codegen` run. Always import models from `@/models`, never directly from a generated file.
-:::
-
-### Field Types
-
-| Type | TypeScript | Description |
-|---|---|---|
-| `id` | `string` | Unique identifier. Use `auto_assign = true` for auto-generated IDs |
-| `string` | `string` | Text data |
-| `number` | `number` | Numeric data |
-| `boolean` | `boolean` | True/false |
-| `date` | `string` | Date/time as ISO-8601 string |
-| `stringset` | `StringSet` | Set of strings (tags, categories) |
-
-See [Defining Your Models](./defining-your-models.md) for full field-option reference, unique constraints, and relationships.
+The full authoring loop — field types, options, relationships, uniqueness, and schema evolution — is covered in [Defining Your Models](./defining-your-models.md). Everything below assumes a generated `Task` model.
 
 ## CRUD Operations
 
 ### Create
 
-```typescript
-const task = new Task({
-  title: "Review pull request",
-  priority: 2,
-  dueDate: new Date().toISOString(),
-});
-await task.save();
-```
+A record is created and saved locally first, then synced in the background.
 
-In single-document mode, this saves to the active document automatically. Otherwise, specify a target:
+::: code-group
 
-```typescript
-await task.save({ targetDocument: "doc-abc123" });
-```
+<<< ../../examples/documents/model-create.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/model-create.swift#example{swift} [Swift]
+
+:::
+
+In JavaScript a model is a class with instance `.save()`; in Swift a `TypedModel<Task>` (bound to one document) does the writes. In single-document mode the JS save targets the active document; otherwise pass `{ targetDocument }`.
 
 ### Read
 
-```typescript
-// Find by ID
-const task = await Task.find("task-id");
+Find by id, query with filters, get the first match, or count.
 
-// Query with filters
-const urgent = await Task.query({
-  priority: { $gte: 2 },
-  completed: false,
-});
+::: code-group
 
-// Find first matching record
-const topTask = await Task.queryOne(
-  { completed: false },
-  { sort: { priority: -1 } }
-);
+<<< ../../examples/documents/model-read.ts#example{ts} [JavaScript]
 
-// Count
-const remaining = await Task.count({ completed: false });
-```
+<<< ../../examples/documents/model-read.swift#example{swift} [Swift]
+
+:::
+
+`query()` returns a `PaginatedResult` in JavaScript — rows are on `.data`. In Swift, `query()` returns the rows directly and `count` lives on the `.dynamic` layer.
 
 ### Update
 
-```typescript
-const task = await Task.find("task-id");
-if (task) {
-  task.completed = true;
-  await task.save();
-}
-```
+::: code-group
+
+<<< ../../examples/documents/model-update.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/model-update.swift#example{swift} [Swift]
+
+:::
+
+Both look the record up first. JavaScript mutates the loaded object and saves it; Swift applies a partial update keyed by id.
 
 ### Delete
 
-```typescript
-const task = await Task.find("task-id");
-if (task) {
-  await task.delete();
-}
-```
+::: code-group
 
-### Upsert
+<<< ../../examples/documents/model-delete.ts#example{ts} [JavaScript]
 
-```typescript
-await Category.upsertByUnique(
-  ["name", "parentId"],
-  { name: "Work", parentId: null },
-  { color: "blue" }
-);
-```
+<<< ../../examples/documents/model-delete.swift#example{swift} [Swift]
+
+:::
 
 ### Upsert by Natural Key
 
-Use the `upsertOn` option to save-or-update by a natural unique field (such as `email` or `slug`) without needing to know the existing record's ID. The field must have a single-field unique constraint.
+Save-or-update by a unique field (such as `email`) without knowing the existing record's id. The field must have a single-field unique constraint.
 
-```typescript
-const user = new User({ email: "alice@example.com", name: "Alice" });
-// Creates a new record, or merges into the existing one with that email
-await user.save({ upsertOn: "email" });
-```
+::: code-group
 
-When a match is found, the save returns the existing record's ID. Only the fields you provided are updated — all other existing fields are preserved.
+<<< ../../examples/documents/model-upsert.ts#example{ts} [JavaScript]
 
-## Query Operators
+<<< ../../examples/documents/model-upsert.swift#example{swift} [Swift]
+
+:::
+
+For composite keys, use `upsertByUnique(constraintName, …)` — see [Defining Your Models](./defining-your-models.md).
+
+## Querying
+
+### Operators
 
 | Operator | Description | Example |
 |---|---|---|
-| `$eq` | Equals | `{ status: { $eq: "active" } }` |
-| `$ne` | Not equals | `{ status: { $ne: "deleted" } }` |
-| `$gt` / `$gte` | Greater than (or equal) | `{ priority: { $gte: 2 } }` |
-| `$lt` / `$lte` | Less than (or equal) | `{ dueDate: { $lt: new Date() } }` |
+| `$eq` / `$ne` | Equals / not equals | `{ status: { $ne: "deleted" } }` |
+| `$gt` / `$gte` / `$lt` / `$lte` | Comparisons | `{ priority: { $gte: 2 } }` |
 | `$in` / `$nin` | In / not in array | `{ status: { $in: ["pending", "active"] } }` |
-| `$startsWith` | String prefix | `{ name: { $startsWith: "Project" } }` |
-| `$endsWith` | String suffix | `{ name: { $endsWith: ".md" } }` |
+| `$startsWith` / `$endsWith` | String prefix / suffix | `{ name: { $startsWith: "Project" } }` |
 | `$containsText` | Case-insensitive contains | `{ title: { $containsText: "urgent" } }` |
-| `$exists` | Field exists | `{ dueDate: { $exists: true } }` |
 | `$contains` | StringSet contains value | `{ tags: { $contains: "tutorial" } }` |
+| `$exists` | Field exists | `{ dueDate: { $exists: true } }` |
 
 ### Logical Operators
 
-```typescript
-const results = await Task.query({
-  $or: [
-    { priority: 3 },
-    { dueDate: { $lt: new Date() } },
-  ],
-});
-```
+Combine conditions with `$or` / `$and`. The filter shape is identical across clients (a dictionary/object).
 
-## Sorting and Pagination
+::: code-group
 
-```typescript
-// Sort (1 = ascending, -1 = descending)
-const tasks = await Task.query(
-  { completed: false },
-  { sort: { priority: -1, createdAt: 1 } }
-);
+<<< ../../examples/documents/query-logical.ts#example{ts} [JavaScript]
 
-// Paginate
-const page1 = await Task.query(
-  { completed: false },
-  { limit: 20, sort: { createdAt: -1 } }
-);
+<<< ../../examples/documents/query-logical.swift#example{swift} [Swift]
 
-if (page1.nextCursor) {
-  const page2 = await Task.query(
-    { completed: false },
-    { limit: 20, sort: { createdAt: -1 }, uniqueStartKey: page1.nextCursor }
-  );
-}
-```
-
-## Loading Related Data
-
-Use `include` to load related records alongside query results:
-
-```typescript
-const posts = await Post.query({}, {
-  include: [
-    { model: "users", type: "refersTo", sourceField: "authorId", as: "author" },
-    { model: "comments", type: "hasMany", foreignKey: "postId", as: "comments", limit: 5 },
-    { model: "tags", type: "refersToMany", sourceField: "tagIds", as: "tags" },
-  ],
-});
-// posts[0]._related.author, posts[0]._related.comments, posts[0]._related.tags
-```
-
-## Aggregations
-
-```typescript
-const stats = await Task.aggregate({
-  groupBy: ["category"],
-  operations: [
-    { type: "count" },
-    { type: "avg", field: "priority" },
-    { type: "sum", field: "estimatedHours" },
-  ],
-  filter: { completed: false },             // optional: filter records before aggregating
-  sort: { field: "count", direction: -1 },  // optional: sort results
-  limit: 10,                                // optional: cap number of groups returned
-});
-// Returns: [{ category: "work", count: 8, avg_priority: 2.5, sum_estimatedHours: 40 }, ...]
-```
-
-### StringSet Facet Aggregation
-
-When `groupBy` contains a `stringset` field, each string value becomes a separate group:
-
-```typescript
-// Count tasks per tag
-const tagCounts = await Task.aggregate({
-  groupBy: ["tags"],  // "tags" is a stringset field
-  operations: [{ type: "count" }],
-  sort: { field: "count", direction: -1 },
-});
-// Returns: { "work": 15, "urgent": 8, "personal": 5, ... }
-```
-
-## Subscribing to Changes
-
-Data can change from sync (another user edited it). Subscribe to keep your UI updated:
-
-```typescript
-const unsubscribe = Task.subscribe(() => {
-  // Re-query and update UI
-});
-
-// Later, when you no longer need updates:
-unsubscribe();
-```
-
-`Model.subscribe()` works **anywhere** — components, Pinia stores, plain services. It doesn't depend on the Vue component lifecycle. It returns an unsubscribe function; always call it when you're done (on unmount, on logout, or when tearing down a store) so the listener doesn't leak.
-
-### Vue Data Loader
-
-For components, the template includes a `useJsBaoDataLoader` composable that wraps the subscription above and also handles document readiness and reactive query parameters:
-
-```typescript
-const { data, initialDataLoaded } = useJsBaoDataLoader<{
-  tasks: Task[];
-}>({
-  subscribeTo: [Task],
-  queryParams: computed(() => ({ showCompleted: false })),
-  documentReady,
-  async loadData(queryParams) {
-    const query = queryParams?.showCompleted ? {} : { completed: false };
-    const result = await Task.query(query, { sort: { priority: -1 } });
-    return { tasks: result.data as Task[] };
-  },
-});
-```
-
-Use `PrimitiveLoadingGate` in your template to show loading state until `initialDataLoaded` is true.
-
-::: warning useJsBaoDataLoader is component-only
-`useJsBaoDataLoader` registers its subscriptions in Vue's `onMounted` hook, which runs only inside mounted components. If you call it from a **Pinia store** or any other non-component context, it will load data once but never react to later changes. For those cases, subscribe directly instead (next section).
 :::
 
-### Subscribing in a Pinia store
+### Sorting and Pagination
 
-When the source of truth for some data lives in a store rather than a component, set up the subscription yourself with `Model.subscribe()` in the store's `setup()` function, and keep the unsubscribe handle:
+Pass a sort and a page size, then carry the cursor forward.
 
-```typescript
-import { defineStore } from "pinia";
-import { ref } from "vue";
-import { Task } from "@/models";
+::: code-group
 
-export const useTasksStore = defineStore("tasks", () => {
-  const tasks = ref<Task[]>([]);
-  let unsubscribe: (() => void) | null = null;
+<<< ../../examples/documents/query-paginate.ts#example{ts} [JavaScript]
 
-  async function reload() {
-    const result = await Task.query({ completed: false }, { sort: { priority: -1 } });
-    tasks.value = result.data as Task[];
-  }
+<<< ../../examples/documents/query-paginate.swift#example{swift} [Swift]
 
-  function start() {
-    if (unsubscribe) return;            // don't subscribe twice
-    unsubscribe = Task.subscribe(reload); // reacts to every Task change
-    void reload();                        // initial load
-  }
+:::
 
-  function stop() {
-    unsubscribe?.();
-    unsubscribe = null;
-  }
+In Swift, cursor pagination lives on the `.dynamic` layer (`queryPaged`); use `sortOrder` (an ordered list) so the cursor is stable across pages.
 
-  return { tasks, reload, start, stop };
-});
-```
+### Aggregations
 
-Call `start()` once the relevant documents are open (e.g. after login) and `stop()` when tearing down (e.g. on logout).
+Group-by with `count` / `avg` / `sum` / `min` / `max`, an optional pre-filter, sort, and limit.
+
+::: code-group
+
+<<< ../../examples/documents/aggregate.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/aggregate.swift#example{swift} [Swift]
+
+:::
+
+When you group by a `stringset` field (like `tags`), each member value becomes its own group — a tag-facet count.
+
+## Reacting to Changes
+
+Data can change from sync (another user edited it). Subscribe to keep your UI current — the callback fires on both local and synced remote writes. Always release the subscription when you're done.
+
+::: code-group
+
+<<< ../../examples/documents/subscribe.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/subscribe.swift#example{swift} [Swift]
+
+:::
+
+Most apps don't call `subscribe` directly in views — they use a framework helper that wraps it: **`useJsBaoDataLoader`** (the Vue composable in the web template) and **`BaoDataLoader`** (the SwiftUI loader in `PrimitiveApp`). Both handle document readiness, debounced reloads, and a loaded/empty/loading phase. See the [Swift Client guide](./swift-client.md) for the SwiftUI pattern.
+
+## Creating and Opening Documents
+
+Open a document before querying or writing data in it. For a per-user singleton document (a personal app's "the user's data"), `getOrCreateWithAlias` resolves-or-creates atomically:
+
+::: code-group
+
+<<< ../../examples/documents/get-or-create-doc.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/get-or-create-doc.swift#example{swift} [Swift]
+
+:::
+
+Other patterns: **one document at a time** (list the user's owned documents, open the selected one) and **multiple open documents** (open several; in JavaScript a query then runs across all open documents, while in Swift each document has its own `TypedModel`).
 
 ## Sharing Documents
 
-Share a document by user ID, by email (grant resolves at signup if they aren't a member yet), or with an entire group:
+Share by user id, by email (the grant resolves at signup if they aren't a member yet), or with an entire group.
 
-```typescript
-// By user ID
-await client.documents.updatePermissions(documentId, {
-  userId: "user-abc",
-  permission: "read-write",
-});
+::: code-group
 
-// By email — works whether or not the recipient is a member yet
-await client.documents.updatePermissions(documentId, {
-  email: "colleague@example.com",
-  permission: "read-write",
-});
+<<< ../../examples/documents/share-document.ts#example{ts} [JavaScript]
 
-// With a group
-await client.documents.grantGroupPermission(documentId, {
-  groupType: "team",
-  groupId: "engineering",
-  permission: "read-write",
-});
-```
+<<< ../../examples/documents/share-document.swift#example{swift} [Swift]
 
-The `primitive-app` library provides a `PrimitiveDocumentList` component with built-in sharing UI.
+:::
 
 For the full sharing story — member invitations with quotas, email-based grants, and access requests — see [Sharing and Invitations](./sharing-and-invitations.md).
 
-## Listing the User's Documents
+## Finding Documents a User Can Access
 
-Two calls cover the "my documents" surface:
+There is no single "my documents" list. A user reaches documents through **four distinct paths**, and you query each one separately — combine them in your UI as needed:
 
-```typescript
-// Documents the user owns — what they created or had ownership transferred to.
-const owned = await client.me.ownedDocuments();
+### 1. Documents they own
 
-// Documents shared directly with the user (non-owner permission grants and
-// pending document invitations). Doesn't include group- or collection-shared
-// documents — those are listed through the group or collection.
-const { items } = await client.me.sharedDocuments();
-```
+Created by the user, or had ownership transferred to them.
 
-`me.sharedDocuments()` returns a `{ items, cursor }` envelope — the same shape as the paginated owned-documents page — and each row in `items` carries the base document fields (`title`, `createdBy`, `createdAt`, `lastModified`, plus `tags`/`metadata`/`thumbnailBlobId` when set) alongside the share-specific extras `permission`, `source` (`"permission"` or `"invitation"`), `grantedBy`, and `invitationId` (pending invitations only).
+::: code-group
 
-Both accept `tag`, `limit`, and `cursor` for filtering and pagination. `me.ownedDocuments()` also has an `includeRoot` flag (the user's root document is excluded by default) and a `returnPage: true` overload that returns a paginated `DocumentListPage` instead of a flat array.
+<<< ../../examples/documents/list-owned.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/list-owned.swift#example{swift} [Swift]
+
+:::
+
+### 2. Documents shared directly with them
+
+Non-owner permission grants plus pending document invitations. Each row carries the base document fields plus the share extras (`permission`, `source`, `grantedBy`, `invitationId`).
+
+::: code-group
+
+<<< ../../examples/documents/list-shared.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/list-shared.swift#example{swift} [Swift]
+
+:::
+
+### 3. Documents shared via a group
+
+Listed through the group the user belongs to.
+
+::: code-group
+
+<<< ../../examples/documents/list-group-documents.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/list-group-documents.swift#example{swift} [Swift]
+
+:::
+
+### 4. Documents shared via a collection
+
+Listed through a collection the user is a member of.
+
+::: code-group
+
+<<< ../../examples/documents/list-collection-documents.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/list-collection-documents.swift#example{swift} [Swift]
+
+:::
+
+`ownedDocuments` and `sharedDocuments` both return the `{ items, cursor }` envelope and accept `tag` / `limit` / `cursor`. (In JavaScript, `ownedDocuments()` returns a flat array by default and the `{ items, cursor }` page when you pass `returnPage: true`; Swift always returns the envelope.)
 
 ## Document Thumbnails and Metadata
 
-Documents carry two presentation fields you can update at any time:
+Documents carry presentation fields you can update at any time.
 
-```typescript
-await client.documents.update(documentId, {
-  title: "Q2 Planning",
-  thumbnailBlobId: blob.blobId,     // reference a blob you previously uploaded
-  metadata: { color: "blue", tags: ["plan", "q2"] },  // ≤4KB JSON, replace semantics
-});
-```
+::: code-group
 
-`thumbnailBlobId` points at a blob you've already uploaded; the platform makes the thumbnail readable to anyone with access to the document. `metadata` is a small JSON blob (4KB cap on the serialized form) for UI hints that should travel with the document — pass `null` to clear either field.
+<<< ../../examples/documents/update-metadata.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/update-metadata.swift#example{swift} [Swift]
+
+:::
+
+`thumbnailBlobId` points at a blob you've already uploaded; the platform makes the thumbnail readable to anyone with access to the document. `metadata` is a small JSON blob (4KB cap) for UI hints — pass `null` to clear either field.
 
 ## Document Access Requests
 
-A `403` from `client.documents.get(documentId)` can include a `canRequestAccess` hint. Users with a document link can submit a request, and document owners can approve or deny it. See [Sharing and Invitations](./sharing-and-invitations.md#document-access-requests).
+A `403` from getting a document can include a `canRequestAccess` hint. Users with a document link can submit a request, and document owners can approve or deny it. See [Sharing and Invitations](./sharing-and-invitations.md#document-access-requests).
 
 ## Next Steps
 
 - **[Choosing Your Data Model](./choosing-your-data-model.md)** — When to use documents vs. databases
 - **[Defining Your Models](./defining-your-models.md)** — TOML authoring, codegen, relationships, schema evolution
 - **[Sharing and Invitations](./sharing-and-invitations.md)** — Full sharing, invitations, and access requests
+- **[Swift Client](./swift-client.md)** — iOS/macOS setup, `TypedModel`, and the SwiftUI data loader
 - **[Working with Databases](./working-with-databases.md)** — Server-side structured storage
-- **[Blobs and Files](./blobs-and-files.md)** — File storage within documents

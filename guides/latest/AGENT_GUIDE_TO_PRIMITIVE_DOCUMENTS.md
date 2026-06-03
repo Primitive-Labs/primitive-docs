@@ -81,28 +81,117 @@ const result = await TodoItem.query({});         // throws DocumentClosedError o
 - **Handle open failures explicitly** — surface an error or redirect. Don't silently continue.
 - **`open()` is idempotent** — calling it on an already-open document is a no-op.
 
-### 2. Document List Access
+### 2. Finding documents a user can access
 
-The "my documents" surface is split across two calls. Use `ownedDocuments` for what the user created (or had ownership transferred to) and `sharedDocuments` for things shared directly with them:
+There is **no single "my documents" list**. A user reaches documents through **four distinct paths** — query each separately and combine in the UI. Do NOT try to unify them into one server-side list.
 
+**a. Documents they own** (`ownedDocuments` — created, or ownership transferred):
+
+JavaScript:
+<!-- example:start documents/list-owned lang=ts -->
 ```typescript
-// Documents the user owns. Cache-backed and offline-aware.
-const owned = await jsBaoClient.me.ownedDocuments({
-  tag: "todolist",          // optional tag filter
-  limit: 50,
-  // returnPage: true,        // returns DocumentListPage instead of array
-  // includeRoot: false,      // root document excluded by default
-});
+  // Paginated page — the unified { items, cursor } envelope, same shape as
+  // sharedDocuments():
+  const page = await client.me.ownedDocuments({
+    tag: "channel",
+    returnPage: true,
+  });
+  const { items, cursor } = page;
 
-// Documents shared directly with the user — non-owner DocumentPermissions
-// plus pending DocumentInvitations. Group- and collection-shared documents
-// do NOT appear here.
-const { items, cursor } = await jsBaoClient.me.sharedDocuments({
-  limit: 50,
-});
+  // (Without `returnPage`, the JS client returns a flat `DocumentInfo[]` for
+  // convenience: `const owned = await client.me.ownedDocuments({ tag: "channel" })`.)
 ```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/list-owned lang=swift -->
+```swift
+  // The unified { items, cursor } envelope as [String: Any] — same shape as
+  // sharedDocuments(tag:).
+  let page = try await client.me.ownedDocuments(tag: "channel")
+  let items = page["items"] as? [[String: Any]] ?? []
+  let cursor = page["cursor"] as? String
+```
+<!-- example:end -->
 
-`sharedDocuments` returns the unified `{ items, cursor }` envelope (raw-JSON `cursor`, NOT base64url) — the same shape as the owned-documents page. Each `SharedDocument` in `items` extends `DocumentInfo`: it carries the base document fields (`title`, `createdBy`, `createdAt`, `lastModified`, plus `tags`/`metadata`/`thumbnailBlobId` when set) and the share-only extras `permission` (the granted level, never `"owner"`), `source` (`"permission"` | `"invitation"`), `grantedBy`, and `invitationId` (invitation rows only).
+**b. Documents shared directly with them** (`sharedDocuments` — non-owner `DocumentPermission` rows + pending `DocumentInvitation`s; group/collection shares do NOT appear here):
+
+JavaScript:
+<!-- example:start documents/list-shared lang=ts -->
+```typescript
+  const { items, cursor } = await client.me.sharedDocuments({
+    tag: "channel",
+    limit: 50,
+  });
+
+  for (const doc of items) {
+    // Each row carries the base document fields (title, createdAt, …) plus the
+    // share extras (permission, source, grantedBy, invitationId).
+    console.log(doc.title, doc.permission, doc.grantedBy);
+  }
+
+  // `cursor` is a raw-JSON pagination cursor — pass it back for the next page.
+  if (cursor) {
+    const next = await client.me.sharedDocuments({ cursor });
+    return next;
+  }
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/list-shared lang=swift -->
+```swift
+  let page = try await client.me.sharedDocuments(limit: 50, tag: "channel")
+  let items = page["items"] as? [[String: Any]] ?? []
+
+  for doc in items {
+    // Each row carries the base document fields (title, createdAt, …) plus the
+    // share extras (permission, source, grantedBy, invitationId).
+    print(doc["title"] ?? "", doc["permission"] ?? "", doc["grantedBy"] ?? "")
+  }
+
+  // `cursor` is a raw-JSON pagination cursor — pass it back for the next page.
+  if let cursor = page["cursor"] as? String {
+    _ = try await client.me.sharedDocuments(cursor: cursor)
+  }
+```
+<!-- example:end -->
+
+**c. Documents shared via a group** (`groups.listDocuments`):
+
+JavaScript:
+<!-- example:start documents/list-group-documents lang=ts -->
+```typescript
+  const documents = await client.groups.listDocuments("team", "engineering");
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/list-group-documents lang=swift -->
+```swift
+  let documents = try await client.groups.listDocuments(groupType: "team", groupId: "engineering")
+```
+<!-- example:end -->
+
+**d. Documents shared via a collection** (`collections.listDocuments`):
+
+JavaScript:
+<!-- example:start documents/list-collection-documents lang=ts -->
+```typescript
+  const { items, cursor } = await client.collections.listDocuments(collectionId, {
+    limit: 50,
+  });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/list-collection-documents lang=swift -->
+```swift
+  let page = try await client.collections.listDocuments(
+    collectionId: collectionId,
+    options: PaginationOptions(limit: 50)
+  )
+  let items = page["items"] as? [[String: Any]] ?? []
+```
+<!-- example:end -->
+
+`ownedDocuments` and `sharedDocuments` return the unified `{ items, cursor }` envelope (raw-JSON `cursor`, NOT base64url). Each `SharedDocument` in `items` extends `DocumentInfo`: base document fields (`title`, `createdBy`, `createdAt`, `lastModified`, plus `tags`/`metadata`/`thumbnailBlobId` when set) plus the share-only extras `permission` (never `"owner"`), `source` (`"permission"` | `"invitation"`), `grantedBy`, `invitationId` (invitation rows only). In JS, `ownedDocuments()` returns a flat `DocumentInfo[]` by default and the envelope with `returnPage: true`; Swift always returns the envelope as `[String: Any]`.
 
 For an "everything I can access" surface, combine these two calls with group and collection memberships:
 
@@ -121,6 +210,355 @@ const collections = await jsBaoClient.collections.list();
 - **`client.documents.list()`** — deprecated. Returns the union of owner + reader + read-write rows and logs a console warning on every call. Use `me.ownedDocuments` and `me.sharedDocuments`; they have the same option set (`tag`, `limit`, `cursor`, `returnPage`).
 - **`client.documents.createInvitation(...)`, `documents.acceptInvitation(...)`, `documents.declineInvitation(...)`, `documents.listPendingInvitationsForUser(...)`** — the per-document `DocumentInvitation` flow. Use `documents.updatePermissions(documentId, { email, ... })` for the share path; the platform creates an `AppInvitation` + `DeferredDocumentPermission` and the recipient redeems it via `client.invitations.accept(inviteToken)`. `client.me.pendingDocumentInvitations()` is the current "invitations I can accept" lookup.
 - **`client.me.bookmarks.*`** — removed. There is no bookmarks API; render "my documents" from `me.ownedDocuments()` + `me.sharedDocuments()` (and `collections.list()` / `groups.listUserMemberships(...)` if you also want group/collection access).
+
+## Core data operations (JavaScript + Swift)
+
+Every example below is compiled against the real clients as part of the docs build. JavaScript uses generated model classes (`new Task(...)`, `Task.query(...)`); Swift uses a `TypedModel<Task>` bound to a document, with paged/aggregate/subscribe on its `.dynamic` layer. The deeper [Querying Data](#querying-data) and [Saving Data](#saving-data) sections below add JS-specific nuance (projections, includes, save options).
+
+### Create
+
+JavaScript:
+<!-- example:start documents/model-create lang=ts -->
+```typescript
+  const task = new Task({
+    title: "Review pull request",
+    priority: 2,
+    dueDate: new Date().toISOString(),
+  });
+  await task.save();
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/model-create lang=swift -->
+```swift
+  let task = try tasks.create(Task(
+    id: UUID().uuidString,
+    title: "Review pull request",
+    priority: 2
+  ))
+  _ = task
+```
+<!-- example:end -->
+
+### Read (find / query / first / count)
+
+JavaScript:
+<!-- example:start documents/model-read lang=ts -->
+```typescript
+  // Find one by id
+  const task = await Task.find("task-id");
+
+  // Query with filters — returns a PaginatedResult; rows are on `.data`
+  const urgent = await Task.query({ priority: { $gte: 2 }, completed: false });
+  const rows = urgent.data;
+
+  // First match (with a sort)
+  const topTask = await Task.queryOne({ completed: false }, { sort: { priority: -1 } });
+
+  // Count
+  const remaining = await Task.count({ completed: false });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/model-read lang=swift -->
+```swift
+  // Find one by id
+  let task = tasks.find("task-id")
+
+  // Query with filters
+  let urgent = tasks.query(["priority": ["$gte": 2], "completed": false])
+
+  // First match (with a sort)
+  let topTask = tasks.query(
+    ["completed": false],
+    options: QueryOptions(sort: ["priority": -1])
+  ).first
+
+  // Count
+  let remaining = tasks.dynamic.count(["completed": false])
+```
+<!-- example:end -->
+
+### Update
+
+JavaScript:
+<!-- example:start documents/model-update lang=ts -->
+```typescript
+  const task = await Task.find(taskId);
+  if (task) {
+    task.completed = true;
+    await task.save();
+  }
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/model-update lang=swift -->
+```swift
+  if let task = tasks.find(taskId) {
+    tasks.update(task.id, ["completed": true])
+  }
+```
+<!-- example:end -->
+
+### Delete
+
+JavaScript:
+<!-- example:start documents/model-delete lang=ts -->
+```typescript
+  const task = await Task.find(taskId);
+  if (task) {
+    await task.delete();
+  }
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/model-delete lang=swift -->
+```swift
+  tasks.delete(taskId)
+```
+<!-- example:end -->
+
+### Upsert by natural key
+
+JavaScript:
+<!-- example:start documents/model-upsert lang=ts -->
+```typescript
+  const user = new AppUser({ email: "alice@example.com", name: "Alice" });
+  // Creates a new record, or merges into the existing one with that email.
+  await user.save({ upsertOn: "email" });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/model-upsert lang=swift -->
+```swift
+  // Creates a new record, or merges into the existing one with that email.
+  _ = try users.dynamic.upsert(
+    ["email": .string("alice@example.com"), "name": .string("Alice")],
+    on: "email"
+  )
+```
+<!-- example:end -->
+
+### Logical query operators
+
+JavaScript:
+<!-- example:start documents/query-logical lang=ts -->
+```typescript
+  const result = await Task.query({
+    $or: [
+      { priority: 3 },
+      { dueDate: { $lt: new Date().toISOString() } },
+    ],
+  });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/query-logical lang=swift -->
+```swift
+  let result = tasks.query([
+    "$or": [
+      ["priority": 3],
+      ["dueDate": ["$lt": "2026-06-02T00:00:00Z"]],
+    ],
+  ])
+```
+<!-- example:end -->
+
+### Sort + cursor pagination
+
+JavaScript:
+<!-- example:start documents/query-paginate lang=ts -->
+```typescript
+  const page1 = await Task.query(
+    { completed: false },
+    { limit: 20, sort: { priority: -1 } },
+  );
+
+  if (page1.nextCursor) {
+    const page2 = await Task.query(
+      { completed: false },
+      { limit: 20, sort: { priority: -1 }, uniqueStartKey: page1.nextCursor },
+    );
+    return page2.data;
+  }
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/query-paginate lang=swift -->
+```swift
+  let page1 = try tasks.dynamic.queryPaged(
+    ["completed": false],
+    options: QueryOptions(sortOrder: [("priority", -1)], limit: 20)
+  )
+
+  if let cursor = page1.nextCursor {
+    let page2 = try tasks.dynamic.queryPaged(
+      ["completed": false],
+      options: QueryOptions(sortOrder: [("priority", -1)], limit: 20, cursor: cursor)
+    )
+    _ = page2
+  }
+```
+<!-- example:end -->
+
+### Aggregation
+
+JavaScript:
+<!-- example:start documents/aggregate lang=ts -->
+```typescript
+  const stats = await Task.aggregate({
+    groupBy: ["category"],
+    operations: [
+      { type: "count" },
+      { type: "avg", field: "priority" },
+      { type: "sum", field: "estimatedHours" },
+    ],
+    filter: { completed: false },
+    sort: { field: "count", direction: -1 },
+    limit: 10,
+  });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/aggregate lang=swift -->
+```swift
+  let stats = tasks.dynamic.aggregate(AggregateOptions(
+    groupBy: ["category"],
+    operations: [
+      AggregateOperation(type: .count),
+      AggregateOperation(type: .avg, field: "priority"),
+      AggregateOperation(type: .sum, field: "estimatedHours"),
+    ],
+    filter: ["completed": false],
+    sort: AggregateSort(field: "count", direction: -1),
+    limit: 10
+  ))
+```
+<!-- example:end -->
+
+### Subscribe to changes
+
+JavaScript:
+<!-- example:start documents/subscribe lang=ts -->
+```typescript
+  const unsubscribe = Task.subscribe(() => {
+    // re-query and update your UI
+  });
+
+  // later, when you no longer need updates:
+  unsubscribe();
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/subscribe lang=swift -->
+```swift
+  let unsubscribe = tasks.dynamic.subscribe {
+    // re-query and update your UI
+  }
+
+  // later, when you no longer need updates:
+  unsubscribe()
+```
+<!-- example:end -->
+
+### Resolve-or-create a singleton document
+
+JavaScript:
+<!-- example:start documents/get-or-create-doc lang=ts -->
+```typescript
+  const result = await client.documents.getOrCreateWithAlias({
+    title: "My Data",
+    alias: { scope: "user", aliasKey: "default-doc" },
+  });
+  await client.documents.open(result.documentId);
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/get-or-create-doc lang=swift -->
+```swift
+  let result = try await client.documents.getOrCreateWithAlias(
+    alias: ["scope": "user", "aliasKey": "default-doc"],
+    title: "My Data"
+  )
+  if let documentId = result["documentId"] as? String {
+    _ = try await client.documents.open(documentId)
+  }
+```
+<!-- example:end -->
+
+### Share a document (user / email / group)
+
+JavaScript:
+<!-- example:start documents/share-document lang=ts -->
+```typescript
+  // By user ID
+  await client.documents.updatePermissions(documentId, {
+    userId: "user-abc",
+    permission: "read-write",
+  });
+
+  // By email — works whether or not the recipient is a member yet
+  await client.documents.updatePermissions(documentId, {
+    email: "colleague@example.com",
+    permission: "read-write",
+  });
+
+  // With a group
+  await client.documents.grantGroupPermission(documentId, {
+    groupType: "team",
+    groupId: "engineering",
+    permission: "read-write",
+  });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/share-document lang=swift -->
+```swift
+  // By user ID
+  _ = try await client.documents.updatePermissions(
+    documentId: documentId,
+    params: ["userId": "user-abc", "permission": "read-write"]
+  )
+
+  // By email — works whether or not the recipient is a member yet
+  _ = try await client.documents.updatePermissions(
+    documentId: documentId,
+    params: ["email": "colleague@example.com", "permission": "read-write"]
+  )
+
+  // With a group
+  _ = try await client.documents.grantGroupPermission(
+    documentId: documentId,
+    params: ["groupType": "team", "groupId": "engineering", "permission": "read-write"]
+  )
+```
+<!-- example:end -->
+
+### Update thumbnail / metadata
+
+JavaScript:
+<!-- example:start documents/update-metadata lang=ts -->
+```typescript
+  await client.documents.update(documentId, {
+    title: "Q2 Planning",
+    thumbnailBlobId: blobId,                              // a blob you uploaded
+    metadata: { color: "blue", tags: ["plan", "q2"] },   // ≤4KB JSON, replace semantics
+  });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/update-metadata lang=swift -->
+```swift
+  _ = try await client.documents.update(
+    documentId: documentId,
+    data: [
+      "title": "Q2 Planning",
+      "thumbnailBlobId": blobId,                                 // a blob you uploaded
+      "metadata": ["color": "blue", "tags": ["plan", "q2"]],     // ≤4KB JSON, replace semantics
+    ]
+  )
+```
+<!-- example:end -->
 
 ## Common Document Usage Patterns
 

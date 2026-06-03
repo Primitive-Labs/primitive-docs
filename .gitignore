@@ -9,3 +9,10 @@ docs/.vitepress/cache/
 # docs/.vitepress/generated/
 
 
+
+# Example-harness generated models + build dirs
+examples/_harness/generated/
+examples/_harness/ts/.build/
+examples/_harness/swift/.build/
+examples/_harness/swift/Package.resolved
+examples/_harness/swift/Sources/
