@@ -103,6 +103,25 @@ Compile-clean (typed returns, no subscript) and need no change: `sharing/documen
 3. **Re-pin the submodule** (`library_repos/js-bao-wss`) to that commit (currently pinned `4f4e406`, pre-#923).
 4. **Then** update the `docs/` examples + `guides/` per §3 and run `compile:examples` + `compile:dev-examples` green.
 
-## 5. How to verify what's done now
+## 5. Behavioral parity pass (follow-up — "fix simple, defer big")
+
+After typing, the remaining documents divergences were triaged. **Implemented** (simple alignments the document-manager already backed):
+- `delete` → evicts local data + emits `documentMetadataChanged(action:"deleted")` + treats `404`/offline as already-applied (offline-fallback) (#961).
+- `removePermission(userId:)` → evicts local data on self-removal (#961).
+- `close` → returns `CloseDocumentResult { evicted }`, with a sync-state guard so eviction is skipped (and `evicted:false`) when local writes are unsynced (#961).
+- `listGroupPermissions(includeSystem:)` → default excludes `_`-prefixed platform groups (#506).
+- Added the four "JS-only" methods Swift can now back: `openAlias`, `isReadOnly`, `listOpen`, `isSynced`.
+
+**Kept divergent — with justification** (documented inline in `dev-docs/documents.md` and `PARITY-TRACKING.md` #961):
+- `inSync` / `includesWrites` — **by design** sync-local predicates; async network behavior is `waitForInSync` / `waitForWriteConfirmation`.
+- `getDocumentPermission` (typed enum) and `getLocalMetadata` (sync, SQLite vs IndexedDB) — platform/idiom wins, not gaps.
+- `open` returns `YDocument` (not `{doc, metadata}`) — ergonomic Swift shape.
+
+**Deferred big transformations — with justification:**
+- Local-first `documents.create` + `commitOfflineCreate` (#852) — the flow exists via `client.createDocument`; routing the sub-API through it is larger.
+- `list` pagination options (#946) — `list` is deprecated; option-parity belongs on `me.ownedDocuments`/`sharedDocuments`.
+- Awareness/presence API — a standalone WS subsystem, not in v1.
+
+## 6. How to verify what's done now
 - Client library: `cd js-bao-wss/swift-client && swift build` → Build complete.
 - Dev cookbook: `cd primitive-docs && node scripts/compile-dev-examples.mjs` → All dev snippets compile (requires the mirrored submodule).

@@ -2,16 +2,12 @@
 
 Create, open, share, and sync collaborative Yjs documents. Blob attachments are a separate surface ([`client.documents.blobs(id)`](/blobs)) and are not covered here.
 
-::: tip Typed surface
-The Swift `DocumentsAPI` now takes and returns the same named types JS exposes — `DocumentInfo`, `PermissionUpdateResult`, `DocumentAccessRequest`, `DocumentAliasInfo`, and friends — decoded from the wire by the client (resolving [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). Opaque blobs such as a document's `metadata` are typed as `JSONValue`, which is `Codable` and accepts dictionary/array/scalar literals (e.g. `metadata: ["color": "blue"]`). Remaining divergences are behavioral — sync vs async, `void` vs a richer result, local-eviction differences — and are noted inline.
-:::
-
 ## create(options)
 
 Create a new document. Pass `localOnly: true` to defer the server commit.
 
-::: warning Swift parity gap
-JS `create` is local-first: it writes the document locally and returns immediately, then commits to the server in the background (and honors `localOnly` to defer the commit entirely). Swift instead POSTs the raw create synchronously and has no offline/deferred path — so a create issued while offline fails rather than queueing (sweep D2, [#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852)).
+::: warning Divergent behavior (alignment deferred)
+JS `documents.create` is local-first: it writes the document locally and returns immediately, then commits to the server in the background (honoring `localOnly`). Swift's `documents.create` POSTs synchronously and has no offline/deferred path here — so a create issued while offline fails rather than queueing (sweep D2, [#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852)). The local-first flow **does** exist on Swift via the top-level `client.createDocument(options:)`; routing `documents.create` (and adding `commitOfflineCreate`) through it is a larger change deferred for now.
 :::
 
 ::: code-group
@@ -41,8 +37,8 @@ Resolve an alias to a document, creating one if it doesn't exist yet (singleton 
 
 List documents accessible to the current user. Deprecated in favor of `client.me.ownedDocuments()` / `client.me.sharedDocuments()` ([#628](https://github.com/Primitive-Labs/js-bao-wss/issues/628)).
 
-::: tip Divergent shape
-Swift returns a typed `[DocumentInfo]` but only supports `limit`/`cursor` pagination. JS adds `tag`, `forward`, `waitForLoad`, `refreshFromServer`, `localOnly`, and a `returnPage` array-vs-page duality ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
+::: tip Divergent shape (alignment deferred)
+Swift returns a typed `[DocumentInfo]` but only supports `limit`/`cursor` pagination. JS adds `tag`, `forward`, `waitForLoad`, `refreshFromServer`, `localOnly`, and a `returnPage` array-vs-page duality ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)). Since `list` is deprecated in both clients (use `me.ownedDocuments()` / `me.sharedDocuments()`), expanding its options is deferred — the option-parity work belongs on the `me.*` surface.
 :::
 
 ::: code-group
@@ -90,8 +86,8 @@ Remove a tag from a document. Returns the updated tag list.
 
 Delete a document from the server and evict its local data.
 
-::: warning Swift parity gap
-Both clients return `void`, but Swift skips the post-delete reconciliation JS performs: JS evicts the document's local data, emits a `documentMetadataChanged` event, and — when offline — treats a pending/`404` server response as an already-applied delete (offline-fallback) instead of throwing. Swift does none of this, so a deleted doc can linger in local caches and listeners never fire (sweep D4, [#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
+::: tip Now aligned
+Both clients return `void`. Swift now matches JS's post-delete reconciliation: it evicts the document's local data, emits a `documentMetadataChanged` (`action: "deleted"`) event, and treats a `404`/offline response as an already-applied delete (offline-fallback) instead of throwing ([#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
 :::
 
 ::: code-group
@@ -103,8 +99,8 @@ Both clients return `void`, but Swift skips the post-delete reconciliation JS pe
 
 Open a document for editing.
 
-::: tip Divergent shape
-JS returns `{ doc, metadata }`; Swift returns the `YDocument` directly and takes a typed `OpenDocumentOptions`.
+::: tip Divergent shape (kept by design)
+JS returns `{ doc, metadata }`; Swift returns the `YDocument` directly and takes a typed `OpenDocumentOptions`. The bare `YDocument` is the ergonomic Swift shape — aligning the return to a `{ doc, metadata }` tuple is deferred rather than treated as a gap.
 :::
 
 ::: code-group
@@ -125,8 +121,8 @@ Open the app's shared root document for editing.
 
 Close an open document, optionally evicting its local data.
 
-::: tip Divergent shape
-JS returns `{ evicted }`; Swift returns `Void` ([#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
+::: tip Now aligned
+Both clients return `{ evicted }`. Swift mirrors JS's guard: when `evictLocal` is set, local data is evicted only if the server already has all of this client's writes — otherwise it's kept and `evicted` is `false` ([#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
 :::
 
 ::: code-group
@@ -147,11 +143,14 @@ Fetch metadata for the app's shared root document.
 
 Resolve an alias and open the document it points at in one call.
 
-::: warning No Swift equivalent
-JavaScript-only. In Swift, resolve via `documents.aliases.resolve(...)` then `documents.open(...)` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+::: tip Divergent shape
+JS returns `{ doc, metadata }`; Swift returns the `YDocument` directly (consistent with `open`). Swift resolves the alias via `aliases.resolve` then opens.
 :::
 
+::: code-group
 <<< ./snippets/documents/open-alias.ts#example{ts} [JavaScript]
+<<< ./snippets/documents/open-alias.swift#example{swift} [Swift]
+:::
 
 ## getPermissions(documentId)
 
@@ -179,8 +178,8 @@ Revoke a user's access, or cancel a pending email invitation.
 JS takes a `string | { userId } | { email }` union; Swift splits it into `userId:` / `email:` overloads. Both return `void`.
 :::
 
-::: warning Swift parity gap
-When you remove *your own* permission (leaving a shared doc), JS evicts that document's local data as part of the call; Swift skips this self-removal eviction, so the doc you no longer have access to stays cached on-device (sweep D5, [#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
+::: tip Now aligned
+Self-removal eviction now matches JS: removing *your own* permission (the `userId:` overload, matched against the current user) evicts the document's local data, since you can no longer sync it ([#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
 :::
 
 ::: code-group
@@ -208,11 +207,10 @@ List pending (deferred) email invitations scoped to a document.
 
 ## listGroupPermissions(documentId, options?)
 
-List group-based permissions on a document.
-
-::: tip Divergent shape
-JS accepts `{ includeSystem: true }` to surface platform-managed internal groups; Swift has no such option ([#506](https://github.com/Primitive-Labs/js-bao-wss/issues/506)).
-:::
+List group-based permissions on a document. Both clients exclude
+platform-managed internal groups (`groupType` prefixed with `_`, e.g. the
+`_col-*` groups backing collection sharing) by default; pass
+`includeSystem: true` to surface them ([#506](https://github.com/Primitive-Labs/js-bao-wss/issues/506)).
 
 ::: code-group
 <<< ./snippets/documents/list-group-permissions.ts#example{ts} [JavaScript]
@@ -286,8 +284,8 @@ Deny a pending access request (owner/admin only).
 
 Check whether client and server hold identical document state.
 
-::: tip Divergent shape
-JS is an async state-vector round-trip; Swift is a synchronous local read.
+::: tip Divergent by design
+JS does an async state-vector round-trip over the WebSocket; Swift keeps this as a cheap **synchronous local read**. The async network-round-trip behavior is available separately on Swift via `waitForInSync` / `waitForWriteConfirmation`, so this divergence is intentional rather than a gap.
 :::
 
 ::: code-group
@@ -299,8 +297,8 @@ JS is an async state-vector round-trip; Swift is a synchronous local read.
 
 Check whether the server has all of this client's writes.
 
-::: tip Divergent shape
-JS is an async state-vector round-trip; Swift is a synchronous local read.
+::: tip Divergent by design
+JS does an async state-vector round-trip over the WebSocket; Swift keeps this as a cheap **synchronous local read**. The async network-round-trip behavior is available separately on Swift via `waitForInSync` / `waitForWriteConfirmation`, so this divergence is intentional rather than a gap.
 :::
 
 ::: code-group
@@ -332,13 +330,13 @@ Wait until client and server hold identical document state.
 
 ## isSynced(documentId)
 
-Check whether a document's local state is synced (synchronous, local).
+Check whether a document's local state is synced (synchronous, local). On
+Swift this is an alias of `inSync(...)`.
 
-::: warning No Swift equivalent
-JavaScript-only. On Swift use `inSync(...)` or `waitForInSync(...)` ([api.md exclusion](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
-:::
-
+::: code-group
 <<< ./snippets/documents/is-synced.ts#example{ts} [JavaScript]
+<<< ./snippets/documents/is-synced.swift#example{swift} [Swift]
+:::
 
 ## isOpen(documentId)
 
@@ -351,30 +349,29 @@ Check whether a document is currently open (synchronous, local).
 
 ## isReadOnly(documentId)
 
-Check whether a document is read-only for the current user.
+Check whether a document is read-only for the current user (i.e. the cached
+permission is `reader`).
 
-::: warning No Swift equivalent
-JavaScript-only. On Swift, derive it from `getDocumentPermission(...)` or `getPermissions(...)`.
-:::
-
+::: code-group
 <<< ./snippets/documents/is-read-only.ts#example{ts} [JavaScript]
+<<< ./snippets/documents/is-read-only.swift#example{swift} [Swift]
+:::
 
 ## listOpen()
 
-List the IDs of all currently open documents.
+List the IDs of all currently open documents (synchronous, local).
 
-::: warning No Swift equivalent
-JavaScript-only — Swift tracks open state in its internal `DocumentManager`.
-:::
-
+::: code-group
 <<< ./snippets/documents/list-open.ts#example{ts} [JavaScript]
+<<< ./snippets/documents/list-open.swift#example{swift} [Swift]
+:::
 
 ## getDocumentPermission(documentId)
 
 Get the current user's permission level for a document (local).
 
-::: tip Divergent shape
-JS returns a string literal union (or `null`); Swift returns a typed `DocumentPermission?` enum.
+::: tip Divergent by design
+JS returns a string literal union (or `null`); Swift returns a typed `DocumentPermission?` enum. Swift's typed enum is the idiomatic, safer shape — this divergence is intentional and kept.
 :::
 
 ::: code-group
@@ -386,8 +383,8 @@ JS returns a string literal union (or `null`); Swift returns a typed `DocumentPe
 
 Get locally cached metadata for a document.
 
-::: tip Divergent shape
-JS is an async accessor; Swift is a synchronous local read.
+::: tip Divergent by design
+JS is an async accessor (IndexedDB is inherently asynchronous); Swift reads synchronously from local SQLite. This is a platform constraint, not a gap.
 :::
 
 ::: code-group
@@ -456,8 +453,8 @@ JS is async and returns `{ documentId, title?, createdAt }` objects; Swift is sy
 
 Commit a locally-created (`localOnly`) document to the server.
 
-::: warning No Swift equivalent
-JavaScript-only — Swift has no `commitOfflineCreate` ([#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852)).
+::: warning No Swift equivalent (deferred)
+JavaScript-only — `documents.commitOfflineCreate` isn't exposed on Swift. It's paired with the deferred local-first `documents.create` work (see [create](#create-options)): the underlying flow exists via `client.createDocument`, but the explicit offline-create/commit surface on `documents.*` is deferred ([#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852)).
 :::
 
 <<< ./snippets/documents/commit-offline-create.ts#example{ts} [JavaScript]
@@ -489,8 +486,8 @@ Swift-only convenience. In JavaScript, read `createdBy` off `documents.get(id)` 
 
 Broadcast the local user's awareness state (e.g. cursor) for a document.
 
-::: warning No Swift equivalent
-JavaScript-only — the awareness/presence API is not in the Swift v1 surface.
+::: warning No Swift equivalent (deferred)
+JavaScript-only — the awareness/presence subsystem (cursors/selections over the WebSocket) is not in the Swift v1 surface. Bringing it to Swift is a sizeable standalone effort, deferred rather than treated as a per-method gap.
 :::
 
 <<< ./snippets/documents/set-awareness.ts#example{ts} [JavaScript]
@@ -499,8 +496,8 @@ JavaScript-only — the awareness/presence API is not in the Swift v1 surface.
 
 Get all current awareness states for a document.
 
-::: warning No Swift equivalent
-JavaScript-only — the awareness/presence API is not in the Swift v1 surface.
+::: warning No Swift equivalent (deferred)
+JavaScript-only — the awareness/presence subsystem (cursors/selections over the WebSocket) is not in the Swift v1 surface. Bringing it to Swift is a sizeable standalone effort, deferred rather than treated as a per-method gap.
 :::
 
 <<< ./snippets/documents/get-awareness-states.ts#example{ts} [JavaScript]
@@ -509,8 +506,8 @@ JavaScript-only — the awareness/presence API is not in the Swift v1 surface.
 
 Remove awareness states for specific clients (e.g. on timeout).
 
-::: warning No Swift equivalent
-JavaScript-only — the awareness/presence API is not in the Swift v1 surface.
+::: warning No Swift equivalent (deferred)
+JavaScript-only — the awareness/presence subsystem (cursors/selections over the WebSocket) is not in the Swift v1 surface. Bringing it to Swift is a sizeable standalone effort, deferred rather than treated as a per-method gap.
 :::
 
 <<< ./snippets/documents/remove-awareness.ts#example{ts} [JavaScript]
