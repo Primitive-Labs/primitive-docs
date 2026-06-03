@@ -2,10 +2,12 @@
 
 The fastest way to build on Primitive is to start from an official template. Primitive supports multiple platforms as first-class citizens — there's a **web template** (Vue + TypeScript + Tailwind) and an **iOS template** (Swift + SwiftUI). Both give you a working app in minutes: authentication, local-first data storage, real-time sync, and dev tooling. (Templates are optional — the clients are plain libraries; see [Using the Client Directly](./authentication.md#using-the-client-directly).)
 
-| Platform | Template | Stack |
+| Platform | Create | Stack |
 |---|---|---|
-| Web | `npx create-primitive-app` | Vue 3 + TypeScript + Tailwind |
-| iOS / macOS | `primitive init --platform ios` | Swift + SwiftUI (`PrimitiveApp` package) |
+| Web (default) | `npx create-primitive-app my-app` | Vue 3 + TypeScript + Tailwind |
+| iOS / macOS | `npx create-primitive-app my-app --platform ios` | Swift + SwiftUI (`PrimitiveApp` package) |
+
+`create-primitive-app` is a thin wrapper around `primitive init` and forwards every flag, so the two are interchangeable — use `npx create-primitive-app` when you don't have the CLI installed yet, or `primitive init my-app --platform <web|ios>` if you do.
 
 ## Web (Vue)
 
