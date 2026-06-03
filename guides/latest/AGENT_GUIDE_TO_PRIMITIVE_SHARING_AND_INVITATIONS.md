@@ -2,6 +2,183 @@
 
 Guidelines for AI agents implementing invitations, document sharing, group and collection membership, and access requests.
 
+> **Swift parity:** the sharing operations below exist in both clients. Exception: `client.invitations.getAcceptToken(...)` is **JavaScript-only**. Note `documents.requestAccess` **requires** a `permission` (`"read-write"`|`"reader"`).
+
+## Core operations (JavaScript + Swift)
+
+### Share a document (user / email / group)
+
+JavaScript:
+<!-- example:start documents/share-document lang=ts -->
+```typescript
+  // By user ID
+  await client.documents.updatePermissions(documentId, {
+    userId: "user-abc",
+    permission: "read-write",
+  });
+
+  // By email — works whether or not the recipient is a member yet
+  await client.documents.updatePermissions(documentId, {
+    email: "colleague@example.com",
+    permission: "read-write",
+  });
+
+  // With a group
+  await client.documents.grantGroupPermission(documentId, {
+    groupType: "team",
+    groupId: "engineering",
+    permission: "read-write",
+  });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start documents/share-document lang=swift -->
+```swift
+  // By user ID
+  _ = try await client.documents.updatePermissions(
+    documentId: documentId,
+    params: ["userId": "user-abc", "permission": "read-write"]
+  )
+
+  // By email — works whether or not the recipient is a member yet
+  _ = try await client.documents.updatePermissions(
+    documentId: documentId,
+    params: ["email": "colleague@example.com", "permission": "read-write"]
+  )
+
+  // With a group
+  _ = try await client.documents.grantGroupPermission(
+    documentId: documentId,
+    params: ["groupType": "team", "groupId": "engineering", "permission": "read-write"]
+  )
+```
+<!-- example:end -->
+
+### App invitations (quota / create / list / cancel)
+
+JavaScript:
+<!-- example:start sharing/app-invitation lang=ts -->
+```typescript
+  // The caller's remaining invite quota (admins/owners are unlimited)
+  const quota = await client.invitations.quota();
+
+  // Invite someone to the app by email
+  const invitation = await client.invitations.create({
+    email: "alice@example.com",
+    role: "member",
+  });
+
+  // Pending invitations
+  const { items } = await client.invitations.list();
+
+  // Cancel one
+  await client.invitations.delete(invitationId);
+```
+<!-- example:end -->
+Swift:
+<!-- example:start sharing/app-invitation lang=swift -->
+```swift
+  // The caller's remaining invite quota (admins/owners are unlimited)
+  let quota = try await client.invitations.quota()
+
+  // Invite someone to the app by email
+  let invitation = try await client.invitations.create(params: [
+    "email": "alice@example.com",
+    "role": "member",
+  ])
+
+  // Pending invitations
+  let list = try await client.invitations.list()
+
+  // Cancel one
+  _ = try await client.invitations.delete(invitationId: invitationId)
+```
+<!-- example:end -->
+
+### Accept an invite token
+
+JavaScript:
+<!-- example:start sharing/accept-invitation lang=ts -->
+```typescript
+  const result = await client.invitations.accept(inviteToken);
+```
+<!-- example:end -->
+Swift:
+<!-- example:start sharing/accept-invitation lang=swift -->
+```swift
+  let result = try await client.invitations.accept(inviteToken: inviteToken)
+```
+<!-- example:end -->
+
+### Document members + pending invites
+
+JavaScript:
+<!-- example:start sharing/document-members lang=ts -->
+```typescript
+  // Current members (accepted permission grants)
+  const members = await client.documents.getPermissions(documentId);
+
+  // Pending email invites on this document
+  const pending = await client.documents.listPendingInvitations(documentId);
+```
+<!-- example:end -->
+Swift:
+<!-- example:start sharing/document-members lang=swift -->
+```swift
+  // Current members (accepted permission grants)
+  let members = try await client.documents.getPermissions(documentId: documentId)
+
+  // Pending email invites on this document
+  let pending = try await client.documents.listPendingInvitations(documentId: documentId)
+```
+<!-- example:end -->
+
+### Access requests
+
+JavaScript:
+<!-- example:start sharing/request-access lang=ts -->
+```typescript
+  // A user with the link requests access
+  await client.documents.requestAccess(documentId, {
+    permission: "read-write",
+    message: "Please add me to this doc",
+  });
+
+  // An owner lists pending requests and approves one
+  const requests = await client.documents.listAccessRequests(documentId);
+  await client.documents.approveAccessRequest(documentId, requestId);
+```
+<!-- example:end -->
+Swift:
+<!-- example:start sharing/request-access lang=swift -->
+```swift
+  // A user with the link requests access
+  _ = try await client.documents.requestAccess(
+    documentId: documentId,
+    params: ["permission": "read-write", "message": "Please add me to this doc"]
+  )
+
+  // An owner lists pending requests and approves one
+  let requests = try await client.documents.listAccessRequests(documentId: documentId)
+  _ = try await client.documents.approveAccessRequest(documentId: documentId, requestId: requestId)
+```
+<!-- example:end -->
+
+### Collection access summary
+
+JavaScript:
+<!-- example:start sharing/collection-access lang=ts -->
+```typescript
+  const access = await client.collections.getAccess(collectionId);
+```
+<!-- example:end -->
+Swift:
+<!-- example:start sharing/collection-access lang=swift -->
+```swift
+  let access = try await client.collections.getAccess(collectionId: collectionId)
+```
+<!-- example:end -->
+
 ## Mental Model
 
 Sharing in Primitive is built from a small set of primitives the client cares about, plus several internal primitives the platform manages on your behalf.

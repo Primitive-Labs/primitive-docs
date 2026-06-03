@@ -101,6 +101,7 @@ await myEmailService.send({ to: invitation.email, link: acceptUrl });
 The same `inviteToken` is also surfaced inline on the deferred entries returned by `client.documents.updatePermissions({ email })` and `client.groups.addMember({ email })`, so the same custom-email pattern works for share-by-email and add-to-group flows. To look up the token for an existing invitation later — e.g. on a "resend invite" button — use:
 
 ```typescript
+// JavaScript-only: the Swift invitations API doesn't expose getAcceptToken yet.
 const token = await client.invitations.getAcceptToken(invitationId);
 // { invitationId, inviteToken, email, expiresAt, accepted, acceptedAt, status }
 ```
@@ -120,27 +121,19 @@ Documents are private by default. You share them by granting a permission level 
 | `read-write` | Yes | Yes | | |
 | `owner` | Yes | Yes | Yes | Yes |
 
-### Share by User ID
+You share a document by user id, by email, or with a group — all three:
 
-```typescript
-await client.documents.updatePermissions(documentId, {
-  userId: "user-abc",
-  permission: "read-write",
-});
-```
+::: code-group
+
+<<< ../../examples/documents/share-document.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/share-document.swift#example{swift} [Swift]
+
+:::
 
 ### Share by Email
 
-The most common case — you have a colleague's email but don't know (or care) whether they've signed up yet:
-
-```typescript
-await client.documents.updatePermissions(documentId, {
-  email: "alice@example.com",
-  permission: "read-write",
-});
-```
-
-Two paths:
+The most common case — you have a colleague's email but don't know (or care) whether they've signed up yet (shown in the example above). Two paths:
 
 1. **Existing user** — the server resolves the email to a userId and grants access immediately.
 2. **Non-member** — the server creates an invitation (if one doesn't exist) and remembers the pending share. The recipient receives a share email when `sendEmail: true` is passed (existing members get the `document-share` template; non-members get the `document-share-deferred` template, which carries a tokenized accept URL composed from `app.baseUrl`). When they sign up with that email, the share is applied automatically. Repeated calls for the same recipient are idempotent — the latest `permission` value wins and only one pending entry is tracked.
@@ -161,15 +154,7 @@ When you set `sendEmail: true`, you also need `documentUrl` in the request and `
 
 ### Share with a Group
 
-Grant document access to everyone in a group. When group membership changes, access updates automatically:
-
-```typescript
-await client.documents.grantGroupPermission(documentId, {
-  groupType: "team",
-  groupId: "engineering",
-  permission: "read-write",
-});
-```
+Grant document access to everyone in a group (the `grantGroupPermission` call in the example above). When group membership changes, access updates automatically.
 
 ### Checking Who a Document Is Shared With
 
@@ -228,9 +213,16 @@ The deferred-grant flow mirrors document shares (see [How Email-Based Sharing Re
 
 To see who's currently a member and who has a pending invitation:
 
+::: code-group
+
+<<< ../../examples/sharing/collection-access.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/collection-access.swift#example{swift} [Swift]
+
+:::
+
 ```typescript
-const access = await client.collections.getAccess(collectionId);
-// { directMembers, groupPermissions, ... }
+// returns { directMembers, groupPermissions, ... }
 
 const pending = await client.collections.listPendingInvitations(collectionId);
 // [{ email, permission, invitationId, ... }]
@@ -256,10 +248,13 @@ This is what runs whenever the recipient's signup email matches the invited emai
 
 The recipient is signed in (or wants to sign in) under a **different** email than the invitation was sent to — for example, invited at `work@example.com` but signing in with their personal `home@gmail.com` — or they're an **existing user** who wants to bind a fresh deferred grant to their current account. In both cases the platform can't infer intent from the email, so the app calls accept explicitly:
 
-```typescript
-const result = await client.invitations.accept(inviteToken);
-// { status: "accepted", invitationId, grantsResolved: { groups, documents } }
-```
+::: code-group
+
+<<< ../../examples/sharing/accept-invitation.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/accept-invitation.swift#example{swift} [Swift]
+
+:::
 
 The invitation is marked accepted (write-once) and every deferred grant linked to it is bound to the **currently signed-in user** — regardless of the email the invite was sent to. `AppInvitation.acceptedByUserId` records the user that actually accepted, which may differ from the invited email.
 
@@ -317,26 +312,23 @@ try {
 
 Submitting a request:
 
-```typescript
-await client.documents.requestAccess(documentId, {
-  message: "Working on the Q2 planning deck",
-});
-```
+The full flow — request (note `permission` is **required**), then an owner lists and approves:
+
+::: code-group
+
+<<< ../../examples/sharing/request-access.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/request-access.swift#example{swift} [Swift]
+
+:::
 
 The requester receives an `access-request-created` email confirmation. Document owners and app admins receive a WebSocket event (`document:access-request-created`) so their UI can show a badge immediately.
 
 ### How It Works for Owners/Admins
 
+Owners list and approve (above), or deny with a reason:
+
 ```typescript
-// List pending requests for a document
-const { requests } = await client.documents.listAccessRequests(documentId);
-
-// Approve — grants the requested permission
-await client.documents.approveAccessRequest(documentId, requestId, {
-  permission: "read-write",
-});
-
-// Deny
 await client.documents.denyAccessRequest(documentId, requestId, {
   reason: "Please email sales instead",
 });
@@ -405,12 +397,15 @@ Sharing UIs typically show two sections: people who currently have access, and p
 
 ### Current Members
 
-For a document:
+For a document — current members and pending email invites:
 
-```typescript
-const members = await client.documents.getPermissions(documentId);
-// [{ userId, email, name, avatarUrl, permission, grantedAt }, ...]
-```
+::: code-group
+
+<<< ../../examples/sharing/document-members.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/document-members.swift#example{swift} [Swift]
+
+:::
 
 For a group:
 
