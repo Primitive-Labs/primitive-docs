@@ -1,13 +1,13 @@
 import JsBaoClient
 
-// List documents accessible to the current user. Swift returns an untyped
-// `[String: Any]` envelope and only supports limit/cursor pagination.
+// List documents accessible to the current user as a typed `[DocumentInfo]`.
+// (Deprecated — prefer `client.me.ownedDocuments()` / `sharedDocuments()`.)
 func list(client: JsBaoClient) async throws {
   // #region example
-  let result = try await client.documents.list(
+  let items = try await client.documents.list(
     options: PaginationOptions(limit: 50)
   )
-  let items = result["items"] as? [[String: Any]] ?? []
+  let firstTitle = items.first?.title
   // #endregion example
-  _ = items
+  _ = firstTitle
 }

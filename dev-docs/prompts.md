@@ -6,10 +6,18 @@ Execute server-defined prompt templates by key.
 
 Execute a prompt template with variables and return the result.
 
-::: tip Divergent shape
+::: warning Swift parity gap
 JS `execute` resolves to a typed `ExecutePromptResult` (`success`, `output`,
 `metrics`, `rawResponse`, `configId`); Swift returns an untyped `[String: Any]`,
-so read fields with dictionary casts ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+so read fields with dictionary casts (sweep prompts D2,
+[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+:::
+
+::: tip Divergent shape
+Swift additionally carries a positional
+`execute(promptKey:variables:modelOverride:configId:)` overload with no JS
+analog — prefer the options-struct form for cross-client parity (sweep
+prompts D3, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group

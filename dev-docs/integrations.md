@@ -7,10 +7,19 @@ Proxy calls to configured third-party integrations through the server.
 Call a third-party integration through the server proxy and unwrap the
 upstream response.
 
-::: tip Divergent shape
-JS `call<T>` is generic — the response `body` is typed `T` and `query` accepts
-`Record<string, any>`. Swift's `IntegrationCallResponse.body` is `Any?` (cast at
-the call site) and `query` is `[String: String]` only ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+::: warning Swift parity gap
+JS `call<T>` is generic — the response `body` is typed `T`. Swift's
+`IntegrationCallResponse.body` is `Any?`, so you cast at the call site (sweep
+integrations D2, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+:::
+
+::: warning Swift parity gap
+Swift's request shape is narrower and over-eager: `query` is `[String: String]`
+only (JS accepts `Record<string, any>`), and `method`/`path` default to `"GET"`
+/`""` and are always sent. JS omits them when unset so the server applies the
+integration's configured `defaultMethod`/base path — so a Swift call that leaves
+them unset can hit `DISALLOWED_METHOD` where the JS call succeeds (sweep
+integrations D2, [#958](https://github.com/Primitive-Labs/js-bao-wss/issues/958)).
 :::
 
 ::: code-group

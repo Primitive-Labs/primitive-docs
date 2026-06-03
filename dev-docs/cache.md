@@ -6,11 +6,13 @@ General-purpose key-value cache with in-memory + persistent storage, request ded
 
 Build a deterministic cache key from a base string and optional params.
 
-::: tip Divergent shape
+::: warning Swift parity gap — keys are not portable
 The two clients produce **different keys** for the same inputs: JS serializes params as
 `base:<stable-JSON>` and accepts any value (scalar, array, object), while Swift accepts only
-`[String: Any]` and joins them as `base?k=v&…`. Keys are therefore not portable across platforms
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+`[String: Any]` and joins them as `base?k=v&…`. Keys are therefore **not portable across
+platforms** — a value cached under a JS key won't be found by Swift and vice versa. Behavioral
+divergence, no issue number filed yet (sweep cache D3); the param-typedness half (Swift `[String:
+Any]` only) is tracked under [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).
 :::
 
 ::: code-group
@@ -22,11 +24,13 @@ The two clients produce **different keys** for the same inputs: JS serializes pa
 
 Return a cached value if present, otherwise run the fetcher and cache its result.
 
-::: tip Divergent shape
-JS accepts `string | any[]` for the key (an array is stable-serialized); Swift takes a `String`
-only. Swift also silently ignores `waitForLoad`, `serverTimeoutMs`, and offline gating — only
-`refreshNetwork` and `refreshIfOlderThanMs` take effect
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+::: warning Swift parity gap — advertised options are silent no-ops
+Swift `fetchCached` **silently ignores** `waitForLoad`, `serverTimeoutMs`, and offline gating —
+only `refreshNetwork` and `refreshIfOlderThanMs` take effect — even though these fields are present
+and documented on `FetchCachedOptions`. Calls that rely on `waitForLoad`/`serverTimeoutMs` behave
+differently on iOS with no error. Behavioral P1, no issue number filed yet (sweep cache D8). The
+param shape also differs: JS accepts `string | any[]` for the key (an array is stable-serialized),
+Swift takes a `String` only (sweep cache D9).
 :::
 
 ::: code-group
@@ -38,13 +42,16 @@ only. Swift also silently ignores `waitForLoad`, `serverTimeoutMs`, and offline 
 
 Fetch from an HTTP endpoint with automatic caching keyed on the request.
 
-::: warning Divergent shape — P0 behavior bug
+::: warning Swift parity gap — P0 wrong-results behavior bug
 JS serializes `query` into the request URL and folds `query` (plus `body` for non-GET) into the
-cache key. **Swift drops `query` from both the request and the cache key**, never includes `body`
-in the key, and ignores `serverTimeoutMs`/offline options. As a result, Swift sends unfiltered
-requests and POSTs with different bodies collide on a single cache entry
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). The shapes also differ: JS takes
-a single `req` object, Swift takes positional params.
+cache key. **Swift silently drops `query` from both the request and the cache key**, never includes
+`body` in the key, and ignores `serverTimeoutMs`/offline options — even though `FetchCachedOptions`
+advertises them as live. As a result, Swift sends **unfiltered** requests and POSTs with different
+bodies **collide on a single cache entry** (stale/wrong results), with no error raised. Behavioral
+P0 — no issue number filed yet (sweep cache D1 / D8); `query` being typed `[String: Any]` with no
+array/nested encoding is sweep cache D2. The shapes also differ: JS takes a single `req` object,
+Swift takes positional params (typedness tracked under
+[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group
@@ -91,9 +98,9 @@ The JS cache emits `cacheUpdated` (`{ key, updatedAt, source, value }`) on every
 refresh and `cacheUpdateFailed` (`{ key, error }`) on failure.
 
 ::: warning No Swift equivalent
-JavaScript-only — the Swift `KvCache` has no emitter and fires no cache events
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). These events are also not part
-of the typed public event map, so they are not surfaced through `client.on(...)`.
+JavaScript-only — the Swift `KvCache` has no emitter and fires no cache events (sweep cache D7; no
+issue number filed yet). These events are also not part of the typed public event map, so they are
+not surfaced through `client.on(...)`.
 :::
 
 ## KvCache.get / KvCache.set
@@ -104,5 +111,5 @@ reads and writes that bypass the facade.
 ::: warning No JavaScript equivalent
 Swift-only — neither the JS `CacheFacade` nor the JS `KvCache` exposes `get`/`set`. On Swift these
 live on the internal `KvCache` (not on `client.cache`), so they are not reachable through the
-public facade ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+public facade (sweep cache D10; no issue number filed yet).
 :::

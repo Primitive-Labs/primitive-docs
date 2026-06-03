@@ -1,12 +1,13 @@
 import JsBaoClient
 
-// List pending access requests for a document (owner/admin only). Swift
-// returns an untyped `[[String: Any]]`.
+// List pending access requests for a document (owner/admin only) as typed
+// `[DocumentAccessRequest]`.
 func listAccessRequests(client: JsBaoClient, documentId: String) async throws {
   // #region example
   let requests = try await client.documents.listAccessRequests(
     documentId: documentId
   )
+  let firstRequester = requests.first?.requesterId
   // #endregion example
-  _ = requests
+  _ = firstRequester
 }

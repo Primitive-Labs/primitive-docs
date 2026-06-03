@@ -24,10 +24,11 @@ passed explicitly) and has no `retainLocal` ([#965](https://github.com/Primitive
 
 List blobs attached to this document.
 
-::: tip Divergent shape
+::: warning Swift parity gap
 JS returns a typed `BlobListResult<T>` (`{ items, cursor? }`) and accepts a
 `cursor` for pagination. Swift returns an untyped `[[String: Any]]` and drops the
-cursor — there is no way to page ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+cursor entirely — callers stringly-key into each dict and there is no way to page
+(sweep D7, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#965](https://github.com/Primitive-Labs/js-bao-wss/issues/965)).
 :::
 
 ::: code-group
@@ -39,9 +40,9 @@ cursor — there is no way to page ([#954](https://github.com/Primitive-Labs/js-
 
 Retrieve metadata for a single blob.
 
-::: tip Divergent shape
-JS returns a typed `T` (blob metadata). Swift returns an untyped `[String: Any]`,
-so callers stringly-key into the dict ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+::: warning Swift parity gap
+JS returns a typed `T` / `BlobInfo` (blob metadata). Swift returns an untyped `[String: Any]`,
+so callers stringly-key into the dict (sweep D8, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#965](https://github.com/Primitive-Labs/js-bao-wss/issues/965)).
 :::
 
 ::: code-group
@@ -84,9 +85,16 @@ JS's `read` takes an `options` object (`as: "uint8array" | "arrayBuffer" | "blob
 
 Delete a blob from the document.
 
-::: tip Divergent shape
+::: warning Swift parity gap
 JS returns a typed `{ deleted: boolean }`. Swift returns an untyped
-`[String: Any]` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+`[String: Any]` (sweep D9, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#965](https://github.com/Primitive-Labs/js-bao-wss/issues/965)).
+:::
+
+::: warning Swift parity gap
+Beyond the result shape, JS `delete` also evicts the blob's local cache, cancels any
+queued upload for it, and emits `queue-drained`. Swift's `delete` does none of this —
+a deleted blob can be served stale from the local cache, and a delete issued mid-upload
+won't cancel the in-flight transfer (sweep D10, [#965](https://github.com/Primitive-Labs/js-bao-wss/issues/965)).
 :::
 
 ::: code-group

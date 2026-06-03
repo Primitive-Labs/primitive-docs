@@ -1,8 +1,10 @@
 import JsBaoClient
 
-// Delete a document alias. Swift takes positional args.
+// Delete a document alias with a typed `AliasRef`.
 func aliasesDelete(client: JsBaoClient) async throws {
   // #region example
-  try await client.documents.aliases.delete(scope: "user", aliasKey: "notes")
+  try await client.documents.aliases.delete(
+    AliasRef(scope: .user, aliasKey: "notes")
+  )
   // #endregion example
 }

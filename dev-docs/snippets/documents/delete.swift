@@ -1,12 +1,12 @@
 import JsBaoClient
 
-// Delete a document. Swift returns an untyped `[String: Any]` (vs JS `void`)
-// and does not perform local eviction.
+// Delete a document from the server. Returns `Void`; pass
+// `forceCloseIfOpen: true` to close it first if it's currently open.
 func deleteDocument(client: JsBaoClient, documentId: String) async throws {
   // #region example
-  let result = try await client.documents.delete(
-    documentId: documentId, forceCloseIfOpen: true
+  try await client.documents.delete(
+    documentId: documentId,
+    options: DeleteDocumentOptions(forceCloseIfOpen: true)
   )
   // #endregion example
-  _ = result
 }

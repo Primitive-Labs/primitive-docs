@@ -229,10 +229,12 @@ Get the field schema for a model in a database.
 Connect to a database and get a `DoDb` for ad-hoc record query/find/save/count/aggregate.
 
 ::: warning No Swift equivalent
-JavaScript-only — the Swift client has no `connect()` and no ad-hoc record
-CRUD/query surface. On Swift, read and write records through named operations
-(`executeOperation` / `executeBatch`)
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+JavaScript-only — the Swift client has no `connect()` and no `DoDb` record
+surface, so the entire ad-hoc `query` / `find` / `save` / `patch` / `count` /
+`aggregate` API is absent on Swift (sweep databases D2). On Swift, read and
+write records through named operations (`executeOperation` / `executeBatch`)
+instead ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954),
+[#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
 :::
 
 <<< ./snippets/databases/connect.ts#example{ts} [JavaScript]
@@ -242,9 +244,14 @@ CRUD/query surface. On Swift, read and write records through named operations
 Subscribe to real-time database changes for a server-registered subscription.
 
 ::: warning No Swift equivalent
-JavaScript-only — the Swift client has no `subscribe()`. Poll via
+JavaScript-only — the Swift client has no `subscribe()`; poll via
 `executeOperation` instead
-([#952](https://github.com/Primitive-Labs/js-bao-wss/issues/952)).
+([#952](https://github.com/Primitive-Labs/js-bao-wss/issues/952)). Swift also
+ships no typed `DatabaseChangeEvent` / `DatabaseChangePayload` payloads, and the
+`change.changeType` (`"enter"` / `"update"` / `"leave"`) field the JS `onChange`
+callback exposes is missing from the public JS type as well (sweep databases D1
+/ [#949](https://github.com/Primitive-Labs/js-bao-wss/issues/949),
+[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 <<< ./snippets/databases/subscribe.ts#example{ts} [JavaScript]

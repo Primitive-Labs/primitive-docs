@@ -1,13 +1,15 @@
 import JsBaoClient
 
-// Create a document and assign an alias atomically. Swift takes an untyped
-// options dict and returns an untyped `[String: Any]` envelope.
+// Create a document and assign an alias atomically with typed
+// `CreateWithAliasOptions`. Returns a `CreateWithAliasResult` (incl. the id).
 func createWithAlias(client: JsBaoClient) async throws {
   // #region example
-  let result = try await client.documents.createWithAlias(options: [
-    "title": "User Notes",
-    "alias": ["scope": "user", "aliasKey": "notes"],
-  ])
+  let result = try await client.documents.createWithAlias(
+    options: CreateWithAliasOptions(
+      title: "User Notes",
+      alias: AliasRef(scope: .user, aliasKey: "notes")
+    )
+  )
   // #endregion example
-  _ = result
+  _ = result.documentId
 }

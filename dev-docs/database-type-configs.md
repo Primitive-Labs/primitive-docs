@@ -2,16 +2,18 @@
 
 Bind a rule set, CEL trigger rules, and a metadata-access gate to a `databaseType` tag. A small CRUD surface over `/databases/types`.
 
-::: tip Divergent shape
+::: warning Swift parity gap
 Every method on the Swift client takes and returns untyped `[String: Any]` /
 `[[String: Any]]` where JS uses the named `DatabaseTypeConfigInfo`,
 `CreateDatabaseTypeConfigParams`, and `UpdateDatabaseTypeConfigParams`
-interfaces ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+interfaces (sweep databaseTypeConfigs D1/D2,
+[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 In particular `delete` resolves to a typed `{ success: boolean }` in JS but a
 bare dict in Swift, and the Swift client swallows decode failures with
-`?? [:]` / `?? []` (a failed cast surfaces as an empty result rather than an
-error). Read fields out of the dictionary, and pass `NSNull()` where JS would
-pass `null`.
+`?? [:]` / `?? []` — a failed cast surfaces as an empty result rather than an
+error (borders on a silent-empty bug, so check for an expected key rather than
+trusting an empty dict). Read fields out of the dictionary, and pass `NSNull()`
+where JS would pass `null`.
 :::
 
 ## list()

@@ -1,7 +1,7 @@
 import JsBaoClient
 
-// Deprecated: no invitee-side decline verb. Swift returns an untyped
-// `[String: Any]`.
+// Deprecated: no invitee-side decline verb. Returns a typed
+// `{ success, message }`.
 func declineInvitation(
   client: JsBaoClient, documentId: String, invitationId: String
 ) async throws {
@@ -10,5 +10,5 @@ func declineInvitation(
     documentId: documentId, invitationId: invitationId
   )
   // #endregion example
-  _ = result
+  _ = result.success
 }

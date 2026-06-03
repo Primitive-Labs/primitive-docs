@@ -1,7 +1,7 @@
 import JsBaoClient
 
-// Deprecated: prefer `updatePermissions(params:)` (idempotent). Swift returns
-// an untyped `[String: Any]`.
+// Deprecated: prefer `updatePermissions(params:)` (idempotent). Returns a typed
+// `DocumentInvitationResponse`.
 func updateInvitation(client: JsBaoClient, documentId: String) async throws {
   // #region example
   let result = try await client.documents.updateInvitation(
@@ -10,5 +10,5 @@ func updateInvitation(client: JsBaoClient, documentId: String) async throws {
     permission: "reader"
   )
   // #endregion example
-  _ = result
+  _ = result.invitationId
 }

@@ -2,15 +2,25 @@
 
 Bind a rule set to a `collectionType` tag, governing access for app-defined collections. A small CRUD surface over `/collection-type-configs`.
 
-::: tip Divergent shape
+::: warning Swift parity gap
 Every method on the Swift client takes and returns untyped `[String: Any]` /
 `[[String: Any]]` where JS uses the named `CollectionTypeConfigInfo`,
 `CreateCollectionTypeConfigParams`, and `UpdateCollectionTypeConfigParams`
-interfaces ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+interfaces (sweep collectionTypeConfigs D1,
+[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 `delete` resolves to a typed `{ success: boolean }` in JS but a bare dict in
 Swift, and the Swift client swallows decode failures with `?? [:]` / `?? []`
 (a failed cast surfaces as an empty result rather than an error). Read fields
 out of the dictionary, and pass `NSNull()` where JS would pass `null`.
+:::
+
+::: warning Swift parity gap
+The Swift `get` / `update` / `delete` path builders fall back to an
+**unescaped** `collectionType` when percent-encoding fails, and use a different
+escape spec than JS's `encodeURIComponent` — so an unusual `collectionType` tag
+can produce divergent request paths across the two clients (sweep
+collectionTypeConfigs D2,
+[#596](https://github.com/Primitive-Labs/js-bao-wss/issues/596)).
 :::
 
 ## list()

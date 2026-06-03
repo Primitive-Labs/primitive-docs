@@ -6,6 +6,10 @@ Generate content with Google Gemini models: structured prompts, raw passthrough,
 Every Swift `GeminiAPI` method takes and returns **untyped `[String: Any]` / `Any`** where JS exposes named interfaces (`GeminiGenerateOptions`, `GeminiGenerateResult`, `GeminiPromptOptions`, …). Both compile; the Swift examples use dict access. Tracked under [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954). Per-method divergences (`models()` return shape, `generateRaw` error code) are noted inline.
 :::
 
+::: warning Swift parity gap — no analytics, no error normalization
+Across **all** `gemini.*` methods, the Swift `GeminiAPI` emits **no analytics events** — JS fires `prompt_started` / `prompt_succeeded` / `prompt_failed` for every generate call, but the Swift auto-events engine isn't wired (the context getter hardcodes `isEnabled = true` yet nothing fires). Swift also does **not** normalize provider failures to the `GEMINI_ERROR` code the way JS does. Until both are aligned, treat gemini analytics as JS-only and don't rely on a uniform error code on iOS ([#963](https://github.com/Primitive-Labs/js-bao-wss/issues/963), sweep gemini D2).
+:::
+
 ## generate(options)
 
 Send a structured prompt to Gemini and return the generated response.

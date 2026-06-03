@@ -23,6 +23,22 @@ Start a workflow run and get back `{ runId, runKey, status, existing }`. In
 Swift, `input` is a positional `[String: Any]` and the idempotency/scoping
 fields live on `StartWorkflowOptions`.
 
+::: tip Divergent shape
+Swift flattens the JS options object: `input` is a positional `[String: Any]`
+and the remaining idempotency/scoping fields move onto `StartWorkflowOptions`.
+This positional-args-mirror-JS-options shape is the convention across the Swift
+workflows surface (`define` / `listStepRuns` / `getStatus` / `meta`) and is
+expected, not a gap (sweep workflows D3,
+[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+:::
+
+::: warning Swift parity gap
+The `WorkflowStartedEvent` that follows `start` carries only
+`{ workflowKey, runId }` in Swift, vs the JS event's full 8-field payload — so
+Swift subscribers can't read the other fields off the start event (sweep
+workflows D2, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+:::
+
 ::: code-group
 <<< ./snippets/workflows/start.ts#example{ts} [JavaScript]
 <<< ./snippets/workflows/start.swift#example{swift} [Swift]
@@ -47,6 +63,13 @@ JavaScript-only — the Swift client has no `runSync`. Swift callers use the
 
 Poll the status of a run. The Swift envelope adds a `normalizedStatus` field
 that reconciles the Cloudflare-workflow and DB status shapes.
+
+::: tip Divergent shape
+`normalizedStatus` is Swift-only — JS `getStatus` has no such field, so code
+that reads it won't port across clients (sweep workflows D4). Tracked for
+documenting (or porting to JS) under
+[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).
+:::
 
 ::: code-group
 <<< ./snippets/workflows/get-status.ts#example{ts} [JavaScript]

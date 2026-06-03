@@ -2,14 +2,22 @@
 
 Schedule workflow runs on a standard 5-field cron expression and manage their lifecycle.
 
-::: tip Divergent shape
+::: warning Swift parity gap
 Every Swift `cronTriggers` method returns (and, for `create`/`update`, accepts) an
-**untyped `[String: Any]`** where JS uses typed interfaces — `CronTriggerInfo`,
-`CronTriggerListResult`, `CreateCronTriggerParams`, `UpdateCronTriggerParams`, and the
-typed `{ archived }` / `{ started, runId?, … }` results ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-Both compile; on Swift you index fields by key. Note the Swift client silently casts a
-non-dict or decode-failed response to an empty `[:]` rather than throwing, so a malformed
-body reads as a (misleadingly) successful empty result.
+**untyped `[String: Any]`** where JS uses typed interfaces — `CronTriggerInfo`
+(`get`/`create`/`update`/`pause`/`resume`), `CronTriggerListResult` (`list`),
+`CreateCronTriggerParams` / `UpdateCronTriggerParams` (`create`/`update` params),
+and the typed `{ archived }` (`delete`) / `{ started, runId?, … }` (`test`) results.
+Both compile; on Swift you index fields by key, so required/enum fields and result
+shapes are unenforced (sweep cron D1–D4,
+[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+:::
+
+::: warning Swift parity gap
+The Swift client silently casts a non-dict or decode-failed response to an empty
+`[:]` rather than throwing, so a malformed body reads as a (misleadingly)
+**successful empty result** — there is no equivalent silent-success path in JS
+(sweep cron D5, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ## list()

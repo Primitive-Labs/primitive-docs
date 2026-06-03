@@ -1,13 +1,17 @@
 import JsBaoClient
 
-// Update document metadata. Swift takes an untyped data dict and returns
-// an untyped `[String: Any]`.
+// Update document metadata with typed `UpdateDocumentData`. Replace semantics:
+// omit a field to leave it unchanged; pass `.null` metadata (or `.clear`
+// thumbnailBlobId) to clear it.
 func update(client: JsBaoClient, documentId: String) async throws {
   // #region example
-  let info = try await client.documents.update(documentId: documentId, data: [
-    "title": "Q3 Roadmap (final)",
-    "metadata": ["color": "green"],
-  ])
+  let info = try await client.documents.update(
+    documentId: documentId,
+    data: UpdateDocumentData(
+      title: "Q3 Roadmap (final)",
+      metadata: ["color": "green"]
+    )
+  )
   // #endregion example
   _ = info
 }

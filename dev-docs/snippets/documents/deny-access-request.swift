@@ -1,7 +1,7 @@
 import JsBaoClient
 
-// Deny a pending access request (owner/admin only). Swift returns an untyped
-// `[String: Any]`.
+// Deny a pending access request (owner/admin only). Returns a typed
+// `AccessRequestResult`.
 func denyAccessRequest(
   client: JsBaoClient, documentId: String, requestId: String
 ) async throws {
@@ -10,5 +10,5 @@ func denyAccessRequest(
     documentId: documentId, requestId: requestId
   )
   // #endregion example
-  _ = result
+  _ = result.success
 }

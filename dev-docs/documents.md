@@ -2,13 +2,17 @@
 
 Create, open, share, and sync collaborative Yjs documents. Blob attachments are a separate surface ([`client.documents.blobs(id)`](/blobs)) and are not covered here.
 
-::: tip Divergent shape
-Almost the entire Swift `DocumentsAPI` takes and returns untyped `[String: Any]` dictionaries where JS exposes named interfaces (`DocumentInfo`, `PermissionUpdateResult`, `DocumentAccessRequest`, …). Both compile; the Swift examples use dict access. Tracked under [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954). Per-method divergences (sync vs async, `void` vs dict, renamed fields) are noted inline.
+::: tip Typed surface
+The Swift `DocumentsAPI` now takes and returns the same named types JS exposes — `DocumentInfo`, `PermissionUpdateResult`, `DocumentAccessRequest`, `DocumentAliasInfo`, and friends — decoded from the wire by the client (resolving [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). Opaque blobs such as a document's `metadata` are typed as `JSONValue`, which is `Codable` and accepts dictionary/array/scalar literals (e.g. `metadata: ["color": "blue"]`). Remaining divergences are behavioral — sync vs async, `void` vs a richer result, local-eviction differences — and are noted inline.
 :::
 
 ## create(options)
 
 Create a new document. Pass `localOnly: true` to defer the server commit.
+
+::: warning Swift parity gap
+JS `create` is local-first: it writes the document locally and returns immediately, then commits to the server in the background (and honors `localOnly` to defer the commit entirely). Swift instead POSTs the raw create synchronously and has no offline/deferred path — so a create issued while offline fails rather than queueing (sweep D2, [#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852)).
+:::
 
 ::: code-group
 <<< ./snippets/documents/create.ts#example{ts} [JavaScript]
@@ -38,7 +42,7 @@ Resolve an alias to a document, creating one if it doesn't exist yet (singleton 
 List documents accessible to the current user. Deprecated in favor of `client.me.ownedDocuments()` / `client.me.sharedDocuments()` ([#628](https://github.com/Primitive-Labs/js-bao-wss/issues/628)).
 
 ::: tip Divergent shape
-Swift returns an untyped `[String: Any]` envelope and only supports `limit`/`cursor`. JS adds `tag`, `forward`, `waitForLoad`, `refreshFromServer`, `localOnly`, and a `returnPage` array-vs-page duality ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
+Swift returns a typed `[DocumentInfo]` but only supports `limit`/`cursor` pagination. JS adds `tag`, `forward`, `waitForLoad`, `refreshFromServer`, `localOnly`, and a `returnPage` array-vs-page duality ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
 :::
 
 ::: code-group
@@ -48,11 +52,7 @@ Swift returns an untyped `[String: Any]` envelope and only supports `limit`/`cur
 
 ## get(documentId)
 
-Fetch a document's metadata from the server.
-
-::: tip Divergent shape
-The Swift `DocumentInfo` names the timestamp `modifiedAt` (JS: `lastModified`) and drops `thumbnailBlobId`/`metadata`/`invitationAccepted` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#673](https://github.com/Primitive-Labs/js-bao-wss/issues/673)).
-:::
+Fetch a document's metadata from the server as a typed `DocumentInfo` (with `documentId`, `title`, `lastModified`, `permission`, `tags`, `thumbnailBlobId`, `metadata`, …). The Swift client decodes the wire's `modifiedAt` field into `lastModified` so the property matches JS ([#673](https://github.com/Primitive-Labs/js-bao-wss/issues/673)).
 
 ::: code-group
 <<< ./snippets/documents/get.ts#example{ts} [JavaScript]
@@ -90,8 +90,8 @@ Remove a tag from a document. Returns the updated tag list.
 
 Delete a document from the server and evict its local data.
 
-::: tip Divergent shape
-Swift returns an untyped `[String: Any]` and skips the local eviction / offline-fallback reconciliation that JS performs (JS returns `void`) ([#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
+::: warning Swift parity gap
+Both clients return `void`, but Swift skips the post-delete reconciliation JS performs: JS evicts the document's local data, emits a `documentMetadataChanged` event, and — when offline — treats a pending/`404` server response as an already-applied delete (offline-fallback) instead of throwing. Swift does none of this, so a deleted doc can linger in local caches and listeners never fire (sweep D4, [#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
 :::
 
 ::: code-group
@@ -176,7 +176,11 @@ Grant or change a user's permission. By email it routes through the deferred-gra
 Revoke a user's access, or cancel a pending email invitation.
 
 ::: tip Divergent shape
-JS takes a `string | { userId } | { email }` union and returns `void`; Swift splits it into `userId:` / `email:` overloads that each return an untyped `[String: Any]`. Swift also skips the self-removal local eviction JS performs ([#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
+JS takes a `string | { userId } | { email }` union; Swift splits it into `userId:` / `email:` overloads. Both return `void`.
+:::
+
+::: warning Swift parity gap
+When you remove *your own* permission (leaving a shared doc), JS evicts that document's local data as part of the call; Swift skips this self-removal eviction, so the doc you no longer have access to stays cached on-device (sweep D5, [#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
 :::
 
 ::: code-group
@@ -226,11 +230,7 @@ Grant a group a permission level on a document.
 
 ## revokeGroupPermission(documentId, groupType, groupId)
 
-Revoke a group's permission on a document.
-
-::: tip Divergent shape
-JS returns `{ success }`; Swift returns an untyped `[String: Any]`.
-:::
+Revoke a group's permission on a document. Both clients return a typed `{ success }`.
 
 ::: code-group
 <<< ./snippets/documents/revoke-group-permission.ts#example{ts} [JavaScript]
@@ -596,11 +596,7 @@ No invitee-side decline verb — pending invitations expire automatically. To le
 
 ## aliases.set(params)
 
-Create or update a document alias.
-
-::: tip Divergent shape
-JS takes a typed `SetAliasParams` (`scope: "app" | "user"`) and returns `DocumentAliasInfo`; Swift takes positional args with a bare-`String` scope and returns an untyped `[String: Any]` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
+Create or update a document alias. Both clients take a typed `SetAliasParams` (`scope: .app | .user`) and return `DocumentAliasInfo`.
 
 ::: code-group
 <<< ./snippets/documents/aliases-set.ts#example{ts} [JavaScript]

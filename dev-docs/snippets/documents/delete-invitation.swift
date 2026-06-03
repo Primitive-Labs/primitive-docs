@@ -1,7 +1,7 @@
 import JsBaoClient
 
 // Deprecated: prefer `removePermission(email:)` or
-// `client.invitations.delete`. Swift returns an untyped `[String: Any]`.
+// `client.invitations.delete`. Returns a typed `{ success, message }`.
 func deleteInvitation(
   client: JsBaoClient, documentId: String, invitationId: String
 ) async throws {
@@ -10,5 +10,5 @@ func deleteInvitation(
     documentId: documentId, invitationId: invitationId
   )
   // #endregion example
-  _ = result
+  _ = result.success
 }

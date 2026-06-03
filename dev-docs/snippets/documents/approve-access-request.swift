@@ -1,7 +1,7 @@
 import JsBaoClient
 
-// Approve a pending access request (owner/admin only). Swift takes an untyped
-// params dict and returns an untyped `[String: Any]`.
+// Approve a pending access request (owner/admin only) with typed
+// `ApproveAccessRequestOptions`. Returns an `AccessRequestResult`.
 func approveAccessRequest(
   client: JsBaoClient, documentId: String, requestId: String
 ) async throws {
@@ -9,8 +9,8 @@ func approveAccessRequest(
   let result = try await client.documents.approveAccessRequest(
     documentId: documentId,
     requestId: requestId,
-    params: ["permission": "reader"]
+    options: ApproveAccessRequestOptions(permission: .reader)
   )
   // #endregion example
-  _ = result
+  _ = result.success
 }

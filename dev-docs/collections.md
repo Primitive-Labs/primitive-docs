@@ -2,19 +2,29 @@
 
 Group documents into collections and manage their membership, group permissions, and pending invitations.
 
-::: tip Divergent shape
-Every `CollectionsAPI` method exists in both clients, but the Swift client takes and
+::: warning Swift parity gap
+All 16 `CollectionsAPI` methods exist in both clients, but the Swift client takes and
 returns **untyped `[String: Any]`** where JS uses named interfaces
-(`CollectionInfo`, `PaginatedResult<T>`, `{ success: boolean }`, …) — so the Swift
-snippets below cast out of dictionaries. Both compile; the shapes differ
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). Two specifics worth
+(`CollectionInfo`, `CollectionAccessInfo`, `PaginatedResult<T>`,
+`{ success: boolean }`, …) — so the Swift snippets below cast out of
+dictionaries (sweep collections D1,
+[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). Specifics worth
 flagging:
 
 - **`addMember`** returns JS's `CollectionAddMemberResult` discriminated union
   (`added` / `already_member` / `pending_signup`) but a flat `[String: Any]` in Swift —
-  branch on the `status` key yourself ([#453](https://github.com/Primitive-Labs/js-bao-wss/issues/453)).
-- **`listAll`** takes positional `limit`/`cursor` args in Swift, while every sibling
-  (`list`, `listDocuments`, `listCollectionsForDocument`) takes a `PaginationOptions`.
+  branch on the `status` key yourself (sweep collections D2,
+  [#453](https://github.com/Primitive-Labs/js-bao-wss/issues/453),
+  [#671](https://github.com/Primitive-Labs/js-bao-wss/issues/671)).
+- **Mutators** (`delete` / `removeDocument` / `revokeGroupPermission` /
+  `removeMember`) return `{ success: boolean }` in JS but a bare dict in Swift,
+  and the Swift client swallows decode failures (a failed cast surfaces as an
+  empty result rather than an error) — check for an expected key rather than
+  trusting an empty dict (sweep collections D3).
+- **`listAll`** takes positional `limit` / `cursor` args in Swift, while every sibling
+  (`list`, `listDocuments`, `listCollectionsForDocument`) takes a `PaginationOptions`;
+  the Swift `cursor` is raw-interpolated into the request path (latent
+  injection/escaping bug) (sweep collections D4).
 :::
 
 ## create(params)

@@ -26,10 +26,11 @@ Create a new group. `groupType`, `groupId`, and `name` are required;
 
 List groups, optionally filtered by `type`, with cursor pagination.
 
-::: tip Divergent shape
+::: warning Swift parity gap
 JS returns a typed `PaginatedResult<GroupInfo>` and accepts an `includeSystem`
 option (to surface platform-internal `_`-prefixed groups). Swift returns an
-untyped `[String: Any]` envelope and has no `includeSystem` parameter.
+untyped `[String: Any]` envelope and has no `includeSystem` parameter (groups D2,
+[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group
@@ -67,9 +68,14 @@ Delete a group. JS returns `{ success: boolean }`; Swift returns an untyped
 
 ## listMembers(groupType, groupId, options?)
 
-List the members of a group, with optional `limit` / `cursor` pagination. Swift
-takes a typed `PaginationOptions` but returns an untyped `[String: Any]`
-envelope.
+List the members of a group, with optional `limit` / `cursor` pagination.
+
+::: warning Swift parity gap
+Swift takes a typed `PaginationOptions` but returns an untyped `[String: Any]`
+envelope, where JS returns a typed `PaginatedResult<GroupMemberInfo>` (`{ items,
+cursor? }`) (groups D2,
+[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+:::
 
 ::: code-group
 <<< ./snippets/groups/list-members.ts#example{ts} [JavaScript]
