@@ -4,6 +4,10 @@ Primitive includes a built-in analytics pipeline. Events are buffered on the cli
 
 This page covers what's tracked out of the box, how to emit your own events, and how to read analytics back from the client, the CLI, and from workflows.
 
+::: warning JavaScript-only
+The custom-event client API (`client.analytics.*`) is currently **JavaScript-only** — the Swift client doesn't yet expose a public analytics API. Swift apps still get server-side auto-tracking (DAU/WAU/MAU, document/permission/workflow lifecycle), but can't emit custom events from the client today. Read analytics back via the CLI, REST, or workflow steps from any platform.
+:::
+
 ## What's Tracked Automatically
 
 You get a working analytics pipeline by initializing `JsBaoClient` with default options. No `logEvent` calls required.

@@ -116,11 +116,13 @@ primitive cron-triggers delete <trigger-id>
 
 From your app:
 
-```typescript
-const { items } = await client.cronTriggers.list();
-const trigger = await client.cronTriggers.get(triggerId);
-await client.cronTriggers.test(triggerId);
-```
+::: code-group
+
+<<< ../../examples/scheduling/cron-manage.ts#example{ts} [JavaScript]
+
+<<< ../../examples/scheduling/cron-manage.swift#example{swift} [Swift]
+
+:::
 
 ### Limits
 
@@ -139,6 +141,10 @@ primitive workflows runs status <workflow-id> <run-id>
 The run's `meta.triggerId` identifies the cron trigger that fired it, so you can filter by source.
 
 ## Real-Time Database Subscriptions
+
+::: warning JavaScript-only
+`client.databases.subscribe(...)` is currently **JavaScript-only** — the Swift client exposes `executeOperation` but not database subscriptions yet. Swift apps poll with `executeOperation` (or use document-based real-time, which Swift fully supports) until the subscription API lands.
+:::
 
 Databases live on the server. Traditionally your app called `executeOperation` to read them. Subscriptions flip that — the server pushes a `db.change` frame to connected clients whenever matching rows change.
 

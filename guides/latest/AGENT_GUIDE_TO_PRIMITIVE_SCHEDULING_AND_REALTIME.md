@@ -2,6 +2,28 @@
 
 Guidelines for AI agents implementing cron-triggered workflows and real-time database subscriptions.
 
+> **Swift parity:** cron triggers exist in both clients; **database subscriptions (`client.databases.subscribe`) are JavaScript-only** — the Swift `DatabasesAPI` exposes `executeOperation` but no `subscribe`. Don't write Swift snippets calling `client.databases.subscribe`. Swift apps poll via `executeOperation` or use document-based real-time.
+
+## Cron triggers from the client (JavaScript + Swift)
+
+JavaScript:
+<!-- example:start scheduling/cron-manage lang=ts -->
+```typescript
+  const { items } = await client.cronTriggers.list();
+  const trigger = await client.cronTriggers.get(triggerId);
+  await client.cronTriggers.test(triggerId); // fire once, now
+```
+<!-- example:end -->
+Swift:
+<!-- example:start scheduling/cron-manage lang=swift -->
+```swift
+  let list = try await client.cronTriggers.list()
+  let items = list["items"] as? [[String: Any]] ?? []
+  let trigger = try await client.cronTriggers.get(triggerId: triggerId)
+  _ = try await client.cronTriggers.test(triggerId: triggerId) // fire once, now
+```
+<!-- example:end -->
+
 ## Mental Model
 
 Two independent capabilities. They often combine, but they answer different questions.

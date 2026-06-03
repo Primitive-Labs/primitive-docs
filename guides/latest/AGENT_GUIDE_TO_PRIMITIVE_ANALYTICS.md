@@ -2,6 +2,8 @@
 
 Guidelines for AI agents implementing analytics tracking in Primitive apps.
 
+> **JavaScript-only client API.** The custom-event client surface (`client.analytics.logEvent/logSnapshot/setPlanOverride/setAppVersionOverride`) exists **only in the JavaScript client**. The Swift client has internal analytics plumbing (auto-events, an `AnalyticsQueue`) but exposes **no public `client.analytics` API** — do not write Swift snippets that call `client.analytics.*`. Server-side auto-tracking applies to all platforms; read analytics via CLI/REST/workflow steps.
+
 ## Overview
 
 Primitive provides built-in analytics via `client.analytics`. Events are buffered client-side, batched over WebSocket, and stored server-side for querying. The system handles offline persistence, rate limiting, and automatic lifecycle events out of the box.
