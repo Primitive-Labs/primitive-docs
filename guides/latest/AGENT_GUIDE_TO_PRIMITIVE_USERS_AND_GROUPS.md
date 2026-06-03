@@ -2,6 +2,116 @@
 
 Guidelines for modeling user relationships and managing access control with Primitive's built-in user system and groups.
 
+## Core operations (JavaScript + Swift)
+
+The key client calls in both languages, compiled against the real clients as part of the docs build. The dense reference below adds the result shapes, discriminated-union branching, and CEL access-control detail.
+
+### Look up users
+
+JavaScript:
+<!-- example:start users-and-groups/users-lookup lang=ts -->
+```typescript
+  // One user's basic profile
+  const user = await client.users.getBasic(userId);
+
+  // Batch-fetch several profiles in one round-trip
+  const profiles = await client.users.getProfiles([userId, "user-456"]);
+
+  // Find a user by email
+  const found = await client.users.lookup("alice@example.com");
+
+  // The current signed-in user
+  const me = await client.me.get();
+```
+<!-- example:end -->
+Swift:
+<!-- example:start users-and-groups/users-lookup lang=swift -->
+```swift
+  // One user's basic profile
+  let user = try await client.users.getBasic(userId: userId)
+
+  // Batch-fetch several profiles in one round-trip
+  let profiles = try await client.users.getProfiles(userIds: [userId, "user-456"])
+
+  // Find a user by email
+  let found = try await client.users.lookup(email: "alice@example.com")
+
+  // The current signed-in user
+  let me = try await client.me.get()
+```
+<!-- example:end -->
+
+There is no client-side `users.list()` / `users.get()`; the current user lives on `client.me`. Enumerate users via the CLI or admin REST surface.
+
+### Manage group membership
+
+JavaScript:
+<!-- example:start users-and-groups/group-membership lang=ts -->
+```typescript
+  // Add a member by email (recommended for user-facing flows)
+  const result = await client.groups.addMember("team", "engineering", {
+    email: "alice@example.com",
+  });
+
+  // ...or by user id (internal / programmatic)
+  await client.groups.addMember("team", "engineering", { userId: "user-456" });
+
+  // List a group's members
+  const members = await client.groups.listMembers("team", "engineering");
+
+  // List the groups a user belongs to
+  const memberships = await client.groups.listUserMemberships(userId);
+```
+<!-- example:end -->
+Swift:
+<!-- example:start users-and-groups/group-membership lang=swift -->
+```swift
+  // Add a member by email (recommended for user-facing flows)
+  let result = try await client.groups.addMember(
+    groupType: "team", groupId: "engineering",
+    params: ["email": "alice@example.com"]
+  )
+
+  // ...or by user id (internal / programmatic)
+  _ = try await client.groups.addMember(
+    groupType: "team", groupId: "engineering",
+    params: ["userId": "user-456"]
+  )
+
+  // List a group's members
+  let members = try await client.groups.listMembers(groupType: "team", groupId: "engineering")
+
+  // List the groups a user belongs to
+  let memberships = try await client.groups.listUserMemberships(userId: userId)
+```
+<!-- example:end -->
+
+### Grant document access to a group
+
+JavaScript:
+<!-- example:start users-and-groups/grant-group-document lang=ts -->
+```typescript
+  await client.documents.grantGroupPermission(documentId, {
+    groupType: "team",
+    groupId: "engineering-team",
+    permission: "read-write",
+  });
+```
+<!-- example:end -->
+Swift:
+<!-- example:start users-and-groups/grant-group-document lang=swift -->
+```swift
+  _ = try await client.documents.grantGroupPermission(
+    documentId: documentId,
+    params: [
+      "groupType": "team",
+      "groupId": "engineering-team",
+      "permission": "read-write",
+    ]
+  )
+```
+<!-- example:end -->
+
 ## Core Concept: Built-in User Model
 
 Primitive provides a built-in user model that every app should leverage. **Do not reinvent user identity.** The platform manages user accounts, authentication, and basic profile information — your app builds on top of this.

@@ -21,22 +21,17 @@ Never create your own "users" model in js-bao or databases that duplicates these
 
 ## Listing and Looking Up Users
 
-```typescript
-import { jsBaoClientService } from "primitive-app";
+Look up users by id or email from the client. The current signed-in user lives on `client.me`.
 
-const client = await jsBaoClientService.getClientAsync();
+::: code-group
 
-// List all users in your app
-const { users } = await client.users.list();
+<<< ../../examples/users-and-groups/users-lookup.ts#example{ts} [JavaScript]
 
-// Get a specific user
-const user = await client.users.get(userId);
+<<< ../../examples/users-and-groups/users-lookup.swift#example{swift} [Swift]
 
-// Get the current user
-const me = await client.users.me();
-```
+:::
 
-Via the CLI:
+To list **all** users in your app, use the CLI or admin console (there's no client-side "list every user" call):
 
 ```bash
 primitive users list
@@ -61,32 +56,15 @@ primitive groups create --type "team" --name "engineering" --display-name "Engin
 
 You can add members by **email** or by user ID. Most apps should use email — it's what your users know, and the server resolves it automatically.
 
-```typescript
-// Add a member by email (recommended for user-facing flows)
-const result = await client.groups.addMember("team", "engineering", {
-  email: "alice@example.com",
-});
+::: code-group
 
-// Add a member by user ID (for internal/programmatic use)
-await client.groups.addMember("team", "engineering", {
-  userId: "user-456",
-});
+<<< ../../examples/users-and-groups/group-membership.ts#example{ts} [JavaScript]
 
-// List members
-const members = await client.groups.listMembers("team", "engineering");
+<<< ../../examples/users-and-groups/group-membership.swift#example{swift} [Swift]
 
-// List groups a user belongs to (each row includes `name` and optional `description`
-// joined from the group; orphan rows are skipped)
-const memberships = await client.groups.listUserMemberships(userId);
-// [{ groupType, groupId, name, description?, addedAt, addedBy }]
+:::
 
-// Filter to a single group type when you only need one slice
-const teamMemberships = await client.groups.listUserMemberships(userId, {
-  groupType: "team",
-});
-```
-
-Provide **either** `email` or `userId`, not both.
+Provide **either** `email` or `userId`, not both. `listUserMemberships` rows include `name` and optional `description` joined from the group (orphan rows are skipped); in JavaScript you can also pass `{ groupType }` to filter to one slice.
 
 The `addMember` result is a discriminated union — branch on `status`:
 
@@ -138,14 +116,13 @@ Members have a role within each group. Default roles are `member` and `admin`, b
 
 Grant document access to an entire group instead of individual users:
 
-```typescript
-// Share a document with a group
-await client.documents.grantGroupPermission(documentId, {
-  groupType: "team",
-  groupId: "engineering-team",
-  permission: "read-write",
-});
-```
+::: code-group
+
+<<< ../../examples/users-and-groups/grant-group-document.ts#example{ts} [JavaScript]
+
+<<< ../../examples/users-and-groups/grant-group-document.swift#example{swift} [Swift]
+
+:::
 
 All members of the group receive the specified permission level. When membership changes, document access updates automatically.
 
