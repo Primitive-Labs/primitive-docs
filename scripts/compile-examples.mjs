@@ -65,6 +65,14 @@ const tsCompile = tsAll.filter((f) => !isSkipped(f));
 console.log(`TypeScript: ${tsCompile.length} file(s) to compile, ${tsAll.length - tsCompile.length} skipped (// nocompile)`);
 
 if (tsCompile.length > 0) {
+  // (Re)generate the fixture model classes the TS examples import — the
+  // generated output is gitignored, so the gate must produce it itself
+  // (locally and on CI).
+  execFileSync(
+    "npx",
+    ["js-bao-codegen-v2", "generate", "-i", join(EXAMPLES_DIR, "_harness", "schema.toml"), "-o", join(EXAMPLES_DIR, "_harness", "generated", "ts")],
+    { cwd: ROOT, stdio: "inherit" },
+  );
   const buildDir = join(EXAMPLES_DIR, "_harness", "ts", ".build");
   mkdirSync(buildDir, { recursive: true });
   const tsconfigPath = join(buildDir, "tsconfig.gen.json");

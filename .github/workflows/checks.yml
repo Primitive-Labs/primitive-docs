@@ -105,6 +105,17 @@ jobs:
             echo "::endgroup::"
           done
 
+      # The vendored swift-client needs a current toolchain — the image's
+      # default Xcode hits an SPM "redefinition of module 'CTOML'" bug fixed
+      # in newer Swift.
+      - name: Select latest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Swift version
+        run: swift --version
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
