@@ -99,7 +99,9 @@ calls a non-existent client method or passes the wrong shape **fails the build.*
 pnpm gen:example-models   # (re)generate fixture model classes from _harness/schema.toml
 pnpm compile:examples     # type-check every TS example against the real clients
 pnpm sync:examples        # inject corpus code into agent-guide regions (writes)
-pnpm check:examples       # CI gate: parity + guides-in-sync + TS compile (non-zero on drift)
+pnpm check:toml           # validate every ```toml block in docs/guides (workflow/database/schema validators)
+pnpm check:cli            # validate every documented `primitive …` invocation against the pinned CLI
+pnpm check:examples       # CI gate: all of the above + parity + compiles + renders current (non-zero on drift)
 ```
 
 ## Variants: language × platform

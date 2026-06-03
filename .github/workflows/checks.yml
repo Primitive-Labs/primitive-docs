@@ -1,20 +1,22 @@
-# Publish documentation to GitHub Pages when changes are merged to main
+# Drift gate for every PR and branch push: example parity, TS compile,
+# rendered guides current, guides.json current, TOML examples valid, CLI
+# invocations valid against the pinned primitive-admin.
+# (Swift compile is skipped on ubuntu — no toolchain; the macOS publish-time
+# story for Swift stays local via `pnpm check:examples`.)
 
-name: Publish Docs
+name: Checks
 
 on:
+  pull_request:
   push:
-    branches:
-      - main
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    branches-ignore:
+      - main # main runs the same gate inside publish-docs.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  publish:
+  check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,7 +30,6 @@ jobs:
 
       - name: Initialize submodules (resilient)
         run: |
-          # Parse .gitmodules directly (git submodule foreach only works on already-checked-out submodules)
           git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | while read key sm_path; do
             name="${key#submodule.}"
             name="${name%.path}"
@@ -62,19 +63,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      # Drift gate: example parity, TS compile (Swift compile is skipped on
-      # ubuntu — no toolchain), rendered guides current, guides.json current,
-      # TOML examples valid, CLI invocations valid against primitive-admin.
       - name: Check examples, TOML, and CLI invocations
         run: pnpm check:examples
 
       - name: Build documentation
         run: pnpm docs:build:ci
-
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Publish to gh-pages
-        run: pnpm docs:publish

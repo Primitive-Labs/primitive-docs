@@ -130,9 +130,11 @@ Integrations can also be called as workflow steps:
 
 ```toml
 [[steps]]
-name = "fetch-weather"
-type = "integration.call"
+id = "fetch-weather"
+kind = "integration.call"
 integrationKey = "weather-api"
+
+[steps.request]
 method = "GET"
 path = "/forecast/{{ input.city }}"
 ```

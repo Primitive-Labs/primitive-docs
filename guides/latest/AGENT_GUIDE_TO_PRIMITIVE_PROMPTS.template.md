@@ -591,7 +591,7 @@ primitive sync push --dir ./config                  # apply
 
 ### Gemini
 
-```toml
+```toml novalidate
 provider = "gemini"
 model = "models/gemini-3.5-flash"         # fast/cheap (GA)
 model = "models/gemini-3-flash-preview"   # fast/cheap
@@ -602,7 +602,7 @@ The `gemini` provider enforces a server-side allowlist of model names; a model n
 
 ### OpenRouter (everything else)
 
-```toml
+```toml novalidate
 provider = "openrouter"
 model = "anthropic/claude-3-5-sonnet"
 model = "openai/gpt-4o"

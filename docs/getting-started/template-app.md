@@ -69,26 +69,19 @@ When deploying to production, you'll add your production domain to these setting
 
 ### 2. Enable Google OAuth in Primitive Admin
 
-**Option A: Using the CLI**
-
-```bash
-primitive apps oauth set-google --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
-```
-
-Then add your allowed origins:
-
-```bash
-primitive apps origins add http://localhost:5173
-```
-
-**Option B: Using the Dashboard**
-
 Go to the [Primitive Admin Console](https://admin.primitiveapi.com/login) and navigate to your app's settings:
 
 1. Open the **Google OAuth** section
 2. Enable Google OAuth as a sign-in method
 3. Add your **Google Client ID** and **Client Secret** from step 1
 4. Add matching origin/callback URLs to match what you configured with Google
+
+You can also toggle the provider and set allowed origins from the CLI:
+
+```bash
+primitive apps update --google-oauth true
+primitive apps update --cors-origins "http://localhost:5173"
+```
 
 ## What's in the Template?
 

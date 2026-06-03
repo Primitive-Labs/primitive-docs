@@ -110,10 +110,10 @@ unique = true
 indexed = true
 ```
 
-**Composite (multi-field) uniqueness** — declare a named constraint under `[models.<name>.options]`.
+**Composite (multi-field) uniqueness** — declare a named constraint with `[[models.<name>.unique_constraints]]`.
 
 ```toml
-[[models.categories.options.unique_constraints]]
+[[models.categories.unique_constraints]]
 name = "name_parent_unique"
 fields = ["name", "parentId"]
 ```

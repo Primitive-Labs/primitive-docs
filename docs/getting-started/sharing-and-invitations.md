@@ -39,13 +39,7 @@ The invitee receives an email. The invitation is consumed when they sign up with
 
 ### Member Invitations (with Quotas)
 
-By default only admins can invite. If you want regular members to invite teammates, enable member invitations:
-
-```bash
-primitive apps update --member-invitations-enabled --member-invitation-limit 5
-```
-
-or in the admin console under App Settings.
+By default only admins can invite. If you want regular members to invite teammates, enable member invitations in the admin console under App Settings (there's no CLI flag for these yet).
 
 Two fields control the behavior:
 

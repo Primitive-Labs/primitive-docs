@@ -35,7 +35,7 @@ To list **all** users in your app, use the CLI or admin console (there's no clie
 
 ```bash
 primitive users list
-primitive users get --user-id <userId>
+primitive users list --search <userId-or-email-or-name>
 ```
 
 ## Groups
@@ -45,11 +45,11 @@ Groups let you organize users into teams, roles, departments, or any relationshi
 ### Creating Groups
 
 ```bash
-# Create a group type (defines a category of groups)
-primitive group-types create --name "team" --display-name "Teams"
+# Create a group type config (defines a category of groups)
+primitive group-type-configs create --group-type team
 
 # Create a group
-primitive groups create --type "team" --name "engineering" --display-name "Engineering Team"
+primitive groups create --type team --id engineering --name "Engineering Team"
 ```
 
 ### Managing Members
@@ -92,21 +92,16 @@ Via the CLI:
 
 ```bash
 # Add a member
-primitive groups add-member --group-id <groupId> --user-id <userId> --role member
+primitive groups members add <group-type> <group-id> <user-id>
 
 # List members
-primitive groups list-members --group-id <groupId>
+primitive groups members list <group-type> <group-id>
 
-# Update a member's role
-primitive groups update-member --group-id <groupId> --user-id <userId> --role admin
-
-# Remove a member by user ID
-primitive groups remove-member --group-id <groupId> --user-id <userId>
-
-# Remove by email — also cancels a pending deferred add if the user
-# hasn't signed up yet
-primitive groups remove-member --group-id <groupId> --email alice@example.com
+# Remove a member
+primitive groups members remove <group-type> <group-id> <user-id>
 ```
+
+The CLI takes user IDs. Email-based adds and removes (including pending-signup handling) are client-API features — see `addMember` above.
 
 ### Group Roles
 
@@ -130,7 +125,7 @@ All members of the group receive the specified permission level. When membership
 
 Use CEL functions to check group membership in database operation access expressions. The platform exposes three group-related helpers: `isMemberOf(groupType, groupId)` (two args, strict match), `memberGroups(groupType)` (returns the array of `groupId`s the caller belongs to), and `hasRole(role)` (checks the caller's app role — `"owner"`, `"admin"`, or `"member"`).
 
-```toml
+```toml novalidate
 # Only members of the engineering team
 access = "isMemberOf('team', 'engineering')"
 

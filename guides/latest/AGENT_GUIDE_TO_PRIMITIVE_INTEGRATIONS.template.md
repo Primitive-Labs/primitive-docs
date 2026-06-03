@@ -226,7 +226,7 @@ forwardQueryParams = ["foo", "bar"]
 
 ### 1. Default `allowedPaths` is `["/*"]` — that allows EVERYTHING
 
-```toml
+```toml novalidate
 # WRONG - omitting allowedPaths defaults to ["/*"]; client can hit any path on baseUrl
 [requestConfig]
 baseUrl = "https://api.stripe.com/"
@@ -243,7 +243,7 @@ allowedPaths = ["/v1/customers", "/v1/customers/*", "/v1/charges"]
 
 `/users/*` matches `/users/`, `/users/123`, **and** `/users/123/admin/delete`. There is no `/users/*/profile` glob — that pattern would only match a path literally starting with `/users/*/profile`.
 
-```toml
+```toml novalidate
 # WRONG - looks scoped, actually allows everything under /users/
 allowedPaths = ["/users/*"]
 
@@ -253,7 +253,7 @@ allowedPaths = ["/users", "/users/me", "/users/me/avatar"]
 
 ### 3. `forwardHeaders = ["*"]` leaks every client header upstream
 
-```toml
+```toml novalidate
 # WRONG - forwards Cookie, Authorization, X-Internal-* everything from the browser
 forwardHeaders = ["*"]
 
@@ -265,7 +265,7 @@ Never put `authorization` in `forwardHeaders` unless the client genuinely owns t
 
 ### 4. Don't hardcode secrets in TOML
 
-```toml
+```toml novalidate
 # WRONG - secret committed to source control and visible in the admin UI
 [requestConfig.defaultHeaders]
 Authorization = "Bearer sk-abc123..."

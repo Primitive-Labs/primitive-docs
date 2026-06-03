@@ -209,7 +209,7 @@ CEL expressions give you fine-grained control over who can execute each operatio
 
 ### Common Patterns
 
-```toml
+```toml novalidate
 # Anyone can access
 access = "true"
 

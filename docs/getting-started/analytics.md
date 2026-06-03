@@ -219,9 +219,9 @@ Workflows can run analytics queries as a step. This is the simplest way to ship 
 
 ```toml
 [[steps]]
-name = "top-users-weekly"
-type = "analytics.query"
-queryType = "top-users"
+id = "top-users-weekly"
+kind = "analytics.query"
+queryType = "users.top"
 windowDays = 7
 limit = 25
 ```

@@ -6,10 +6,12 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "@iarna/toml": "^2.2.5",
     "@types/node": "^25.0.9",
     "commander": "^15.0.0",
     "js-bao": "0.5.1",
     "js-bao-wss-client": "2.0.0",
+    "primitive-admin": "^1.0.49",
     "typedoc": "^0.28.15",
     "typedoc-plugin-markdown": "^4.9.0",
     "typescript": "^5.9.3",
@@ -28,11 +30,13 @@
     "gen:vue-docs": "node scripts/gen-vue-docs.mjs",
     "gen:primitive-app-ts": "node scripts/gen-primitive-app-ts-reference.mjs",
     "gen:reference-index": "node scripts/gen-reference-index.mjs",
-    "check:examples": "node scripts/examples.mjs --check && node scripts/compile-examples.mjs && node scripts/render-guides.mjs --check && node scripts/sync-guides-json.mjs --check",
+    "check:examples": "node scripts/examples.mjs --check && node scripts/compile-examples.mjs && node scripts/render-guides.mjs --check && node scripts/sync-guides-json.mjs --check && node scripts/check-toml.mjs && node scripts/check-cli.mjs",
     "compile:examples": "node scripts/compile-examples.mjs",
     "gen:example-models": "js-bao-codegen-v2 generate -i examples/_harness/schema.toml -o examples/_harness/generated/ts",
     "sync:examples": "node scripts/examples.mjs",
     "render:guides": "node scripts/render-guides.mjs && node scripts/sync-guides-json.mjs",
-    "docs:publish": "node scripts/publish-gh-pages.mjs"
+    "docs:publish": "node scripts/publish-gh-pages.mjs",
+    "check:toml": "node scripts/check-toml.mjs",
+    "check:cli": "node scripts/check-cli.mjs"
   }
 }

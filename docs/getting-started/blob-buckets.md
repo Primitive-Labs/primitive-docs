@@ -38,9 +38,9 @@ Or via CLI:
 ```bash
 primitive blob-buckets create \
   --key avatars \
-  --display-name "User avatars" \
-  --access-policy authenticated \
-  --ttl-tier persistent
+  --name "User avatars" \
+  --access authenticated \
+  --ttl permanent
 ```
 
 ### 2. Upload
@@ -154,29 +154,35 @@ Use a short expiry (minutes to hours) for user-facing URLs, and regenerate as ne
 
 ## Using Buckets in Workflows
 
-A new `blob` workflow step lets your workflows write to buckets:
+The `blob.upload` workflow step lets your workflows write to buckets:
 
 ```toml
 [[steps]]
-name = "save-report"
-type = "blob"
-bucket = "reports"
-action = "upload"
+id = "save-report"
+kind = "blob.upload"
+bucketKey = "reports"
 filename = "{{ meta.workflowRunId }}.pdf"
 contentType = "application/pdf"
-bytesFrom = "{{ outputs.generate-pdf.bytes }}"
-metadata = { reportType = "monthly", teamId = "{{ input.teamId }}" }
+contentBase64 = "{{ steps.generate-pdf.bytesBase64 }}"
+tags = ["monthly"]
 ```
 
-Step output includes the `blobId`, which you can pass to a subsequent step (e.g. email the download link):
+Step output includes the `blobId`. To share the file, mint a URL with `blob.signedUrl` and pass it to a subsequent step (e.g. email the download link):
 
 ```toml
 [[steps]]
-name = "email-link"
-type = "email.send"
+id = "report-url"
+kind = "blob.signedUrl"
+bucketKey = "reports"
+blobId = "{{ steps.save-report.blobId }}"
+expiresInSeconds = 3600
+
+[[steps]]
+id = "email-link"
+kind = "email.send"
 templateType = "report-ready"
 to = "{{ input.email }}"
-variables = { downloadUrl = "{{ outputs.save-report.signedUrl }}" }
+variables = { downloadUrl = "{{ steps.report-url.url }}" }
 ```
 
 ## Buckets vs. Document Blobs
@@ -205,7 +211,7 @@ primitive blob-buckets list
 primitive blob-buckets get avatars
 
 # List blobs in a bucket
-primitive blob-buckets blobs avatars
+primitive blob-buckets list-blobs avatars
 
 # Upload a file from your machine
 primitive blob-buckets upload avatars ./alice.jpg --content-type image/jpeg
@@ -216,8 +222,8 @@ primitive blob-buckets signed-url avatars <blobId> --expires 3600
 # Delete a blob
 primitive blob-buckets delete-blob avatars <blobId>
 
-# Delete a bucket (requires --force if not empty)
-primitive blob-buckets delete avatars --force
+# Delete a bucket (prompts for confirmation; -y to skip)
+primitive blob-buckets delete avatars -y
 ```
 
 ## Limits

@@ -594,10 +594,10 @@ type = "string"
 unique = true
 indexed = true
 
-# 2. Multi-field (composite) uniqueness via [[models.X.options.unique_constraints]].
+# 2. Multi-field (composite) uniqueness via [[models.X.unique_constraints]].
 #    Each entry is a NAMED constraint — the name is what you pass to
 #    upsertByUnique / findByUnique at runtime.
-[[models.categories.options.unique_constraints]]
+[[models.categories.unique_constraints]]
 name = "name_parent_unique"
 fields = ["name", "parentId"]
 ```
@@ -606,16 +606,16 @@ After `npx js-bao-codegen-v2`, single-field constraints get an auto-generated ru
 
 **Wrong** — these TOML shapes are silently rejected or fail at codegen:
 
-```toml
-# DON'T: composite uniqueness at the top level of the model — it must
-# live under [[models.X.options.unique_constraints]].
-[[models.categories.unique_constraints]]
+```toml novalidate
+# DON'T: nesting under `options` — that's the programmatic
+# defineModelSchema({ options: { uniqueConstraints } }) shape, not the
+# TOML dialect. In TOML the array lives directly on the model.
+[[models.categories.options.unique_constraints]]
 name = "name_parent_unique"
 fields = ["name", "parentId"]
 
 # DON'T: bare array of fields. Each constraint must be a table with
 # both `name` and `fields`.
-[models.categories.options]
 unique_constraints = [["name", "parentId"]]
 ```
 

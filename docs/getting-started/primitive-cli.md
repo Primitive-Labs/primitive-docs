@@ -204,15 +204,14 @@ primitive users admin-invitations delete <invitation-id>
 
 ### OAuth Configuration
 
-Configure OAuth providers for your app:
+Configure OAuth providers for your app (client credentials are entered in the [Admin Console](https://admin.primitiveapi.com/login) under the app's Google OAuth settings):
 
 ```bash
-# Set up Google OAuth
-primitive apps oauth set-google --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
+# Enable Google OAuth as a sign-in method
+primitive apps update --google-oauth true
 
-# Add allowed origins (for CORS)
-primitive apps origins add http://localhost:5173
-primitive apps origins add https://myapp.com
+# Set allowed origins (for CORS; comma-separated list)
+primitive apps update --cors-origins "http://localhost:5173,https://myapp.com"
 ```
 
 ### Accessing Guides
@@ -330,7 +329,7 @@ Manage LLM prompts:
 ```bash
 primitive prompts list
 primitive prompts create my-prompt
-primitive prompts test my-prompt
+primitive prompts execute my-prompt
 ```
 
 ### Workflows
@@ -351,12 +350,12 @@ Schedule workflows to run on a cron expression:
 primitive cron-triggers list
 primitive cron-triggers create \
   --key nightly-digest \
-  --workflow send-digest \
-  --schedule "0 9 * * *" \
+  --workflow-key send-digest \
+  --cron "0 9 * * *" \
   --timezone "America/Los_Angeles"
-primitive cron-triggers run nightly-digest       # fire manually
-primitive cron-triggers disable nightly-digest
-primitive cron-triggers enable nightly-digest
+primitive cron-triggers test nightly-digest      # fire manually
+primitive cron-triggers pause nightly-digest
+primitive cron-triggers resume nightly-digest
 primitive cron-triggers delete nightly-digest
 ```
 
@@ -378,11 +377,11 @@ Manage general-purpose blob storage:
 
 ```bash
 primitive blob-buckets list
-primitive blob-buckets create --key avatars --access-policy authenticated --ttl-tier persistent
-primitive blob-buckets blobs avatars
+primitive blob-buckets create --key avatars --access authenticated --ttl permanent
+primitive blob-buckets list-blobs avatars
 primitive blob-buckets upload avatars ./file.png --content-type image/png
 primitive blob-buckets signed-url avatars <blobId> --expires 3600
-primitive blob-buckets delete avatars --force
+primitive blob-buckets delete avatars -y
 ```
 
 See [Blob Buckets](./blob-buckets.md).
@@ -439,7 +438,7 @@ For integration tests and local dev, Primitive supports a `+primitivetest` OTP b
 primitive apps update --test-account-bases alice@example.com,bob@example.com
 
 # Inspect the current whitelist (along with other app settings)
-primitive apps show
+primitive apps get
 
 # Clear the whitelist — pass an empty string
 primitive apps update --test-account-bases ''

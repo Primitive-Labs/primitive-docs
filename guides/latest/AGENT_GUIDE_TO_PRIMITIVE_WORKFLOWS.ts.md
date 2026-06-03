@@ -551,7 +551,7 @@ Templates have **no arithmetic** (`{{ a + b }}` won't work). Move math into a st
 
 ## `runIf` (CEL, not templates)
 
-```toml
+```toml novalidate
 runIf = "input.shouldRun"                        # truthy
 runIf = "outputs.text.length < 1000"             # comparison
 runIf = "steps.check.isMember && input.amount > 0"
@@ -736,7 +736,7 @@ Every entry in `steps[id]` carries a reserved verdict namespace alongside the ru
 
 `ok`, `skipped`, `errored`, `error`, and `errorDetails` are written by the engine and override any same-named field the runner would have produced. Downstream `runIf` and templates can rely on them on every step kind:
 
-```toml
+```toml novalidate
 runIf = "steps.fetch.ok"
 runIf = "!steps.fetch.skipped && !steps.fetch.errored"
 ```
@@ -1048,7 +1048,7 @@ Manual flow if you need it: `claimApply` → run logic → `confirmApply` (succe
 
 ### Wrong: trying to use `{{ }}` in `runIf`
 
-```toml
+```toml novalidate
 # WRONG — runIf is CEL, not a template
 runIf = "{{ steps.check.isMember }}"
 
@@ -1058,7 +1058,7 @@ runIf = "steps.check.isMember"
 
 ### Wrong: stuffing secrets into step config
 
-```toml
+```toml novalidate
 # WRONG — step config is logged to step run records
 [steps.request.headers]
 Authorization = "Bearer {{ secrets.API_KEY }}"
@@ -1069,7 +1069,7 @@ Authorization = "Bearer {{ secrets.API_KEY }}"
 
 ### Wrong: assuming `meta.startedAt` exists
 
-```toml
+```toml novalidate
 # WRONG — meta only has whatever you passed to start()
 filename = "{{ meta.startedAt }}.pdf"
 

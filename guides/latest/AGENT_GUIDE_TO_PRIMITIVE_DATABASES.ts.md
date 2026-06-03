@@ -162,7 +162,7 @@ Each file in `database-types/` defines a database type with its triggers and ope
 
 **TOML quoting tip:** CEL expressions containing apostrophes (e.g., `isMemberOf('class-teachers', database.id)`) must use triple-quoted strings in TOML, because single-quoted TOML strings don't support escaping. Use `'''...'''` for literal strings or `"""..."""` for basic strings:
 
-```toml
+```toml novalidate
 # WRONG — TOML parse error due to apostrophes in single-quoted string:
 access = 'isMemberOf('team', database.metadata.teamId)'
 
@@ -808,13 +808,11 @@ The CEL context (formerly called "metadata") stores per-database values that ope
 
 `client.databases.updateMetadata(databaseId, {...})` is the legacy alias for the same call (JavaScript).
 
-Via CLI (new preferred form):
+Via CLI:
 
 ```bash
 primitive databases cel-context update <database-id> --data '{"teamId":"team-alpha"}'
 primitive databases cel-context get <database-id>
-# Legacy alias still works:
-primitive databases metadata update <database-id> --data '{"teamId":"team-alpha"}'
 ```
 
 ## Direct Record Operations

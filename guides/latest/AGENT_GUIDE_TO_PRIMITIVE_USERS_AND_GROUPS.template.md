@@ -90,12 +90,12 @@ The user lookup surface — single fetch, batch fetch, and email lookup — is s
 There is no `list()` or `get()` method on `client.users`. The current authenticated user lives on a separate namespace: `client.me.get()` returns the current user's profile (cached, with the same `GetUserOptions` knobs). To enumerate or search users in the app, use the REST endpoint or the CLI:
 
 ```bash
-# Paginated list of app users
-primitive users list [--limit N] [--cursor <next>]
+# List app users
+primitive users list
 
-# Substring search by name (minimum 2 characters per term; tokens AND-combined)
-# Backed by a global search index on User.name.
-primitive users list --name "ali"
+# --search: ULID → userId lookup; '@' → email lookup; otherwise substring
+# name search (backed by a global search index on User.name).
+primitive users list --search "ali"
 ```
 
 ```typescript
@@ -450,7 +450,7 @@ Plus all CEL functions: `isMemberOf`, `memberGroups`, `hasRole`, `now()`, `fromW
 
 **Don't do this — rule CEL footguns:**
 
-```toml
+```toml novalidate
 # BAD — `user.appRole` does not exist. Use user.role.
 create = "user.appRole == 'admin'"
 
@@ -633,7 +633,7 @@ type = "query"
 modelName = "grades"
 access = "true"
 definition = '{"filter":{"studentId":"$params.studentId"},"sort":{"date":-1}}'
-params = '{"studentId":{"type":"string","required":true,"access":"value in memberGroups(\'parent-of\')"}}'
+params = '''{"studentId":{"type":"string","required":true,"access":"value in memberGroups('parent-of')"}}'''
 ```
 
 The per-parameter `access` expression ensures parents can only view their own children's grades.

@@ -329,8 +329,8 @@ Use `inputMapping` to extract a nested path from the payload before passing it t
 Each event (accepted, rejected, duplicate) is logged and viewable via the API. Manage webhooks via the CLI:
 
 ```bash
-# Create/update webhook definitions
-primitive webhooks push --dir ./config
+# Create/update webhook definitions (part of your synced config)
+primitive sync push --dir ./config
 
 # List webhooks
 primitive webhooks list
@@ -391,7 +391,7 @@ Define test cases to validate prompt behavior:
 ```bash
 primitive prompts tests create <prompt-id> \
   --name "basic-test" \
-  --variables '{"text": "Long article text...", "style": "bullet points"}' \
+  --vars '{"text": "Long article text...", "style": "bullet points"}' \
   --contains '["•"]'
 
 primitive prompts tests run-all <prompt-id>
