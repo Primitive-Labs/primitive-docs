@@ -251,7 +251,7 @@ now = "2026-04-27T00:00:00Z"
 # Output: { matched, updated, truncated? }
 ```
 
-There is **no `database.executeBatch` step kind.** Batch writes from a workflow are done with `forEach` over a `database.mutate` step, or by calling `database.applyToQuery` for query-driven updates.
+Workflows have no batch-write step kind. To apply a set of updates, run `forEach` over a `database.mutate` step (see `forEach` below), or use `database.applyToQuery` for query-driven updates.
 
 ### `group.addMember` / `removeMember` / `checkMembership` / `listMembers` / `listUserMemberships`
 
@@ -630,6 +630,26 @@ htmlBody = "<p>Hi {{ member.name }}</p>"
 When `concurrency = 1` (the default), iterations are sequential. When `concurrency > 1`, the engine fans them out in parallel batches — in durable mode each batch runs as a child workflow so restarts don't re-run completed items. For very large fan-outs, `workflow.start` + `workflow.await` gives finer control.
 
 When a parallel `forEach` batch's combined output exceeds the inline size limit (~1 MB), the engine automatically offloads the batch result to managed object storage and rehydrates it transparently for the next step. You don't need to handle this — large per-iteration outputs no longer fail the step — but it does add a storage round-trip, so keep per-iteration outputs lean when you can.
+
+### Batch database updates
+
+Workflows have no batch-write step kind — a set of database updates is a `forEach` over a `database.mutate` step (add `concurrency` to parallelize):
+
+```toml
+[[steps]]
+id = "import-contacts"
+kind = "database.mutate"
+forEach = "input.contacts"
+as = "contact"
+maxItems = 1000
+databaseId = "{{ input.dbId }}"
+operationName = "createContact"
+[steps.params]
+name = "{{ contact.name }}"
+email = "{{ contact.email }}"
+```
+
+To mutate every record matching a server-side filter without enumerating items, use `database.applyToQuery` instead.
 
 ### Zip mode (parallel arrays by index)
 
@@ -1116,10 +1136,6 @@ templateType = "..."
 ### Wrong: `workflow.call` thinking the child sees parent state
 
 The child gets ONLY its `[steps.input]` table as `input`. It does not inherit `steps`, `outputs`, `meta`, or `selected`. Pass everything the child needs explicitly.
-
-### Wrong: `database.executeBatch` step
-
-Doesn't exist. Use `forEach` over a `database.mutate` step, or use `database.applyToQuery` for query-driven updates.
 
 ### Wrong: arbitrary analytics query types
 

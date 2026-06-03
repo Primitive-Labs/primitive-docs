@@ -74,6 +74,8 @@ Every step has an `id` (unique within the workflow) and a `kind` (the step type)
 | `blob.upload` / `blob.download` / `blob.signedUrl` | Read, write, or sign blob URLs |
 | `analytics.write` / `analytics.query` | Emit analytics events or query server-side aggregates |
 
+There's no batch-write step: to apply a set of database updates, run `forEach` over a `database.mutate` step, or use `database.applyToQuery` to update every record matching a server-side filter.
+
 ### Template Syntax
 
 Templates use double braces. They reference the workflow's run context:
