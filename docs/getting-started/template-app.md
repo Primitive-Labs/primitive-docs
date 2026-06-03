@@ -1,4 +1,4 @@
-# Starter Templates
+# Quick Start
 
 The fastest way to build on Primitive is to start from an official template. Primitive supports multiple platforms as first-class citizens — there's a **web template** (Vue + TypeScript + Tailwind) and an **iOS template** (Swift + SwiftUI). Both give you a working app in minutes: authentication, local-first data storage, real-time sync, and dev tooling. (Templates are optional — the clients are plain libraries; see [Using the Client Directly](./authentication.md#using-the-client-directly).)
 
@@ -9,43 +9,61 @@ The fastest way to build on Primitive is to start from an official template. Pri
 
 `create-primitive-app` is a thin wrapper around `primitive init` and forwards every flag, so the two are interchangeable — use `npx create-primitive-app` when you don't have the CLI installed yet, or `primitive init my-app --platform <web|ios>` if you do.
 
-## Web (Vue)
+## 1. Create Your App
 
-### 1. Create Your App
+Run the command for your platform, replacing `my-app` with your desired app name:
 
-Run the following command, replacing `my-app` with your desired app name:
+::: code-group
 
-```bash
+```bash [Web (Vue)]
 npx create-primitive-app my-app
 ```
 
-This will:
-- Prompt you to sign in to your Primitive account (if not already authenticated)
-- Create a new app on the Primitive servers
-- Download and configure the template
-- Install dependencies (prompting to install pnpm if needed)
-
-### 2. Start Developing!
-
-```bash
-cd my-app
-pnpm dev
+```bash [iOS (SwiftUI)]
+# Requires macOS with Xcode, plus `brew install xcodegen`
+npx create-primitive-app my-app --platform ios
 ```
 
-Visit `http://localhost:5173` to see your app running.
+:::
+
+Either way, this will:
+
+- Prompt you to sign in to your Primitive account (if not already authenticated)
+- Create a new app on the Primitive servers
+- Download and configure the platform's template
+- Initialize a Git repository and create an initial commit
+- Install dependencies (`pnpm` for web, `swift package resolve` for iOS)
+
+## 2. Run It
+
+::: code-group
+
+```bash [Web (Vue)]
+cd my-app
+pnpm dev
+# → http://localhost:5173
+```
+
+```bash [iOS (SwiftUI)]
+cd my-app
+./run-ios.sh
+# regenerates the Xcode project, builds, and launches the simulator
+```
+
+:::
 
 **Congratulations!** You now have a working Primitive app with:
-- Authentication (OAuth, Magic Link, OTP, Passkeys)
+
+- Authentication with a drop-in login flow (OAuth, Magic Link, OTP, and Passkeys on web; one-time email code and OAuth on iOS)
 - Local-first data storage with real-time sync
 - Server-side databases with access control
 - Blob storage for files and images
-- A Vue + TypeScript + Tailwind foundation
-- Built-in dev tools (Document Explorer, Test Harness, Blob Explorer)
+- Built-in dev tools (Document Explorer, Test Harness, and Blob Explorer on web; the Debug Inspector on iOS)
 - CLI for managing workflows, prompts, integrations, and more
 
-### Push to a Remote Repository (Optional)
+## 3. Push to a Remote Repository (Optional)
 
-`create-primitive-app` automatically initializes a Git repository and creates an initial commit for you. To push to a remote like GitHub:
+The scaffold initializes a Git repository and creates an initial commit for you. To push to a remote like GitHub:
 
 1. Create a new repository on [GitHub](https://github.com/new) (don't initialize with README, .gitignore, or license)
 
@@ -56,39 +74,6 @@ git remote add origin https://github.com/your-username/my-app.git
 git branch -M main
 git push -u origin main
 ```
-
-## iOS (Swift)
-
-Scaffold an iOS app with:
-
-```bash
-primitive init --platform ios my-app
-```
-
-You get a SwiftUI app built on the `PrimitiveApp` package (the Swift counterpart of `primitive-app`):
-
-- **`PrimitiveAppState`** — owns the `JsBaoClient` lifecycle: loads `primitive.json` (app ID + server URLs), initializes the client, tracks connection state, and opens your documents. Your app subclasses it (the template's `TemplateAppState`) to bind models and open its root document.
-- **`AuthGateView`** — wraps your content and walks initializing → login → connecting → connected, presenting `PrimitiveLoginView` (one-time email code, optional Google OAuth) until the user is signed in.
-- **`BaoDataLoader`** — reactive data binding for SwiftUI views (the counterpart of the web template's `useJsBaoDataLoader` composable).
-- **Debug Inspector** — the iOS counterpart of the web dev tools, registered automatically for typed models.
-
-The app entry is a few lines:
-
-```swift
-@main
-struct MyApp: App {
-  @StateObject private var appState = TemplateAppState()
-
-  var body: some Scene {
-    WindowGroup {
-      ContentView()              // AuthGateView { … } + appState.initialize()
-        .environmentObject(appState)
-    }
-  }
-}
-```
-
-For the full walkthrough — running on simulator/device, data modeling and codegen, shipping with Fastlane — see the [Swift Client guide](./swift-client.md).
 
 ## Setting Up Google Sign In (Optional)
 
@@ -125,11 +110,13 @@ primitive apps update --google-oauth true
 primitive apps update --cors-origins "http://localhost:5173"
 ```
 
-### What's in the Web Template?
+## What's in the Template?
 
-The web template gives you a production-ready starting point:
+Both templates are production-ready starting points with the same shape: app config, data model schemas with codegen, UI scaffolding around the platform's login flow, and agent guides for AI coding assistants.
 
-```
+::: code-group
+
+```text [Web (Vue)]
 my-app/
 ├── src/
 │   ├── assets/         # Static images and assets
@@ -149,11 +136,33 @@ my-app/
 └── wrangler.toml       # Deployment config
 ```
 
+```text [iOS (SwiftUI)]
+my-app/
+├── Sources/PrimitiveAppTemplate/
+│   ├── PrimitiveAppTemplateApp.swift   # @main entry — owns the app state
+│   ├── TemplateAppState.swift          # PrimitiveAppState subclass: client lifecycle, documents
+│   ├── Views/                          # SwiftUI views (ContentView wraps AuthGateView)
+│   └── Models/
+│       ├── schema.toml                 # Your data model schemas
+│       └── Generated/                  # swift-bao-codegen output
+├── docs/                               # Agent guides for AI coding assistants
+├── primitive.json                      # App ID + server URLs
+├── project.yml                         # xcodegen project definition
+├── run-ios.sh / run.sh                 # Build + launch scripts (iOS simulator / macOS)
+└── fastlane/                           # TestFlight + App Store lanes
+```
+
+:::
+
 Key configuration files:
 
-- **`src/config/envConfig.ts`** — API URLs, App ID, logging, js-bao configuration
-- **`src/models/models.toml`** — Your data model schemas (start here! Run `pnpm codegen` after editing to regenerate the TypeScript classes in `*.generated.ts`)
-- **`docs/`** — Guides for AI coding assistants working on your project
+| | Web (Vue) | iOS (SwiftUI) |
+|---|---|---|
+| App config | `src/config/envConfig.ts` (API URLs, App ID) | `primitive.json` (App ID + server URLs) |
+| Data models (start here!) | `src/models/models.toml` — run `pnpm codegen` after editing | `Sources/…/Models/schema.toml` — codegen is wired into both build paths |
+| Agent guides | `docs/` | `docs/` |
+
+On iOS, the `PrimitiveApp` package does the heavy lifting: `PrimitiveAppState` owns the `JsBaoClient` lifecycle (your app subclasses it, like the template's `TemplateAppState`), `AuthGateView` presents `PrimitiveLoginView` until the user is signed in and connected, and `BaoDataLoader` binds queries to SwiftUI views — the counterparts of the web template's client service, `PrimitiveLogin`, and `useJsBaoDataLoader`. For the full iOS walkthrough — running on simulator/device, data modeling and codegen, shipping with Fastlane — see the [Swift Client guide](./swift-client.md).
 
 ## Next Steps
 

@@ -12,20 +12,7 @@ Modern apps need authentication, data storage, real-time sync, file storage, acc
 
 **Production-ready from day one.** Every service is built for real workloads: offline support, real-time collaboration, fine-grained access control, server-side workflows. You're not building on top of a prototype — you're building on infrastructure that scales.
 
-## Quick Start
-
-The fastest way to get started is the template app:
-
-```bash
-npx create-primitive-app my-app
-cd my-app
-pnpm dev
-```
-
-In minutes you'll have a running app with authentication, real-time data sync, file storage, dev tools, and a Vue + TypeScript + Tailwind foundation.
-
-- **[Starting with the Template App](./getting-started/template-app.md)** — Full setup guide and walkthrough
-- **[Example Apps](./getting-started/example-apps.md)** — See Primitive in action
+**Ready to build?** The [Quick Start](./getting-started/template-app.md) gets you a running app — web (Vue) or iOS (SwiftUI) — in minutes. Or see Primitive in action in the [Example Apps](./getting-started/example-apps.md).
 
 ## What Primitive Provides
 

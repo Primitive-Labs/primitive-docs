@@ -495,7 +495,7 @@ primitive users invite --help
 
 ## Next Steps
 
-- **[Template App Setup](./template-app.md)** — Create your first app
+- **[Quick Start](./template-app.md)** — Create your first app
 - **[Working with Databases](./working-with-databases.md)** — Server-side storage managed via CLI
 - **[Workflows and Prompts](./workflows-and-prompts.md)** — Automation configured via CLI
 - **[Deploying to Production](./deploying-to-production.md)** — Deploy your app
