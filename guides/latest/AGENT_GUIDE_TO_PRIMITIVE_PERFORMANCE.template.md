@@ -73,13 +73,9 @@ definition = '''
 '''
 ```
 
-```ts
-// 1 round trip
-const bundle = await db.executeOperation("dashboardBundle");
-const groups   = bundle.steps?.groups?.data ?? [];
-const accounts = bundle.steps?.accounts?.data ?? [];
-// ...
-```
+Then execute it in one round trip and read each step's `data`:
+
+{{ example: performance/pipeline-bundle }}
 
 ### When to reach for it
 
@@ -155,13 +151,7 @@ Three sequential round trips even though none depends on the others.
 
 ### Pattern
 
-```ts
-const [a, b, c] = await Promise.all([
-  db.executeOperation("opA"),
-  db.executeOperation("opB"),
-  db.executeOperation("opC"),
-]);
-```
+{{ example: performance/parallel-operations }}
 
 One round trip's worth of wall-clock latency.
 
@@ -192,14 +182,7 @@ for (const symbol of symbols) {
 
 Use the third party's bulk endpoint (most have one) and a single proxy call:
 
-```ts
-// 1 proxy call
-await client.integrations.call({
-  integrationKey: "yahoo-finance",
-  path: "/v7/finance/quote",
-  query: { symbols: symbols.join(",") },
-});
-```
+{{ example: performance/integration-bulk-call }}
 
 Update the integration's TOML to allow the bulk path and forward the new query param:
 
@@ -390,8 +373,11 @@ export const useSourceStore = defineStore("source", () => {
   }
   function invalidate() { source.value = null; }
 
-  // Wire up DB subscribe once on first use
-  client.databases.subscribe(dbId, ["holdings","accounts"], invalidate);
+  // Wire up DB subscribe once on first use. `subscribe` takes the database id,
+  // a server-registered subscription key, and an options object carrying the
+  // `onChange` callback (plus any `params` forwarded to the subscription's
+  // filter CEL).
+  client.databases.subscribe(dbId, "source-changes", { onChange: invalidate });
 
   return { source, ensureLoaded, invalidate };
 });

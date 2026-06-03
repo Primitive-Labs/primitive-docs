@@ -4,7 +4,19 @@
       "topic": "authentication",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.md",
       "description": "Implementing user authentication with OAuth, Magic Link, OTP, and Passkeys",
-      "keywords": ["authentication", "auth", "OAuth", "Google", "Magic Link", "OTP", "Passkey", "WebAuthn", "login", "sign-in", "JWT"],
+      "keywords": [
+        "authentication",
+        "auth",
+        "OAuth",
+        "Google",
+        "Magic Link",
+        "OTP",
+        "Passkey",
+        "WebAuthn",
+        "login",
+        "sign-in",
+        "JWT"
+      ],
       "useCases": [
         "Implementing Google OAuth sign-in",
         "Adding passwordless Magic Link authentication",
@@ -13,15 +25,45 @@
         "Handling auth state changes and events",
         "Managing JWT persistence"
       ],
-      "concepts": ["OAuth", "magicLinkRequest", "magicLinkVerify", "otpRequest", "otpVerify", "passkeyAuthStart", "passkeyAuthFinish", "auth events", "getAuthConfig"],
+      "concepts": [
+        "OAuth",
+        "magicLinkRequest",
+        "magicLinkVerify",
+        "otpRequest",
+        "otpVerify",
+        "passkeyAuthStart",
+        "passkeyAuthFinish",
+        "auth events",
+        "getAuthConfig"
+      ],
       "prerequisites": [],
-      "relatedGuides": ["documents"]
+      "relatedGuides": [
+        "documents"
+      ]
     },
     {
       "topic": "blobs",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_BLOBS.md",
       "description": "Storing and managing binary files — document-scoped blobs and general-purpose blob buckets",
-      "keywords": ["blobs", "files", "upload", "download", "images", "PDFs", "storage", "offline", "cache", "prefetch", "bucket", "buckets", "blob bucket", "signed url", "ttl", "access policy", "avatars"],
+      "keywords": [
+        "blobs",
+        "files",
+        "upload",
+        "download",
+        "images",
+        "PDFs",
+        "storage",
+        "offline",
+        "cache",
+        "prefetch",
+        "bucket",
+        "buckets",
+        "blob bucket",
+        "signed url",
+        "ttl",
+        "access policy",
+        "avatars"
+      ],
       "useCases": [
         "Uploading files and images scoped to a document",
         "Downloading and displaying blobs",
@@ -34,15 +76,42 @@
         "Generating time-limited signed URLs",
         "Applying CEL-based access rules to buckets"
       ],
-      "concepts": ["blobs.upload", "blobs.read", "blobs.list", "blobs.delete", "blobs.prefetch", "downloadUrl", "proxyUrl", "upload queue", "service worker", "blobBuckets.bucket", "bucket.upload", "bucket.signedUrl", "accessPolicy", "ttlTier", "BlobBucket"],
+      "concepts": [
+        "blobs.upload",
+        "blobs.read",
+        "blobs.list",
+        "blobs.delete",
+        "blobs.prefetch",
+        "downloadUrl",
+        "proxyUrl",
+        "upload queue",
+        "service worker",
+        "blobBuckets.bucket",
+        "bucket.upload",
+        "bucket.signedUrl",
+        "accessPolicy",
+        "ttlTier",
+        "BlobBucket"
+      ],
       "prerequisites": [],
-      "relatedGuides": ["documents", "workflows"]
+      "relatedGuides": [
+        "documents",
+        "workflows"
+      ]
     },
     {
       "topic": "data-modeling",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.ts.md",
       "description": "Choosing between documents and databases, and designing your app's data architecture",
-      "keywords": ["data modeling", "storage", "architecture", "documents vs databases", "when to use", "design patterns", "data architecture"],
+      "keywords": [
+        "data modeling",
+        "storage",
+        "architecture",
+        "documents vs databases",
+        "when to use",
+        "design patterns",
+        "data architecture"
+      ],
       "useCases": [
         "Deciding between documents and databases for a feature",
         "Designing data architecture for a new app",
@@ -50,15 +119,47 @@
         "Choosing access control patterns",
         "Planning for scale and performance"
       ],
-      "concepts": ["documents", "databases", "local-first", "server-side storage", "access control", "CEL", "sharing", "collaboration"],
+      "concepts": [
+        "documents",
+        "databases",
+        "local-first",
+        "server-side storage",
+        "access control",
+        "CEL",
+        "sharing",
+        "collaboration"
+      ],
       "prerequisites": [],
-      "relatedGuides": ["documents", "databases", "users-and-groups"]
+      "relatedGuides": [
+        "documents",
+        "databases",
+        "users-and-groups"
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.swift.md"
+      }
     },
     {
       "topic": "users-and-groups",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md",
       "description": "Built-in user model, groups, memberships, and CEL-based access control patterns",
-      "keywords": ["users", "groups", "memberships", "access control", "roles", "permissions", "CEL", "rule sets", "isMemberOf", "memberGroups", "teams", "user model", "profile", "email-based add"],
+      "keywords": [
+        "users",
+        "groups",
+        "memberships",
+        "access control",
+        "roles",
+        "permissions",
+        "CEL",
+        "rule sets",
+        "isMemberOf",
+        "memberGroups",
+        "teams",
+        "user model",
+        "profile",
+        "email-based add"
+      ],
       "useCases": [
         "Accessing built-in user profile info (name, email, avatar)",
         "Creating and managing groups for team-based access",
@@ -70,15 +171,51 @@
         "Modeling user relationships (parent-child, mentor-mentee)",
         "Supplementing platform user data without replacing it"
       ],
-      "concepts": ["users.getBasic", "groups.create", "groups.addMember", "groups.removeMember", "groups.listMembers", "groupTypeConfigs", "ruleSets", "isMemberOf", "memberGroups", "hasRole", "grantGroupPermission", "appRole", "autoAddCreator"],
+      "concepts": [
+        "users.getBasic",
+        "groups.create",
+        "groups.addMember",
+        "groups.removeMember",
+        "groups.listMembers",
+        "groupTypeConfigs",
+        "ruleSets",
+        "isMemberOf",
+        "memberGroups",
+        "hasRole",
+        "grantGroupPermission",
+        "appRole",
+        "autoAddCreator"
+      ],
       "prerequisites": [],
-      "relatedGuides": ["databases", "documents", "data-modeling", "authentication", "sharing-and-invitations"]
+      "relatedGuides": [
+        "databases",
+        "documents",
+        "data-modeling",
+        "authentication",
+        "sharing-and-invitations"
+      ]
     },
     {
       "topic": "sharing-and-invitations",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md",
       "description": "Invitations, document and database sharing, collections, member invitation quotas, and access requests",
-      "keywords": ["sharing", "share", "invitation", "invitations", "invite", "email invite", "access request", "request access", "collection", "collections", "member invitation", "quota", "sharing by email", "updatePermissions", "grantGroupPermission"],
+      "keywords": [
+        "sharing",
+        "share",
+        "invitation",
+        "invitations",
+        "invite",
+        "email invite",
+        "access request",
+        "request access",
+        "collection",
+        "collections",
+        "member invitation",
+        "quota",
+        "sharing by email",
+        "updatePermissions",
+        "grantGroupPermission"
+      ],
       "useCases": [
         "Sharing a document by userId, email, or group",
         "Sharing a database with a group",
@@ -90,15 +227,51 @@
         "Rendering a 'people with access + pending invitations' panel",
         "Listing the documents a user owns or has been shared into"
       ],
-      "concepts": ["client.documents.updatePermissions", "client.documents.grantGroupPermission", "client.collections.addMember", "client.invitations.create", "client.invitations.quota", "client.invitations.delete", "client.documents.requestAccess", "client.documents.approveAccessRequest", "client.documents.denyAccessRequest", "client.me.ownedDocuments", "client.me.sharedDocuments", "canRequestAccess", "AppInvitation", "memberInvitationsEnabled", "memberInvitationLimit"],
+      "concepts": [
+        "client.documents.updatePermissions",
+        "client.documents.grantGroupPermission",
+        "client.collections.addMember",
+        "client.invitations.create",
+        "client.invitations.quota",
+        "client.invitations.delete",
+        "client.documents.requestAccess",
+        "client.documents.approveAccessRequest",
+        "client.documents.denyAccessRequest",
+        "client.me.ownedDocuments",
+        "client.me.sharedDocuments",
+        "canRequestAccess",
+        "AppInvitation",
+        "memberInvitationsEnabled",
+        "memberInvitationLimit"
+      ],
       "prerequisites": [],
-      "relatedGuides": ["documents", "users-and-groups", "authentication"]
+      "relatedGuides": [
+        "documents",
+        "users-and-groups",
+        "authentication"
+      ]
     },
     {
       "topic": "scheduling-and-realtime",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.ts.md",
       "description": "Cron-scheduled workflows and real-time database subscriptions over WebSocket",
-      "keywords": ["cron", "schedule", "scheduled workflow", "CronTrigger", "timezone", "overlap", "subscription", "subscriptions", "db.subscribe", "real-time", "WebSocket", "live data", "DatabaseTypeSubscription", "originConnectionId", "isOrigin"],
+      "keywords": [
+        "cron",
+        "schedule",
+        "scheduled workflow",
+        "CronTrigger",
+        "timezone",
+        "overlap",
+        "subscription",
+        "subscriptions",
+        "db.subscribe",
+        "real-time",
+        "WebSocket",
+        "live data",
+        "DatabaseTypeSubscription",
+        "originConnectionId",
+        "isOrigin"
+      ],
       "useCases": [
         "Scheduling a workflow to run on a cron expression",
         "Handling timezones and overlap policies for scheduled jobs",
@@ -108,15 +281,59 @@
         "Building load+subscribe UIs for live views",
         "Driving workflow-progress UIs by subscribing to workflow-written records"
       ],
-      "concepts": ["CronTrigger", "client.cronTriggers.create", "client.cronTriggers.test", "overlapPolicy", "IANA timezone", "DatabaseTypeSubscription", "client.databases.subscribe", "originConnectionId", "originUserId", "isOrigin", "select projection", "emit filter", "access rule", "filter rule"],
+      "concepts": [
+        "CronTrigger",
+        "client.cronTriggers.create",
+        "client.cronTriggers.test",
+        "overlapPolicy",
+        "IANA timezone",
+        "DatabaseTypeSubscription",
+        "client.databases.subscribe",
+        "originConnectionId",
+        "originUserId",
+        "isOrigin",
+        "select projection",
+        "emit filter",
+        "access rule",
+        "filter rule"
+      ],
       "prerequisites": [],
-      "relatedGuides": ["workflows", "databases"]
+      "relatedGuides": [
+        "workflows",
+        "databases"
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.swift.md"
+      }
     },
     {
       "topic": "databases",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md",
       "description": "Server-side database storage with CEL-based access control, registered operations, triggers, real-time subscriptions, and group permissions",
-      "keywords": ["databases", "database", "server-side", "CEL", "access control", "operations", "triggers", "autoPopulatedFields", "defaultAccess", "query", "mutation", "aggregate", "pipeline", "permissions", "groups", "subscription", "subscriptions", "real-time", "applyToQuery", "DatabaseTypeSubscription", "DatabaseGroupPermission"],
+      "keywords": [
+        "databases",
+        "database",
+        "server-side",
+        "CEL",
+        "access control",
+        "operations",
+        "triggers",
+        "autoPopulatedFields",
+        "defaultAccess",
+        "query",
+        "mutation",
+        "aggregate",
+        "pipeline",
+        "permissions",
+        "groups",
+        "subscription",
+        "subscriptions",
+        "real-time",
+        "applyToQuery",
+        "DatabaseTypeSubscription",
+        "DatabaseGroupPermission"
+      ],
       "useCases": [
         "Creating and managing server-side databases",
         "Defining registered operations with access control",
@@ -132,15 +349,58 @@
         "Importing CSV data into databases",
         "Managing database permissions"
       ],
-      "concepts": ["databases.create", "databases.connect", "databases.executeOperation", "DatabaseTypeConfig", "registered operations", "autoPopulatedFields", "defaultAccess", "CEL expressions", "isMemberOf", "hasRole", "triggers", "pipeline", "aggregate", "bulk import", "DoDb", "syncIndexes", "applyToQuery", "itemAccess", "databases.subscribe", "DatabaseTypeSubscription", "select projection", "originConnectionId", "DatabaseGroupPermission", "grantGroupPermission"],
+      "concepts": [
+        "databases.create",
+        "databases.connect",
+        "databases.executeOperation",
+        "DatabaseTypeConfig",
+        "registered operations",
+        "autoPopulatedFields",
+        "defaultAccess",
+        "CEL expressions",
+        "isMemberOf",
+        "hasRole",
+        "triggers",
+        "pipeline",
+        "aggregate",
+        "bulk import",
+        "DoDb",
+        "syncIndexes",
+        "applyToQuery",
+        "itemAccess",
+        "databases.subscribe",
+        "DatabaseTypeSubscription",
+        "select projection",
+        "originConnectionId",
+        "DatabaseGroupPermission",
+        "grantGroupPermission"
+      ],
       "prerequisites": [],
-      "relatedGuides": ["documents", "data-modeling", "users-and-groups", "scheduling-and-realtime"]
+      "relatedGuides": [
+        "documents",
+        "data-modeling",
+        "users-and-groups",
+        "scheduling-and-realtime"
+      ]
     },
     {
       "topic": "documents",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md",
       "description": "Working with documents - the core local-first data architecture in Primitive apps",
-      "keywords": ["documents", "models", "schema", "query", "save", "CRUD", "sharing", "permissions", "js-bao", "data modeling", "local-first", "collaboration"],
+      "keywords": [
+        "documents",
+        "models",
+        "schema",
+        "query",
+        "save",
+        "CRUD",
+        "sharing",
+        "permissions",
+        "js-bao",
+        "data modeling",
+        "local-first",
+        "collaboration"
+      ],
       "useCases": [
         "Creating and defining data models",
         "Querying and filtering data",
@@ -149,15 +409,58 @@
         "Understanding document permissions",
         "Using useJsBaoDataLoader for reactive data"
       ],
-      "concepts": ["BaseModel", "models.toml", "js-bao-codegen-v2", "query", "save", "documents.open", "me.ownedDocuments", "me.sharedDocuments", "useJsBaoDataLoader", "documentReady", "initialDataLoaded", "upsertByUnique", "aliases"],
+      "concepts": [
+        "BaseModel",
+        "models.toml",
+        "js-bao-codegen-v2",
+        "query",
+        "save",
+        "documents.open",
+        "me.ownedDocuments",
+        "me.sharedDocuments",
+        "useJsBaoDataLoader",
+        "documentReady",
+        "initialDataLoaded",
+        "upsertByUnique",
+        "aliases"
+      ],
       "prerequisites": [],
-      "relatedGuides": ["workflows", "devtools", "databases", "data-modeling"]
+      "relatedGuides": [
+        "workflows",
+        "devtools",
+        "databases",
+        "data-modeling"
+      ]
     },
     {
       "topic": "workflows",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md",
       "description": "Creating multi-step automation pipelines with AI/LLM calls, integrations, email, blobs, analytics, cron scheduling, synchronous invocation, and database operations",
-      "keywords": ["workflows", "automation", "pipelines", "steps", "LLM", "AI", "OpenAI", "Gemini", "TOML", "templates", "email.send", "switch step", "forEach", "zip", "successWhen", "runSync", "syncCallable", "analytics.query", "applyToQuery", "cron", "scheduled", "include fragments", "$params validator"],
+      "keywords": [
+        "workflows",
+        "automation",
+        "pipelines",
+        "steps",
+        "LLM",
+        "AI",
+        "OpenAI",
+        "Gemini",
+        "TOML",
+        "templates",
+        "email.send",
+        "switch step",
+        "forEach",
+        "zip",
+        "successWhen",
+        "runSync",
+        "syncCallable",
+        "analytics.query",
+        "applyToQuery",
+        "cron",
+        "scheduled",
+        "include fragments",
+        "$params validator"
+      ],
       "useCases": [
         "Building multi-step automation pipelines",
         "Chaining LLM calls together",
@@ -174,15 +477,60 @@
         "Sharing common step blocks via include fragments",
         "Inspecting workflow run steps for debugging"
       ],
-      "concepts": ["workflow", "steps", "llm.chat", "gemini.generate", "integration.call", "prompt.execute", "transform", "switch", "runIf", "saveAs", "templates", "now", "today", "uuid", "ulid", "CEL safe navigation", "syncCallable", "workflows.runSync", "forEach zip", "successWhen", "include fragments", "email.send", "blob.upload", "analytics.query", "database.applyToQuery", "cron trigger", "overlapPolicy", "workflow run steps"],
+      "concepts": [
+        "workflow",
+        "steps",
+        "llm.chat",
+        "gemini.generate",
+        "integration.call",
+        "prompt.execute",
+        "transform",
+        "switch",
+        "runIf",
+        "saveAs",
+        "templates",
+        "now",
+        "today",
+        "uuid",
+        "ulid",
+        "CEL safe navigation",
+        "syncCallable",
+        "workflows.runSync",
+        "forEach zip",
+        "successWhen",
+        "include fragments",
+        "email.send",
+        "blob.upload",
+        "analytics.query",
+        "database.applyToQuery",
+        "cron trigger",
+        "overlapPolicy",
+        "workflow run steps"
+      ],
       "prerequisites": [],
-      "relatedGuides": ["prompts", "integrations", "scheduling-and-realtime", "blobs", "analytics"]
+      "relatedGuides": [
+        "prompts",
+        "integrations",
+        "scheduling-and-realtime",
+        "blobs",
+        "analytics"
+      ]
     },
     {
       "topic": "prompts",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_PROMPTS.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_PROMPTS.ts.md",
       "description": "Managing LLM prompts with templates, configurations, and testing",
-      "keywords": ["prompts", "LLM", "templates", "variables", "configs", "testing", "Gemini", "OpenRouter", "TOML"],
+      "keywords": [
+        "prompts",
+        "LLM",
+        "templates",
+        "variables",
+        "configs",
+        "testing",
+        "Gemini",
+        "OpenRouter",
+        "TOML"
+      ],
       "useCases": [
         "Creating managed prompt templates",
         "Using variable substitution in prompts",
@@ -191,15 +539,43 @@
         "Setting up LLM-based evaluation",
         "Syncing prompts from TOML files"
       ],
-      "concepts": ["prompt", "configs", "userPromptTemplate", "systemPrompt", "variables", "execute", "preview", "test cases", "evaluator", "provider", "model"],
+      "concepts": [
+        "prompt",
+        "configs",
+        "userPromptTemplate",
+        "systemPrompt",
+        "variables",
+        "execute",
+        "preview",
+        "test cases",
+        "evaluator",
+        "provider",
+        "model"
+      ],
       "prerequisites": [],
-      "relatedGuides": ["workflows"]
+      "relatedGuides": [
+        "workflows"
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_PROMPTS.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_PROMPTS.swift.md"
+      }
     },
     {
       "topic": "integrations",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_INTEGRATIONS.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_INTEGRATIONS.ts.md",
       "description": "Connecting to third-party APIs with secure credential storage",
-      "keywords": ["integrations", "API", "REST", "HTTP", "credentials", "secrets", "proxy", "external services", "TOML"],
+      "keywords": [
+        "integrations",
+        "API",
+        "REST",
+        "HTTP",
+        "credentials",
+        "secrets",
+        "proxy",
+        "external services",
+        "TOML"
+      ],
       "useCases": [
         "Connecting to external REST APIs",
         "Storing API credentials securely",
@@ -207,15 +583,45 @@
         "Testing integration endpoints",
         "Managing API secrets and rotation"
       ],
-      "concepts": ["integration", "requestConfig", "baseUrl", "allowedMethods", "allowedPaths", "secrets", "proxy", "forwardHeaders", "staticQuery"],
+      "concepts": [
+        "integration",
+        "requestConfig",
+        "baseUrl",
+        "allowedMethods",
+        "allowedPaths",
+        "secrets",
+        "proxy",
+        "forwardHeaders",
+        "staticQuery"
+      ],
       "prerequisites": [],
-      "relatedGuides": ["workflows"]
+      "relatedGuides": [
+        "workflows"
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_INTEGRATIONS.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_INTEGRATIONS.swift.md"
+      }
     },
     {
       "topic": "analytics",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.md",
       "description": "Tracking user behavior with automatic lifecycle events and custom event logging",
-      "keywords": ["analytics", "events", "tracking", "metrics", "DAU", "WAU", "MAU", "logEvent", "auto events", "usage", "user activity", "session", "offline"],
+      "keywords": [
+        "analytics",
+        "events",
+        "tracking",
+        "metrics",
+        "DAU",
+        "WAU",
+        "MAU",
+        "logEvent",
+        "auto events",
+        "usage",
+        "user activity",
+        "session",
+        "offline"
+      ],
       "useCases": [
         "Logging custom analytics events",
         "Configuring automatic lifecycle event tracking",
@@ -226,15 +632,47 @@
         "Handling pre-auth event logging",
         "Flushing events before navigation"
       ],
-      "concepts": ["client.analytics.logEvent", "client.analytics.flush", "client.analytics.logSnapshot", "analyticsAutoEvents", "ANALYTICS_UNAUTHENTICATED_USER", "auto events", "offline persistence", "rate limiting"],
-      "prerequisites": ["authentication"],
-      "relatedGuides": ["workflows", "integrations", "blobs"]
+      "concepts": [
+        "client.analytics.logEvent",
+        "client.analytics.flush",
+        "client.analytics.logSnapshot",
+        "analyticsAutoEvents",
+        "ANALYTICS_UNAUTHENTICATED_USER",
+        "auto events",
+        "offline persistence",
+        "rate limiting"
+      ],
+      "prerequisites": [
+        "authentication"
+      ],
+      "relatedGuides": [
+        "workflows",
+        "integrations",
+        "blobs"
+      ]
     },
     {
       "topic": "performance",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_PERFORMANCE.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_PERFORMANCE.ts.md",
       "description": "Patterns and anti-patterns for cutting cold-load time and round-trip count in Primitive apps",
-      "keywords": ["performance", "perf", "slow", "latency", "round trips", "N+1", "pipeline op", "Promise.all", "cold path", "first paint", "bulk op", "subscribe", "cron cache", "stale-while-revalidate", "Pinia", "measure"],
+      "keywords": [
+        "performance",
+        "perf",
+        "slow",
+        "latency",
+        "round trips",
+        "N+1",
+        "pipeline op",
+        "Promise.all",
+        "cold path",
+        "first paint",
+        "bulk op",
+        "subscribe",
+        "cron cache",
+        "stale-while-revalidate",
+        "Pinia",
+        "measure"
+      ],
       "useCases": [
         "Diagnosing why a page is slow on cold load",
         "Replacing N+1 executeOperation loops with a single bulk call",
@@ -247,15 +685,45 @@
         "Auditing an existing Primitive app for common slow patterns",
         "Instrumenting first-paint time to verify a perf win"
       ],
-      "concepts": ["pipeline operation", "bulk op", "Promise.all", "cold path vs background", "re-block trap", "stale-while-revalidate", "client.databases.subscribe", "fromWorkflow", "server-side cron", "pure compute", "Pinia store"],
+      "concepts": [
+        "pipeline operation",
+        "bulk op",
+        "Promise.all",
+        "cold path vs background",
+        "re-block trap",
+        "stale-while-revalidate",
+        "client.databases.subscribe",
+        "fromWorkflow",
+        "server-side cron",
+        "pure compute",
+        "Pinia store"
+      ],
       "prerequisites": [],
-      "relatedGuides": ["databases", "integrations", "workflows", "scheduling-and-realtime"]
+      "relatedGuides": [
+        "databases",
+        "integrations",
+        "workflows",
+        "scheduling-and-realtime"
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_PERFORMANCE.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_PERFORMANCE.swift.md"
+      }
     },
     {
       "topic": "devtools",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DEVTOOLS.md",
       "description": "Using Document Explorer and Test Harness for debugging and testing",
-      "keywords": ["devtools", "debugging", "testing", "Document Explorer", "Test Harness", "browser", "validation", "inspection"],
+      "keywords": [
+        "devtools",
+        "debugging",
+        "testing",
+        "Document Explorer",
+        "Test Harness",
+        "browser",
+        "validation",
+        "inspection"
+      ],
       "useCases": [
         "Inspecting document data in the browser",
         "Validating CRUD operations worked correctly",
@@ -263,15 +731,50 @@
         "Filtering and sorting records for inspection",
         "Writing test cases for js-bao models"
       ],
-      "concepts": ["DevTools", "Document Explorer", "Test Harness", "TestGroup", "test cases", "model inspection", "data validation"],
-      "prerequisites": ["documents"],
-      "relatedGuides": ["documents"]
+      "concepts": [
+        "DevTools",
+        "Document Explorer",
+        "Test Harness",
+        "TestGroup",
+        "test cases",
+        "model inspection",
+        "data validation"
+      ],
+      "prerequisites": [
+        "documents"
+      ],
+      "relatedGuides": [
+        "documents"
+      ]
     },
     {
       "topic": "swift-client",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_SWIFT_CLIENT.md",
       "description": "Building Primitive apps in Swift (iOS / macOS) — PrimitiveApp, JsBaoClient, codegen + TypedModel, Fastlane",
-      "keywords": ["swift", "apple", "ios", "macos", "iphone", "ipad", "mac", "swiftui", "xcode", "fastlane", "testflight", "app store", "PrimitiveApp", "PrimitiveAppState", "TypedModel", "swift-bao-codegen", "JsBaoCodegenPlugin", "schema.toml", "xcodegen", "AuthGateView", "BaoModel", "primitive init --platform apple"],
+      "keywords": [
+        "swift",
+        "apple",
+        "ios",
+        "macos",
+        "iphone",
+        "ipad",
+        "mac",
+        "swiftui",
+        "xcode",
+        "fastlane",
+        "testflight",
+        "app store",
+        "PrimitiveApp",
+        "PrimitiveAppState",
+        "TypedModel",
+        "swift-bao-codegen",
+        "JsBaoCodegenPlugin",
+        "schema.toml",
+        "xcodegen",
+        "AuthGateView",
+        "BaoModel",
+        "primitive init --platform apple"
+      ],
       "useCases": [
         "Scaffolding a new iOS or macOS app with `primitive init --platform apple`",
         "Running on iOS Simulator, paired iPhone/iPad, or macOS",
@@ -285,9 +788,38 @@
         "Shipping to TestFlight and the App Store with Fastlane lanes (beta / release / add_testers / bump)",
         "Migrating from the legacy BaoModel<T> / BaoModelRecord path to TypedModel<T> + codegen"
       ],
-      "concepts": ["PrimitiveAppState", "AuthGateView", "JsBaoClient", "TypedModel", "PrimitiveModel", "PrimitiveSchema", "swift-bao-codegen", "JsBaoCodegenPlugin", "makeTypedModel", "BaoDataLoader", "EventSubscription", "OpenDocumentOptions", "StartWorkflowOptions", "WorkflowStatusEvent", "primitive init --platform apple", "xcodegen", "project.yml", "primitive.json", "Fastfile", "upload_to_testflight", "upload_to_app_store"],
+      "concepts": [
+        "PrimitiveAppState",
+        "AuthGateView",
+        "JsBaoClient",
+        "TypedModel",
+        "PrimitiveModel",
+        "PrimitiveSchema",
+        "swift-bao-codegen",
+        "JsBaoCodegenPlugin",
+        "makeTypedModel",
+        "BaoDataLoader",
+        "EventSubscription",
+        "OpenDocumentOptions",
+        "StartWorkflowOptions",
+        "WorkflowStatusEvent",
+        "primitive init --platform apple",
+        "xcodegen",
+        "project.yml",
+        "primitive.json",
+        "Fastfile",
+        "upload_to_testflight",
+        "upload_to_app_store"
+      ],
       "prerequisites": [],
-      "relatedGuides": ["documents", "data-modeling", "workflows", "blobs", "authentication", "sharing-and-invitations"]
+      "relatedGuides": [
+        "documents",
+        "data-modeling",
+        "workflows",
+        "blobs",
+        "authentication",
+        "sharing-and-invitations"
+      ]
     }
   ]
 }

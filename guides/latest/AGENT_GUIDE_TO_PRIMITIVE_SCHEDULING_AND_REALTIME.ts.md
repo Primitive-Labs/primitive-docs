@@ -4,25 +4,13 @@ Guidelines for AI agents implementing cron-triggered workflows and real-time dat
 
 > **Swift parity:** cron triggers exist in both clients; **database subscriptions (`client.databases.subscribe`) are JavaScript-only** — the Swift `DatabasesAPI` exposes `executeOperation` but no `subscribe`. Don't write Swift snippets calling `client.databases.subscribe`. Swift apps poll via `executeOperation` or use document-based real-time.
 
-## Cron triggers from the client (JavaScript + Swift)
+## Cron triggers from the client
 
-JavaScript:
-<!-- example:start scheduling/cron-manage lang=ts -->
 ```typescript
   const { items } = await client.cronTriggers.list();
   const trigger = await client.cronTriggers.get(triggerId);
   await client.cronTriggers.test(triggerId); // fire once, now
 ```
-<!-- example:end -->
-Swift:
-<!-- example:start scheduling/cron-manage lang=swift -->
-```swift
-  let list = try await client.cronTriggers.list()
-  let items = list["items"] as? [[String: Any]] ?? []
-  let trigger = try await client.cronTriggers.get(triggerId: triggerId)
-  _ = try await client.cronTriggers.test(triggerId: triggerId) // fire once, now
-```
-<!-- example:end -->
 
 ## Mental Model
 
@@ -100,17 +88,17 @@ The TOML key `key` maps to the API field `triggerKey`. `cron` (not `schedule`) i
 ### Creating (client)
 
 ```typescript
-const trigger = await client.cronTriggers.create({
-  triggerKey: "nightly-digest",
-  displayName: "Nightly digest email",
-  cron: "0 9 * * *",                       // NOT `schedule`
-  timezone: "America/Los_Angeles",
-  workflowKey: "send-digest",
-  overlapPolicy: "skip",                   // "skip" | "allow"
-  rootInput: { digestType: "daily" },      // NOT `input`
-  inputMapping: { firedAt: "{{now}}" },    // optional, merged over rootInput
-});
-// trigger.triggerId is a ULID — use it for subsequent calls.
+  const trigger = await client.cronTriggers.create({
+    triggerKey: "nightly-digest",
+    displayName: "Nightly digest email",
+    cron: "0 9 * * *",                  // NOT `schedule`
+    timezone: "America/Los_Angeles",    // set whenever the hour is user-visible
+    workflowKey: "send-digest",
+    overlapPolicy: "skip",              // "skip" (default) | "allow" — no "queue"
+    rootInput: { digestType: "daily" }, // NOT `input`
+    inputMapping: { firedAt: "{{now}}" }, // merged over rootInput; {{now}} = fire time
+  });
+  // trigger.triggerId is a ULID — use it for get/update/pause/test/delete.
 ```
 
 #### Wrong
@@ -184,13 +172,16 @@ run.meta.manual     // true if started via cronTriggers.test()
 ### Lifecycle methods
 
 ```typescript
-await client.cronTriggers.list();                       // exclude archived
-await client.cronTriggers.get(triggerId);               // includes runtime.scheduledAlarmAt
-await client.cronTriggers.update(triggerId, { ... });   // change cron/timezone/state etc.
-await client.cronTriggers.pause(triggerId);             // cancels pending alarm
-await client.cronTriggers.resume(triggerId);            // clears lastError, reschedules
-await client.cronTriggers.delete(triggerId);            // soft delete (archive)
-await client.cronTriggers.test(triggerId);              // fire NOW; does not affect schedule
+  await client.cronTriggers.list();                       // excludes archived
+  await client.cronTriggers.get(triggerId);               // includes runtime.scheduledAlarmAt
+  await client.cronTriggers.update(triggerId, {           // change cron/timezone/state etc.
+    cron: "0 8 * * *",
+    timezone: "America/New_York",
+  });
+  await client.cronTriggers.pause(triggerId);             // cancels the pending alarm
+  await client.cronTriggers.resume(triggerId);            // clears lastError, reschedules
+  await client.cronTriggers.test(triggerId);              // fire NOW; does not touch schedule
+  await client.cronTriggers.delete(triggerId);            // soft delete (archive)
 ```
 
 Note: `.test()`, `.pause()`, `.resume()`, `.delete()`, `.update()`, `.get()` all take the `triggerId` (ULID returned from `.create()`), NOT the `triggerKey`. Use `.list()` to look up `triggerId` by key.
@@ -200,8 +191,8 @@ Note: `.test()`, `.pause()`, `.resume()`, `.delete()`, `.update()`, `.get()` all
 There is no `triggerSource` filter on `workflows.listRuns()`. Cron runs are identifiable by their `contextDocId` starting with `cron:` and `meta.source === "cron"`:
 
 ```typescript
-const { items } = await client.workflows.listRuns({ workflowKey: "send-digest" });
-const cronRuns = items.filter(r => r.contextDocId?.startsWith("cron:"));
+  const { items } = await client.workflows.listRuns({ workflowKey: "send-digest" });
+  const cronRuns = items.filter((r) => r.contextDocId?.startsWith("cron:"));
 ```
 
 ---
@@ -240,11 +231,10 @@ teamId = { type = "string", required = true }
 **Via admin HTTP API** — POST/PUT/DELETE directly against `/databases/types/<databaseType>/subscriptions` from a server-side client that holds admin permission:
 
 ```typescript
-await adminClient.fetch(
-  `/databases/types/support-desk/subscriptions`,
-  {
-    method: "POST",
-    body: JSON.stringify({
+  await adminClient.makeRequest(
+    "POST",
+    "/databases/types/support-desk/subscriptions",
+    {
       subscriptionKey: "my-open-tickets",
       displayName: "My open tickets",
       modelName: "ticket",
@@ -252,9 +242,8 @@ await adminClient.fetch(
       filter: "record.data.assigneeId == user.userId && record.data.status == 'open'",
       select: ["id", "title", "priority", "updatedAt"],
       emit: ["enter", "update", "leave"],
-    }),
-  },
-);
+    },
+  );
 ```
 
 Endpoints:
@@ -278,6 +267,8 @@ Field reference:
 | Params | `[subscriptions.params]` | `params` | No | `{ <name>: { type: "string" \| "number" \| "boolean", required?: boolean } }`. Max 5. Bound at subscribe time. |
 
 ### Subscribing (client)
+
+> **JavaScript only.** `client.databases.subscribe` has no Swift equivalent — the Swift `DatabasesAPI` exposes `executeOperation` but no `subscribe`. Swift apps poll via `executeOperation` or use document-based real-time.
 
 `subscribe()` returns an `unsub()` function. There is no event-emitter API.
 
@@ -398,6 +389,8 @@ interface DatabaseChangeEvent {
 
 ## Canonical Pattern: Load + Subscribe
 
+> **JavaScript only.** Uses `client.databases.subscribe`, which has no Swift equivalent. Swift apps re-run the `executeOperation` load on an interval or on document-real-time signals instead.
+
 ```typescript
 async function liveTickets(databaseId: string) {
   // 1. Initial load — full current state.
@@ -452,6 +445,8 @@ state = "active"
 [inputMapping]
 firedAt = "{{now}}"
 ```
+
+> **JavaScript only.** The client side uses `client.databases.subscribe` (no Swift equivalent).
 
 ```typescript
 // On the client — no cron-awareness needed.
@@ -521,3 +516,4 @@ Common states:
 - [Workflows](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md) — what cron triggers fire
 - [Databases](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) — operations, access rules, triggers
 - [Users and Groups](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) — CEL membership checks for `access`
+</content>

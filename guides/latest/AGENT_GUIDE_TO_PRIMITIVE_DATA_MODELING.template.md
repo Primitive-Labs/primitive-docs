@@ -54,34 +54,13 @@ If you cannot answer one of these from context, ask before building:
 
 ### Document — single per-user document (personal apps)
 
-```typescript
-// On app load, after sign-in
-const { documentId } = await jsBaoClient.documents.getOrCreateWithAlias({
-  title: "My Data",
-  alias: { scope: "user", aliasKey: "default" },
-});
-await jsBaoClient.documents.open(documentId);
-
-// Reads are local and synchronous after open()
-const tasks = await Task.query({ completed: false });
-```
+{{ example: data-modeling/per-user-document }}
 
 Use for: task managers, journals, settings, preferences. Root document also works for a single per-user doc with no sharing.
 
 ### Document — one per workspace (shared collaboratively)
 
-```typescript
-const { metadata } = await jsBaoClient.documents.create({
-  title: "Project Alpha",
-  tags: ["workspace"],
-});
-await jsBaoClient.documents.open(metadata.documentId);
-
-await jsBaoClient.documents.updatePermissions(metadata.documentId, {
-  email: "alice@example.com",
-  permission: "read-write",
-});
-```
+{{ example: data-modeling/workspace-document }}
 
 Use when each workspace is a sharing unit and every member of that workspace needs the full contents. Stays under ~10 MB per workspace.
 
@@ -97,19 +76,7 @@ access = "isMemberOf('team', database.celContext.teamId)"
 definition = '{"filter":{"assigneeId":"$user.userId"},"sort":{"createdAt":-1},"limit":50}'
 ```
 
-```typescript
-const db = await client.databases.create({
-  title: "Alpha",
-  databaseType: "project",
-});
-await client.databases.updateCelContext(db.databaseId, { teamId: "team-1" });
-
-const result = await client.databases.executeOperation(
-  db.databaseId,
-  "listMyTasks",
-  {},
-);
-```
+{{ example: data-modeling/database-celcontext-operation }}
 
 Use for: any data where access scopes change per record or per caller. The operation's CEL gate plus `$user.userId` / `$params.*` substitution does the per-row scoping for you.
 
@@ -149,6 +116,10 @@ filter = "record.assigneeId == user.userId && record.status == 'open'"
 select = ["id", "title", "priority", "updatedAt"]  # optional projection
 ```
 
+<!-- Inline (not templatized): database-level subscriptions are TypeScript-only.
+     `client.databases.subscribe` has no Swift counterpart, so this block stays a
+     raw TS fence rather than a {{ example }} placeholder. -->
+
 ```typescript
 const initial = await client.databases.executeOperation(dbId, "listMyTickets", {});
 const unsub = client.databases.subscribe(dbId, "my-open-tickets", {
@@ -159,7 +130,7 @@ const unsub = client.databases.subscribe(dbId, "my-open-tickets", {
 });
 ```
 
-Subscriptions deliver deltas only — always pair with an operation call for the initial state, and use semantically equivalent filters. See the Databases guide for the full frame shape (`originConnectionId`, `originUserId`, `isOrigin`, `isOriginUser`, `changeType`).
+Database subscriptions are available in the TypeScript client. Subscriptions deliver deltas only — always pair with an operation call for the initial state, and use semantically equivalent filters. See the Databases guide for the full frame shape (`originConnectionId`, `originUserId`, `isOrigin`, `isOriginUser`, `changeType`).
 
 ## Worked architectures
 

@@ -2,30 +2,9 @@
 
 Integrations let tenant apps call third-party APIs through a server-side proxy without exposing credentials to clients. The proxy enforces an allowlist of methods and paths, injects credentials from App Secrets, and returns the upstream response to the caller.
 
-## Call an integration (JavaScript + Swift)
+## Call an integration
 
-JavaScript:
-<!-- example:start integrations/integration-call lang=ts -->
-```typescript
-  const response = await client.integrations.call({
-    integrationKey: "crm-api",
-    method: "POST",
-    path: "/contacts",
-    body: { email: "user@example.com", name: "Alice" },
-  });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start integrations/integration-call lang=swift -->
-```swift
-  let response = try await client.integrations.call(IntegrationCallRequest(
-    integrationKey: "crm-api",
-    method: "POST",
-    path: "/contacts",
-    body: ["email": "user@example.com", "name": "Alice"]
-  ))
-```
-<!-- example:end -->
+{{ example: integrations/integration-call }}
 
 This guide is verified against `js-bao-wss` source. Anything not described here is unsupported.
 
@@ -444,23 +423,9 @@ primitive integrations update <integration-id> --status active
 
 If `sync push` reports a conflict, someone modified the server since your last `pull`. Either re-pull and merge, or `--force` to overwrite the server.
 
-## Calling from Client SDK (TypeScript)
+## Calling from the Client SDK
 
-```typescript
-const response = await client.integrations.call({
-  integrationKey: "open-ai",
-  method: "POST",
-  path: "/v1/responses",
-  body: { model: "gpt-4.1-mini", input: "hi" },
-});
-
-console.log(response.status);     // upstream HTTP status (number)
-console.log(response.headers);    // Record<string, string>
-console.log(response.body);       // upstream body, parsed if JSON
-console.log(response.traceId);    // optional, correlates with admin logs
-console.log(response.durationMs); // optional, proxy-side duration
-console.log(response.errorCode);  // optional, set when status >= 400
-```
+{{ example: integrations/integration-call-response }}
 
 ### `IntegrationCallRequest`
 
@@ -475,25 +440,7 @@ console.log(response.errorCode);  // optional, set when status >= 400
 
 ### Error handling
 
-```typescript
-import { isJsBaoError } from "js-bao-wss-client";
-
-try {
-  await client.integrations.call({ integrationKey: "crm", method: "POST", path: "/contacts", body: { ... } });
-} catch (error) {
-  if (isJsBaoError(error)) {
-    switch (error.code) {
-      case "INTEGRATION_NOT_FOUND":      break; // 404, also fires for status != active
-      case "INTEGRATION_SECRET_MISSING": break; // 409, MISSING_SECRET upstream
-      case "INTEGRATION_REQUEST_INVALID":break; // 400/413/422 (method/path/body)
-      case "INTEGRATION_PROXY_FAILED":   break; // upstream timeout/network/malformed
-      case "ACCESS_DENIED":              break; // 401/403 (client auth)
-      case "INVALID_ARGUMENT":           break; // missing integrationKey
-      case "OFFLINE":                    break; // SDK in offline mode
-    }
-  }
-}
-```
+{{ example: integrations/integration-call-errors }}
 
 ### Server-side proxy error codes (`errorCode` on response or in `JsBaoError.details`)
 

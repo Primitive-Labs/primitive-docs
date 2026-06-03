@@ -2,19 +2,8 @@
 
 How to author, test, and execute LLM prompts on Primitive using the `primitive` CLI, TOML files, and the client SDK.
 
-## Execute a managed prompt (JavaScript + Swift)
+## Execute a managed prompt
 
-JavaScript:
-<!-- example:start prompts/prompt-execute lang=ts -->
-```typescript
-  const result = await client.prompts.execute("my-summarizer", {
-    variables: { text: documentText, style: "concise" },
-    modelOverride: "gpt-4o", // optional; defaults to the active config's model
-  });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start prompts/prompt-execute lang=swift -->
 ```swift
   let result = try await client.prompts.execute(
     promptKey: "my-summarizer",
@@ -24,7 +13,6 @@ Swift:
     )
   )
 ```
-<!-- example:end -->
 
 ## Quick Mental Model
 
@@ -644,22 +632,22 @@ The TOML `[prompt].outputSchema` field is read on push and applies to the prompt
 
 ## Client SDK
 
-```typescript
-import { JsBaoClient } from "@primitive/js-bao";
+```swift
+  let result = try await client.prompts.execute(
+    promptKey: "my-prompt-key",
+    options: ExecutePromptOptions(
+      variables: ["text": "Hello world"], // → {{ input.text }}
+      modelOverride: "anthropic/claude-3-5-sonnet", // optional; overrides config.model
+      configId: "01ABC" // optional; defaults to activeConfigId
+    )
+  )
 
-const result = await client.prompts.execute("my-prompt-key", {
-  variables: { text: "Hello world" },     // → {{ input.text }}
-  configId: "01ABC...",                   // optional; defaults to activeConfigId
-  modelOverride: "anthropic/claude-3-5-sonnet",  // optional; overrides config.model
-});
-
-// ExecutePromptResult
-result.success;     // boolean
-result.output;      // string — generated text
-result.error;       // string | undefined
-result.configId;    // string — which config was used
-result.metrics;     // { durationMs, inputTokens?, outputTokens?, totalTokens? }
-result.rawResponse; // any — raw provider response (don't depend on shape)
+  let success = result["success"] as? Bool          // generated successfully
+  let output = result["output"] as? String          // generated text
+  let error = result["error"] as? String             // error message, if any
+  let configId = result["configId"] as? String        // which config was used
+  let metrics = result["metrics"] as? [String: Any]   // { durationMs, inputTokens?, ... }
+  let rawResponse = result["rawResponse"]              // raw provider response
 ```
 
 The first arg is the `promptKey`, NOT the `promptId`. The endpoint is `POST /prompts/:promptKey/execute`.
