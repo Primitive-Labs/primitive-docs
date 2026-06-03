@@ -102,15 +102,19 @@ Variables available in rules:
 | `isMemberOf(type, id)` | Group membership check |
 | `hasRole(role)` | App role check |
 
-Attach metadata at upload time to make rules useful:
+Attach data at upload time to make rules useful (uploads take `tags: string[]` — see the corrected call below):
 
-```typescript
-await client.blobBuckets.bucket("team-exports").upload(bytes, {
-  filename: "q2.csv",
-  contentType: "text/csv",
-  metadata: { teamId: "eng" },
-});
-```
+::: code-group
+
+<<< ../../examples/blobs/bucket-upload.ts#example{ts} [JavaScript]
+
+<<< ../../examples/blobs/bucket-upload.swift#example{swift} [Swift]
+
+:::
+
+::: warning Content review needed
+The upload API accepts `tags: string[]`, but the CEL rule examples above reference `blob.metadata.*`. This metadata-vs-tags mismatch needs reconciling in a follow-up (the client upload has no arbitrary `metadata` field).
+:::
 
 ## TTL Tiers
 

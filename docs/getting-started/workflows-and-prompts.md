@@ -113,34 +113,15 @@ CEL optional types are enabled in every workflow context, so you can collapse mu
 
 ### Starting a Workflow from Your App
 
-```typescript
-import { jsBaoClientService } from "primitive-app";
+::: code-group
 
-const client = await jsBaoClientService.getClientAsync();
+<<< ../../examples/workflows/workflow-start.ts#example{ts} [JavaScript]
 
-// Start a workflow and let it run in the background
-const { runId, runKey } = await client.workflows.start({
-  workflowKey: "welcome-email",
-  input: {
-    userName: "Alice",
-    userEmail: "alice@example.com",
-  },
-});
+<<< ../../examples/workflows/workflow-start.swift#example{swift} [Swift]
 
-// Check status
-const status = await client.workflows.getStatus({
-  workflowKey: "welcome-email",
-  runKey,
-});
-console.log(status.status);  // "running" | "complete" | "failed" | "apply_pending" | ...
-console.log(status.output);  // final result when complete
+:::
 
-// List recent runs
-const { items } = await client.workflows.listRuns({
-  workflowKey: "welcome-email",
-  limit: 50,
-});
-```
+`getStatus` returns `status` (`"running"` | `"complete"` | `"failed"` | `"apply_pending"` | …) and, when complete, `output`. (In Swift, `start`/`getStatus`/`listRuns` return untyped `[String: Any]`.)
 
 For short, latency-sensitive workflows (validation, enrichment, webhook responses), opt the workflow into synchronous invocation by setting `syncCallable = true` in the workflow TOML (pushed by `primitive sync push`) or via `primitive workflows update --sync-callable true`. Clients can then `await` the final result in one round-trip:
 
@@ -182,25 +163,39 @@ Each firing creates a persistent `WorkflowRun` record so cron failures are surfa
 
 Every step's input and output is persisted and reachable from the client:
 
-```typescript
+::: code-group
+
+```typescript [JavaScript]
 const { items: steps } = await client.workflows.listStepRuns({ runId });
-steps.forEach(step => {
-  console.log(step.kind, step.status, step.output);
-});
+steps.forEach((step) => console.log(step.kind, step.status, step.output));
 ```
+
+```swift [Swift]
+let result = try await client.workflows.listStepRuns(runId: runId)
+let steps = result["items"] as? [[String: Any]] ?? []
+```
+
+:::
 
 You'll see the same data in the admin console under the run's detail view.
 
 ### Real-Time Status via WebSocket
 
-```typescript
+::: code-group
+
+```typescript [JavaScript]
 client.on("workflowStatus", (event) => {
-  console.log(`Workflow run ${event.runId}: ${event.status}`);
-  if (event.status === "completed") {
-    console.log("Result:", event.output);
-  }
+  if (event.status === "completed") console.log("Result:", event.output);
 });
 ```
+
+```swift [Swift]
+let sub = client.events.on(.workflowStatus) { (event: WorkflowStatusEvent) in
+  if event.status == "completed" { print("Result:", event.output ?? "") }
+}
+```
+
+:::
 
 ### Script Transforms
 

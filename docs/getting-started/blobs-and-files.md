@@ -20,10 +20,17 @@ The blob context comes from the document: `client.document(documentId).blobs()` 
 
 ## Displaying Images
 
-```typescript
-// Get a URL for inline display
+::: code-group
+
+```typescript [JavaScript]
 const imageUrl = blobs.downloadUrl(blobId, { disposition: "inline" });
 ```
+
+```swift [Swift]
+let imageUrl = blobs.downloadUrl(blobId: blobId, disposition: .inline)
+```
+
+:::
 
 ```vue
 <template>
@@ -47,20 +54,13 @@ The URL includes authentication, so it only works for signed-in users with docum
 
 ## Listing and Managing Blobs
 
-```typescript
-// List blobs in a document
-const { items, cursor } = await blobs.list({ limit: 50 });
+::: code-group
 
-items.forEach(blob => {
-  console.log(blob.blobId, blob.filename, blob.numBytes, blob.sha256);
-});
+<<< ../../examples/blobs/doc-blob-manage.ts#example{ts} [JavaScript]
 
-// Get metadata
-const meta = await blobs.get(blobId);
+<<< ../../examples/blobs/doc-blob-manage.swift#example{swift} [Swift]
 
-// Delete
-await blobs.delete(blobId);
-```
+:::
 
 ## Offline Support
 

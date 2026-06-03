@@ -60,21 +60,28 @@ primitive integrations test weather-api
 
 ## Calling from Your App
 
-```typescript
-import { jsBaoClientService } from "primitive-app";
+::: code-group
 
-const client = await jsBaoClientService.getClientAsync();
-
+```typescript [JavaScript]
 const response = await client.integrations.call({
   integrationKey: "weather-api",
   method: "GET",
   path: "/forecast/san-francisco",
   query: { units: "metric" },
 });
-
-console.log(response.status);
-console.log(response.body);
+console.log(response.status, response.body);
 ```
+
+```swift [Swift]
+let response = try await client.integrations.call(IntegrationCallRequest(
+  integrationKey: "weather-api",
+  method: "GET",
+  path: "/forecast/san-francisco",
+  query: ["units": "metric"]
+))
+```
+
+:::
 
 ### POST Requests
 
@@ -87,6 +94,8 @@ console.log(response.body);
 :::
 
 ### Error Handling
+
+In Swift, catch `HttpError` and switch on its typed `serverCode` (the same codes — `INTEGRATION_NOT_FOUND`, `INTEGRATION_SECRET_MISSING`, `INTEGRATION_PROXY_FAILED`); the JavaScript client uses the `isJsBaoError(error)` guard + `error.code`:
 
 ```typescript
 import { isJsBaoError } from "js-bao-wss-client";
