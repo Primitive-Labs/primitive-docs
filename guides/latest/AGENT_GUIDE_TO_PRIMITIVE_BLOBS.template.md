@@ -8,137 +8,43 @@ The bucket-blob client calls in both languages, compiled against the real client
 
 ### Upload
 
-JavaScript:
-<!-- example:start blobs/bucket-upload lang=ts -->
-```typescript
-  const { blobId } = await client.blobBuckets.upload("avatars", {
-    filename: "alice.jpg",
-    contentType: "image/jpeg",
-    data,
-    tags: ["profile"],
-  });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start blobs/bucket-upload lang=swift -->
-```swift
-  let result = try await client.blobBuckets.upload(
-    bucketIdOrKey: "avatars",
-    data: data,
-    filename: "alice.jpg",
-    contentType: "image/jpeg",
-    tags: ["profile"]
-  )
-  let blobId = result["blobId"] as? String
-```
-<!-- example:end -->
+{{ example: blobs/bucket-upload }}
 
 ### Read (signed URL / download)
 
-JavaScript:
-<!-- example:start blobs/bucket-read lang=ts -->
-```typescript
-  // Signed URL (for <img> tags, etc.)
-  const { url } = await client.blobBuckets.getSignedUrl("avatars", blobId, 3600);
-
-  // Or download the bytes directly
-  const bytes = await client.blobBuckets.download("avatars", blobId);
-```
-<!-- example:end -->
-Swift:
-<!-- example:start blobs/bucket-read lang=swift -->
-```swift
-  // Signed URL (for <img> tags, etc.)
-  let signed = try await client.blobBuckets.getSignedUrl(
-    bucketIdOrKey: "avatars", blobId: blobId, expiresInSeconds: 3600
-  )
-  let url = signed["url"] as? String
-
-  // Or download the bytes directly
-  let bytes = try await client.blobBuckets.download(bucketIdOrKey: "avatars", blobId: blobId)
-```
-<!-- example:end -->
+{{ example: blobs/bucket-read }}
 
 ### List / metadata / delete
 
-JavaScript:
-<!-- example:start blobs/bucket-manage lang=ts -->
-```typescript
-  // List blobs in the bucket
-  const { items, cursor } = await client.blobBuckets.list("avatars", { limit: 50 });
+{{ example: blobs/bucket-manage }}
 
-  // One blob's metadata
-  const meta = await client.blobBuckets.getMetadata("avatars", blobId);
+### Bucket admin (create / list / get / delete)
 
-  // Delete a blob
-  await client.blobBuckets.delete("avatars", blobId);
-```
-<!-- example:end -->
-Swift:
-<!-- example:start blobs/bucket-manage lang=swift -->
-```swift
-  // List blobs in the bucket
-  let page = try await client.blobBuckets.list(bucketIdOrKey: "avatars", limit: 50)
-  let items = page["items"] as? [[String: Any]] ?? []
+Admin/owner only. Deleting a bucket cascades to every blob inside it.
 
-  // One blob's metadata
-  let meta = try await client.blobBuckets.getMetadata(bucketIdOrKey: "avatars", blobId: blobId)
-
-  // Delete a blob
-  _ = try await client.blobBuckets.delete(bucketIdOrKey: "avatars", blobId: blobId)
-```
-<!-- example:end -->
+{{ example: blobs/bucket-admin }}
 
 ## Document-scoped blob operations (JavaScript + Swift)
 
-Context accessor differs: `client.document(documentId).blobs()` (JS) vs `client.documents.blobs(documentId:)` (Swift). `prefetch` is JS-only.
+Context accessor differs: `client.document(documentId).blobs()` (JS) vs `client.documents.blobs(documentId:)` (Swift). `prefetch`, `proxyUrl`, `uploads()`/pause/resume, and the `read(blobId, { as })` format options are JS-only.
 
 ### Upload
 
-JavaScript:
-<!-- example:start blobs/doc-blob-upload lang=ts -->
-```typescript
-  const blobs = client.document(documentId).blobs();
-  const { blobId } = await blobs.upload(data, {
-    filename: "notes.txt",
-    contentType: "text/plain",
-  });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start blobs/doc-blob-upload lang=swift -->
-```swift
-  let blobs = client.documents.blobs(documentId: documentId)
-  let result = try await blobs.upload(
-    data: data,
-    options: BlobUploadSourceOptions(filename: "notes.txt", contentType: "text/plain")
-  )
-  let blobId = result.blobId
-```
-<!-- example:end -->
+{{ example: blobs/doc-blob-upload }}
+
+### Upload with disposition
+
+`disposition` is stored on the blob (sent as `X-Blob-Disposition`). `retainLocal` (default `true`; set `false` to drop local bytes once the server confirms) is a JS-only option.
+
+{{ example: blobs/doc-blob-upload-options }}
 
 ### List / URL / read
 
-JavaScript:
-<!-- example:start blobs/doc-blob-read lang=ts -->
-```typescript
-  const blobs = client.document(documentId).blobs();
+{{ example: blobs/doc-blob-read }}
 
-  const list = await blobs.list();
-  const url = blobs.downloadUrl(blobId);              // synchronous, authenticated
-  const bytes = await blobs.read(blobId, { as: "arrayBuffer" });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start blobs/doc-blob-read lang=swift -->
-```swift
-  let blobs = client.documents.blobs(documentId: documentId)
+### List / metadata / delete
 
-  let list = try await blobs.list()
-  let url = blobs.downloadUrl(blobId: blobId)          // synchronous, authenticated
-  let bytes = try await blobs.read(blobId: blobId)
-```
-<!-- example:end -->
+{{ example: blobs/doc-blob-manage }}
 
 ## Overview
 
@@ -166,31 +72,9 @@ await client.blobBuckets.getSignedUrl("avatars", blobId, 3600);
 
 ## Uploading
 
-`upload` accepts `File | Blob | Uint8Array | ArrayBuffer`. SHA-256 is computed client-side and used for server-side dedup.
+`upload` accepts `File | Blob | Uint8Array | ArrayBuffer` (JS) or `Data` (Swift). SHA-256 is computed client-side and used for server-side dedup. See **Upload with disposition** above for the full options form. The download endpoint chooses `Content-Disposition` from the `?disposition=` query param (default `attachment`), not from the upload-time value — pass `disposition` explicitly to `downloadUrl`/`proxyUrl` when serving inline.
 
-```typescript
-import type {
-  BlobUploadSourceOptions,
-  BlobUploadResult,
-} from "js-bao-wss-client";
-
-const data = new TextEncoder().encode("hello blob");
-const { blobId, numBytes, contentType } = await blobs.upload(data, {
-  filename: "hello.txt",
-  contentType: "text/plain",
-  disposition: "attachment", // or "inline"; stored on the blob (sent as
-                              // X-Blob-Disposition). Note: the download
-                              // endpoint chooses Content-Disposition from the
-                              // ?disposition= query param (default "attachment"),
-                              // not from the upload-time value — pass
-                              // disposition explicitly to downloadUrl/proxyUrl
-                              // when serving inline.
-  // retainLocal: true (default) — keep a local copy after upload completes
-  // retainLocal: false — delete local bytes once the server confirms upload
-});
-```
-
-### From a file input (browser)
+### From a file input (browser, JS-only)
 
 ```typescript
 const file = (document.querySelector('input[type="file"]') as HTMLInputElement).files![0];
@@ -215,13 +99,15 @@ await blobs.upload(buf, { filename: file.name, contentType: file.type });
 
 Uploading the same `blobId` twice with **identical** `sha256` and `size` returns 200 with `bytesTransferred: 0` — the server keeps the existing object, so retries from a flaky network are free. Uploading the same `blobId` with **different** bytes (different sha256 or size) returns 409; pick a new `blobId` instead of overwriting. This dedup behavior is what makes `retryWithBackoff`-style upload loops safe.
 
-### `uploadFile` vs `upload`
+### `uploadFile` vs `upload` (JS-only)
 
 Both call the same code path. `uploadFile` returns a slightly trimmed result (`{ blobId, numBytes, bytesTransferred? }`). Prefer `upload`.
 
 ---
 
 ## Listing
+
+See **List / metadata / delete** above for the basic call. To page through results, follow the cursor:
 
 ```typescript
 const page1 = await blobs.list({ limit: 50 });
@@ -233,11 +119,13 @@ if (page1.cursor) {
 }
 ```
 
-`cursor` is an opaque pagination token; only present when more results exist.
+`cursor` is an opaque pagination token; only present when more results exist. (Swift `list(limit:)` returns the items array directly and does not expose the cursor.)
 
 ---
 
 ## Get metadata
+
+See **List / metadata / delete** above (`blobs.get(blobId)` / Swift `blobs.get(blobId:)`).
 
 ```typescript
 const meta = await blobs.get(blobId);
@@ -250,16 +138,20 @@ const meta = await blobs.get(blobId);
 
 ### Download URL (authenticated)
 
+The basic call is shown in **List / URL / read** above. JS accepts extra params; Swift's `downloadUrl(blobId:disposition:)` accepts only `disposition`.
+
 ```typescript
 const url = blobs.downloadUrl(blobId, {
   disposition: "attachment",        // or "inline"
-  attachmentFilename: "report.pdf", // optional override (RFC 5987-encoded)
+  attachmentFilename: "report.pdf", // optional override (RFC 5987-encoded) — JS-only
 });
 // Synchronous; returns a string. Authenticated via the user's session/cookie
 // against the API origin. Works in <a href={url} download> or window.location.
 ```
 
 ### Read content into memory
+
+`read` is shown in **List / URL / read** above. In JS the return format is selectable via `{ as }`; Swift's `read(blobId:)` always returns `Data`.
 
 ```typescript
 const text  = await blobs.read(blobId, { as: "text" });
@@ -286,6 +178,8 @@ Both behaviors are on the document blob path only. Bucket blobs go through signe
 
 ## Deleting
 
+See **List / metadata / delete** above.
+
 ```typescript
 const { deleted } = await blobs.delete(blobId); // { deleted: true }
 ```
@@ -294,9 +188,9 @@ Also cancels any in-flight upload for the same `blobId` and clears local bytes.
 
 ---
 
-## Offline & the upload queue
+## Offline & the upload queue (JS-only)
 
-The upload queue is keyed by user identity. It hydrates from IndexedDB on sign-in, retries with exponential backoff (2s base, 60s max), and persists across page reloads.
+The upload queue is keyed by user identity. It hydrates from IndexedDB on sign-in, retries with exponential backoff (2s base, 60s max), and persists across page reloads. The Swift client does not expose the upload queue, offline network mode, or prefetch.
 
 ### Upload while offline
 
@@ -339,7 +233,7 @@ await client.setNetworkMode("online");
 
 ---
 
-## Queue management
+## Queue management (JS-only)
 
 ```typescript
 // Inspect what's queued for this document
@@ -362,7 +256,7 @@ client.getBlobUploadConcurrency();
 
 ---
 
-## Events
+## Events (JS-only)
 
 ```typescript
 // status here is one of: "queued" | "uploading" | "pending" | "paused"
@@ -389,7 +283,7 @@ client.on("blobs:queue-drained", () => {
 
 ---
 
-## Service worker proxy (for `<img>` / `<video>`)
+## Service worker proxy (for `<img>` / `<video>`) (JS/web-only)
 
 `downloadUrl` requires the request to carry the user's auth token, which `<img>` tags don't do. Use `proxyUrl` if you've registered a service worker that forwards Primitive auth headers.
 
@@ -431,7 +325,7 @@ Both fields are optional and accept `null` to clear. Errors surface as `BLOB_NOT
 
 ---
 
-## Complete example: image upload with progress + display
+## Complete example: image upload with progress + display (JS/web-only)
 
 ```typescript
 async function uploadAndDisplay(
@@ -466,7 +360,7 @@ async function uploadAndDisplay(
 }
 ```
 
-## Complete example: offline-ready gallery
+## Complete example: offline-ready gallery (JS/web-only)
 
 ```typescript
 async function loadGallery(client: JsBaoClient, documentId: string) {
@@ -495,7 +389,7 @@ General-purpose binary storage that isn't tied to a document. Use buckets for av
 
 ## Bucket configuration
 
-A bucket has a `ttlTier` and an `accessPolicy`. Configure via TOML sync (preferred) or the CLI.
+A bucket has a `ttlTier` and an `accessPolicy`. Configure via TOML sync (preferred), the CLI, or `createBucket` (see **Bucket admin** above).
 
 ```toml
 # config/blob-buckets/avatars.toml
@@ -548,60 +442,14 @@ Don't reach for `permanent` for short-lived content — pay only for what you ne
 
 ## Client API
 
-The bucket API lives at `client.blobBuckets`. **All methods take `bucketIdOrKey` as a positional argument** — there is no per-bucket context object.
+The bucket API lives at `client.blobBuckets`. **All methods take `bucketIdOrKey` as a positional argument** — there is no per-bucket context object. The core operations (upload, signed URL, download, list, metadata, delete) are shown in **Bucket operations** above; bucket admin in **Bucket admin**.
 
-```typescript
-import type {
-  BlobInfo,
-  BlobUploadParams,
-  BucketBlobUploadResult,
-  BlobSignedUrlResult,
-} from "js-bao-wss-client";
+Notes on the surface:
 
-// Upload (data: ArrayBuffer | Uint8Array | Blob | string)
-const result: BucketBlobUploadResult = await client.blobBuckets.upload(
-  "avatars",
-  {
-    filename: "alice.jpg",
-    contentType: "image/jpeg",
-    data: file, // a File works (it's a Blob); also ArrayBuffer, Uint8Array, or string
-    tags: ["profile", "user:alice"], // optional
-  }
-);
-// result: { blobId, bucketId, filename, contentType, numBytes, sha256, tags, createdBy }
-
-// Signed URL (default 300s, min 30s, max 86400s; clamped server-side)
-const signed: BlobSignedUrlResult = await client.blobBuckets.getSignedUrl(
-  "avatars",
-  result.blobId,
-  3600 // expiresInSeconds
-);
-// signed: { url, token, expiresAt (unix seconds), expiresInSeconds }
-imgEl.src = signed.url;
-
-// Direct download (returns ArrayBuffer; uses authenticated request)
-const buf: ArrayBuffer = await client.blobBuckets.download("avatars", blobId);
-
-// List blobs in a bucket (cursor pagination; default limit 100, max 1000)
-const { items, cursor } = await client.blobBuckets.list("avatars", { limit: 50 });
-
-// Metadata only
-const meta: BlobInfo = await client.blobBuckets.getMetadata("avatars", blobId);
-
-// Delete a blob
-await client.blobBuckets.delete("avatars", blobId);
-
-// Bucket admin (admin/owner only)
-await client.blobBuckets.createBucket({
-  bucketKey: "uploads",
-  name: "User uploads",
-  ttlTier: "28d",
-  accessPolicy: "authenticated",
-});
-const buckets = await client.blobBuckets.listBuckets();
-const bucket  = await client.blobBuckets.getBucket("avatars");
-await client.blobBuckets.deleteBucket("avatars"); // cascades to all blobs
-```
+- **Upload** accepts `data: ArrayBuffer | Uint8Array | Blob | string` (JS) or `Data` (Swift). A `File` works in JS (it's a `Blob`). `tags: string[]` is the only extra metadata — there is no arbitrary `metadata` field. Result: `{ blobId, bucketId, filename, contentType, numBytes, sha256, tags, createdBy }`.
+- **Signed URL** defaults to 300s, min 30s, max 86400s (clamped server-side). Result: `{ url, token, expiresAt (unix seconds), expiresInSeconds }`.
+- **Download** returns an `ArrayBuffer` (JS) / `Data` (Swift) via an authenticated request.
+- **List** is cursor-paginated; default limit 100, max 1000.
 
 ### Don't do this
 
@@ -628,6 +476,8 @@ imgEl.src = `/app/${appId}/api/blob-buckets/${bucketId}/blobs/${blobId}`; // 401
 ```
 
 ### Signed URLs in `<img>` / `<video>`
+
+The signed-URL call is shown in **Read (signed URL / download)** above. In the browser, point an element at the returned `url`:
 
 ```typescript
 const { url, expiresAt } = await client.blobBuckets.getSignedUrl(

@@ -54,10 +54,7 @@ See the [Data Modeling guide](AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.md) for a f
 
 Documents must be opened before querying or modifying data within them.
 
-```typescript
-await jsBaoClient.documents.open(documentId);
-const result = await MyModel.query({}, { documents: documentId });
-```
+{{ example: documents/doc-open-query }}
 
 Documents are ready to be queried once the `.open()` call finishes. Applications should wait for all required documents to be opened and show a loading state until all needed documents have been opened. Often it's handy to track this with an `isReady` ref.
 
@@ -87,109 +84,19 @@ There is **no single "my documents" list**. A user reaches documents through **f
 
 **a. Documents they own** (`ownedDocuments` — created, or ownership transferred):
 
-JavaScript:
-<!-- example:start documents/list-owned lang=ts -->
-```typescript
-  // Paginated page — the unified { items, cursor } envelope, same shape as
-  // sharedDocuments():
-  const page = await client.me.ownedDocuments({
-    tag: "channel",
-    returnPage: true,
-  });
-  const { items, cursor } = page;
-
-  // (Without `returnPage`, the JS client returns a flat `DocumentInfo[]` for
-  // convenience: `const owned = await client.me.ownedDocuments({ tag: "channel" })`.)
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/list-owned lang=swift -->
-```swift
-  // The unified { items, cursor } envelope as [String: Any] — same shape as
-  // sharedDocuments(tag:).
-  let page = try await client.me.ownedDocuments(tag: "channel")
-  let items = page["items"] as? [[String: Any]] ?? []
-  let cursor = page["cursor"] as? String
-```
-<!-- example:end -->
+{{ example: documents/list-owned }}
 
 **b. Documents shared directly with them** (`sharedDocuments` — non-owner `DocumentPermission` rows + pending `DocumentInvitation`s; group/collection shares do NOT appear here):
 
-JavaScript:
-<!-- example:start documents/list-shared lang=ts -->
-```typescript
-  const { items, cursor } = await client.me.sharedDocuments({
-    tag: "channel",
-    limit: 50,
-  });
-
-  for (const doc of items) {
-    // Each row carries the base document fields (title, createdAt, …) plus the
-    // share extras (permission, source, grantedBy, invitationId).
-    console.log(doc.title, doc.permission, doc.grantedBy);
-  }
-
-  // `cursor` is a raw-JSON pagination cursor — pass it back for the next page.
-  if (cursor) {
-    const next = await client.me.sharedDocuments({ cursor });
-    return next;
-  }
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/list-shared lang=swift -->
-```swift
-  let page = try await client.me.sharedDocuments(limit: 50, tag: "channel")
-  let items = page["items"] as? [[String: Any]] ?? []
-
-  for doc in items {
-    // Each row carries the base document fields (title, createdAt, …) plus the
-    // share extras (permission, source, grantedBy, invitationId).
-    print(doc["title"] ?? "", doc["permission"] ?? "", doc["grantedBy"] ?? "")
-  }
-
-  // `cursor` is a raw-JSON pagination cursor — pass it back for the next page.
-  if let cursor = page["cursor"] as? String {
-    _ = try await client.me.sharedDocuments(cursor: cursor)
-  }
-```
-<!-- example:end -->
+{{ example: documents/list-shared }}
 
 **c. Documents shared via a group** (`groups.listDocuments`):
 
-JavaScript:
-<!-- example:start documents/list-group-documents lang=ts -->
-```typescript
-  const documents = await client.groups.listDocuments("team", "engineering");
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/list-group-documents lang=swift -->
-```swift
-  let documents = try await client.groups.listDocuments(groupType: "team", groupId: "engineering")
-```
-<!-- example:end -->
+{{ example: documents/list-group-documents }}
 
 **d. Documents shared via a collection** (`collections.listDocuments`):
 
-JavaScript:
-<!-- example:start documents/list-collection-documents lang=ts -->
-```typescript
-  const { items, cursor } = await client.collections.listDocuments(collectionId, {
-    limit: 50,
-  });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/list-collection-documents lang=swift -->
-```swift
-  let page = try await client.collections.listDocuments(
-    collectionId: collectionId,
-    options: PaginationOptions(limit: 50)
-  )
-  let items = page["items"] as? [[String: Any]] ?? []
-```
-<!-- example:end -->
+{{ example: documents/list-collection-documents }}
 
 `ownedDocuments` and `sharedDocuments` return the unified `{ items, cursor }` envelope (raw-JSON `cursor`, NOT base64url). Each `SharedDocument` in `items` extends `DocumentInfo`: base document fields (`title`, `createdBy`, `createdAt`, `lastModified`, plus `tags`/`metadata`/`thumbnailBlobId` when set) plus the share-only extras `permission` (never `"owner"`), `source` (`"permission"` | `"invitation"`), `grantedBy`, `invitationId` (invitation rows only). In JS, `ownedDocuments()` returns a flat `DocumentInfo[]` by default and the envelope with `returnPage: true`; Swift always returns the envelope as `[String: Any]`.
 
@@ -217,348 +124,51 @@ Every example below is compiled against the real clients as part of the docs bui
 
 ### Create
 
-JavaScript:
-<!-- example:start documents/model-create lang=ts -->
-```typescript
-  const task = new Task({
-    title: "Review pull request",
-    priority: 2,
-    dueDate: new Date().toISOString(),
-  });
-  await task.save();
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/model-create lang=swift -->
-```swift
-  let task = try tasks.create(Task(
-    id: UUID().uuidString,
-    title: "Review pull request",
-    priority: 2
-  ))
-  _ = task
-```
-<!-- example:end -->
+{{ example: documents/model-create }}
 
 ### Read (find / query / first / count)
 
-JavaScript:
-<!-- example:start documents/model-read lang=ts -->
-```typescript
-  // Find one by id
-  const task = await Task.find("task-id");
-
-  // Query with filters — returns a PaginatedResult; rows are on `.data`
-  const urgent = await Task.query({ priority: { $gte: 2 }, completed: false });
-  const rows = urgent.data;
-
-  // First match (with a sort)
-  const topTask = await Task.queryOne({ completed: false }, { sort: { priority: -1 } });
-
-  // Count
-  const remaining = await Task.count({ completed: false });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/model-read lang=swift -->
-```swift
-  // Find one by id
-  let task = tasks.find("task-id")
-
-  // Query with filters
-  let urgent = tasks.query(["priority": ["$gte": 2], "completed": false])
-
-  // First match (with a sort)
-  let topTask = tasks.query(
-    ["completed": false],
-    options: QueryOptions(sort: ["priority": -1])
-  ).first
-
-  // Count
-  let remaining = tasks.dynamic.count(["completed": false])
-```
-<!-- example:end -->
+{{ example: documents/model-read }}
 
 ### Update
 
-JavaScript:
-<!-- example:start documents/model-update lang=ts -->
-```typescript
-  const task = await Task.find(taskId);
-  if (task) {
-    task.completed = true;
-    await task.save();
-  }
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/model-update lang=swift -->
-```swift
-  if let task = tasks.find(taskId) {
-    tasks.update(task.id, ["completed": true])
-  }
-```
-<!-- example:end -->
+{{ example: documents/model-update }}
 
 ### Delete
 
-JavaScript:
-<!-- example:start documents/model-delete lang=ts -->
-```typescript
-  const task = await Task.find(taskId);
-  if (task) {
-    await task.delete();
-  }
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/model-delete lang=swift -->
-```swift
-  tasks.delete(taskId)
-```
-<!-- example:end -->
+{{ example: documents/model-delete }}
 
 ### Upsert by natural key
 
-JavaScript:
-<!-- example:start documents/model-upsert lang=ts -->
-```typescript
-  const user = new AppUser({ email: "alice@example.com", name: "Alice" });
-  // Creates a new record, or merges into the existing one with that email.
-  await user.save({ upsertOn: "email" });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/model-upsert lang=swift -->
-```swift
-  // Creates a new record, or merges into the existing one with that email.
-  _ = try users.dynamic.upsert(
-    ["email": .string("alice@example.com"), "name": .string("Alice")],
-    on: "email"
-  )
-```
-<!-- example:end -->
+{{ example: documents/model-upsert }}
 
 ### Logical query operators
 
-JavaScript:
-<!-- example:start documents/query-logical lang=ts -->
-```typescript
-  const result = await Task.query({
-    $or: [
-      { priority: 3 },
-      { dueDate: { $lt: new Date().toISOString() } },
-    ],
-  });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/query-logical lang=swift -->
-```swift
-  let result = tasks.query([
-    "$or": [
-      ["priority": 3],
-      ["dueDate": ["$lt": "2026-06-02T00:00:00Z"]],
-    ],
-  ])
-```
-<!-- example:end -->
+{{ example: documents/query-logical }}
 
 ### Sort + cursor pagination
 
-JavaScript:
-<!-- example:start documents/query-paginate lang=ts -->
-```typescript
-  const page1 = await Task.query(
-    { completed: false },
-    { limit: 20, sort: { priority: -1 } },
-  );
-
-  if (page1.nextCursor) {
-    const page2 = await Task.query(
-      { completed: false },
-      { limit: 20, sort: { priority: -1 }, uniqueStartKey: page1.nextCursor },
-    );
-    return page2.data;
-  }
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/query-paginate lang=swift -->
-```swift
-  let page1 = try tasks.dynamic.queryPaged(
-    ["completed": false],
-    options: QueryOptions(sortOrder: [("priority", -1)], limit: 20)
-  )
-
-  if let cursor = page1.nextCursor {
-    let page2 = try tasks.dynamic.queryPaged(
-      ["completed": false],
-      options: QueryOptions(sortOrder: [("priority", -1)], limit: 20, cursor: cursor)
-    )
-    _ = page2
-  }
-```
-<!-- example:end -->
+{{ example: documents/query-paginate }}
 
 ### Aggregation
 
-JavaScript:
-<!-- example:start documents/aggregate lang=ts -->
-```typescript
-  const stats = await Task.aggregate({
-    groupBy: ["category"],
-    operations: [
-      { type: "count" },
-      { type: "avg", field: "priority" },
-      { type: "sum", field: "estimatedHours" },
-    ],
-    filter: { completed: false },
-    sort: { field: "count", direction: -1 },
-    limit: 10,
-  });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/aggregate lang=swift -->
-```swift
-  let stats = tasks.dynamic.aggregate(AggregateOptions(
-    groupBy: ["category"],
-    operations: [
-      AggregateOperation(type: .count),
-      AggregateOperation(type: .avg, field: "priority"),
-      AggregateOperation(type: .sum, field: "estimatedHours"),
-    ],
-    filter: ["completed": false],
-    sort: AggregateSort(field: "count", direction: -1),
-    limit: 10
-  ))
-```
-<!-- example:end -->
+{{ example: documents/aggregate }}
 
 ### Subscribe to changes
 
-JavaScript:
-<!-- example:start documents/subscribe lang=ts -->
-```typescript
-  const unsubscribe = Task.subscribe(() => {
-    // re-query and update your UI
-  });
-
-  // later, when you no longer need updates:
-  unsubscribe();
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/subscribe lang=swift -->
-```swift
-  let unsubscribe = tasks.dynamic.subscribe {
-    // re-query and update your UI
-  }
-
-  // later, when you no longer need updates:
-  unsubscribe()
-```
-<!-- example:end -->
+{{ example: documents/subscribe }}
 
 ### Resolve-or-create a singleton document
 
-JavaScript:
-<!-- example:start documents/get-or-create-doc lang=ts -->
-```typescript
-  const result = await client.documents.getOrCreateWithAlias({
-    title: "My Data",
-    alias: { scope: "user", aliasKey: "default-doc" },
-  });
-  await client.documents.open(result.documentId);
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/get-or-create-doc lang=swift -->
-```swift
-  let result = try await client.documents.getOrCreateWithAlias(
-    alias: ["scope": "user", "aliasKey": "default-doc"],
-    title: "My Data"
-  )
-  if let documentId = result["documentId"] as? String {
-    _ = try await client.documents.open(documentId)
-  }
-```
-<!-- example:end -->
+{{ example: documents/get-or-create-doc }}
 
 ### Share a document (user / email / group)
 
-JavaScript:
-<!-- example:start documents/share-document lang=ts -->
-```typescript
-  // By user ID
-  await client.documents.updatePermissions(documentId, {
-    userId: "user-abc",
-    permission: "read-write",
-  });
-
-  // By email — works whether or not the recipient is a member yet
-  await client.documents.updatePermissions(documentId, {
-    email: "colleague@example.com",
-    permission: "read-write",
-  });
-
-  // With a group
-  await client.documents.grantGroupPermission(documentId, {
-    groupType: "team",
-    groupId: "engineering",
-    permission: "read-write",
-  });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/share-document lang=swift -->
-```swift
-  // By user ID
-  _ = try await client.documents.updatePermissions(
-    documentId: documentId,
-    params: ["userId": "user-abc", "permission": "read-write"]
-  )
-
-  // By email — works whether or not the recipient is a member yet
-  _ = try await client.documents.updatePermissions(
-    documentId: documentId,
-    params: ["email": "colleague@example.com", "permission": "read-write"]
-  )
-
-  // With a group
-  _ = try await client.documents.grantGroupPermission(
-    documentId: documentId,
-    params: ["groupType": "team", "groupId": "engineering", "permission": "read-write"]
-  )
-```
-<!-- example:end -->
+{{ example: documents/share-document }}
 
 ### Update thumbnail / metadata
 
-JavaScript:
-<!-- example:start documents/update-metadata lang=ts -->
-```typescript
-  await client.documents.update(documentId, {
-    title: "Q2 Planning",
-    thumbnailBlobId: blobId,                              // a blob you uploaded
-    metadata: { color: "blue", tags: ["plan", "q2"] },   // ≤4KB JSON, replace semantics
-  });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start documents/update-metadata lang=swift -->
-```swift
-  _ = try await client.documents.update(
-    documentId: documentId,
-    data: [
-      "title": "Q2 Planning",
-      "thumbnailBlobId": blobId,                                 // a blob you uploaded
-      "metadata": ["color": "blue", "tags": ["plan", "q2"]],     // ≤4KB JSON, replace semantics
-    ]
-  )
-```
-<!-- example:end -->
+{{ example: documents/update-metadata }}
 
 ## Common Document Usage Patterns
 
@@ -574,18 +184,7 @@ Each user gets exactly one document that holds all their data. The document is o
 
 **User experience:** Users sign in and immediately see their data. No concept of "documents" is exposed in the UI.
 
-**Implementation:**
-
-```typescript
-// On app initialization after user is authenticated
-// Use getOrCreateWithAlias for idempotent initialization — no try/catch needed
-const result = await jsBaoClient.documents.getOrCreateWithAlias({
-  title: "My Data",
-  alias: { scope: "user", aliasKey: "default-doc" },
-});
-// result.created === true if a new document was just created
-await jsBaoClient.documents.open(result.documentId);
-```
+**Implementation** — resolve-or-create the per-user document on app init, then open it (see [Resolve-or-create a singleton document](#resolve-or-create-a-singleton-document) above for the compiled call). `result.created === true` if a new document was just created.
 
 ### Pattern 2: One Document at a Time (Workspaces)
 
@@ -595,17 +194,9 @@ Users have multiple documents but work in one at a time, switching between them.
 
 **UI components** in `src/components/documents/`: `PrimitiveDocumentSwitcher` (sidebar dropdown) and `PrimitiveDocumentList` (full management page with rename/share/delete).
 
-```typescript
-// List, open, create
-const documents = await jsBaoClient.me.ownedDocuments();
-await jsBaoClient.documents.open(selectedDocumentId);
+List with `me.ownedDocuments()` and `open()` the selected document; create a new workspace document with `create()` and open it:
 
-const { metadata } = await jsBaoClient.documents.create({
-  title: "New Project",
-  tags: ["workspace"],
-});
-await jsBaoClient.documents.open(metadata.documentId);
-```
+{{ example: documents/create-document }}
 
 ### Pattern 3: Multiple Documents
 
@@ -626,7 +217,7 @@ const messages = await Message.query({});
 
 **Implementation tips for Pattern 3:** The demo app does not ship a built-in "multi-document" Pinia store. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over a local store. For per-tag in-memory tracking, build directly on `jsBaoClient.me.ownedDocuments({ tag })` and `jsBaoClient.documents.open()`, and track per-document readiness yourself.
 
-A minimal store for "all documents tagged `channel`":
+A minimal store for "all documents tagged `channel`" (Vue/Pinia framework glue — web-specific, left inline):
 
 ```typescript
 // stores/channelDocsStore.ts
@@ -698,7 +289,11 @@ The same pattern adapts to "the K most recent" or "channels the user belongs to"
 
 ### Tagging Documents
 
-Use tags to categorize documents by type:
+Use tags to categorize documents by type. Pass `tags` to `create()`, filter the user's owned documents by tag server-side, or add/remove tags on an existing document:
+
+{{ example: documents/tag-documents }}
+
+You can also create a tagged document and filter locally:
 
 ```typescript
 const { metadata } = await jsBaoClient.documents.create({
@@ -706,22 +301,9 @@ const { metadata } = await jsBaoClient.documents.create({
   tags: ["todolist"],
 });
 
-// Filter the user's owned documents by tag
-const todoLists = await jsBaoClient.me.ownedDocuments({ tag: "todolist" });
-
-// Or filter locally
+// Filter locally
 const owned = await jsBaoClient.me.ownedDocuments();
 const todoListsLocal = owned.filter((doc) => doc.tags?.includes("todolist"));
-```
-
-**Programmatic tag management:**
-
-```typescript
-// Add a tag to an existing document
-await jsBaoClient.documents.addTag(documentId, "archived");
-
-// Remove a tag from a document
-await jsBaoClient.documents.removeTag(documentId, "archived");
 ```
 
 ## Defining Models
@@ -960,16 +542,7 @@ items.map(...);  // TypeError: items.map is not a function
 | `$all`          | StringSet contains all values  | `{ tags: { $all: ["work", "urgent"] } }`             |
 | `$size`         | StringSet size comparison      | `{ tags: { $size: { $gte: 2 } } }`                   |
 
-**Logical operators:**
-
-```typescript
-const result = await Task.query({
-  $or: [
-    { priority: 3 },
-    { dueDate: { $lt: new Date().toISOString() } },
-  ],
-});
-```
+**Logical operators** — see [Logical query operators](#logical-query-operators) above for the compiled `$or` example. Plain field maps AND together:
 
 ```typescript
 const result = await Task.query({
@@ -981,25 +554,7 @@ const result = await Task.query({
 
 ### Pagination
 
-Use cursor-based pagination for large result sets:
-
-```typescript
-const pageSize = 20;
-let cursor: string | undefined;
-
-// First page
-const page1 = await Task.query(
-  { completed: false },
-  { limit: pageSize, sort: { createdAt: -1 } }
-);
-
-// Next page using cursor
-cursor = page1.nextCursor;
-const page2 = await Task.query(
-  { completed: false },
-  { limit: pageSize, sort: { createdAt: -1 }, uniqueStartKey: cursor }
-);
-```
+Use cursor-based pagination for large result sets — see [Sort + cursor pagination](#sort--cursor-pagination) above for the compiled `nextCursor` / `uniqueStartKey` example.
 
 ### Counting Records
 
@@ -1083,20 +638,9 @@ const result = await Article.query({}, {
 
 ### Aggregations
 
-Group and calculate statistics. Returns a **nested object keyed by group values** (not an array):
+Group and calculate statistics — see [Aggregation](#aggregation) above for the compiled call. The result is a **nested object keyed by group values** (not an array):
 
 ```typescript
-const stats = await Task.aggregate({
-  groupBy: ["category"],
-  operations: [
-    { type: "count" },
-    { type: "avg", field: "priority" },
-    { type: "sum", field: "estimatedHours" },
-  ],
-  filter: { completed: false },             // optional: filter records before aggregating
-  sort: { field: "count", direction: -1 },  // optional: sort results
-  limit: 10,                                // optional: cap number of groups returned
-});
 // Returns:
 // {
 //   work:     { count: 8, avg_priority: 2.5, sum_estimatedHours: 40 },
@@ -1173,7 +717,7 @@ const {
 
 `useJsBaoDataLoader` is the right tool inside a component. Outside one — a **Pinia store**, a singleton service, a router guard — do not reach for it: its `onMounted`-based subscriptions never register there, so reactive updates silently never fire.
 
-`Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle. It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). Wire it up directly in the store's `setup()` and keep the unsubscribe handle so you can tear it down:
+`Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle (see [Subscribe to changes](#subscribe-to-changes) above for the compiled call). It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). Wire it up directly in the store's `setup()` and keep the unsubscribe handle so you can tear it down (Vue/Pinia framework glue — web-specific, left inline):
 
 ```typescript
 // stores/tasksStore.ts
@@ -1296,12 +840,7 @@ When saving new objects, you need to specify which document they go into. There 
 
 ### Deleting Records
 
-```typescript
-const task = await Task.find("task-id");
-if (task) {
-  await task.delete();
-}
-```
+Delete a record after finding it — see [Delete](#delete) above for the compiled call.
 
 ### Upsert by Unique Constraint
 
@@ -1328,7 +867,7 @@ await User.upsertByUnique(
 
 Single-field constraints declared via `unique = true` in TOML get an auto-generated name of `<modelName>_<fieldName>_unique` (where `modelName` is the `[models.<name>]` block key). Use `[[models.X.options.unique_constraints]]` to control the name explicitly.
 
-For single-field upserts where the value already lives on the instance, `save({ upsertOn })` is simpler than `upsertByUnique` — see next section.
+For single-field upserts where the value already lives on the instance, `save({ upsertOn })` is simpler than `upsertByUnique` — see [Upsert by natural key](#upsert-by-natural-key) above for the compiled call.
 
 **Wrong** — common mistakes that throw at runtime:
 
@@ -1347,13 +886,7 @@ await Category.upsertByUnique("name_parent_unique", ["Work", null], { name: "Hom
 
 ### Upsert by Natural Key (`upsertOn`)
 
-Use the `upsertOn` option in `save()` to upsert by a natural unique field (e.g., `email`, `slug`) without knowing the existing record's ID. The field must have a single-field `uniqueConstraints` entry on the model.
-
-```typescript
-const user = new User({ email: "alice@example.com", name: "Alice", role: "admin" });
-// Creates a new record if none exists with that email, or merges into the existing one
-const result = await user.save({ upsertOn: "email" });
-```
+Use the `upsertOn` option in `save()` to upsert by a natural unique field (e.g., `email`, `slug`) without knowing the existing record's ID. The field must have a single-field `uniqueConstraints` entry on the model. See [Upsert by natural key](#upsert-by-natural-key) above for the compiled call.
 
 Behavior:
 - **No existing record**: creates a new record with an auto-generated ID (or the caller-provided ID)
@@ -1417,17 +950,7 @@ Run `npx js-bao-codegen-v2` and import as `import { TodoList, TodoItem } from "@
 
 ### Singleton Documents with Aliases
 
-For documents that should exist exactly once (default document, settings), use `getOrCreateWithAlias`. This single call atomically resolves an existing alias or creates a new document with that alias, eliminating race conditions when multiple clients initialize simultaneously.
-
-```typescript
-// Atomic get-or-create — handles everything in one call
-const result = await jsBaoClient.documents.getOrCreateWithAlias({
-  title: "My Preferences",
-  alias: { scope: "user", aliasKey: "user-preferences" },
-});
-// result.created === true if a new document was just created
-await jsBaoClient.documents.open(result.documentId);
-```
+For documents that should exist exactly once (default document, settings), use `getOrCreateWithAlias`. This single call atomically resolves an existing alias or creates a new document with that alias, eliminating race conditions when multiple clients initialize simultaneously. See [Resolve-or-create a singleton document](#resolve-or-create-a-singleton-document) above for the compiled call.
 
 **Alias scopes:**
 
@@ -1450,13 +973,9 @@ Documents can be shared with individual users (by userId or email), with groups,
 
 ### Quick Reference
 
-```typescript
-// By userId — single user
-await client.documents.updatePermissions(documentId, {
-  userId: "user-abc",
-  permission: "read-write",
-});
+The core share calls — by userId, by email, and with a group — are in [Share a document (user / email / group)](#share-a-document-user--email--group) above. The full surface adds batch grants, deferred email shares, and access requests:
 
+```typescript
 // Batch — multiple users at once
 await client.documents.updatePermissions(documentId, {
   permissions: [
@@ -1465,11 +984,11 @@ await client.documents.updatePermissions(documentId, {
   ],
 });
 
-// By email — resolves if the user exists, otherwise creates a deferred grant
-// that auto-applies when the recipient signs up. With `sendEmail: true`,
-// `documentUrl` is required AND the app must have `baseUrl` configured
-// (used to compose the accept URL for the deferred-share email). Both
-// preconditions return HTTP 400 if missing.
+// By email with notification — resolves if the user exists, otherwise creates a
+// deferred grant that auto-applies when the recipient signs up. With
+// `sendEmail: true`, `documentUrl` is required AND the app must have `baseUrl`
+// configured (used to compose the accept URL for the deferred-share email).
+// Both preconditions return HTTP 400 if missing.
 await client.documents.updatePermissions(documentId, {
   email: "alice@example.com",
   permission: "read-write",
@@ -1479,16 +998,6 @@ await client.documents.updatePermissions(documentId, {
 // Returns either a DirectPermissionGrant (existing user) or a
 // DeferredPermissionGrant ({ invitationId, inviteToken, ... }) that the
 // recipient redeems via client.invitations.accept(inviteToken) after signup.
-// With `sendEmail: true`, existing members get the `document-share` email
-// (using your `documentUrl`); non-members get the `document-share-deferred`
-// email (using `app.baseUrl` + the `inviteToken` for the accept URL).
-
-// With a group
-await client.documents.grantGroupPermission(documentId, {
-  groupType: "team",
-  groupId: "engineering",
-  permission: "read-write",
-});
 
 // Respond to a 403 with canRequestAccess hint. `permission` is REQUIRED.
 try {
@@ -1516,7 +1025,7 @@ Render the user's documents from two calls: `client.me.ownedDocuments()` for doc
 
 ### Using PrimitiveShareDocumentDialog
 
-When allowing users to share documents, use `PrimitiveShareDocumentDialog`:
+When allowing users to share documents, use `PrimitiveShareDocumentDialog` (Vue framework glue — web-specific, left inline):
 
 ```vue
 <PrimitiveShareDocumentDialog
@@ -1558,17 +1067,7 @@ async function handleInvitationAccepted(documentId: string): Promise<void> {
 
 When your app opens many documents over a session (e.g., viewing individual items that each live in their own document), close documents you're no longer using to avoid accumulating sync connections:
 
-```typescript
-// Close a document and stop syncing
-await jsBaoClient.documents.close(documentId);
-
-// Close and remove the local cached copy
-// Safe: eviction is skipped if the server doesn't yet have all local writes
-const { evicted } = await jsBaoClient.documents.close(documentId, { evictLocal: true });
-if (!evicted) {
-  // Server was not fully in sync — local copy was retained
-}
-```
+{{ example: documents/close-document }}
 
 When `evictLocal: true` is passed, the client performs a state vector check against the server before removing local data. If the server hasn't received all local writes (e.g. due to a brief network interruption), eviction is skipped and `evicted: false` is returned. This prevents data loss during WebSocket instability.
 
@@ -1576,37 +1075,15 @@ When `evictLocal: true` is passed, the client performs a state vector check agai
 
 Use these methods to confirm the server has received your writes before taking irreversible actions (e.g., logging out, clearing local storage):
 
-```typescript
-// Check if the server has received all of this client's writes
-const hasAllWrites = await jsBaoClient.documents.includesWrites(documentId);
+{{ example: documents/sync-verification }}
 
-// Check if client and server have completely identical document state
-const fullyInSync = await jsBaoClient.documents.inSync(documentId);
-```
-
-Both return `false` if the client is disconnected or the check times out. An optional `timeoutMs` parameter controls how long to wait (default: 5000ms).
-
-For cases where you need to wait until the server is confirmed to have all writes, use the polling helpers — they exist on both `documents.*` and the client root:
-
-```typescript
-// Wait until server has all writes (returns true on success, false on timeout)
-await jsBaoClient.documents.waitForWriteConfirmation(documentId);
-
-// Wait until fully in sync (throws on timeout)
-await jsBaoClient.documents.waitForInSync(documentId);
-```
+The point-in-time checks return `false` if the client is disconnected or the check times out (JS accepts an optional `timeoutMs`; Swift's `includesWrites` / `inSync` are synchronous local reads). The `waitFor*` polling helpers exist on both `documents.*` and the client root: `waitForWriteConfirmation` returns true on success / false on timeout, and `waitForInSync` throws on timeout.
 
 ### Updating Document Metadata
 
-```typescript
-// Update a document's title, thumbnail, and presentation metadata.
-// Each field is optional; pass `null` to clear `thumbnailBlobId` or `metadata`.
-await jsBaoClient.documents.update(documentId, {
-  title: "New Title",
-  thumbnailBlobId: blob.blobId,        // a blob ID owned by this document
-  metadata: { color: "blue", cover: { kind: "preset", name: "ocean" } },
-});
+Update a document's title, thumbnail, and presentation metadata — see [Update thumbnail / metadata](#update-thumbnail--metadata) above for the compiled call. Each field is optional; pass `null` to clear `thumbnailBlobId` or `metadata`.
 
+```typescript
 // Check if a document is currently open
 const open = jsBaoClient.documents.isOpen(documentId);
 ```
@@ -1621,26 +1098,18 @@ const open = jsBaoClient.documents.isOpen(documentId);
 
 ### Deleting Documents
 
-```typescript
-// Delete a document (must be closed first)
-await jsBaoClient.documents.delete(documentId);
+Delete a document (it must be closed first, or pass `forceCloseIfOpen: true`) — see the compiled call below. Root documents cannot be deleted.
 
-// Force-close before deleting
-await jsBaoClient.documents.delete(documentId, { forceCloseIfOpen: true });
-```
-
-Note: Root documents cannot be deleted.
+{{ example: documents/delete-document }}
 
 ### Programmatic Sharing — Full Reference
 
-Beyond the Quick Reference and the `PrimitiveShareDocumentDialog` UI, the full programmatic surface:
+Beyond the Quick Reference and the `PrimitiveShareDocumentDialog` UI, the full programmatic surface. Inspecting a document's current members and pending invites:
+
+{{ example: sharing/document-members }}
 
 ```typescript
-// Inspect access
-await jsBaoClient.documents.getPermissions(documentId);
-// → [{ userId, email, name, permission, grantedAt }, ...]
 await jsBaoClient.documents.listGroupPermissions(documentId);
-await jsBaoClient.documents.listPendingInvitations(documentId);
 
 // Mutate access — by user id
 await jsBaoClient.documents.updatePermissions(documentId, {
@@ -1680,14 +1149,11 @@ await jsBaoClient.documents.revokeGroupPermission(documentId, groupType, groupId
 // Recipient redeems a deferred grant (after signup or in a different session)
 // using the inviteToken returned from updatePermissions.
 await client.invitations.accept(inviteToken);
-
-// Access requests (when caller has no access yet)
-await jsBaoClient.documents.requestAccess(documentId, {
-  permission: "read-write", message, documentUrl, reviewUrl,
-});
-await jsBaoClient.documents.listAccessRequests(documentId);     // owners only
-await jsBaoClient.documents.approveAccessRequest(documentId, requestId);
 ```
+
+The access-request flow (a user with a link requests access; an owner lists and approves) is compiled here:
+
+{{ example: sharing/request-access }}
 
 ### Collections
 
@@ -1700,42 +1166,33 @@ Group documents into a **collection** to share them as a unit. Permissions grant
 - Member access is O(1) regardless of collection size (uses system-managed groups internally).
 - **Cascade rule:** sharing a collection automatically propagates access to every document inside it (current and future). Don't add per-document grants for documents already shared at the collection level — the collection grant is canonical. Prefer collection-level sharing over per-document sharing whenever the same set of users should see a related set of docs.
 
+Create a collection, add/remove documents, and share it with a group or an individual user:
+
+{{ example: documents/collection-manage }}
+
+A collection's members + pending invites in one call:
+
+{{ example: sharing/collection-access }}
+
+Additional collection calls:
+
 ```typescript
-// Create
+// Optional, immutable-after-create — bind create() to a CollectionTypeConfig
+// rule set and an external entity (exposed to CEL as collection.contextId).
 const collection = await client.collections.create({
   name: "Q1 Reports",
-  description: "All quarterly report documents",
-  // Optional, immutable-after-create — bind to a CollectionTypeConfig rule set
-  // and an external entity (exposed to CEL as collection.contextId).
   collectionType: "class-reports",
   contextId: "math-101",
 });
-
-// Add / remove documents
-await client.collections.addDocument(collection.collectionId, documentId);
-await client.collections.removeDocument(collection.collectionId, documentId);
 
 // List
 await client.collections.listDocuments(collection.collectionId);
 // → { items: CollectionDocumentInfo[], cursor?: string }
 await client.collections.listCollectionsForDocument(documentId);
 
-// Share with a group (fans out to every document in the collection)
-await client.collections.grantGroupPermission(collection.collectionId, {
-  groupType: "team", groupId: "engineering", permission: "read-write",
-});
 await client.collections.revokeGroupPermission(collection.collectionId, "team", "engineering");
-
-// Share with individual users (O(1)). userId only — no email/deferred form yet.
-await client.collections.addMember(collection.collectionId, {
-  userId: targetUserId, permission: "reader",
-});
 await client.collections.removeMember(collection.collectionId, targetUserId);
 // Change a user's permission: call addMember again with the new level.
-
-// Inspect all access
-const access = await client.collections.getAccess(collection.collectionId);
-// → { groups: [...], members: [...] }
 ```
 
 > **Gap (#671):** `collections.addMember` accepts `userId` only — no email-based deferred grant, and there's no `collections.listPendingInvitations` to power a "Members + Pending" UI on a collection. To share a collection with someone who hasn't signed up, either get them into the app first (`client.invitations.create({ email })`, or share an individual document by email so the deferred-grant flow runs) and add them to the collection after signup, or share the collection with a group they'll be a member of.
@@ -1757,7 +1214,7 @@ primitive collections access <collection-id>
 
 ### Read-Only Permission Handling
 
-When a user has "reader" permission, disable all edit functionality:
+When a user has "reader" permission, disable all edit functionality (Vue computed — web-specific, left inline):
 
 ```typescript
 const isReadOnly = computed(() => {

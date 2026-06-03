@@ -16,18 +16,20 @@ Each method must be enabled in the Admin Console. Check availability with `getAu
 ## Discovering Available Methods
 
 ```typescript
-const config = await client.getAuthConfig();
-// {
-//   appId, name, mode, waitlistEnabled,
-//   googleOAuthEnabled, googleClientId, hasOAuth, redirectUris,
-//   passkeyEnabled, passkeyRpId, passkeyRpName, passkeyRpConfig, hasPasskey,
-//   magicLinkEnabled, otpEnabled
-// }
+  const config = await client.getAuthConfig();
+  // {
+  //   appId, name, mode, waitlistEnabled,
+  //   googleOAuthEnabled, googleClientId, hasOAuth, redirectUris,
+  //   passkeyEnabled, passkeyRpId, passkeyRpName, hasPasskey,
+  //   magicLinkEnabled, otpEnabled
+  // }
 
-if (config.hasOAuth) showGoogleButton();
-if (config.magicLinkEnabled) showMagicLinkForm();
-if (config.otpEnabled) showOtpForm();
-if (config.hasPasskey) showPasskeyButton();
+  const methods = {
+    google: config.hasOAuth,
+    magicLink: config.magicLinkEnabled,
+    otp: config.otpEnabled,
+    passkey: config.hasPasskey,
+  };
 ```
 
 `hasOAuth` is true when Google OAuth is enabled (the flag defaults to enabled when both `googleClientId` and the server-side `googleClientSecret` are configured). `hasPasskey` requires `passkeyEnabled` plus a non-empty `passkeyRpConfig` map. `magicLinkEnabled` and `otpEnabled` default to `true` unless explicitly disabled in the Admin Console.
@@ -52,17 +54,23 @@ if (config.hasPasskey) showPasskeyButton();
 ### Start the flow
 
 ```typescript
-const hasOAuth = await client.checkOAuthAvailable();
-if (hasOAuth) {
-  await client.startOAuthFlow(continueUrl); // Redirects browser to Google
-}
+  const hasOAuth = await client.checkOAuthAvailable();
+  if (hasOAuth) {
+    // Redirects the browser to Google. Code after this does not run on success.
+    await client.startOAuthFlow(continueUrl);
+  }
+
+  // On the callback route (?code=&state=): token is stored, WS reconnects.
+  await client.handleOAuthCallback(code, state);
 ```
 
 `startOAuthFlow` throws `Error("OAuth not configured")` if `oauthRedirectUri` was not passed to `initializeClient`. The browser navigates away — code after the call doesn't run on success.
 
+On Swift, `startOAuthFlow(redirectUri:continueUrl:)` takes an explicit `redirectUri` and **returns** the authorization URL to open yourself (e.g. via `ASWebAuthenticationSession`) rather than redirecting the browser.
+
 **`autoOAuth` client option.** Pass `autoOAuth: true` (with `oauthRedirectUri`) to `initializeClient` and the client will auto-redirect to OAuth whenever it comes back online without a valid token (e.g. a refresh failed, or there was no persisted token). For apps where OAuth is the only sign-in path this avoids hand-rolling the "no token, send to login" branch. Leave it off if you have multiple sign-in methods or want to render your own login screen first.
 
-Optional second argument supports waitlist enrollment and invite-token acceptance:
+Optional second argument supports waitlist enrollment and invite-token acceptance (TypeScript client only — the Swift `startOAuthFlow` has no waitlist/inviteToken options):
 
 ```typescript
 await client.startOAuthFlow(continueUrl, {
@@ -104,6 +112,8 @@ const token = await JsBaoClient.exchangeOAuthCode({
 // Persist however your app does (storage / cookie / pass to initializeClient)
 ```
 
+Swift exposes the same static helper as `JsBaoClient.exchangeOAuthCode(apiUrl:appId:code:state:)`, but **without** the refresh-proxy parameters — it always exchanges the code directly.
+
 **Don't:**
 
 ```typescript
@@ -118,21 +128,26 @@ const { token } = await client.handleOAuthCallback(code, state);
 
 ## Magic Link
 
-### Request
+### Request + verify
 
 ```typescript
-// Requires oauthRedirectUri set on the client OR explicit redirectUri option.
-await client.magicLinkRequest("user@example.com");
+  // Request the email. Requires oauthRedirectUri on the client, or pass
+  // an explicit redirectUri here.
+  await client.magicLinkRequest(email, {
+    redirectUri: "https://app.example.com/auth/magic-callback",
+  });
 
-// Override the redirect:
-await client.magicLinkRequest("user@example.com", {
-  redirectUri: "https://app.example.com/auth/magic-callback",
-});
+  // On the callback page, read ?magic_token=... and verify it.
+  const { user, isNewUser, promptAddPasskey } =
+    await client.magicLinkVerify(magicToken);
+  // Token is now stored on the client and the WS auto-connects.
 ```
 
-Throws `Error("Redirect URI not configured")` if neither is set.
+The TypeScript `magicLinkRequest` accepts an optional `redirectUri` (defaulting to the client's `oauthRedirectUri`) and throws `Error("Redirect URI not configured")` if neither is set. On Swift, `magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument, and `magicLinkVerify(token:)` returns the raw `[String: Any]` response (no `inviteToken` option).
 
-### Verify (callback page reads `?magic_token=...`)
+### Reading the token (web callback page)
+
+On the web the callback page reads `?magic_token=...` off the URL and feeds it to `magicLinkVerify`:
 
 ```typescript
 const magicToken = new URLSearchParams(window.location.search).get("magic_token");
@@ -149,7 +164,7 @@ The query param name is **`magic_token`** (not `token`, `magicToken`, or `code`)
 
 The callback URL may also carry `?purpose=login-add-passkey`. The server appends this when the link was sent for an existing user the platform thinks should add a passkey (e.g. they signed in via OTP/magic-link but have no passkey on file). The `magicLinkVerify` call itself is unchanged — apps that read `purpose` from the URL can use it as a hint to route the user to passkey registration after sign-in instead of straight to the home screen.
 
-To accept an invitation server-side at verify time (so the deferred grant resolves to the signing-in user even when emails differ), pass `inviteToken`:
+To accept an invitation server-side at verify time (so the deferred grant resolves to the signing-in user even when emails differ), pass `inviteToken` (TypeScript client only — the Swift `magicLinkVerify` has no `inviteToken` option):
 
 ```typescript
 await client.magicLinkVerify(magicToken, { inviteToken: inviteTokenFromUrl });
@@ -160,15 +175,14 @@ await client.magicLinkVerify(magicToken, { inviteToken: inviteTokenFromUrl });
 ## OTP (Email Code)
 
 ```typescript
-await client.otpRequest("user@example.com");
+  await client.otpRequest(email);
 
-// User enters the 6-digit code from email.
-const { user, isNewUser } = await client.otpVerify("user@example.com", "123456");
-
-if (isNewUser) showOnboarding();
+  // User enters the 6-digit code from the email.
+  const { user, isNewUser } = await client.otpVerify(email, code);
+  // Token is now stored on the client and the WS auto-connects.
 ```
 
-Same `{ inviteToken }` option is supported on `otpVerify`.
+The TypeScript `otpVerify` also accepts an `{ inviteToken }` option; the Swift `otpVerify(email:code:)` does not, and returns the raw `[String: Any]` response.
 
 ### Error handling
 
@@ -217,9 +231,13 @@ The exported `AUTH_CODES` constant covers: `ADDED_TO_WAITLIST`, `INVITATION_REQU
 
 The same `AuthError` codes apply to `magicLinkRequest`/`magicLinkVerify` and `passkey*` methods.
 
+On Swift, `AuthError` carries an optional `code: AuthCode?` enum (cases like `.invalidToken`, `.invitationRequired`, `.domainNotAllowed`, `.passkeyNotEnabled`, `.magicLinkNotEnabled`, `.inviteTokenInvalid`, `.inviteTokenExpired`, `.inviteAlreadyAccepted`, `.addedToWaitlist`, `.waitlistEntryUpdated`) — switch on `error.code` rather than importing an `AUTH_CODES` constant. There is no Swift equivalent of the JS `AUTH_CODES` object.
+
 ---
 
 ## Passkeys
+
+> **TypeScript-only.** The passkey methods (`passkeyAuthStart`/`Finish`, `passkeyRegisterStart`/`Finish`, `passkeyList`/`Update`/`Delete`) have **no Swift client equivalent** — the WebAuthn flow is web-specific (it relies on the browser's `@simplewebauthn/browser` helpers). The blocks below are TypeScript only.
 
 `passkeyAuthStart` works without an existing session (used to sign in). `passkeyRegisterStart` and management methods require an authenticated client.
 
@@ -284,7 +302,7 @@ await client.passkeyDelete(passkeyId);
 
 ## Auth Events
 
-These are the canonical events. `auth-failed` and `auth:onlineAuthRequired` are the ones most apps must handle.
+These are the canonical events. `auth-failed` and `auth:onlineAuthRequired` are the ones most apps must handle. (Event registration is framework glue; the snippets below are the TypeScript `client.on(...)` form. The Swift client exposes the same events through `client.events.on(...)` with typed event structs.)
 
 ```typescript
 // Token refresh failed or server invalidated session — prompt re-login.
@@ -367,21 +385,28 @@ The admin console exposes the same toggles. App code does not need to special-ca
 ## Token Inspection & Manual Token
 
 ```typescript
-client.isAuthenticated();         // boolean
-client.getToken();                // string | null
+  const signedIn = client.isAuthenticated(); // boolean
+
+  // Wait until a userId is available. Default timeout 5000ms.
+  const userId = await client.waitForUserId({ timeoutMs: 5000 });
+
+  // Wait until authenticated AND offline DBs are ready. Returns the mode.
+  const ready = await client.waitForAuthReady({ timeoutMs: 6000 });
+```
+
+`isAuthenticated()` returns true when either an online JWT or an unlocked offline identity is present.
+
+To read or manually set the token:
+
+```typescript
+client.getToken(); // string | null
 
 // Manually set a token (e.g. you obtained one out-of-band). Triggers
 // auth-success and pushes through the normal apply-token pipeline.
 client.setToken(jwt, { cause: "external" });
-
-// Wait until a userId is available. Default timeout 5000ms.
-const userId = await client.waitForUserId({ timeoutMs: 5000 });
-
-// Wait until authenticated AND offline DBs are ready. Returns mode.
-const { userId, mode } = await client.waitForAuthReady({ timeoutMs: 6000 });
 ```
 
-`isAuthenticated()` returns true when either an online JWT or an unlocked offline identity is present.
+On Swift, the equivalent of `setToken` is `client.updateToken(_:cause:)`. There is **no top-level `getToken()` on the Swift client** — read the token via the JWT payload (`client.getJwtPayload()`) or track it from the `authSuccess` event.
 
 **Don't:**
 
@@ -440,9 +465,16 @@ const client = await initializeClient({
 ## Logout
 
 ```typescript
-await client.logout();
+  await client.logout({
+    wipeLocal: true, // delete locally cached document data + KV cache
+    waitForDisconnect: true, // wait for the WS to close before resolving
+  });
+  // Fires `auth:logout` immediately and `auth:logout:complete` when finished.
+```
 
-// With options:
+The TypeScript `logout` accepts a richer options object than the Swift `logout(wipeLocal:)`:
+
+```typescript
 await client.logout({
   redirectTo: "/signed-out",
   wipeLocal: true,         // delete all locally cached document data + KV cache
@@ -452,7 +484,7 @@ await client.logout({
 });
 ```
 
-Logout fires `auth:logout` immediately and `auth:logout:complete` when finished.
+The Swift client takes only `wipeLocal` (`redirectTo`, `revokeOffline`, `clearOfflineIdentity`, and `waitForDisconnect` are TypeScript-only). Logout fires `auth:logout` immediately and `auth:logout:complete` when finished.
 
 ---
 

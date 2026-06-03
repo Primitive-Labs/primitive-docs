@@ -8,17 +8,6 @@ Guidelines for building apps with Primitive's server-side database storage.
 
 ### Run a registered operation
 
-JavaScript:
-<!-- example:start databases/db-execute-operation lang=ts -->
-```typescript
-  const result = await client.databases.executeOperation(databaseId, "list-products", {
-    params: { search: "widget" },
-  });
-  // result: { data: [...records], hasMore: boolean, nextCursor?: string }
-```
-<!-- example:end -->
-Swift:
-<!-- example:start databases/db-execute-operation lang=swift -->
 ```swift
   let result = try await client.databases.executeOperation(
     databaseId: databaseId,
@@ -27,22 +16,9 @@ Swift:
   )
   // result: { data: [...records], hasMore, nextCursor? }
 ```
-<!-- example:end -->
 
 ### List / get databases
 
-JavaScript:
-<!-- example:start databases/db-list-get lang=ts -->
-```typescript
-  // Databases where you're owner or manager
-  const databases = await client.databases.list();
-
-  // Any authenticated user can resolve a database by id
-  const db = await client.databases.get(databaseId);
-```
-<!-- example:end -->
-Swift:
-<!-- example:start databases/db-list-get lang=swift -->
 ```swift
   // Databases where you're owner or manager
   let databases = try await client.databases.list()
@@ -50,29 +26,15 @@ Swift:
   // Any authenticated user can resolve a database by id
   let db = try await client.databases.get(databaseId: databaseId)
 ```
-<!-- example:end -->
 
 ### Grant a group access
 
-JavaScript:
-<!-- example:start databases/db-grant-group lang=ts -->
-```typescript
-  await client.databases.grantGroupPermission(databaseId, {
-    groupType: "team",
-    groupId: "engineering",
-    permission: "manager",
-  });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start databases/db-grant-group lang=swift -->
 ```swift
   _ = try await client.databases.grantGroupPermission(
     databaseId: databaseId,
     params: ["groupType": "team", "groupId": "engineering", "permission": "manager"]
   )
 ```
-<!-- example:end -->
 
 
 ## Core Concept: Databases
@@ -149,23 +111,33 @@ primitive sync push --dir ./config
 
 ### 2. Use databases in app code
 
+Construct the client, then create a database and call its registered operations:
+
 ```typescript
 import { JsBaoClient } from "js-bao-wss-client";
-
 const client = new JsBaoClient({ apiUrl, wsUrl, appId, token });
+```
 
-// Create a database instance of the configured type
-const db = await client.databases.create({ title: "Alpha Project", databaseType: "project" });
+```swift
+  // Create a database instance of the configured type
+  let db = try await client.databases.create(params: [
+    "title": "Alpha Project", "databaseType": "project",
+  ])
+  let databaseId = db["databaseId"] as? String ?? ""
 
-// Execute registered operations
-const result = await client.databases.executeOperation(db.databaseId, "listTasks", {
-  params: { projectId: "proj-1" },
-});
+  // Execute registered operations
+  let result = try await client.databases.executeOperation(
+    databaseId: databaseId, name: "listTasks",
+    options: ["params": ["projectId": "proj-1"]]
+  )
 
-const createResult = await client.databases.executeOperation(db.databaseId, "createTask", {
-  params: { title: "Ship v1", projectId: "proj-1" },
-});
-const taskId = createResult.results[0].id; // server-assigned ULID
+  let createResult = try await client.databases.executeOperation(
+    databaseId: databaseId, name: "createTask",
+    options: ["params": ["title": "Ship v1", "projectId": "proj-1"]]
+  )
+  // executeOperation returns Any; mutation result shape is { results: [{ id }] }.
+  let results = (createResult as? [String: Any])?["results"] as? [[String: Any]]
+  let taskId = results?.first?["id"] as? String // server-assigned ULID
 ```
 
 ## Configuring with the CLI
@@ -743,48 +715,55 @@ The client library is used at runtime to create database instances, execute oper
 
 ### Creating database instances
 
-```typescript
-const db = await client.databases.create({
-  title: "Alpha Project",
-  databaseType: "project", // must match a configured database type
-});
-// db: { databaseId, title, databaseType, metadata, permission, createdBy, createdAt, modifiedAt }
+```swift
+  let db = try await client.databases.create(params: [
+    "title": "Alpha Project",
+    "databaseType": "project", // must match a configured database type
+  ])
+  // db: ["databaseId": ..., "title": ..., "databaseType": ..., "permission": ...]
 ```
+
+`db.databaseType` is the configured type; `db.celContext` holds the per-database CEL context dict (`db.metadata` is the legacy alias for the same field).
 
 ### Listing and fetching databases
 
-```typescript
-// Lists DBs where the user has a direct permission (owner or manager).
-// Databases the user can access ONLY via CEL-gated operations are NOT
-// returned, and databases reachable via DatabaseGroupPermission are
-// also NOT returned by list() (use groups.listDatabases for those).
-// App admins see all DBs in the app.
-const databases = await client.databases.list();
+`list()` returns DBs where the user has a **direct** permission (owner or manager). Databases reachable only via CEL-gated operations or `DatabaseGroupPermission` are NOT returned by `list()` (use `groups.listDatabases` for group-shared ones). App admins see all DBs in the app. Passing `{ databaseType }` to `list()` is a post-join filter that narrows the set, never widens it.
 
-// Filter to one databaseType (post-join JS filter — narrows the
-// set above, doesn't widen it).
-const projects = await client.databases.list({ databaseType: "project" });
+```swift
+  // Databases where the caller is owner or manager (admins see all).
+  // Databases reachable only via CEL-gated operations or group grants are
+  // NOT returned here — use groups.listDatabases for group-shared ones.
+  let databases = try await client.databases.list()
 
-// Get a specific database
-const db = await client.databases.get(databaseId);
+  let db = try await client.databases.get(databaseId: databaseId)
 
-// Update title
-await client.databases.update(databaseId, { title: "New Title" });
+  _ = try await client.databases.update(
+    databaseId: databaseId,
+    params: ["title": "New Title"]
+  )
 
-// Delete (owner only — permanently removes all records and permissions)
-await client.databases.delete(databaseId);
+  // Owner only — permanently removes all records and permissions.
+  _ = try await client.databases.delete(databaseId: databaseId)
 ```
 
 ### Executing operations
 
-```typescript
-// Execute a registered operation
-const result = await client.databases.executeOperation(databaseId, "listTasks", {
-  params: { projectId: "proj-1" },
-  limit: 10,
-  cursor: previousCursor,
-  direction: 1, // 1 for forward, -1 for backward
-});
+Callers can override `limit`, `cursor`, and `direction` at call time:
+
+```swift
+  var options: [String: Any] = [
+    "params": ["projectId": "proj-1"],
+    "limit": 10,
+    "direction": 1, // 1 for forward, -1 for backward
+  ]
+  if let previousCursor { options["cursor"] = previousCursor }
+
+  let result = try await client.databases.executeOperation(
+    databaseId: databaseId,
+    name: "listTasks",
+    options: options
+  )
+  // result: { data: [...records], hasMore, nextCursor? }
 ```
 
 **Response shapes by operation type:**
@@ -800,24 +779,29 @@ const result = await client.databases.executeOperation(databaseId, "listTasks", 
 
 **Operation timing:** Pass `timing: true` to get per-phase millisecond timings in `result._timing`. Works on all operation types.
 
-```typescript
-const result = await client.databases.executeOperation(databaseId, "listTasks", {
-  params: { projectId: "proj-1" },
-  timing: true,
-});
-// result._timing: { totalMs, databaseLookup, operationLookup, celEvaluation, doInvocation, ... }
+```swift
+  let result = try await client.databases.executeOperation(
+    databaseId: databaseId,
+    name: "listTasks",
+    options: ["params": ["projectId": "proj-1"], "timing": true]
+  )
+  // result._timing: { totalMs, databaseLookup, operationLookup, celEvaluation, ... }
 ```
 
 ### Bulk operation calls (`executeBatch`)
 
 `executeBatch` invokes a single registered **mutation** operation many times in one HTTP request (up to 100,000 items). Each item is a `{ params }` object — the operation runs once per item, with its `op.access` and per-parameter `access` rules **re-evaluated against each item's params**.
 
-```typescript
-const result = await client.databases.executeBatch(databaseId, "createTask", [
-  { params: { title: "Task 1", projectId: "proj-1" } },
-  { params: { title: "Task 2", projectId: "proj-1" } },
-]);
-// { imported: 2, failed: 0 }
+```swift
+  let result = try await client.databases.executeBatch(
+    databaseId: databaseId,
+    operationName: "import-contacts",
+    batch: [
+      ["params": ["name": "Alice", "email": "alice@example.com"]],
+      ["params": ["name": "Bob", "email": "bob@example.com"]],
+    ]
+  )
+  // result: { imported, failed }
 ```
 
 **Constraints:**
@@ -834,11 +818,14 @@ const result = await client.databases.executeBatch(databaseId, "createTask", [
 
 The CEL context (formerly called "metadata") stores per-database values that operations and triggers can reference via `$database.celContext.*` (or the legacy alias `$database.metadata.*`):
 
-```typescript
-await client.databases.updateCelContext(databaseId, { teamId: "team-alpha", projectId: "proj-1" });
-// Legacy alias also works:
-await client.databases.updateMetadata(databaseId, { teamId: "team-alpha", projectId: "proj-1" });
+```swift
+  _ = try await client.databases.updateCelContext(
+    databaseId: databaseId,
+    celContext: ["teamId": "team-alpha", "projectId": "proj-1"]
+  )
 ```
+
+`client.databases.updateMetadata(databaseId, {...})` is the legacy alias for the same call (JavaScript).
 
 Via CLI (new preferred form):
 
@@ -1209,21 +1196,17 @@ Owner and manager permissions control **who can manage the database itself** —
 
 The database creator is automatically the `owner`. Console admins bypass all checks.
 
-```typescript
-// These are for administrative access — not for end-user data access
-await client.databases.addManager(databaseId, {
-  userId: "co-admin-user-id",
-});
+These calls are for administrative access — not for end-user data access:
 
-// List current permissions
-const permissions = await client.databases.listPermissions(databaseId);
-// [{ databaseId, userId, permission, grantedAt, grantedBy, userName?, userEmail? }]
+```swift
+  _ = try await client.databases.addManager(databaseId: databaseId, userId: coAdminUserId)
 
-// Remove a manager
-await client.databases.removeManager(databaseId, "co-admin-user-id");
+  let permissions = try await client.databases.listPermissions(databaseId: databaseId)
+  // [["databaseId": ..., "userId": ..., "permission": ..., "grantedAt": ...]]
 
-// Transfer ownership
-await client.databases.transferOwnership(databaseId, "new-owner-id");
+  _ = try await client.databases.removeManager(databaseId: databaseId, userId: coAdminUserId)
+
+  _ = try await client.databases.transferOwnership(databaseId: databaseId, newOwnerId: newOwnerId)
 ```
 
 **Don't add end users as managers.** `manager` bypasses every CEL operation gate. The right pattern is: a small fixed set of admin accounts hold owner/manager; everyone else goes through registered operations with `access` rules.
@@ -1232,18 +1215,20 @@ await client.databases.transferOwnership(databaseId, "new-owner-id");
 
 `DatabaseGroupPermission` grants the same admin-level access (`manager`) to every member of a group at once. Membership changes propagate automatically. Only `"manager"` is supported.
 
-```typescript
-await client.databases.grantGroupPermission(databaseId, {
-  groupType: "team",
-  groupId: "engineering",
-  permission: "manager",
-});
+```swift
+  _ = try await client.databases.grantGroupPermission(
+    databaseId: databaseId,
+    params: ["groupType": "team", "groupId": "engineering", "permission": "manager"]
+  )
 
-const groupPerms = await client.databases.listGroupPermissions(databaseId);
-await client.databases.revokeGroupPermission(databaseId, "team", "engineering");
+  let groupPerms = try await client.databases.listGroupPermissions(databaseId: databaseId)
+  _ = try await client.databases.revokeGroupPermission(
+    databaseId: databaseId, groupType: "team", groupId: "engineering"
+  )
 
-// Group members discover their group-accessible databases via this:
-const dbs = await client.groups.listDatabases("team", "engineering");
+  // Group members discover their group-accessible databases via this
+  // (databases.list() does NOT return group-shared databases).
+  let dbs = try await client.groups.listDatabases(groupType: "team", groupId: "engineering")
 ```
 
 | Call | Resolves group access? |
@@ -1334,6 +1319,8 @@ CEL context differs between the two phases:
 
 ### Subscribing from the client
 
+> **JavaScript only.** `client.databases.subscribe(...)` has no Swift equivalent — the Swift `DatabasesAPI` exposes no `subscribe`. Swift apps poll via `executeOperation` instead.
+
 ```typescript
 const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
   params: { teamId: "team-1" },
@@ -1381,23 +1368,29 @@ See the [Scheduling and Real-Time guide](AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND
 
 Databases are schemaless — the system tracks fields and inferred types as records are written.
 
+List the models (collections) in a database via the raw records endpoint:
+
 ```typescript
-// List models (collections)
 const response = await fetch(
   `${apiUrl}/app/${appId}/api/databases/${databaseId}/records/models`,
   { headers: { Authorization: `Bearer ${token}` } }
 );
 const { models } = await response.json();
 // ["contacts", "orders", "products"]
+```
 
-// Describe a model's fields
-const fields = await client.databases.describe(databaseId, "products");
-// [{ model_name: "products", field_name: "name", inferred_type: "string", first_seen_at: "..." }]
+Describe a model's observed fields:
+
+```swift
+  let fields = try await client.databases.describe(databaseId: databaseId, modelName: "products")
+  // [["model_name": "products", "field_name": "name", "inferred_type": "string", ...]]
 ```
 
 Inferred types: `string`, `number`, `boolean`, `array`, `object`.
 
 ## CSV Import
+
+> **JavaScript only.** The rich `importCsv` API below (raw-CSV parsing, `columnMap`, per-row `transform`, `onProgress`) is JavaScript-only. The Swift client exposes `databases.importRows(databaseId:operationName:rows:batchSize:)`, which takes **pre-parsed** row dicts and batches them through `executeBatch` — parse the CSV with a third-party parser first, and do any column mapping / coercion yourself before calling.
 
 ```typescript
 import { Product } from "./models";
@@ -1532,15 +1525,22 @@ params = '{"title":{"type":"string","required":true}}'
 
 **In app code:**
 
-```typescript
-// Each user only sees their own items
-const result = await client.databases.executeOperation(dbId, "myItems", {});
+```swift
+  // Each user only sees their own items (the operation filters on $user.userId).
+  let result = try await client.databases.executeOperation(
+    databaseId: dbId, name: "myItems", options: [:]
+  )
 
-// Creates an item owned by the calling user (server sets ownerId and assigns ID)
-const createResult = await client.databases.executeOperation(dbId, "createItem", {
-  params: { title: "My Item" },
-});
-const itemId = createResult.results[0].id; // server-assigned ULID
+  // Creates an item owned by the calling user; server assigns the id.
+  let createResult = try await client.databases.executeOperation(
+    databaseId: dbId, name: "createItem",
+    options: ["params": ["title": "My Item"]]
+  )
+  // executeOperation returns Any; the mutation result shape is
+  // { results: [{ success, id }] } — cast to read the server-assigned id.
+  let dict = createResult as? [String: Any]
+  let results = dict?["results"] as? [[String: Any]]
+  let itemId = results?.first?["id"] as? String // server-assigned ULID
 ```
 
 ## Reserved Field Names

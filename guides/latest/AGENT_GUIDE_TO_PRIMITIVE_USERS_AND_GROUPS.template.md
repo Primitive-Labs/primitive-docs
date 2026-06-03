@@ -2,115 +2,23 @@
 
 Guidelines for modeling user relationships and managing access control with Primitive's built-in user system and groups.
 
-## Core operations (JavaScript + Swift)
+## Core operations
 
-The key client calls in both languages, compiled against the real clients as part of the docs build. The dense reference below adds the result shapes, discriminated-union branching, and CEL access-control detail.
+The key client calls, compiled against the real clients as part of the docs build. The dense reference below adds the result shapes, discriminated-union branching, and CEL access-control detail.
 
 ### Look up users
 
-JavaScript:
-<!-- example:start users-and-groups/users-lookup lang=ts -->
-```typescript
-  // One user's basic profile
-  const user = await client.users.getBasic(userId);
-
-  // Batch-fetch several profiles in one round-trip
-  const profiles = await client.users.getProfiles([userId, "user-456"]);
-
-  // Find a user by email
-  const found = await client.users.lookup("alice@example.com");
-
-  // The current signed-in user
-  const me = await client.me.get();
-```
-<!-- example:end -->
-Swift:
-<!-- example:start users-and-groups/users-lookup lang=swift -->
-```swift
-  // One user's basic profile
-  let user = try await client.users.getBasic(userId: userId)
-
-  // Batch-fetch several profiles in one round-trip
-  let profiles = try await client.users.getProfiles(userIds: [userId, "user-456"])
-
-  // Find a user by email
-  let found = try await client.users.lookup(email: "alice@example.com")
-
-  // The current signed-in user
-  let me = try await client.me.get()
-```
-<!-- example:end -->
+{{ example: users-and-groups/users-lookup }}
 
 There is no client-side `users.list()` / `users.get()`; the current user lives on `client.me`. Enumerate users via the CLI or admin REST surface.
 
 ### Manage group membership
 
-JavaScript:
-<!-- example:start users-and-groups/group-membership lang=ts -->
-```typescript
-  // Add a member by email (recommended for user-facing flows)
-  const result = await client.groups.addMember("team", "engineering", {
-    email: "alice@example.com",
-  });
-
-  // ...or by user id (internal / programmatic)
-  await client.groups.addMember("team", "engineering", { userId: "user-456" });
-
-  // List a group's members
-  const members = await client.groups.listMembers("team", "engineering");
-
-  // List the groups a user belongs to
-  const memberships = await client.groups.listUserMemberships(userId);
-```
-<!-- example:end -->
-Swift:
-<!-- example:start users-and-groups/group-membership lang=swift -->
-```swift
-  // Add a member by email (recommended for user-facing flows)
-  let result = try await client.groups.addMember(
-    groupType: "team", groupId: "engineering",
-    params: ["email": "alice@example.com"]
-  )
-
-  // ...or by user id (internal / programmatic)
-  _ = try await client.groups.addMember(
-    groupType: "team", groupId: "engineering",
-    params: ["userId": "user-456"]
-  )
-
-  // List a group's members
-  let members = try await client.groups.listMembers(groupType: "team", groupId: "engineering")
-
-  // List the groups a user belongs to
-  let memberships = try await client.groups.listUserMemberships(userId: userId)
-```
-<!-- example:end -->
+{{ example: users-and-groups/group-membership }}
 
 ### Grant document access to a group
 
-JavaScript:
-<!-- example:start users-and-groups/grant-group-document lang=ts -->
-```typescript
-  await client.documents.grantGroupPermission(documentId, {
-    groupType: "team",
-    groupId: "engineering-team",
-    permission: "read-write",
-  });
-```
-<!-- example:end -->
-Swift:
-<!-- example:start users-and-groups/grant-group-document lang=swift -->
-```swift
-  _ = try await client.documents.grantGroupPermission(
-    documentId: documentId,
-    params: [
-      "groupType": "team",
-      "groupId": "engineering-team",
-      "permission": "read-write",
-    ]
-  )
-```
-<!-- example:end -->
+{{ example: users-and-groups/grant-group-document }}
 
 ## Core Concept: Built-in User Model
 
@@ -130,13 +38,7 @@ Primitive provides a built-in user model that every app should leverage. **Do no
 | `appId` | string | The app the user belongs to |
 | `addedAt` | string \| undefined | When the user joined the app |
 
-```typescript
-const user = await client.users.getBasic(userId);
-// Cached with 5-minute default TTL. Override via options:
-const fresh = await client.users.getBasic(userId, { refreshNetwork: true });
-```
-
-`GetUserOptions` knobs: `refreshIfOlderThanMs`, `waitForLoad` (`"local" | "network" | "localIfAvailableElseNetwork"`), `refreshNetwork`, `serverTimeoutMs`.
+`getBasic` results are cached with a 5-minute default TTL. Override per call via `GetUserOptions`: `refreshNetwork` (bypass cache once), `refreshIfOlderThanMs`, `waitForLoad` (`"local" | "network" | "localIfAvailableElseNetwork"`), `serverTimeoutMs`.
 
 ### Supplementing user data — not replacing it
 
@@ -179,18 +81,11 @@ user.id = generateNewId();        // Use platform userId instead
 
 ### Looking up users
 
-```typescript
-// Single user — cached
-const info = await client.users.getBasic(userId);
+The user lookup surface — single fetch, batch fetch, and email lookup — is shown in [Look up users](#look-up-users) above. Result shapes:
 
-// Many users in one call (max 100). Returns only users that exist + belong to the app.
-const profiles = await client.users.getProfiles([userIdA, userIdB]);
-// [{ userId, email, name: string | null, avatarUrl: string | null }]
-
-// Look up a user by email in the current app.
-const result = await client.users.lookup("alice@example.com");
-// { exists: true, user: { userId, name, email } } | { exists: false }
-```
+- `getBasic(userId)` — cached `BasicUserInfo` (table above).
+- `getProfiles([...])` — max 100; returns only users that exist + belong to the app: `[{ userId, email, name: string | null, avatarUrl: string | null }]`.
+- `lookup(email)` — `{ exists: true, user: { userId, name, email } } | { exists: false }`.
 
 There is no `list()` or `get()` method on `client.users`. The current authenticated user lives on a separate namespace: `client.me.get()` returns the current user's profile (cached, with the same `GetUserOptions` knobs). To enumerate or search users in the app, use the REST endpoint or the CLI:
 
@@ -201,8 +96,10 @@ primitive users list [--limit N] [--cursor <next>]
 # Substring search by name (minimum 2 characters per term; tokens AND-combined)
 # Backed by a global search index on User.name.
 primitive users list --name "ali"
+```
 
-# Direct API call for in-app pickers
+```typescript
+// Direct API call for in-app pickers
 const res = await fetch(`/app/${appId}/api/users?name=${encodeURIComponent("ali")}&limit=20`, {
   headers: { Authorization: `Bearer ${token}` },
 });
@@ -226,67 +123,17 @@ The current authenticated user has its own namespace. Use it for "me"-scoped rea
 
 ### Profile
 
-```typescript
-const profile = await client.me.get();
-// { userId, email, name, appRole, appId, avatarUrl? } | null when signed out
+{{ example: users-and-groups/me-profile }}
 
-await client.me.get({
-  waitForLoad: "localIfAvailableElseNetwork", // | "local" | "network"
-  refreshIfOlderThanMs: 60_000,               // default 5 minutes
-  refreshNetwork: true,                       // bypass cache once
-  serverTimeoutMs: 5_000,                     // soft network timeout
-});
-
-await client.me.update({
-  name: "Alice Reyes",
-  avatarUrl: "https://cdn.example.com/u/alice.png", // pass null to clear
-});
-
-// Upload an image directly (server hosts it and returns a URL)
-const { avatarUrl } = await client.me.uploadAvatar(
-  fileFromInput,
-  "image/png" // also "image/jpeg" | "image/gif" | "image/webp"
-);
-```
-
-`get()` is cache-backed; `update()` and `uploadAvatar()` clear that cache automatically. Reach for the cache controls if you need to override:
-
-```typescript
-await client.me.cacheInfo();   // { updatedAt?, ageMs? }
-await client.me.clearCache();  // forces the next get() to hit the network
-```
+`get()` is cache-backed; `update()` and `uploadAvatar()` clear that cache automatically. `get()` returns `{ userId, email, name, appRole, appId, avatarUrl? }` (null when signed out).
 
 ### Documents view
 
-```typescript
-// Documents the user owns (created, or had ownership transferred to).
-// Cache-backed and offline-aware.
-const owned = await client.me.ownedDocuments({
-  tag: "draft",                 // optional tag filter
-  limit: 50,
-  cursor: prevCursor,
-  // returnPage: true,           // overload returning a paginated DocumentListPage
-  // includeRoot: false,         // root document is excluded by default
-});
+{{ example: users-and-groups/me-documents }}
 
-// Documents shared directly with the user (non-owner `DocumentPermission`
-// rows + pending `DocumentInvitation`s). Group- and collection-scoped
-// shares do NOT appear here — those are accessed via the group or collection.
-// Returns the unified `{ items, cursor }` envelope (raw-JSON cursor, NOT
-// base64url). Each `SharedDocument` extends `DocumentInfo`, so rows carry the
-// base document fields plus the share extras (`permission`, `source`,
-// `grantedBy`, `invitationId`).
-const { items, cursor } = await client.me.sharedDocuments({
-  limit: 50,
-  cursor: prevCursor,
-  tag: "shared",
-});
-
-// Document invitations the user can accept — convenient for an inbox view.
-const pending = await client.me.pendingDocumentInvitations();
-// [{ invitationId, documentId, title?, email, permission,
-//    invitedAt, invitedBy, expiresAt?, accepted, document?: {...} }, ...]
-```
+- `ownedDocuments()` is cache-backed and offline-aware. Pass `returnPage: true` to get a paginated `DocumentListPage`; the root document is excluded by default (`includeRoot: false`).
+- `sharedDocuments()` returns the unified `{ items, cursor }` envelope (raw-JSON cursor, NOT base64url). Group- and collection-scoped shares do NOT appear here — those are accessed via the group or collection. Each `SharedDocument` extends `DocumentInfo`, so rows carry the base document fields plus the share extras (`permission`, `source`, `grantedBy`, `invitationId`).
+- `pendingDocumentInvitations()` returns `[{ invitationId, documentId, title?, email, permission, invitedAt, invitedBy, expiresAt?, accepted, document?: {...} }, ...]`.
 
 Together, `me.ownedDocuments()` + `me.sharedDocuments()` give the two halves of "documents the user has direct access to." For group- or collection-scoped access, iterate `groups.listUserMemberships(...)` / `client.collections.list()` and call `groups.listDocuments` / `collections.listDocuments`.
 
@@ -303,79 +150,24 @@ Groups are identified by a `(groupType, groupId)` pair, allowing multiple taxono
 
 ### Quick start
 
-```typescript
-// 1. Create a group
-await client.groups.create({
-  groupType: "team",
-  groupId: "engineering",
-  name: "Engineering Team",
-});
+1. Create a group with `client.groups.create({ groupType, groupId, name })`.
+2. Add members with `client.groups.addMember(...)` (by `userId` or `email`).
+3. Grant group access to a document with `client.documents.grantGroupPermission(...)`.
+4. Gate database operations in CEL: `access: "isMemberOf('team', database.metadata.teamId)"`.
 
-// 2. Add members
-await client.groups.addMember("team", "engineering", { userId: "user-456" });
-await client.groups.addMember("team", "engineering", { email: "bob@example.com" });
-
-// 3. Grant group access to a document
-await client.documents.grantGroupPermission(documentId, {
-  groupType: "team",
-  groupId: "engineering",
-  permission: "read-write",
-});
-
-// 4. Use in database CEL access expressions
-// access: "isMemberOf('team', database.metadata.teamId)"
-```
+The full create/list/get/update/delete surface is in [Managing Groups](#managing-groups); membership in [Managing Members](#managing-members).
 
 ## Managing Groups
 
-### Create
+### Create / List / Get / Update / Delete
 
-```typescript
-await client.groups.create({
-  groupType: "team",
-  groupId: "engineering",
-  name: "Engineering Team",
-  description: "Platform engineering team", // optional
-});
-```
+{{ example: users-and-groups/group-crud }}
 
 If the group type has `autoAddCreator: true` (default), the creator is automatically added as a member.
 
-### List
+`groups.list()` returns a paginated `{ items: GroupInfo[], cursor? }`. `ListGroupsOptions` supports `type`, `limit`, `cursor`, and `includeSystem: true` to include platform-managed internal groups whose `groupType` is prefixed with `_` (e.g. `_col-reader`/`_col-writer` backing collection sharing). These are filtered out by default — only set `includeSystem` for admin tooling.
 
-`groups.list()` returns a paginated result with `{ items, cursor }`.
-
-```typescript
-// All groups (paginated)
-const result = await client.groups.list();
-// result: { items: GroupInfo[], cursor?: string }
-
-// Filter by type
-const teamResult = await client.groups.list({ type: "team" });
-
-// Paginate through results
-const page1 = await client.groups.list({ type: "team", limit: 10 });
-const page2 = await client.groups.list({ type: "team", limit: 10, cursor: page1.cursor });
-```
-
-`ListGroupsOptions` also supports `includeSystem: true` to include platform-managed internal groups whose `groupType` is prefixed with `_` (e.g. `_col-reader`/`_col-writer` backing collection sharing). These are filtered out by default — only set `includeSystem` for admin tooling.
-
-### Get / Update / Delete
-
-```typescript
-const group = await client.groups.get("team", "engineering");
-// { appId, groupType, groupId, name, description?, memberCount,
-//   createdAt, createdBy, modifiedAt }
-
-// Update name and/or description (both optional)
-await client.groups.update("team", "engineering", {
-  name: "Platform Engineering",
-  description: "Owns the platform stack",
-});
-
-// Cascade-deletes all memberships and group permissions
-await client.groups.delete("team", "engineering");
-```
+`groups.get()` returns `{ appId, groupType, groupId, name, description?, memberCount, createdAt, createdBy, modifiedAt }`. `update()` takes optional `name` and/or `description`. `delete()` cascade-deletes all memberships and group permissions.
 
 ## Managing Members
 
@@ -395,24 +187,12 @@ const result = await client.groups.addMember("team", "engineering", {
 
 `addMember` returns `DirectGroupAdd | DeferredGroupAdd` — branch on `status`:
 
-```typescript
-const result = await client.groups.addMember("team", "engineering", { email });
+{{ example: users-and-groups/add-member-branch }}
 
-if (result.status === "added") {
-  // New membership created. result: { userId, userName?, userEmail?, addedAt, addedBy }
-} else if (result.status === "already_member") {
-  // Idempotent no-op. addedAt/addedBy reflect the pre-existing row.
-  // Replaces the old HTTP 409 response.
-} else if (result.status === "pending_signup") {
-  // Email not yet an app user. Server created an AppInvitation +
-  // DeferredGroupAdd. result: { email, appInvitationCreated, deferredId,
-  //   expiresAt, groupType, groupId, invitationId, inviteToken }
-  // Use inviteToken to build your own accept URL; the platform's default
-  // email is sent unless the underlying invitation was created with sendEmail: false.
-  // Cancel a pending add via:
-  //   client.invitations.revokeDeferredGrant(result.deferredId, "group")
-}
-```
+Status meanings:
+- `"added"` — new membership created. `{ userId, userName?, userEmail?, addedAt, addedBy }`.
+- `"already_member"` — idempotent no-op. `addedAt`/`addedBy` reflect the pre-existing row. Replaces the old HTTP 409 response.
+- `"pending_signup"` — email not yet an app user. Server created an `AppInvitation` + `DeferredGroupAdd`: `{ email, appInvitationCreated, deferredId, expiresAt, groupType, groupId, invitationId, inviteToken }`. Use `inviteToken` to build your own accept URL; the platform's default email is sent unless the underlying invitation was created with `sendEmail: false`.
 
 Until a deferred add resolves, `isMemberOf` returns false for that email's user — do not assume membership before sign-up/accept.
 
@@ -435,56 +215,25 @@ See the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INV
 
 ### List members
 
-```typescript
-// Paginated — { items, cursor? }
-const page = await client.groups.listMembers("team", "engineering");
-// page.items: [{ userId, userName?, userEmail?, addedAt, addedBy }]
-
-// Pagination
-const next = await client.groups.listMembers("team", "engineering", {
-  limit: 50,
-  cursor: page.cursor,
-});
-```
+{{ example: users-and-groups/list-members }}
 
 ### Remove members
 
-```typescript
-// By user ID
-await client.groups.removeMember("team", "engineering", "user-456");
+{{ example: users-and-groups/remove-member }}
 
-// By email — handles both "is currently a member" AND "was invited but
-// hasn't signed up yet". If a direct membership exists, it's removed.
-// Otherwise the pending DeferredGroupAdd for that email is canceled.
-await client.groups.removeMember("team", "engineering", { email: "alice@example.com" });
-```
-
-The email form is the right call when you don't know — and don't want to branch on — whether the target has signed up yet. Revoke the whole `AppInvitation` only when you want to cancel **every** grant attached to it (group add, document share, app-join right) at once.
+The email form is the right call when you don't know — and don't want to branch on — whether the target has signed up yet. If a direct membership exists, it's removed; otherwise the pending `DeferredGroupAdd` for that email is canceled. Revoke the whole `AppInvitation` only when you want to cancel **every** grant attached to it (group add, document share, app-join right) at once.
 
 ### List pending invitations for a group
 
-```typescript
-const pending = await client.groups.listPendingInvitations("team", "engineering");
-// [{ email, role, invitationId, createdAt, expiresAt, addedBy? }]
-```
+{{ example: users-and-groups/group-pending-invitations }}
 
 Use this to render the "pending members" section of a group sharing UI without having to filter the lower-level `client.invitations.listDeferredGrants()` surface.
 
 ### List a user's memberships
 
-```typescript
-const memberships = await client.groups.listUserMemberships("user-456");
-// [{ groupType, groupId, name, description?, addedAt, addedBy }]
-//
-// `name` is joined from AppGroup at call time.
-// Orphan rows (membership pointing at a deleted group) are skipped.
+{{ example: users-and-groups/user-memberships }}
 
-// Filter to a single group type — server-side SK-range push-down,
-// not a post-query JS filter.
-const teams = await client.groups.listUserMemberships("user-456", {
-  groupType: "team",
-});
-```
+`name` is joined from `AppGroup` at call time; orphan rows (membership pointing at a deleted group) are skipped. In TypeScript, pass `{ groupType }` to filter to a single type — a server-side SK-range push-down, not a post-query JS filter. (The Swift client returns all memberships; filter client-side.)
 
 ## Group Type Configuration
 
@@ -516,32 +265,19 @@ See the [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md#configuring-with
 
 Grant a group access to a document. All members inherit the permission.
 
-```typescript
-// Grant access — permission is "read-write" or "reader" (NOT "write" or "view")
-await client.documents.grantGroupPermission(documentId, {
-  groupType: "team",
-  groupId: "engineering",
-  permission: "read-write",
-});
+The grant call is shown in [Grant document access to a group](#grant-document-access-to-a-group) above (permission is `"read-write"` or `"reader"` — NOT `"write"` or `"view"`). To inspect what a group reaches and to manage a document's group grants:
 
-// List group permissions on a document
-const groupPerms = await client.documents.listGroupPermissions(documentId);
-
-// Revoke
-await client.documents.revokeGroupPermission(documentId, "team", "engineering");
-
-// List documents a group has access to
-const docs = await client.groups.listDocuments("team", "engineering");
-
-// And databases
-const dbs = await client.groups.listDatabases("team", "engineering");
-```
+{{ example: users-and-groups/group-resources }}
 
 **Permission resolution:** A user's effective permission on a document is the **highest** across their direct permission and all group memberships. If a user has `reader` direct access but their team has `read-write`, they get `read-write`.
 
 ## Groups and Databases
 
-Databases support a coarse-grained group grant — `client.databases.grantGroupPermission(databaseId, { groupType, groupId, permission: "manager" })` — that gives every member of the group `manager`-level access (the database's admin permission, the only level supported for groups). For everything else — gating individual queries and mutations — group memberships are checked in **CEL access expressions** on registered operations. See the [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) for how to register operations.
+Databases support a coarse-grained group grant that gives every member of the group `manager`-level access (the database's admin permission, the only level supported for groups):
+
+{{ example: databases/db-grant-group }}
+
+For everything else — gating individual queries and mutations — group memberships are checked in **CEL access expressions** on registered operations. See the [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) for how to register operations.
 
 **CEL functions available in every context:**
 
@@ -740,41 +476,11 @@ get  = "true"
 
 ### Testing rules
 
-Test a rule set with a simulated request (returns `{ allowed, expression?, context?, trace?, error? }`):
+Test a rule set with a simulated request, or debug against a real user's live memberships (full trace). `test()` returns `{ allowed, expression?, context?, trace?, error? }`; `debug()` returns `{ allowed, expression?, reason?, ruleSetId?, ruleSetName?, user?, memberships?, context?, trace? }`. `debug()` **requires console-admin auth** — regular app callers get 403.
 
-```typescript
-const result = await client.ruleSets.test(ruleSetId, {
-  category: "group",                    // "group" or "member" for resourceType: "group"
-  operation: "create",                  // group: "create" | "edit" | "delete" | "get"; member: "create" | "edit" | "delete" | "list"
-  user: { userId: "user-123", role: "member" },
-  memberships: [{ groupType: "team", groupId: "engineering" }],  // optional
-  group: {                                                       // required for non-create when group context is needed
-    groupType: "team",
-    groupId: "engineering",
-    name: "Eng",
-    createdBy: "user-456",
-  },
-  target: { userId: "user-456" },       // for member.create/edit/delete
-});
-// result.trace shows every isMemberOf/memberGroups/hasRole call and its result.
-```
+{{ example: users-and-groups/rule-sets-test }}
 
-Debug evaluation against a real user (uses live memberships, returns full trace). **Requires console-admin auth** — regular app callers will get 403 from this endpoint:
-
-```typescript
-const debug = await client.ruleSets.debug({
-  userId: "user-123",
-  groupType: "team",
-  groupId: "engineering",       // optional — omit for create
-  category: "member",
-  operation: "create",
-  targetUserId: "user-456",     // optional
-});
-// debug: { allowed, expression?, reason?, ruleSetId?, ruleSetName?,
-//          user?, memberships?, context?, trace? }
-```
-
-To update rule sets, edit the TOML file and run `primitive sync push --dir ./config`.
+`result.trace` shows every `isMemberOf`/`memberGroups`/`hasRole` call and its result. To update rule sets, edit the TOML file and run `primitive sync push --dir ./config`.
 
 ## Rule Sets for Collection Management
 

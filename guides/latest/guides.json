@@ -2,7 +2,7 @@
   "guides": [
     {
       "topic": "authentication",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.ts.md",
       "description": "Implementing user authentication with OAuth, Magic Link, OTP, and Passkeys",
       "keywords": [
         "authentication",
@@ -39,11 +39,15 @@
       "prerequisites": [],
       "relatedGuides": [
         "documents"
-      ]
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_AUTHENTICATION.swift.md"
+      }
     },
     {
       "topic": "blobs",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_BLOBS.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_BLOBS.ts.md",
       "description": "Storing and managing binary files — document-scoped blobs and general-purpose blob buckets",
       "keywords": [
         "blobs",
@@ -97,7 +101,11 @@
       "relatedGuides": [
         "documents",
         "workflows"
-      ]
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_BLOBS.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_BLOBS.swift.md"
+      }
     },
     {
       "topic": "data-modeling",
@@ -142,7 +150,7 @@
     },
     {
       "topic": "users-and-groups",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.ts.md",
       "description": "Built-in user model, groups, memberships, and CEL-based access control patterns",
       "keywords": [
         "users",
@@ -193,11 +201,15 @@
         "data-modeling",
         "authentication",
         "sharing-and-invitations"
-      ]
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.swift.md"
+      }
     },
     {
       "topic": "sharing-and-invitations",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.ts.md",
       "description": "Invitations, document and database sharing, collections, member invitation quotas, and access requests",
       "keywords": [
         "sharing",
@@ -249,7 +261,11 @@
         "documents",
         "users-and-groups",
         "authentication"
-      ]
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.swift.md"
+      }
     },
     {
       "topic": "scheduling-and-realtime",
@@ -309,7 +325,7 @@
     },
     {
       "topic": "databases",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.ts.md",
       "description": "Server-side database storage with CEL-based access control, registered operations, triggers, real-time subscriptions, and group permissions",
       "keywords": [
         "databases",
@@ -381,11 +397,15 @@
         "data-modeling",
         "users-and-groups",
         "scheduling-and-realtime"
-      ]
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.swift.md"
+      }
     },
     {
       "topic": "documents",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.ts.md",
       "description": "Working with documents - the core local-first data architecture in Primitive apps",
       "keywords": [
         "documents",
@@ -430,11 +450,15 @@
         "devtools",
         "databases",
         "data-modeling"
-      ]
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.swift.md"
+      }
     },
     {
       "topic": "workflows",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.ts.md",
       "description": "Creating multi-step automation pipelines with AI/LLM calls, integrations, email, blobs, analytics, cron scheduling, synchronous invocation, and database operations",
       "keywords": [
         "workflows",
@@ -514,7 +538,11 @@
         "scheduling-and-realtime",
         "blobs",
         "analytics"
-      ]
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.swift.md"
+      }
     },
     {
       "topic": "prompts",
@@ -605,7 +633,7 @@
     },
     {
       "topic": "analytics",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.ts.md",
       "description": "Tracking user behavior with automatic lifecycle events and custom event logging",
       "keywords": [
         "analytics",
@@ -649,7 +677,11 @@
         "workflows",
         "integrations",
         "blobs"
-      ]
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.swift.md"
+      }
     },
     {
       "topic": "performance",
@@ -712,7 +744,7 @@
     },
     {
       "topic": "devtools",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_DEVTOOLS.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_DEVTOOLS.ts.md",
       "description": "Using Document Explorer and Test Harness for debugging and testing",
       "keywords": [
         "devtools",
@@ -745,7 +777,11 @@
       ],
       "relatedGuides": [
         "documents"
-      ]
+      ],
+      "files": {
+        "ts": "AGENT_GUIDE_TO_PRIMITIVE_DEVTOOLS.ts.md",
+        "swift": "AGENT_GUIDE_TO_PRIMITIVE_DEVTOOLS.swift.md"
+      }
     },
     {
       "topic": "swift-client",

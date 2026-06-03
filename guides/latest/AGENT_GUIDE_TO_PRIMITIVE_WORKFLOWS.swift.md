@@ -1,0 +1,1173 @@
+# Workflow Agent Guide
+
+> **Swift parity:** workflow *definitions* are TOML (language-neutral). On the client, `workflows.start` exists in both languages, but **`client.workflows.runSync(...)` is JavaScript-only** — Swift has `start` + `runAndApply`. Prompt/integration calls used from app code are dual-language (see the Prompts and Integrations guides).
+
+Workflows are multi-step server-side automations defined in TOML. Each step is one of a fixed set of `kind`s (LLM call, integration call, prompt execute, database op, email, blob, etc.). Steps run sequentially with template-rendered inputs and a shared output context.
+
+This guide is the source of truth for what's actually in `src/workflows/`. Examples are kept short and load-bearing.
+
+## TOML structure
+
+```toml
+[workflow]
+key = "my-workflow"               # required, unique per app
+name = "My Workflow"              # required
+description = "..."               # optional
+status = "draft"                  # draft | active | archived
+accessRule = "hasRole('admin')"  # optional CEL
+perUserMaxRunning = 4             # default 4
+perUserMaxQueued = 100            # default 100
+dequeueOrder = "fifo"             # fifo | lifo (default fifo)
+inputSchema  = "{\"type\":\"object\", ...}"   # JSON-encoded JSON Schema
+outputSchema = "{\"type\":\"object\", ...}"
+
+[[steps]]
+id = "step-1"
+kind = "transform"
+saveAs = "output"
+[steps.output]
+greeting = "Hello {{ input.name }}"
+```
+
+Workflow-level fields the engine actually reads:
+`perUserMaxRunning`, `perUserMaxQueued`, `perAppMaxRunning` (default 25), `perAppMaxQueued` (default 10000), `queueTtlSeconds` (default 43200), `dequeueOrder`, `accessRule`, `inputSchema`, `outputSchema`, `requiresClientApply` (default `true` — see "Client apply" below), `syncCallable` (default `false` — see "Synchronous invocation" below). Sync pushes the schema fields, access rule, queue settings, step list, `requiresClientApply`, and `syncCallable`.
+
+### Per-step common fields
+
+All steps support these in addition to their own:
+
+| Field | Purpose |
+|---|---|
+| `id` (req) | Unique within the workflow |
+| `kind` (req) | Step type — see list below |
+| `name`, `description` | Optional human-readable labels surfaced in CLI/admin views |
+| `runIf` | CEL expression; skip step if false |
+| `selector` | Override `selected` context (`{ source = "step", stepId = "..." }` or `{ source = "context", path = "outputs.x" }`) |
+| `saveAs` | Also store output under `outputs[saveAs]` |
+| `forEach` | Iterate over a list expression (path to array, or to `{items: [...]}`), or a `{ zip, as }` table for parallel-array iteration |
+| `as` | Loop variable name (default exposes `selected`) |
+| `maxItems` | forEach cap (default 200) |
+| `concurrency` | Parallel forEach lanes (integer 1-100; default 1 = sequential). Results preserve insertion order. |
+| `successWhen` | CEL predicate evaluated per forEach iteration to classify the result as functionally succeeded vs empty (see `forEach` below) |
+| `continueOnError` | Capture errors as `{ error, errorDetails, ok: false, errored: true }` instead of failing the workflow |
+| `strict` | Throw if any template expression in this step is unresolved |
+
+## Step types
+
+Every kind below is registered in `src/workflows/runner/default-registry.ts`. If a kind isn't listed here, it doesn't exist.
+
+### `transform`
+
+Returns the templated `output` field. Use this for shaping the workflow's final output.
+
+```toml
+[[steps]]
+id = "final"
+kind = "transform"
+saveAs = "output"
+[steps.output]
+greeting = "Hello {{ input.name }}"
+items = "{{ steps.fetch.data }}"     # single-expression mode preserves arrays
+```
+
+### `noop`
+
+Returns `{ message, payload }`. For testing.
+
+### `switch`
+
+First-match branching. Cases are CEL `when` expressions evaluated top-to-bottom in the same scope as `runIf`; the first truthy case's `output` is templated and returned. Non-selected cases are NOT templated, so they can safely reference outputs of steps that didn't run.
+
+```toml
+[[steps]]
+id = "tier"
+kind = "switch"
+saveAs = "plan"
+
+[[steps.cases]]
+when = "input.score >= 90"
+[steps.cases.output]
+label = "gold"
+discount = 0.2
+
+[[steps.cases]]
+when = "input.score >= 70"
+[steps.cases.output]
+label = "silver"
+discount = 0.1
+
+[steps.default]
+[steps.default.output]
+label = "standard"
+discount = 0
+```
+
+`default` is opt-in. Omit it and a no-match throws `Switch step '<id>' had no matching case and no default`. An explicit `default = { output = null }` skips on no-match (the step output is `null`).
+
+### `delay`
+
+```toml
+[[steps]]
+id = "wait"
+kind = "delay"
+ms = 5000               # number, or "5 seconds" / "200ms"
+```
+
+### `event.wait`
+
+Suspends the workflow until a matching event is delivered to the run via the engine's event API.
+
+```toml
+[[steps]]
+id = "wait-approval"
+kind = "event.wait"
+type = "user-approval"
+timeout = 86400000      # milliseconds (number)
+```
+
+### `llm.chat`
+
+OpenRouter chat completion.
+
+```toml
+[[steps]]
+id = "ask"
+kind = "llm.chat"
+model = "gpt-4o-mini"
+saveAs = "answer"
+
+[[steps.messages]]
+role = "system"
+content = "You are concise."
+
+[[steps.messages]]
+role = "user"
+content = "{{ input.question }}"
+```
+
+Optional: `temperature`, `top_p`, `attachments`, `plugins`, `tools`, `tool_choice`. **No `maxTokens`** — use `prompt.execute` with a managed prompt to control max tokens.
+
+Output shape: whatever the LLM controller returns — typically `{ content, role, metrics }`.
+
+### `gemini.generate`
+
+```toml
+[[steps]]
+id = "extract"
+kind = "gemini.generate"
+model = "models/gemini-2.5-flash"
+thinkingLevel = "minimal"   # Gemini 3 only — minimal | low | medium | high
+
+[steps.prompt]
+[[steps.prompt.messages]]
+role = "user"
+[[steps.prompt.messages.parts]]
+type = "text"
+text = "Summarize: {{ input.content }}"
+```
+
+`prompt` may be an object (forwarded as the body) or an array of messages. `gemini.generateRaw` is the same shape, forwarded as a raw API payload. `gemini.countTokens` returns a token count.
+
+### `prompt.execute`
+
+Execute a managed prompt (configured separately via the prompts API/CLI).
+
+```toml
+[[steps]]
+id = "summarize"
+kind = "prompt.execute"
+promptKey = "summarizer"      # required, must be active
+saveAs = "summary"
+# configId = "..."             # optional, override active config
+# modelOverride = "gpt-4o"     # optional
+
+[steps.variables]
+text = "{{ input.content }}"
+```
+
+Output: result from the prompt config's provider — typically `{ content, role, metrics }`.
+
+### `integration.call`
+
+```toml
+[[steps]]
+id = "fetch"
+kind = "integration.call"
+integrationKey = "weather-api"     # required, must match a configured integration
+saveAs = "weather"
+# bodyMode = "json"                 # json (default) | raw | multipart
+
+[steps.request]
+method = "GET"
+path = "/current"
+
+[steps.request.query]
+city = "{{ input.city }}"
+
+[steps.request.headers]
+X-Custom = "value"
+```
+
+Optional: `attachments`, `multipartFields` (for `bodyMode = "multipart"`).
+
+Integration `defaultHeaders` and `staticQuery` resolve `{{secrets.KEY}}` from app secrets — workflow steps cannot put secrets into `request.headers` directly without exposing them in step output snapshots. Put secrets in the integration config.
+
+### `database.query` / `mutate` / `count` / `aggregate` / `pipeline` / `applyToQuery`
+
+All take `databaseId`, `operationName`, optional `params`. Query takes `limit`, `sort`, `cursor`, `direction`. All accept `dryRun = true`.
+
+```toml
+[[steps]]
+id = "list"
+kind = "database.query"
+databaseId = "{{ input.dbId }}"
+operationName = "listActiveUsers"
+limit = 50
+saveAs = "users"
+[steps.params]
+status = "active"
+# Output: { data: [...], hasMore?, nextCursor? }
+
+[[steps]]
+id = "create-task"
+kind = "database.mutate"
+databaseId = "{{ input.dbId }}"
+operationName = "createTask"
+[steps.params]
+title = "{{ input.title }}"
+# Output: { results: [{ success: true, id }] }
+# Each entry has `success` (not `ok`) + `id`. Failures throw — a result entry's
+# presence implies it succeeded. In `runIf`, prefer the step-level verdict
+# `steps['create-task'].ok` (true iff every result item succeeded) or
+# `size(steps['create-task'].?results) > 0`.
+
+[[steps]]
+id = "mark-overdue"
+kind = "database.applyToQuery"
+databaseId = "{{ input.tasksDbId }}"
+operationName = "mark-overdue"      # NOTE: uses `operationName`, not `operation`
+[steps.params]
+now = "2026-04-27T00:00:00Z"
+# Output: { matched, updated, truncated? }
+```
+
+There is **no `database.executeBatch` step kind.** Batch writes from a workflow are done with `forEach` over a `database.mutate` step, or by calling `database.applyToQuery` for query-driven updates.
+
+### `group.addMember` / `removeMember` / `checkMembership` / `listMembers` / `listUserMemberships`
+
+```toml
+[[steps]]
+id = "add"
+kind = "group.addMember"
+groupType = "team"
+groupId = "{{ input.teamId }}"
+userId = "{{ input.userId }}"   # OR email = "...", not both
+```
+
+`addMember` is idempotent. With `email`, returns `{ status: "pending_signup", invitationId, inviteToken, ... }` if the email has no AppUser yet.
+
+Group operations evaluate the group type's CEL rules. For workflow-issued operations, rules can match `fromWorkflow("workflowKey")`.
+
+### `collect`
+
+Auto-paginate through any step that returns `{ items|data: [...], cursor|nextCursor }`.
+
+```toml
+[[steps]]
+id = "all-users"
+kind = "collect"
+itemsField = "data"
+cursorField = "nextCursor"
+maxPages = 20
+maxItems = 10000
+
+[steps.step]
+kind = "database.query"
+databaseId = "{{ input.dbId }}"
+operationName = "listUsers"
+limit = 100
+# Output: { items: [...all merged...], totalPages }
+```
+
+### `workflow.call`
+
+Run a child workflow synchronously, inline. Child gets isolated `input` — it does NOT see parent's `steps`/`outputs`. Max call depth 10. Circular calls throw immediately.
+
+```toml
+[[steps]]
+id = "onboard"
+kind = "workflow.call"
+workflowKey = "onboard-user"
+[steps.input]
+userId = "{{ item.userId }}"
+# Output: { output: <child's outputs.output or full outputs>, childStepResults: [...] }
+```
+
+### `workflow.start` + `workflow.await`
+
+Fan-out: start child workflows in parallel, then wait. Use with `forEach`.
+
+```toml
+[[steps]]
+id = "start-all"
+kind = "workflow.start"
+forEach = "steps.get-users.data"
+as = "user"
+workflowKey = "process-item"
+maxConcurrent = 25                # default 25; cap on in-flight child runs at any moment
+[steps.input]
+userId = "{{ user.id }}"
+
+[[steps]]
+id = "results"
+kind = "workflow.await"
+runs = "steps.start-all"        # path to forEach output ({items: [...]} accepted)
+timeout = 600000                # ms, default 600000 (10 min)
+onPartialFailure = "fail"       # fail (default) | continue
+# Output: { completed: [...], failed: [...], allSucceeded }
+```
+
+### `email.send`
+
+Two modes; pass exactly one of `templateType` or `htmlBody`.
+
+```toml
+# Template mode — uses a built-in or registered email template
+[[steps]]
+kind = "email.send"
+templateType = "order-confirmation"
+to = "{{ input.email }}"          # OR toUserId, not both
+[steps.variables]
+orderId = "{{ input.orderId }}"
+
+# Inline mode — requires subject + htmlBody (textBody optional)
+[[steps]]
+kind = "email.send"
+to = "{{ input.email }}"
+subject = "Your report is ready"
+htmlBody = "<p>Download: {{ outputs.upload.signedUrl }}</p>"
+textBody = "Download: {{ outputs.upload.signedUrl }}"
+```
+
+`to` is a single address (string), not an array. Built-in templates: `magic-link`, `otp`, `document-share`, `document-share-deferred`, `waitlist-invite`, `waitlist-signup-notification`, `admin-invite`, `app-invite`, `access-request-created`, `access-request-resolved`. Register custom types with `primitive email-templates set <type>`. Hourly rate limit: 100 emails per app per hour (`workflowEmailByApp` in `src/config/rate-limits.ts`).
+
+### `blob.upload` / `blob.download` / `blob.signedUrl`
+
+Three separate kinds, NOT one `blob` step with an `action` field.
+
+```toml
+[[steps]]
+id = "save"
+kind = "blob.upload"
+bucketKey = "reports"             # OR bucketId
+filename = "{{ meta.workflowRunId }}.pdf"
+contentType = "application/pdf"
+contentBase64 = "{{ steps.gen.bytesBase64 }}"   # OR content (utf-8 string)
+tags = ["monthly"]
+# Output: { blobId, bucketId, bucketKey, filename, contentType, numBytes, sha256, tags }
+
+[[steps]]
+id = "url"
+kind = "blob.signedUrl"
+bucketKey = "reports"
+blobId = "{{ steps.save.blobId }}"
+expiresInSeconds = 3600           # 30..86400, default 300 (5 min)
+# Output: { url, token, expiresAt, expiresInSeconds }
+
+[[steps]]
+id = "read"
+kind = "blob.download"
+bucketKey = "reports"
+blobId = "{{ steps.save.blobId }}"
+asBase64 = true                   # default false (returns utf-8 string)
+# Output: { blobId, filename, contentType, numBytes, content?, contentBase64? }
+```
+
+### `analytics.write` / `analytics.query`
+
+`analytics.write` emits up to 25 events per step.
+
+```toml
+[[steps]]
+kind = "analytics.write"
+action = "report.generated"
+feature = "reports"
+[steps.metrics]
+durationMs = 1234
+```
+
+`analytics.query` runs a server-side analytics query. Always lock down the workflow with `accessRule = "hasRole('admin')"` — the runner rejects non-admin callers by default. Per-run cap of 50 queries.
+
+```toml
+[[steps]]
+kind = "analytics.query"
+queryType = "users.top"            # see list below
+windowDays = 7
+limit = 25
+saveAs = "topUsers"
+# cacheTtlSeconds = 0              # 0/null = bypass cache
+```
+
+Valid `queryType` values (dotted form, exact strings):
+`overview.dau`, `overview.wau`, `overview.mau`, `overview.growth`, `daily-active`, `rolling-active`, `cohort-retention`, `users.top`, `users.search`, `users.detail`, `users.snapshot`, `events`, `events.grouped`, `workflows.top`, `prompts.top`, `integrations`. `users.detail` and `users.snapshot` require `userUlid`.
+
+Optional fields:
+
+- `groupBy` — for `events.grouped`. One of `action`, `feature`, `day`, `route`, `country`, `deviceType`, `plan`.
+- `filters` — for `events` and `events.grouped`. Array of `{ field, operator, value }` (max 10 entries; values capped at 200 chars). Same field/operator set as the `/analytics/events` REST endpoint.
+- `page` — 0-indexed page number for the `events` feed.
+- `query` — search string (email or ULID) for `users.search`.
+
+```toml
+[[steps]]
+kind = "analytics.query"
+queryType = "events.grouped"
+windowDays = 7
+groupBy = "feature"
+filters = [
+  { field = "feature", operator = "is",       value = "billing" },
+  { field = "action",  operator = "contains", value = "upgrade" },
+]
+saveAs = "billingUpgrades"
+```
+
+### `script`
+
+Runs a sandboxed [Rhai](https://rhai.rs/) script over JSON input and returns JSON. Use it for transforms too involved for a templated `transform` step (nested reshaping, derived fields, array map/filter/reduce). The sandbox is **deterministic and side-effect-free** — no network, clock, or storage access — so script steps are safe to retry and easy to test.
+
+```toml
+[[steps]]
+id = "normalize"
+kind = "script"
+ref = "normalize-order"     # required — the Script name (unique per app)
+saveAs = "order"
+[steps.with]                # input context passed to the script (templated by the engine)
+raw = "{{ steps.fetch.body }}"
+currency = "{{ input.currency }}"
+```
+
+- `ref` (required) names a `Script` — a stored Rhai body, unique per app. Script bodies live in `transforms/<name>.rhai` in your sync directory and are mirrored to the server by `primitive sync push` (and pulled back by `primitive sync pull`); the `<name>` is the filename without `.rhai`. There is no separate `transforms` CLI command — scripts ride the normal sync flow.
+- `with` is the JSON context handed to the script. The body is resolved from the published snapshot at run time, so the run path does no extra lookup.
+- `limits` (optional) lets a step lower the per-run ceilings (`maxOperations`, `wallMsHint`, `maxOutputBytes`, `maxArrayLength`, `maxObjectKeys`, `maxNestingDepth`, `maxStringSize`, `maxCallDepth`, `maxLogBytes`); requested values are clamped at the app ceiling, never raised.
+- Deterministic failures (parse / compile / runtime / limit / validation) come back as a non-retryable step error so durable retries don't re-run a guaranteed failure; transient/transport errors throw and retry normally. The runtime fails closed — it never silently passes input through.
+- Each execution records per-step telemetry on the `WorkflowRun.scriptMetrics` array (operation counts, input/output byte sizes, runtime version), visible in run detail.
+
+### `iterate-users`
+
+Fans a child workflow out across **every user in the app**, once per user, as a restartable singleton. Built for large per-user batch jobs (backfills, per-user digests, recomputations) that must survive restarts without re-processing completed users or holding the whole user set in memory.
+
+```toml
+[[steps]]
+id = "backfill"
+kind = "iterate-users"
+iterationName = "2026-06-prefs-backfill"   # required — stable name; identifies this iteration
+saveAs = "backfillResult"
+pageSize = 100                # users fetched per page (default 100)
+concurrency = 25             # per-page fan-out (default 25, max 100)
+onConflict = "skip"          # "skip" (default) | "refuse" if an iteration is already running
+onPartialFailure = "continue" # "continue" (default) | "fail"
+[steps.source]
+mode = "app"                 # "app" (all app users) | "analytics"
+[steps.perUser]
+workflowKey = "process-one-user"   # the per-user workflow to run
+[steps.perUser.input]               # static input merged into each child run
+reason = "preferences backfill"
+```
+
+- **Bounded memory**: users are paged (`pageSize`) rather than loaded all at once, so the step scales to large user counts.
+- **Singleton per app**: a per-app lock (`iterationName` keys it) guarantees only one iteration runs at a time and tracks aggregate progress, so a restarted run resumes where it left off instead of starting over. `onConflict` decides whether a second start `skip`s or `refuse`s while one is live.
+- Each user is processed by the `perUser.workflowKey` child workflow (the user id plus any `perUser.input` is passed as its input). `onPartialFailure` controls whether per-user failures stop the whole iteration or are tallied and skipped.
+- Prefer `iterate-users` over a hand-rolled `forEach` across a `users.list` query when the fan-out is app-wide and long-running; `forEach` is better for bounded, in-run collections.
+
+## Templating
+
+`{{ ... }}` resolves paths into the run context. Context vars:
+
+| Var | Source |
+|---|---|
+| `input` | The `rootInput` passed to start() |
+| `selected` | Result of `selector` (or current `forEach` item if no `as`) |
+| `steps` | `steps[stepId]` for every prior step |
+| `outputs` | `outputs[saveAs]` for every prior `saveAs` |
+| `meta` | The `meta` you passed to `start()` — **NOT auto-populated.** No `meta.startedAt`/`meta.userId` unless you set them. |
+| `secrets` | App secrets (read-only) |
+| `<asVar>` | Current item inside a `forEach` step |
+| `loop`, `iteration` | `{ index, count, first, last }` inside `forEach` (use `iteration` in CEL `runIf` since `loop` is reserved) |
+| `now`, `today`, `uuid`, `ulid` | Built-in zero-arg helpers (see below) |
+
+### Built-in template helpers
+
+Four zero-arg helpers are always available in templates. They re-evaluate on every reference — `{{ now }} {{ now }}` produces two different timestamps.
+
+| Name | Returns |
+|---|---|
+| `now` | Current ISO 8601 timestamp (e.g. `2026-05-20T14:38:00.123Z`) |
+| `today` | Current UTC date as `YYYY-MM-DD` |
+| `uuid` | Fresh random UUID v4 |
+| `ulid` | Fresh random ULID (lexicographically sortable) |
+
+```toml
+filename = "report-{{ today }}-{{ ulid }}.pdf"
+correlationId = "{{ uuid }}"
+generatedAt = "{{ now }}"
+```
+
+User-provided keys win over built-ins. If you bind `as = "uuid"` in a forEach, pass `input.now`, or have a step output named `today`, the user value shadows the built-in for that scope.
+
+**Single-expression mode**: when the entire string is one `{{ ... }}`, the raw value (array/object) is returned, not stringified. Otherwise expressions are coerced to strings and interpolated.
+
+**Fallback** with `||`:
+
+```
+"{{ input.title || 'Untitled' }}"
+"{{ input.a || input.b || 'default' }}"
+```
+
+**Filters** with `|` (single pipe — `||` is fallback):
+
+```
+{{ input.data | json }}                         # pretty JSON
+{{ input.tags | join: ', ' }}
+{{ input.items | length }}
+{{ input.users | pluck: 'email' | uniq }}
+{{ input.list | where: 'status', 'active' }}
+{{ input.list | sort: 'name' | first }}
+{{ input.text | upper | truncate: '100' }}
+{{ input.amount | toFixed: '2' }}
+{{ input.x | default: 'fallback' }}
+{{ input.id | expect: 'string' }}              # throws on type mismatch
+```
+
+Available filters (see `src/workflows/runner/templates.ts` for full list):
+- Type: `json`, `string`, `number`, `boolean`, `default`, `expect`
+- String: `upper`/`uppercase`, `lower`/`lowercase`, `trim`, `split`, `replace`, `truncate`, `startsWith`, `endsWith`, `contains`
+- Array: `length`/`size`, `first`, `last`, `keys`, `values`, `join`, `pluck`, `where`, `sort`, `reverse`, `flatten`, `uniq`, `compact`, `slice`, `concat`
+- Number: `round`, `floor`, `ceil`, `abs`, `toFixed`
+- Date: `now`, `toISOString`
+
+Templates have **no arithmetic** (`{{ a + b }}` won't work). Move math into a step or filter chain.
+
+**Missing path sentinel.** In interpolation mode (`"prefix-{{ steps.x.y }}-suffix"`), an unresolved path renders as `<missing: steps.x.y>` so it's visible in step output and logs. In single-expression mode (`"{{ steps.x.y }}"` alone) the raw value is `null` so downstream `runIf`/comparisons work naturally. A resolved `null` interpolates as `"null"`; a resolved empty string interpolates as `""`. Set `strict = true` on the step to throw on any unresolved path instead.
+
+## `runIf` (CEL, not templates)
+
+```toml
+runIf = "input.shouldRun"                        # truthy
+runIf = "outputs.text.length < 1000"             # comparison
+runIf = "steps.check.isMember && input.amount > 0"
+runIf = "steps.previous.ok"                      # uniform verdict on every step
+runIf = "!steps.fetch.skipped"
+```
+
+CEL context: `input`, `selected`, `steps`, `outputs`, `meta`, `secrets`, plus `iteration` (and `as`-var) inside `forEach`. **Do NOT wrap in `{{ }}`** — `runIf` parses CEL directly. A CEL evaluation error fails the step (or is captured by `continueOnError`).
+
+### Safe navigation
+
+CEL optional types are enabled in every workflow context (`runIf`, `accessRule`, group/database access rules, cron triggers). Use them to collapse multi-conjunct null guards into single-line expressions.
+
+| Syntax | Meaning |
+|---|---|
+| `steps.foo.?bar` | Optional field access — returns an optional, never throws on missing |
+| `steps.foo[?"bar"]` | Optional index access (same, for map/list lookups) |
+| `expr.orValue(default)` | Unwrap optional, falling back to `default` |
+| `expr.hasValue()` | True if the optional is set |
+| `optional.of(x)` / `optional.none()` | Construct optionals explicitly |
+
+Common operations work directly on optional values — no `.orValue()` unwrap needed:
+
+| Expression | Semantics |
+|---|---|
+| `size(steps.x.?data)` | `none` → `0`; `some(xs)` → `xs.size()`. Works for lists, maps, strings, bytes. |
+| `steps.x.?body.?token != ''` | `none` is never equal to any scalar value (absent ≠ empty string). |
+| `steps.x.?body.?err == null` | `none == null` is `true` (absent path treated as null). |
+
+```cel
+runIf = "size(steps['fetch'].?data) > 0"
+runIf = "steps['profile'].?body.?err != null"
+runIf = "steps['profile'].?body.?token != ''"
+```
+
+You can still use `.orValue()` and `.hasValue()` when you need explicit control over the fallback value:
+
+```cel
+runIf = "steps.fetch.?data.?items.orValue([]).size() > 0"
+runIf = "steps.profile.?role.hasValue() && steps.profile.role == 'owner'"
+```
+
+Without safe navigation, `steps.fetch.data.items` throws on any missing intermediate; with it, the chain short-circuits to `optional.none()`.
+
+## `forEach`
+
+```toml
+[[steps]]
+id = "notify"
+kind = "email.send"
+forEach = "steps.team.items"
+as = "member"
+maxItems = 500
+to = "{{ member.email }}"
+subject = "Update"
+htmlBody = "<p>Hi {{ member.name }}</p>"
+```
+
+Output is always `{ items: [...per-iter results], errors: [{index, error}], totalSucceeded, totalFailed, totalEmpty, ok }` — even when there are no errors. Results are ordered by input index regardless of completion order. `ok` is `true` iff every iteration succeeded (and the source was non-empty); use it in `runIf` on the next step.
+
+**Parallel forEach** — add `concurrency` to fan out iterations across multiple lanes:
+
+```toml
+[[steps]]
+id = "notify"
+kind = "email.send"
+forEach = "steps.team.items"
+as = "member"
+concurrency = 5           # run up to 5 iterations at once
+maxItems = 500
+to = "{{ member.email }}"
+subject = "Update"
+htmlBody = "<p>Hi {{ member.name }}</p>"
+```
+
+When `concurrency = 1` (the default), iterations are sequential. When `concurrency > 1`, the engine fans them out in parallel batches — in durable mode each batch runs as a child workflow so restarts don't re-run completed items. For very large fan-outs, `workflow.start` + `workflow.await` gives finer control.
+
+When a parallel `forEach` batch's combined output exceeds the inline size limit (~1 MB), the engine automatically offloads the batch result to managed object storage and rehydrates it transparently for the next step. You don't need to handle this — large per-iteration outputs no longer fail the step — but it does add a storage round-trip, so keep per-iteration outputs lean when you can.
+
+### Zip mode (parallel arrays by index)
+
+When the inputs you want to iterate live in several arrays of the same length, use the `{ zip, as }` form. Each iteration binds one variable per `as` name from the matching `zip` expression at the same index.
+
+```toml
+[[steps]]
+id = "send"
+kind = "email.send"
+forEach = { zip = ["steps.list.users", "steps.list.tokens"], as = ["user", "token"] }
+to = "{{ user.email }}"
+subject = "Your code"
+htmlBody = "<p>Code: {{ token }}</p>"
+```
+
+This replaces the silently-corrupting `steps.list.tokens[iteration.index]` pattern — if the arrays drift in length, the engine surfaces it instead of indexing past the end.
+
+### `successWhen` (functional success vs. empty)
+
+For iterations that don't throw but didn't accomplish anything meaningful (e.g. an HTTP 200 with `body.matches = []`), use `successWhen` to classify the outcome.
+
+```toml
+[[steps]]
+id = "lookup"
+kind = "integration.call"
+forEach = "input.queries"
+as = "q"
+successWhen = "result.body.matches.size() > 0"
+[steps.request]
+method = "GET"
+path = "/search?q={{ q }}"
+```
+
+The predicate runs against each iteration's `result` plus the usual `input`/`steps`/`outputs`/`meta`/`iteration` context. Truthy → `functional_status: "succeeded"`; falsy → `"empty"`; throws → `"failed"` (the predicate is not evaluated). `totalEmpty` on the step output counts the empty bucket. A broken predicate falls back to `"succeeded"` and the workflow continues.
+
+## Error handling
+
+- **Default**: a failed step throws and the workflow fails.
+- `continueOnError = true`: failure is captured as `steps[id] = { error, errorDetails }` and execution continues.
+- `strict = true`: any unresolved template expression in the step throws with a path-listing error.
+- `expect:` filter (in templates): runtime type check.
+- `[[compensate]]` block at the top level runs after a failure (when `continueOnError` is not set). Compensate steps see `steps._error = { message, stepId }`. Compensate runs only in sync execution paths (e.g., `executeWorkflowSync`); not all engine modes invoke it.
+
+```toml
+[[steps]]
+id = "deduct-token"
+kind = "database.mutate"
+# ...
+
+[[steps]]
+id = "call-api"
+kind = "integration.call"
+# fails here → compensate runs
+
+[[compensate]]
+id = "restore-token"
+kind = "database.mutate"
+runIf = "steps.deduct-token != null"
+# ...
+```
+
+Per-step retries on transient errors are handled by the workflow engine automatically and are not configurable from TOML. Mark errors non-retryable by ensuring upstream calls return 4xx (the engine wraps 4xx≠429 as non-retryable).
+
+## Output contract
+
+After all steps run:
+
+- `steps[id]` holds every step's output (including skipped/failed entries).
+- `outputs[saveAs]` holds outputs for steps with `saveAs`.
+- The workflow's final result is `outputs.output` if any step used `saveAs = "output"`, otherwise the full `outputs` map.
+
+**Best practice**: end with a `transform` step using `saveAs = "output"` that explicitly shapes the return value.
+
+### Uniform step verdict
+
+Every entry in `steps[id]` carries a reserved verdict namespace alongside the runner's own fields:
+
+| Field | When set |
+|---|---|
+| `ok: boolean` | Always. `true` if the step ran and the runner classified it as successful; `false` for skipped, errored, or kind-specific failures (e.g. an `integration.call` that returned HTTP 5xx) |
+| `skipped: true` | The step's `runIf` evaluated falsy. The runner did NOT execute. |
+| `errored: true` | The step threw but was captured by `continueOnError = true` |
+| `error`, `errorDetails` | Companion fields populated when `errored: true` |
+
+`ok`, `skipped`, `errored`, `error`, and `errorDetails` are written by the engine and override any same-named field the runner would have produced. Downstream `runIf` and templates can rely on them on every step kind:
+
+```toml
+runIf = "steps.fetch.ok"
+runIf = "!steps.fetch.skipped && !steps.fetch.errored"
+```
+
+## Access control
+
+`accessRule` is a CEL expression. Evaluated when:
+- A client calls `workflows.start()`.
+- A `workflow.call` step invokes the workflow from another workflow.
+
+NOT evaluated for inbound webhook triggers (those handle their own auth — e.g., Stripe signature). For webhook-triggered workflows, set `accessRule = "hasRole('owner')"` to prevent direct client invocation.
+
+Behavior:
+- No rule → any authenticated app member can start.
+- `admin`/`owner` always bypass.
+- Otherwise, evaluate against `user.userId`, `user.role`, plus `hasRole(role)`, `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`.
+
+Set `accessRule` once in the `[workflow]` TOML block and it sticks: `primitive sync push` and `primitive workflows create --from-file` both apply it (an absent/empty rule is sent as "no rule" rather than dropped). To change it later without re-pushing the file, `primitive workflows update <id> --access-rule "<CEL>"` sets it (pass `--access-rule ""` to clear; omitting the flag leaves the existing rule untouched).
+
+## Client apply (footgun)
+
+By default, `requiresClientApply = true`. After the workflow completes, status becomes `apply_pending` and a connected client must call `claimApply` → run `onApply` → `confirmApply` to finalize. If no client is listening, the run sits in `apply_pending` indefinitely.
+
+For server-only workflows (no client follow-up), set `requiresClientApply = false` in the workflow TOML:
+
+```toml
+[workflow]
+key = "nightly-digest"
+requiresClientApply = false
+```
+
+`primitive sync push` pushes this flag. You can also set it via the CLI:
+
+```bash
+primitive workflows create --from-file workflow.toml --requires-client-apply false
+primitive workflows update <workflow-id> --requires-client-apply false
+```
+
+## Synchronous invocation (`runSync`)
+
+Opt a workflow into synchronous invocation by setting `syncCallable = true` in the TOML (pushed by `primitive sync push`) or via `primitive workflows update --sync-callable true`. Once set, clients can call `client.workflows.runSync()` and `await` the final envelope in a single round-trip — useful for short, latency-sensitive tasks like input validation, enrichment lookups, or webhook handlers that must reply with a result.
+
+Constraints:
+
+- **Step kinds are restricted.** The server validates step kinds against a sync-compatible list when the flag is set (or when steps are pushed against a sync-callable workflow). Long-running or suspending kinds (`event.wait`, `workflow.await`, `delay` over the timeout) reject at save time with `Workflow contains sync-incompatible steps`.
+- **Timeout.** `timeoutMs` defaults to 5s and is capped server-side at 30s (the server CPU budget per request). Exceeding it resolves with `status: "timeout"`.
+- **Apply still applies.** A sync-callable workflow may still have `requiresClientApply = true`, in which case `runSync` resolves with `status: "apply_pending"` and the normal `claimApply`/`confirmApply` flow takes over. Most sync-callable workflows want `requiresClientApply = false`.
+
+Long-running workflows should keep using `start()` plus the WebSocket / polling lifecycle.
+
+## Workflow lifecycle
+
+A workflow needs `status = "active"` AND one of (active configuration | published revision) before clients can run it.
+
+| Status | Active config/revision? | Client can run? | CLI preview? |
+|---|---|---|---|
+| `draft` | either | no | yes |
+| `active` | yes (required) | yes | yes |
+| `archived` | – | no | no |
+
+Setting `status = "active"` without an active config or revision returns: `Cannot activate workflow without a configuration`.
+
+`primitive sync push` creates a default configuration automatically when a workflow is first created and updates it on subsequent pushes. Each push of `[[steps]]` updates the active configuration's steps in place.
+
+### Configurations vs revisions
+
+- **Configurations** (recommended): named, mutable groupings of steps. One is `activeConfigId`. Created automatically on first sync push.
+- **Revisions** (legacy): immutable snapshots created via `primitive workflows publish`.
+
+## CLI
+
+```bash
+# Sync (recommended for everything)
+primitive sync init --dir ./config
+primitive sync pull --dir ./config
+primitive sync diff --dir ./config
+primitive sync push --dir ./config --dry-run
+primitive sync push --dir ./config
+
+# Workflow CRUD (when not using sync)
+primitive workflows list [--status active] [--json]
+primitive workflows get <workflow-id>
+primitive workflows create --from-file workflow.toml [--requires-client-apply false]
+primitive workflows update <workflow-id> --status active
+primitive workflows delete <workflow-id>           # archive
+primitive workflows delete <workflow-id> --hard --yes
+
+# Expand fragment includes (for debugging)
+primitive workflows expand <workflow.toml>
+
+# Preview a workflow
+primitive workflows preview <workflow-id> --input '{"x":1}' --wait
+primitive workflows preview <workflow-id> --config <config-id> --wait
+primitive workflows preview <workflow-id> --draft --wait
+# Preview source priority:
+#   1. --config <id> if provided
+#   2. --draft if flag set
+#   3. active configuration (default)
+#   4. draft (fallback if no active config)
+
+# Draft / publish (legacy revision flow)
+primitive workflows draft update <workflow-id> --from-file workflow.toml
+primitive workflows publish <workflow-id>
+
+# Configurations
+primitive workflows configs list <workflow-id>
+primitive workflows configs get <workflow-id> <config-id>
+primitive workflows configs create <workflow-id> --name "production" --from-file workflow.toml
+primitive workflows configs update <workflow-id> <config-id> --from-file workflow.toml
+primitive workflows configs activate <workflow-id> <config-id>
+primitive workflows configs duplicate <workflow-id> <config-id> --name "experiment-v2"
+primitive workflows configs archive <workflow-id> <config-id>
+
+# Run inspection
+primitive workflows runs list <workflow-id> [--status pending|running|completed|failed]
+primitive workflows runs status <workflow-id> <run-id>
+primitive workflows runs steps <workflow-id> <run-id>
+primitive workflows runs step-detail <workflow-id> <run-id> <step-id>
+primitive workflows runs error <workflow-id> <run-id>
+primitive workflows runs failures <workflow-id>
+
+# Test cases
+primitive workflows tests list <workflow-id>
+primitive workflows tests create <workflow-id> --name "Basic" --vars '{"x":1}' --contains '["expected"]'
+primitive workflows tests run <workflow-id> <test-case-id>
+primitive workflows tests run-all <workflow-id>
+
+# Analytics (CLI-side)
+primitive workflows analytics overview --days 7
+primitive workflows analytics top --days 7
+```
+
+All inspection commands take `--json`.
+
+### Reusable step fragments
+
+A workflow TOML can pull shared `[[steps]]` blocks out of fragment files via `include`:
+
+```toml
+# config/workflows/onboard.toml
+[workflow]
+key = "onboard"
+name = "Onboard new user"
+status = "active"
+
+include = ["common-validation", "common-audit"]
+
+[[steps]]
+id = "create-account"
+kind = "database.mutate"
+# ...
+```
+
+Fragments live at `<workflowDir>/../workflow-fragments/<name>.toml` and contain only `[[steps]]` tables (no `[workflow]` block, no further `include`). The CLI expands `include` references before `sync push` — the server only ever stores the flattened step list. Step ids must be unique across the expanded set; collisions are reported with both source locations. Use `primitive workflows expand <file>` to print the expanded result.
+
+### Operation `$params` validation
+
+When a workflow references a registered database operation via `database.query`/`mutate`/etc., the CLI checks that every `$params.X` substitution in the operation's TOML maps to a declared `[[operations.params]]` entry at `sync push` time. A typo like `$params.proectId` is reported with the file path and line number of the offending `[[operations]]` block instead of silently no-opping at runtime.
+
+### Cron triggers
+
+```bash
+primitive cron-triggers create \
+  --key nightly-digest \
+  --name "Nightly Digest" \
+  --cron "0 9 * * *" \
+  --workflow-key send-digest \
+  --timezone "America/Los_Angeles" \
+  --overlap-policy skip       # skip (default) | allow
+
+# With per-firing input passed to the workflow:
+primitive cron-triggers create \
+  --key nightly-digest --name "Nightly Digest" --cron "0 9 * * *" \
+  --workflow-key send-digest \
+  --input '{"reportType":"daily","priority":"high"}'
+
+# Or map fields from the trigger context into the workflow input:
+primitive cron-triggers create \
+  --key nightly-digest --name "Nightly Digest" --cron "0 9 * * *" \
+  --workflow-key send-digest \
+  --input-mapping '{"runId":"$triggerId","at":"$firedAt"}'
+
+primitive cron-triggers list
+primitive cron-triggers get <trigger-id>
+primitive cron-triggers test <trigger-id>     # fire manually
+primitive cron-triggers pause <trigger-id>
+primitive cron-triggers resume <trigger-id>
+primitive cron-triggers delete <trigger-id>
+```
+
+Notes:
+- The CLI flags are `--key`, `--name`, `--cron`, `--workflow-key`, `--overlap-policy`, `--timezone`, `--input`, `--input-mapping` — NOT `--schedule` or `--workflow`.
+- `--input` and `--input-mapping` accept JSON strings; `--input` is a literal payload and `--input-mapping` projects fields from the trigger firing context into the workflow input. Both are also accepted by `cron-triggers update`.
+- `overlapPolicy` is exactly `skip` or `allow` (no `queue` value exists).
+- Per-app cap of 50 cron triggers.
+- Always set an IANA `--timezone` for user-visible schedules.
+- The referenced workflow must be `status = "active"` with an active config/revision and (for server-only triggers) `requiresClientApply = false`.
+
+See `AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md` for full details.
+
+## Client SDK
+
+Start a workflow, check its status, and list recent runs:
+
+```swift
+  // Start a workflow; it runs in the background
+  let started = try await client.workflows.start(
+    workflowKey: "welcome-email",
+    input: ["userName": "Alice", "userEmail": "alice@example.com"]
+  )
+  let runKey = started["runKey"] as? String ?? ""
+
+  // Check status
+  let status = try await client.workflows.getStatus(
+    workflowKey: "welcome-email", runKey: runKey, contextDocId: nil
+  )
+
+  // List recent runs
+  let runs = try await client.workflows.listRuns(
+    options: ListWorkflowRunsOptions(workflowKey: "welcome-email", limit: 50)
+  )
+```
+
+Full options and result shapes for these calls:
+
+```typescript
+const result = await client.workflows.start({
+  workflowKey: "my-workflow",
+  input: { text: "hello" },        // optional, default {}
+  runKey: "...",                    // optional, idempotency key — auto-generated otherwise
+  contextDocId: "doc-id",           // optional
+  meta: { source: "api" },          // optional, max 1KB
+  forceRerun: false,                // optional — terminate existing run with same key
+});
+// → { runId, runKey, instanceId, status, existing? }
+
+const status = await client.workflows.getStatus({
+  workflowKey: "my-workflow",
+  runKey: result.runKey,
+  contextDocId: "doc-id",           // optional, must match the start call's scope
+});
+// → { status, output?, error?, run? }
+// status.status: "running" | "complete" | "failed" | "terminated" | "apply_pending" | "apply_claimed"
+// (NOTE: "complete", not "completed", in this method)
+
+await client.workflows.terminate({ workflowKey, runKey, contextDocId });
+const { items, cursor } = await client.workflows.listRuns({ workflowKey, status, limit: 50 });
+```
+
+In Swift, `start`/`getStatus`/`listRuns` return untyped `[String: Any]` dictionaries — read fields by key (e.g. `started["runKey"] as? String`).
+
+**Synchronous invocation is JavaScript-only.** `client.workflows.runSync(...)` has no Swift equivalent (#956); Swift callers use `start()` plus `getStatus`/`runAndApply`. It is only available on workflows with `syncCallable = true`:
+
+```typescript
+const sync = await client.workflows.runSync({
+  workflowKey: "validate-token",
+  input: { token },
+  timeoutMs: 5000,                 // default 5000; server caps at 30000
+  // signal: abortSignal,            // optional AbortSignal
+});
+// → { runId, runKey, status, output?, error?, run?, existing? }
+// status: "completed" | "failed" | "terminated" | "timeout" | "apply_pending"
+// Promise resolves for every terminal outcome — only transport errors reject.
+```
+
+Inspect the per-step debug records of a run:
+
+```swift
+  // Fetch the per-step run records for a run (debugging / admin views)
+  let result = try await client.workflows.listStepRuns(runId: runId)
+  let stepRuns = result["items"] as? [[String: Any]] ?? []
+
+  for step in stepRuns {
+    // step["stepId"], step["stepKind"], step["status"], step["input"], step["output"], step["error"]
+    let stepId = step["stepId"] as? String ?? ""
+    let kind = step["stepKind"] as? String ?? ""
+    let status = step["status"] as? String ?? ""
+    print(stepId, kind, status)
+  }
+```
+
+The step records carry `{ stepRunId, runId, stepKind, status, input, output, error, startedAt, endedAt, ... }`.
+
+`runKey` is scoped as `${contextDocId}#${runKey}`. Calling `start` with an existing `runKey` returns `{ existing: true, ... }` unless `forceRerun: true`.
+
+## WebSocket events
+
+Requires an active WebSocket (e.g., from `client.documents.open(docId)`).
+
+```typescript
+client.on("workflowStarted", (e) => { /* { workflowKey, runId, runKey, instanceId, contextDocId?, meta? } */ });
+
+client.on("workflowStatus", (e) => {
+  // e.status: "completed" | "failed" | "terminated"  (NOTE: "completed" here, with the "d")
+  // e.needsApply: true if requiresClientApply and not yet applied
+});
+```
+
+The `workflowStatus` event uses `"completed"`. The `getStatus` method returns `"complete"`. Yes, this is inconsistent in the SDK — handle both if your code shares logic.
+
+## Apply pattern
+
+For workflows with `requiresClientApply = true`, register an apply handler so a client deterministically runs follow-up logic exactly once.
+
+```typescript
+client.workflows.define("my-workflow-key", {
+  onApply: async ({ output, workflowKey, runKey, runId, contextDocId, startedByUserId, meta }) => {
+    // Runs on exactly one connected client.
+    const { doc } = await client.documents.open(contextDocId);
+    doc.getMap("data").set("result", output);
+  },
+});
+```
+
+Manual flow if you need it: `claimApply` → run logic → `confirmApply` (success) or `releaseApply` (failure). 30s lease timeout for crashed clients.
+
+## Footguns and don't-do-this
+
+### Wrong: trying to use `{{ }}` in `runIf`
+
+```toml
+# WRONG — runIf is CEL, not a template
+runIf = "{{ steps.check.isMember }}"
+
+# RIGHT
+runIf = "steps.check.isMember"
+```
+
+### Wrong: stuffing secrets into step config
+
+```toml
+# WRONG — step config is logged to step run records
+[steps.request.headers]
+Authorization = "Bearer {{ secrets.API_KEY }}"
+
+# RIGHT — put secrets in the integration's defaultHeaders/staticQuery
+# (configured once on the integration, never appears in step output)
+```
+
+### Wrong: assuming `meta.startedAt` exists
+
+```toml
+# WRONG — meta only has whatever you passed to start()
+filename = "{{ meta.startedAt }}.pdf"
+
+# RIGHT — use a built-in helper, or pass timestamps in via meta
+filename = "{{ now }}.pdf"
+```
+
+### Wrong: re-running an idempotent step inside a retry loop
+
+`continueOnError = true` does not retry — it captures the error and moves on. To retry, the workflow has to re-invoke the step explicitly (e.g., another workflow run, or a `workflow.start` fan-out with retries). The engine already retries transient errors per step automatically; don't add a second layer.
+
+### Wrong: leaking secrets/PII via `saveAs`
+
+```toml
+# WRONG — saveAs result is persisted in step_run records
+[[steps]]
+id = "fetch-secrets"
+kind = "database.query"
+saveAs = "creds"
+# operationName returns rows with API keys
+```
+
+If a step output contains sensitive data, do NOT `saveAs`. Pipe it directly into the next step via `steps.<id>.field` and immediately overwrite/transform it down to non-sensitive fields.
+
+### Wrong: cron triggers that overlap when work isn't idempotent
+
+```toml
+# Default overlapPolicy = "skip" → if the previous run is still running, the next firing is dropped.
+# Set "allow" only when each firing is independent and idempotent. There is no "queue" policy.
+```
+
+### Wrong: forgetting `requiresClientApply = false` for server-only workflows
+
+Cron-triggered workflows almost always want `requiresClientApply = false`. Otherwise the run sits in `apply_pending` forever because no client is listening.
+
+```bash
+primitive workflows update <workflow-id> --requires-client-apply false
+```
+
+### Wrong: assuming `email.send` accepts an array `to`
+
+```toml
+# WRONG
+to = ["a@x.com", "b@x.com"]
+
+# RIGHT — fan out with forEach
+[[steps]]
+kind = "email.send"
+forEach = "{{ input.recipients }}"
+as = "addr"
+to = "{{ addr }}"
+templateType = "..."
+```
+
+### Wrong: `workflow.call` thinking the child sees parent state
+
+The child gets ONLY its `[steps.input]` table as `input`. It does not inherit `steps`, `outputs`, `meta`, or `selected`. Pass everything the child needs explicitly.
+
+### Wrong: `database.executeBatch` step
+
+Doesn't exist. Use `forEach` over a `database.mutate` step, or use `database.applyToQuery` for query-driven updates.
+
+### Wrong: arbitrary analytics query types
+
+Use the dotted form. `top-users` → `users.top`. `events-grouped` → `events.grouped`. `workflows` → `workflows.top`.
+
+### Wrong: mirroring workflow state into a separate database row
+
+```toml
+# WRONG — patching an `importJobs` row at the end of the workflow to track status
+[[steps]]
+id = "mark-done"
+kind = "database.mutate"
+operationName = "patch-import-job"
+[steps.params]
+id = "{{ input.jobId }}"
+data = '{ "status": "ready_to_review" }'
+```
+
+This drifts the moment the workflow ends without your mutate firing — async failure, terminated run, an upstream step that throws between the data write and the status patch. The row sticks on `"processing"` forever and your UI spins indefinitely.
+
+The workflow engine already tracks status (`running` / `apply_pending` / `apply_claimed` / `complete` / `failed` / `terminated`). Use the workflow's own machinery instead of mirroring it:
+
+- **`meta` (≤1KB)** passed to `workflows.start()` for small client-display fields that need to ride alongside the run (filenames, blob IDs, source labels). Surfaces in `listRuns`, `getStatus`, and `workflowStarted` / `workflowStatus` events.
+- **Run `output`** (via a final `transform` step with `saveAs = "output"`) for parsed results. Read via `getStatus({ workflowKey, runKey })`.
+- **`requiresClientApply = true`** when you need a "ready for user action" stage before finalization — the run sits in `apply_pending`, the client `claimApply`s it, runs whatever it needs locally, then `confirmApply`s. The run's status now encodes the full pipeline including "user has applied this".
+
+Only persist a separate database row when you need durable history beyond the workflow's 45-day TTL — and even then, store a *result record*, not a status mirror.
+
+## Limits / TTLs
+
+- Workflow runs: cleaned up after **45 days** (preview runs: **7 days**).
+- `forEach`: 200 items default, override with `maxItems`.
+- `collect`: 10 pages / 10000 items default.
+- `analytics.query`: 50 queries per run.
+- `analytics.write`: 25 events per step.
+- `workflow.call`: max depth 10; circular calls throw.
+- Cron triggers: 50 per app.
+- `meta` payload: 1KB.
+- App secrets via templates/CEL: read-only, available as `secrets.KEY`.
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| `Workflow not found` | Wrong app context, or `status != "active"`, or no active config/revision |
+| `Cannot activate workflow without a configuration` | Push steps before activating |
+| `Workflow has no draft or configuration to preview` | First `primitive sync push` to create a config, or use `primitive workflows draft update` |
+| Run stuck in `apply_pending` | `requiresClientApply = true` but no client running `define()` for that key. Set to `false` for server-only workflows. |
+| `existing: true` on `start()` | A run with the same `(contextDocId, runKey)` already exists. Use a different `runKey` or `forceRerun: true`. |
+| `Step "X": required field "Y" is empty` | A template expression resolved to `""`. Check the path; consider `strict = true` to surface earlier. |
+| `runIf expression failed` | CEL syntax error or unknown identifier in `runIf`. Don't use `{{ }}` inside. |

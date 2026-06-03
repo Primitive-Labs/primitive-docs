@@ -919,6 +919,24 @@ See `AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md` for full details.
 
 ## Client SDK
 
+Start a workflow, check its status, and list recent runs:
+
+```typescript
+  // Start a workflow; it runs in the background
+  const { runId, runKey } = await client.workflows.start({
+    workflowKey: "welcome-email",
+    input: { userName: "Alice", userEmail: "alice@example.com" },
+  });
+
+  // Check status
+  const status = await client.workflows.getStatus({ workflowKey: "welcome-email", runKey });
+
+  // List recent runs
+  const { items } = await client.workflows.listRuns({ workflowKey: "welcome-email", limit: 50 });
+```
+
+Full options and result shapes for these calls:
+
 ```typescript
 const result = await client.workflows.start({
   workflowKey: "my-workflow",
@@ -929,17 +947,6 @@ const result = await client.workflows.start({
   forceRerun: false,                // optional — terminate existing run with same key
 });
 // → { runId, runKey, instanceId, status, existing? }
-
-// Synchronous invocation — only on workflows with syncCallable = true
-const sync = await client.workflows.runSync({
-  workflowKey: "validate-token",
-  input: { token },
-  timeoutMs: 5000,                 // default 5000; server caps at 30000
-  // signal: abortSignal,            // optional AbortSignal
-});
-// → { runId, runKey, status, output?, error?, run?, existing? }
-// status: "completed" | "failed" | "terminated" | "timeout" | "apply_pending"
-// Promise resolves for every terminal outcome — only transport errors reject.
 
 const status = await client.workflows.getStatus({
   workflowKey: "my-workflow",
@@ -952,11 +959,37 @@ const status = await client.workflows.getStatus({
 
 await client.workflows.terminate({ workflowKey, runKey, contextDocId });
 const { items, cursor } = await client.workflows.listRuns({ workflowKey, status, limit: 50 });
-
-// Step debug data
-const { items: stepRuns } = await client.workflows.listStepRuns({ runId });
-// → [{ stepRunId, runId, kind, status, input, output, error, startedAt, finishedAt, ... }]
 ```
+
+In Swift, `start`/`getStatus`/`listRuns` return untyped `[String: Any]` dictionaries — read fields by key (e.g. `started["runKey"] as? String`).
+
+**Synchronous invocation is JavaScript-only.** `client.workflows.runSync(...)` has no Swift equivalent (#956); Swift callers use `start()` plus `getStatus`/`runAndApply`. It is only available on workflows with `syncCallable = true`:
+
+```typescript
+const sync = await client.workflows.runSync({
+  workflowKey: "validate-token",
+  input: { token },
+  timeoutMs: 5000,                 // default 5000; server caps at 30000
+  // signal: abortSignal,            // optional AbortSignal
+});
+// → { runId, runKey, status, output?, error?, run?, existing? }
+// status: "completed" | "failed" | "terminated" | "timeout" | "apply_pending"
+// Promise resolves for every terminal outcome — only transport errors reject.
+```
+
+Inspect the per-step debug records of a run:
+
+```typescript
+  // Fetch the per-step run records for a run (debugging / admin views)
+  const { items: stepRuns } = await client.workflows.listStepRuns({ runId });
+
+  for (const step of stepRuns) {
+    // step.stepId, step.stepKind, step.status, step.input, step.output, step.error
+    console.log(step.stepId, step.stepKind, step.status);
+  }
+```
+
+The step records carry `{ stepRunId, runId, stepKind, status, input, output, error, startedAt, endedAt, ... }`.
 
 `runKey` is scoped as `${contextDocId}#${runKey}`. Calling `start` with an existing `runKey` returns `{ existing: true, ... }` unless `forceRerun: true`.
 

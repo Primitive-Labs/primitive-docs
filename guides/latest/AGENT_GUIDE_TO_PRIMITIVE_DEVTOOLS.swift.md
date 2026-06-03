@@ -19,6 +19,13 @@ Provided by the `primitiveDevTools` Vite plugin. Active only when:
 
 Excluded from production builds.
 
+> **web/Vite-only.** These DevTools (the floating overlay, Document/Blob
+> Explorers, and the in-browser Test Harness — including
+> `createTestDocument` / `destroyTestDocument` and the `primitiveDevTools`
+> Vite plugin) ship only with the web/Vite client. The Swift client has no
+> equivalent — use the client's built-in **Debug Inspector** instead. Every
+> code block in this guide is therefore web/Vite-specific.
+
 ## Setup
 
 Add the plugin in `vite.config.ts`:
