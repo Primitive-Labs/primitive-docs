@@ -115,11 +115,15 @@ const client = new JsBaoClient({
 });
 ```
 
-### primitive-app — Vue Integration
-Vue 3 components, services, and dev tools for building Primitive apps. Includes pre-built UI components (forms, tables, dialogs), a singleton client service, and a Vite plugin for development tools (Document Explorer, Test Harness, Blob Explorer).
+### App Templates & UI Layers
+
+Primitive ships starter templates for two platforms, each with a UI layer over the same client surface:
+
+- **primitive-app (Vue 3, web)** — components, services, and dev tools for web apps: pre-built UI (forms, tables, dialogs, login), a singleton client service, and a Vite plugin for development tools (Document Explorer, Test Harness, Blob Explorer).
+- **PrimitiveApp (SwiftUI, iOS/macOS)** — the Swift counterpart: `PrimitiveAppState` owns the client lifecycle, with ready-made views for sign-in (`AuthGateView`/`PrimitiveLoginView`), profile, and connection status, plus `BaoDataLoader` for reactive data binding and a built-in Debug Inspector. See [Swift Client](./swift-client.md).
 
 ::: tip Framework Flexibility
-js-bao and js-bao-wss-client are plain JavaScript — they work with React, Svelte, Solid, or vanilla JS. The primitive-app package adds Vue-specific helpers, but the core platform is framework-agnostic.
+js-bao and js-bao-wss-client are plain JavaScript — they work with React, Svelte, Solid, or vanilla JS, and the Swift client mirrors the same API surface for any Swift app. The primitive-app / PrimitiveApp packages add Vue- and SwiftUI-specific helpers, but the core platform is framework-agnostic.
 :::
 
 ### Primitive CLI
@@ -127,7 +131,7 @@ A command-line tool for managing your app's backend configuration. Configure aut
 
 ## What Runs Where
 
-| Your App (Browser) | Primitive Backend |
+| Your App (Browser / iOS) | Primitive Backend |
 |---|---|
 | UI rendering and interaction | Authentication and sessions |
 | Document data models and queries | Data sync between clients |

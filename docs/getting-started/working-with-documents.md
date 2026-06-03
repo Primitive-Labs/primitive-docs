@@ -164,7 +164,15 @@ Data can change from sync (another user edited it). Subscribe to keep your UI cu
 
 :::
 
-Most apps don't call `subscribe` directly in views — they use a framework helper that wraps it: **`useJsBaoDataLoader`** (the Vue composable in the web template) and **`BaoDataLoader`** (the SwiftUI loader in `PrimitiveApp`). Both handle document readiness, debounced reloads, and a loaded/empty/loading phase. See the [Swift Client guide](./swift-client.md) for the SwiftUI pattern.
+Most apps don't call `subscribe` directly in views — each starter template ships a framework helper that wraps it: **`useJsBaoDataLoader`** (Vue composable) and **`BaoDataLoader`** (SwiftUI loader in `PrimitiveApp`). Both handle document readiness, debounced reloads, and a loaded/empty/loading phase:
+
+::: code-group
+
+<<< ../../examples/documents/dataloader-glue.ts#example{ts} [Web (Vue)]
+
+<<< ../../examples/documents/dataloader-glue.swift#example{swift} [iOS (SwiftUI)]
+
+:::
 
 ## Creating and Opening Documents
 

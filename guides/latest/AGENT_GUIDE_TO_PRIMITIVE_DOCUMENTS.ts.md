@@ -821,6 +821,8 @@ Only one stringset facet field is allowed per aggregation. To check membership o
 
 ### useJsBaoDataLoader Pattern
 
+`useJsBaoDataLoader` is the **web template's** Vue composable for centralized component data loading. The iOS counterpart is `PrimitiveApp`'s `BaoDataLoader<T>` — an `ObservableObject` bound in a SwiftUI `.task` via `.bind(client:subscribeTo:load:)` with triggers like `.onModelChange(model)` (see the Swift client guide); the Vue-specific caveats below don't apply to it.
+
 `useJsBaoDataLoader` is a composable provided by the primitive library that centralizes data loading for a component. **It is component-only**: it registers its model subscriptions and document-event listeners inside `onMounted`, which fires only for mounted Vue components. Calling it from a Pinia store's `setup()`, a router guard, or any other non-component context will load data once but **never react to subsequent changes** — the `onMounted` callback never runs there, so no subscriptions are registered. For those contexts, subscribe directly (see [Subscribing Outside a Component](#subscribing-outside-a-component) below).
 
 It handles four key concerns:

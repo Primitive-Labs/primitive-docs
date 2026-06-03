@@ -2,7 +2,7 @@
 
 The Primitive Swift client is a SwiftUI-first port of the JavaScript stack. You get the same `JsBaoClient` surface (documents, blobs, workflows, collections, events, auth) plus a `PrimitiveApp` library that owns the client lifecycle and ships ready-made views for sign-in, profile, and connection status.
 
-This page walks you from `primitive init --platform ios` through a working app, then into data modeling, the API surface, and shipping.
+This page walks you from `primitive init --platform ios` through a working app, then into data modeling, the API surface, and shipping. (For the two-platform overview — web and iOS — see [Starter Templates](./template-app.md).)
 
 ::: tip Prerequisites
 - Xcode 15+ (iOS 17 / macOS 14 minimum deployment).

@@ -100,7 +100,7 @@ const token = await client.invitations.getAcceptToken(invitationId);
 // { invitationId, inviteToken, email, expiresAt, accepted, acceptedAt, status }
 ```
 
-For details on what happens when the recipient clicks the link — auto-resolution on email match, explicit accept under a different identity, and the landing-page wiring your app needs (or what the template ships out of the box) — see [How Email-Based Sharing Resolves](#how-email-based-sharing-resolves) below.
+For details on what happens when the recipient clicks the link — auto-resolution on email match, explicit accept under a different identity, and the landing-page wiring your app needs (or what the web template ships out of the box) — see [How Email-Based Sharing Resolves](#how-email-based-sharing-resolves) below.
 
 
 ## Document Sharing
@@ -271,12 +271,16 @@ If you're hand-rolling the flow (custom email + custom landing page), the steps:
 3. Build a route in your app that reads the token from wherever you put it.
 4. On mount, branch on signed-in status:
    - **Signed in:** confirm with the user (so they don't bind grants to the wrong account), then `await client.invitations.accept(inviteToken)`.
-   - **Signed out:** save the token in `sessionStorage` (`primitive:pendingInviteToken` is the convention used by the template) and redirect to your login page.
+   - **Signed out:** save the token in `sessionStorage` (`primitive:pendingInviteToken` is the convention used by the web template) and redirect to your login page.
 5. In your auth flow, after the user picks a method (magic link / OTP / passkey / OAuth), read the pending token from `sessionStorage` and pass it as the `inviteToken` argument to the corresponding verify/finish call (`magicLinkVerify`, `otpVerify`, `passkeyRegisterFinish`, `startOAuthFlow`). The server resolves grants atomically with signup.
 6. Clear the token from `sessionStorage` on success or on a clear error path.
-7. Validate token shape before accepting — the template uses a loose check (`isPlausibleInviteToken` in `src/lib/inviteToken.ts`) to avoid round-tripping obvious garbage.
+7. Validate token shape before accepting — the web template uses a loose check (`isPlausibleInviteToken` in `src/lib/inviteToken.ts`) to avoid round-tripping obvious garbage.
 
 The `primitive-app-template` and `primitive-app-demo` projects in [`Primitive-Labs/primitive-app-dev`](https://github.com/Primitive-Labs/primitive-app-dev) both implement this end-to-end — read `primitive-app-template/src/pages/InviteAcceptPage.vue` together with `primitive-app-template/src/lib/inviteToken.ts` and `primitive-app-template/src/stores/userStore.ts` to see all the wiring in one place.
+
+::: info iOS
+The iOS template doesn't ship a prebuilt invite-accept screen yet — the client APIs are the same, so an iOS app implements the hand-rolled steps above: handle the invite URL (universal link or custom scheme), then `client.invitations.accept(inviteToken)` when signed in, or hold the token (e.g. in memory on `PrimitiveAuthManager`'s owner) and pass it to the verify call of whichever sign-in method the user picks.
+:::
 
 ### Domain-Mode Apps
 

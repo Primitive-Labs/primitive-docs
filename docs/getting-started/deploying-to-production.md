@@ -1,6 +1,6 @@
 # Deploying to Production
 
-The template deploys to Cloudflare Workers. You'll need a Cloudflare account with access to deploy Workers.
+The web template deploys to Cloudflare Workers. You'll need a Cloudflare account with access to deploy Workers.
 
 ## 1. Configure wrangler.toml
 
