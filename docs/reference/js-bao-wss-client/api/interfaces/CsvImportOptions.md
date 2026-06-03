@@ -80,7 +80,7 @@ Function to generate IDs for each row.
 
 ### model?
 
-> `optional` **model**: `any`
+> `optional` **model**: [`ModelIdentifier`](../type-aliases/ModelIdentifier.md)
 
 Model identifier — a BaseModel subclass or plain string name.
 

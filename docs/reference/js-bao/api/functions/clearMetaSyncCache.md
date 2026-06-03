@@ -15,7 +15,7 @@ Useful for testing or when schema changes at runtime.
 
 ### yDoc?
 
-`any`
+`Doc`
 
 ## Returns
 

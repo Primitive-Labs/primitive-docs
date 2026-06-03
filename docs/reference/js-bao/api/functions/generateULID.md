@@ -6,8 +6,8 @@
 
 # Function: generateULID()
 
-> **generateULID**(): `any`
+> **generateULID**(): `string`
 
 ## Returns
 
-`any`
+`string`
