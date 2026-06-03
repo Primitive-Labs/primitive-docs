@@ -36,7 +36,7 @@ Manager details (userId)
 
 ### connect()
 
-> **connect**(`databaseId`): `DoDb`
+> **connect**(`databaseId`): [`DoDb`](DoDb.md)
 
 Connect to a database and get a DoDb instance for querying.
 
@@ -50,7 +50,7 @@ The unique identifier of the database to connect to
 
 #### Returns
 
-`DoDb`
+[`DoDb`](DoDb.md)
 
 ***
 
@@ -148,7 +148,7 @@ The name of the operation to delete
 
 ### describe()
 
-> **describe**(`databaseId`, `modelName`): `Promise`\<`ModelFieldInfo`[]\>
+> **describe**(`databaseId`, `modelName`): `Promise`\<[`ModelFieldInfo`](ModelFieldInfo.md)[]\>
 
 Get the field schema for a model in a database.
 
@@ -168,7 +168,7 @@ The name of the model whose field schema to retrieve
 
 #### Returns
 
-`Promise`\<`ModelFieldInfo`[]\>
+`Promise`\<[`ModelFieldInfo`](ModelFieldInfo.md)[]\>
 
 ***
 

@@ -653,6 +653,10 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/DirectPermissionGrant"
                 },
                 {
+                  "text": "DOClientEngine",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DOClientEngine"
+                },
+                {
                   "text": "DocumentAccessResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DocumentAccessResult"
                 },
@@ -711,6 +715,10 @@
                 {
                   "text": "DocumentsAPI",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DocumentsAPI"
+                },
+                {
+                  "text": "DoDb",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DoDb"
                 },
                 {
                   "text": "EnableOfflineAccessOptions",
@@ -889,6 +897,10 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/MeUpdateFailedEvent"
                 },
                 {
+                  "text": "ModelFieldInfo",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ModelFieldInfo"
+                },
+                {
                   "text": "ModelRulesInfo",
                   "link": "/reference/js-bao-wss-client/api/interfaces/ModelRulesInfo"
                 },
@@ -1003,6 +1015,10 @@
                 {
                   "text": "RunSyncWorkflowResult",
                   "link": "/reference/js-bao-wss-client/api/interfaces/RunSyncWorkflowResult"
+                },
+                {
+                  "text": "SaveOptions",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/SaveOptions"
                 },
                 {
                   "text": "SchemaDiscoveredEvent",
@@ -1180,6 +1196,10 @@
                 {
                   "text": "JsBaoErrorCode",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/JsBaoErrorCode"
+                },
+                {
+                  "text": "ModelIdentifier",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/ModelIdentifier"
                 },
                 {
                   "text": "StorageConfig",
