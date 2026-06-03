@@ -1,6 +1,14 @@
 # Defining Your Models
 
-Models are the typed shape of the data your app stores in **documents** (and the same shape used as `modelName` references in **database** operations). The current way to author models is **TOML-first**: declare them in `src/models/models.toml`, run `pnpm codegen`, and import the generated TypeScript classes from `@/models`.
+Models are the typed shape of the data your app stores in **documents** (and the same shape used as `modelName` references in **database** operations). The current way to author models is **TOML-first** on every platform: declare them in one TOML file, run codegen, and consume the generated types.
+
+| | Web (Vue) | iOS (SwiftUI) |
+|---|---|---|
+| Schema file | `src/models/models.toml` | `Sources/<App>/Models/schema.toml` |
+| Codegen | `pnpm codegen` (run after editing) | Automatic on build (`./run-ios.sh` regenerates first; `swift build` runs the SPM plugin) |
+| Output | `*.generated.ts` classes + `@/models` barrel | `PrimitiveModel` structs in `Models/Generated/` |
+
+The TOML dialect is identical on both platforms — the same schema file works for web and iOS clients sharing an app.
 
 This page is the canonical reference for the model authoring loop. For document-level CRUD and querying, see [Working with Documents](./working-with-documents.md). For database operations and registered queries, see [Working with Databases](./working-with-databases.md).
 
@@ -15,21 +23,35 @@ Defining models in TOML, with codegen producing the TypeScript classes, gives yo
 
 ## The Authoring Loop
 
-A typical model change is three small steps:
+A typical model change is three small steps: edit the TOML, regenerate, use the types.
 
-1. **Edit** `src/models/models.toml` — add a model, add a field, declare a relationship.
-2. **Run** `pnpm codegen` — regenerates `*.generated.ts` files and the `src/models/index.ts` barrel.
-3. **Import** the model from `@/models` and use it like any other class.
+::: code-group
 
-```bash
-# After editing src/models/models.toml
+```bash [Web (Vue)]
+# 1. Edit src/models/models.toml
+# 2. Regenerate:
 pnpm codegen
+# 3. Import from @/models and use like any other class
 ```
 
-The `codegen` script is wired up in the project template — under the hood it runs `npx js-bao-codegen-v2 -i src/models/models.toml -o src/models`.
+```bash [iOS (SwiftUI)]
+# 1. Edit Sources/<App>/Models/schema.toml
+# 2. Regenerate — codegen is wired into both build paths:
+./run-ios.sh        # regenerates, then builds + launches (Xcode path)
+swift build         # the SPM plugin regenerates automatically
+# 3. Consume the generated structs through TypedModel<T>
+```
+
+:::
+
+On web, the `codegen` script runs `npx js-bao-codegen-v2 -i src/models/models.toml -o src/models` under the hood. On iOS, `swift-bao-codegen` writes into `Models/Generated/` (gitignored, regenerated every build).
 
 ::: warning Never edit generated files
-The codegen output — every `*.generated.ts` file and `src/models/index.ts` — is overwritten on each run. Make all changes in `models.toml`. If you need custom behavior on top of a generated class, define free functions in `src/lib/` rather than subclassing.
+The codegen output — `*.generated.ts` + the `src/models/index.ts` barrel on web, `Models/Generated/*.swift` on iOS — is overwritten on each run. Make all changes in the TOML. For custom behavior on top of a generated type: on web, define free functions in `src/lib/`; on iOS, add a companion extension file *alongside* (not inside) `Models/Generated/`, e.g. `Models/TaskRecord+Extensions.swift` — the codegen sweep only touches files carrying its generated banner, so extensions survive each regen.
+:::
+
+::: warning iOS: build through run-ios.sh after schema changes
+If you edit `schema.toml` and then hit **Run in Xcode directly**, Xcode compiles whatever stale files are already in `Models/Generated/` with no error pointing at the cause. Build through `./run-ios.sh` (it regenerates first), or run `swift build` once before the Xcode build.
 :::
 
 ## Authoring `models.toml`
@@ -175,6 +197,14 @@ const open = await Todo.query({ completed: false });
 ```
 
 The barrel runs `attachAndRegisterModel` for every model exactly once — that's why importing from `@/models` is essential. Importing directly from `Todo.generated.ts` skips registration, which fails at runtime with "Model not properly initialized" on the first save or query.
+
+On iOS, codegen emits value-type `PrimitiveModel` structs (`Codable`, `Equatable`, `Hashable`) — set `class_name = "TaskRecord"` on the model block to control the Swift type name. You consume them through a `TypedModel<T>` bound to an open document (see [Working with Documents](./working-with-documents.md#creating-and-opening-documents)). A few Swift conventions worth knowing:
+
+- **IDs are `String`** — generate with `UUID().uuidString` when the caller doesn't supply one.
+- **`type = "number"` codegens a `Double`** — cast to `Int` on read if you need to.
+- **No nulls** — the CRDT layer doesn't model `nil`. Use `""` / `0` for absent values and check them explicitly.
+- **Dates round-trip as ISO-8601 `String`s** — there's no native date type on the wire.
+- **Wire keys are forever** — renaming a TOML key orphans existing records on every platform. Keep wire keys snake_case so they round-trip cleanly between web and iOS, and add camelCase aliases in a `+Extensions.swift` companion if the Swift call sites read awkwardly.
 
 ## Working with Model Instances
 

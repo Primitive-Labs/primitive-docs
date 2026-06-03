@@ -5,7 +5,7 @@ The fastest way to build on Primitive is to start from an official template. Pri
 | Platform | Create | Stack |
 |---|---|---|
 | Web (default) | `npx create-primitive-app my-app` | Vue 3 + TypeScript + Tailwind |
-| iOS / macOS | `npx create-primitive-app my-app --platform ios` | Swift + SwiftUI (`PrimitiveApp` package) |
+| iOS | `npx create-primitive-app my-app --platform ios` | Swift + SwiftUI (`PrimitiveApp` package) |
 
 `create-primitive-app` is a thin wrapper around `primitive init` and forwards every flag, so the two are interchangeable — use `npx create-primitive-app` when you don't have the CLI installed yet, or `primitive init my-app --platform <web|ios>` if you do.
 
@@ -20,7 +20,9 @@ npx create-primitive-app my-app
 ```
 
 ```bash [iOS (SwiftUI)]
-# Requires macOS with Xcode, plus `brew install xcodegen`
+# Requires macOS with Xcode 15+, plus `brew install xcodegen`.
+# (An Apple Developer account is only needed for physical devices,
+# TestFlight, and the App Store — the simulator runs unsigned.)
 npx create-primitive-app my-app --platform ios
 ```
 
@@ -47,7 +49,9 @@ pnpm dev
 ```bash [iOS (SwiftUI)]
 cd my-app
 ./run-ios.sh
-# regenerates the Xcode project, builds, and launches the simulator
+# regenerates the Xcode project, runs model codegen, builds, and
+# launches the simulator (./run-ios.sh --device targets a real iPhone —
+# see Deploying to Production for signing)
 ```
 
 :::
@@ -146,9 +150,10 @@ my-app/
 │       ├── schema.toml                 # Your data model schemas
 │       └── Generated/                  # swift-bao-codegen output
 ├── docs/                               # Agent guides for AI coding assistants
-├── primitive.json                      # App ID + server URLs
-├── project.yml                         # xcodegen project definition
-├── run-ios.sh / run.sh                 # Build + launch scripts (iOS simulator / macOS)
+├── Package.swift                       # SwiftPM manifest (pulls in PrimitiveApp)
+├── primitive.json                      # App ID + server URLs — bundled and read at launch
+├── project.yml                         # xcodegen source of truth — edit this, regenerate the xcodeproj
+├── run-ios.sh                          # Build + launch (simulator or device)
 └── fastlane/                           # TestFlight + App Store lanes
 ```
 
@@ -162,7 +167,7 @@ Key configuration files:
 | Data models (start here!) | `src/models/models.toml` — run `pnpm codegen` after editing | `Sources/…/Models/schema.toml` — codegen is wired into both build paths |
 | Agent guides | `docs/` | `docs/` |
 
-On iOS, the `PrimitiveApp` package does the heavy lifting: `PrimitiveAppState` owns the `JsBaoClient` lifecycle (your app subclasses it, like the template's `TemplateAppState`), `AuthGateView` presents `PrimitiveLoginView` until the user is signed in and connected, and `BaoDataLoader` binds queries to SwiftUI views — the counterparts of the web template's client service, `PrimitiveLogin`, and `useJsBaoDataLoader`. For the full iOS walkthrough — running on simulator/device, data modeling and codegen, shipping with Fastlane — see the [Swift Client guide](./swift-client.md).
+On iOS, the `PrimitiveApp` package does the heavy lifting: `PrimitiveAppState` owns the `JsBaoClient` lifecycle (your app subclasses it, like the template's `TemplateAppState`), `AuthGateView` presents `PrimitiveLoginView` until the user is signed in and connected, and `BaoDataLoader` binds queries to SwiftUI views — the counterparts of the web template's client service, `PrimitiveLogin`, and `useJsBaoDataLoader`. `appState.initialize()` reads `primitive.json`, creates the client, attaches the auth manager, and in dev mode auto-signs you in with your CLI token from `~/.primitive/credentials.json` so you don't log in on every rebuild.
 
 ## Next Steps
 

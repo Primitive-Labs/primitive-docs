@@ -3,7 +3,7 @@
 Documents are Primitive's local-first collaborative storage. A document is a container that holds your data models — synced across devices, shared with other users, and available offline. This guide covers document concepts, data modeling, and CRUD operations.
 
 ::: tip Two clients, one API
-The examples below are shown in both **JavaScript** (`js-bao` / `js-bao-wss-client`) and **Swift** (the iOS/macOS client) — pick the tab for your platform. The API shape and semantics line up across both; where they differ, the text calls it out. Every snippet is compiled against the real client as part of the docs build.
+The examples below are shown in both **JavaScript** (`js-bao` / `js-bao-wss-client`) and **Swift** (the iOS client) — pick the tab for your platform. The API shape and semantics line up across both; where they differ, the text calls it out. Every snippet is compiled against the real client as part of the docs build.
 :::
 
 ## Document Concepts
@@ -98,6 +98,10 @@ Save-or-update by a unique field (such as `email`) without knowing the existing 
 
 For composite keys, use `upsertByUnique(constraintName, …)` — see [Defining Your Models](./defining-your-models.md).
 
+::: tip iOS semantics
+Under a bound `TypedModel`, reads are **synchronous** against the local CRDT (`tasks.findAll()`, `tasks.query([...])` — no `await`). `create` is the only CRUD call that throws (it validates required fields, types, and unique constraints); `update`/`delete` don't throw, and unknown field keys in an `update` payload are dropped silently. Writes are local-first: visible to local reads on the next line, synced to peers in the background.
+:::
+
 ## Querying
 
 ### Operators
@@ -174,6 +178,8 @@ Most apps don't call `subscribe` directly in views — each starter template shi
 
 :::
 
+For code that subscribes to client events directly on iOS (`client.events.on(...)`): the returned `EventSubscription` must be **stored on a property** or it's dropped immediately, use `[weak self]` in the closure, and cancel on teardown with `sub?.cancel()`.
+
 ## Creating and Opening Documents
 
 Open a document before querying or writing data in it. For a per-user singleton document (a personal app's "the user's data"), `getOrCreateWithAlias` resolves-or-creates atomically:
@@ -186,7 +192,37 @@ Open a document before querying or writing data in it. For a per-user singleton 
 
 :::
 
+::: tip Why getOrCreateWithAlias?
+Splitting this into a resolve followed by a create looks fine but has a race: two devices onboarding at the same moment both fall into the create branch and you lose one of the docs. `getOrCreateWithAlias` is a single atomic server-side upsert.
+:::
+
 Other patterns: **one document at a time** (list the user's owned documents, open the selected one) and **multiple open documents** (open several; in JavaScript a query then runs across all open documents, while in Swift each document has its own `TypedModel`).
+
+On iOS, the canonical place to open documents and bind models is your `PrimitiveAppState` subclass — open in `connectClient()`, bind in the `onDocumentOpened` hook:
+
+```swift
+@MainActor
+final class MyAppState: PrimitiveAppState {
+  @Published private(set) var tasks: TypedModel<TaskRecord>?
+
+  override func connectClient() async {
+    await super.connectClient()
+    guard let client else { return }
+    let result = try? await client.documents.getOrCreateWithAlias(
+      alias: DocumentAlias(scope: .user, aliasKey: "library"),
+      title: "Library"
+    )
+    guard let id = result?.documentId else { return }
+    await selectDocumentAwaiting(id)
+  }
+
+  override func onDocumentOpened(doc: YDocument, documentId: String) async {
+    tasks = makeTypedModel(doc: doc, documentId: documentId)
+  }
+}
+```
+
+One `TypedModel` per record type per document. Prefer `makeTypedModel(doc:documentId:)` over direct construction — it also registers the model with the in-app Debug Inspector.
 
 ## Sharing Documents
 
@@ -279,5 +315,5 @@ A `403` from getting a document can include a `canRequestAccess` hint. Users wit
 - **[Choosing Your Data Model](./choosing-your-data-model.md)** — When to use documents vs. databases
 - **[Defining Your Models](./defining-your-models.md)** — TOML authoring, codegen, relationships, schema evolution
 - **[Sharing and Invitations](./sharing-and-invitations.md)** — Full sharing, invitations, and access requests
-- **[Swift Client](./swift-client.md)** — iOS/macOS setup, `TypedModel`, and the SwiftUI data loader
+- **[Defining Your Models](./defining-your-models.md)** — The TOML schema + codegen loop on both platforms
 - **[Working with Databases](./working-with-databases.md)** — Server-side structured storage
