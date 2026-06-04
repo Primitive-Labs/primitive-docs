@@ -4,22 +4,6 @@ The signed-in user: read and update their profile, list the documents they own
 or that are shared with them, manage pending invitations, and control the
 profile cache. To look up *other* users, see [`users`](/users).
 
-::: tip Now typed (Swift)
-The `client.me` surface is now typed in Swift (issue
-[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)):
-`get`/`update` use `UserProfile` and `UpdateMeParams`, `uploadAvatar` returns
-`AvatarUploadResult`, `pendingDocumentInvitations` returns
-`[PendingDocumentInvitation]`, `ownedDocuments` returns `[DocumentInfo]`, and
-`sharedDocuments` returns `SharedDocumentListResult` (`{ items, cursor? }`).
-
-One **behavioral** divergence remains: in Swift `ownedDocuments`/`sharedDocuments`
-are **bare network GETs** (accepting only `cursor`/`limit`/`tag`), whereas JS
-layers offline-first cache-merge / stale-refresh and the full `documents.list`
-option set on top. The Swift methods therefore return nothing offline. This is a
-feature gap, deferred — tracked at
-[#938](https://github.com/Primitive-Labs/js-bao-wss/issues/938).
-:::
-
 ## get(options?)
 
 Read the signed-in user's profile, using the cache when available. Returns

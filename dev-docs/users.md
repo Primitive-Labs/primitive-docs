@@ -2,13 +2,6 @@
 
 Look up other users in the current app. The signed-in user lives on [`me`](/me).
 
-::: tip Now typed in Swift
-All three `users` methods return named Swift models matching the JS shapes:
-`getBasic → BasicUserInfo`, `getProfiles → [BatchUserProfile]`, and
-`lookup → UserLookupResult` (`{ exists, user? }`). No more hand-parsing
-dictionaries ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
-
 ## getBasic(userId)
 
 One user's basic public profile by id.

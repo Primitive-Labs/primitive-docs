@@ -6,8 +6,8 @@ Create, open, share, and sync collaborative Yjs documents. Blob attachments are 
 
 Create a new document. Pass `localOnly: true` to defer the server commit.
 
-::: warning Divergent behavior (alignment deferred)
-JS `documents.create` is local-first: it writes the document locally and returns immediately, then commits to the server in the background (honoring `localOnly`). Swift's `documents.create` POSTs synchronously and has no offline/deferred path here — so a create issued while offline fails rather than queueing (sweep D2, [#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852)). The local-first flow **does** exist on Swift via the top-level `client.createDocument(options:)`; routing `documents.create` (and adding `commitOfflineCreate`) through it is a larger change deferred for now.
+::: danger SKIPPED — superseded
+JS `documents.create` is local-first (writes locally, commits in the background, honors `localOnly`); Swift's `documents.create` POSTs synchronously. We are **not** routing the sub-API through a local-first path — the capability already exists on Swift via the top-level `client.createDocument(options:)`, and the tracking issue ([#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852)) is closed. A create issued via `documents.create` while offline therefore fails rather than queueing; use `client.createDocument` when you need offline-first creates.
 :::
 
 ::: code-group
@@ -37,8 +37,8 @@ Resolve an alias to a document, creating one if it doesn't exist yet (singleton 
 
 List documents accessible to the current user. Deprecated in favor of `client.me.ownedDocuments()` / `client.me.sharedDocuments()` ([#628](https://github.com/Primitive-Labs/js-bao-wss/issues/628)).
 
-::: tip Divergent shape (alignment deferred)
-Swift returns a typed `[DocumentInfo]` but only supports `limit`/`cursor` pagination. JS adds `tag`, `forward`, `waitForLoad`, `refreshFromServer`, `localOnly`, and a `returnPage` array-vs-page duality ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)). Since `list` is deprecated in both clients (use `me.ownedDocuments()` / `me.sharedDocuments()`), expanding its options is deferred — the option-parity work belongs on the `me.*` surface.
+::: danger SKIPPED — deprecated
+Swift returns a typed `[DocumentInfo]` but only supports `limit`/`cursor` pagination; JS adds `tag`, `forward`, `waitForLoad`, `refreshFromServer`, `localOnly`, and a `returnPage` array-vs-page duality ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)). We are **not** expanding `list`'s options — `documents.list` is deprecated in both clients; the pagination-parity work belongs on the `me.ownedDocuments()` / `me.sharedDocuments()` surface instead.
 :::
 
 ::: code-group
@@ -86,10 +86,6 @@ Remove a tag from a document. Returns the updated tag list.
 
 Delete a document from the server and evict its local data.
 
-::: tip Now aligned
-Both clients return `void`. Swift now matches JS's post-delete reconciliation: it evicts the document's local data, emits a `documentMetadataChanged` (`action: "deleted"`) event, and treats a `404`/offline response as an already-applied delete (offline-fallback) instead of throwing ([#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
-:::
-
 ::: code-group
 <<< ./snippets/documents/delete.ts#example{ts} [JavaScript]
 <<< ./snippets/documents/delete.swift#example{swift} [Swift]
@@ -120,10 +116,6 @@ Open the app's shared root document for editing.
 ## close(documentId, options?)
 
 Close an open document, optionally evicting its local data.
-
-::: tip Now aligned
-Both clients return `{ evicted }`. Swift mirrors JS's guard: when `evictLocal` is set, local data is evicted only if the server already has all of this client's writes — otherwise it's kept and `evicted` is `false` ([#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
-:::
 
 ::: code-group
 <<< ./snippets/documents/close.ts#example{ts} [JavaScript]
@@ -176,10 +168,6 @@ Revoke a user's access, or cancel a pending email invitation.
 
 ::: tip Divergent shape
 JS takes a `string | { userId } | { email }` union; Swift splits it into `userId:` / `email:` overloads. Both return `void`.
-:::
-
-::: tip Now aligned
-Self-removal eviction now matches JS: removing *your own* permission (the `userId:` overload, matched against the current user) evicts the document's local data, since you can no longer sync it ([#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961)).
 :::
 
 ::: code-group
@@ -453,8 +441,8 @@ JS is async and returns `{ documentId, title?, createdAt }` objects; Swift is sy
 
 Commit a locally-created (`localOnly`) document to the server.
 
-::: warning No Swift equivalent (deferred)
-JavaScript-only — `documents.commitOfflineCreate` isn't exposed on Swift. It's paired with the deferred local-first `documents.create` work (see [create](#create-options)): the underlying flow exists via `client.createDocument`, but the explicit offline-create/commit surface on `documents.*` is deferred ([#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852)).
+::: danger SKIPPED — superseded
+JavaScript-only — `documents.commitOfflineCreate` isn't exposed on Swift, and we are not adding it: it's paired with the [skipped local-first `documents.create`](#create-options) work. The underlying flow already exists via `client.createDocument`, and the tracking issue ([#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852)) is closed.
 :::
 
 <<< ./snippets/documents/commit-offline-create.ts#example{ts} [JavaScript]

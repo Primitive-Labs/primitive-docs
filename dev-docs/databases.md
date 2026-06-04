@@ -5,17 +5,6 @@ and bulk data. Records are read and written through named **operations** —
 register them with `createOperation`, then run them via `executeOperation` /
 `executeBatch`.
 
-::: tip Now typed
-The Swift `databases.*` surface is fully typed: methods take and return named
-models (`DatabaseInfo`, `DatabasePermissionEntry`, `DatabaseOperationInfo`,
-`ModelFieldInfo`, …) and option structs (`CreateDatabaseParams`,
-`UpdateDatabaseParams`, `CreateOperationParams`, `ExecuteOperationOptions`, …)
-that mirror the JS interfaces field-for-field
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). Opaque blobs
-— a database's CEL context, an operation's `definition`/`params`, and ad-hoc
-query results from `executeOperation` — are typed as `JSONValue`.
-:::
-
 ## create(params)
 
 Create a new database of a given type.
@@ -255,13 +244,7 @@ callback exposes is missing from the public JS type as well (sweep databases D1
 Import data from a CSV string into a database, with column mapping, type
 coercion, per-row transforms, and progress callbacks.
 
-::: warning No Swift equivalent
-JavaScript-only rich CSV pipeline (column mapping, type coercion, per-row
-transforms, progress callbacks). The Swift client exposes only the typed
-`importRows(databaseId:operationName:rows:)` — it takes pre-parsed
-`[[String: JSONValue]]` rows and returns a `DatabaseBatchResult`, so parse the
-CSV yourself first
-([#962](https://github.com/Primitive-Labs/js-bao-wss/issues/962)).
-:::
-
+::: code-group
 <<< ./snippets/databases/import-csv.ts#example{ts} [JavaScript]
+<<< ./snippets/databases/import-csv.swift#example{swift} [Swift]
+:::

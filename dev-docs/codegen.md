@@ -45,8 +45,8 @@ From the [codegen-conventions parity sweep](https://github.com/Primitive-Labs/js
 
 | ID | Divergence | Class · severity | Issue |
 |---|---|---|---|
-| D1 | Swift drops the `enum` field key (see below) | missing-in-swift · P1 | [filed](https://github.com/Primitive-Labs/js-bao-wss/issues?q=codegen+enum) |
-| D2 | Swift ignores `auto_stamp` | missing-in-swift · P2 | [filed](https://github.com/Primitive-Labs/js-bao-wss/issues?q=codegen+auto_stamp) |
+| D1 | ~~Swift drops the `enum` field key~~ — now parsed + emitted (see below) | resolved | [filed](https://github.com/Primitive-Labs/js-bao-wss/issues?q=codegen+enum) |
+| D2 | ~~Swift ignores `auto_stamp`~~ — now parsed + round-tripped (see below) | resolved | [filed](https://github.com/Primitive-Labs/js-bao-wss/issues?q=codegen+auto_stamp) |
 | D3 | Name derivation differs | naming · P1 | [filed](https://github.com/Primitive-Labs/js-bao-wss/issues?q=codegen+name) |
 | D4 | Swift codegen has no `--check` / strict mode | param/options · P2 | [filed](https://github.com/Primitive-Labs/js-bao-wss/issues?q=codegen+check) |
 | D5 | Swift emits no relationship accessor methods | missing-in-swift · P1 | [filed](https://github.com/Primitive-Labs/js-bao-wss/issues?q=codegen+relationship) |
@@ -54,15 +54,7 @@ From the [codegen-conventions parity sweep](https://github.com/Primitive-Labs/js
 
 ### D1 — `enum` field key {#d1-enum}
 
-::: warning D1 · `enum` is JS-only — strict Swift load throws
-A `string` field with `enum = ["a","b","c"]` is part of the JS TOML vocabulary: `js-bao-codegen-v2` validates it and emits a TS string-literal union (`status: "Active" | "Archived"`). Swift codegen has no `enum` concept — the key is silently ignored and the property generates as a plain `String?`. Worse, the Swift **runtime** loader does not list `enum` in its known field keys, so the *same* TOML that codegens cleanly in JS **throws `unknownKey`** when loaded in Swift under strict mode (the default). A portability break, not just an ergonomic gap.
-:::
-
 ### D2 — `auto_stamp` {#d2-auto-stamp}
-
-::: warning D2 · Swift codegen ignores `auto_stamp`
-`auto_stamp` (auto-populate a timestamp on create/update/both) is a first-class JS field key — validated and round-tripped by the TOML writer. The Swift build-time codegen has no `autoStamp` in its IR and drops it. The Swift runtime loader *accepts* the key but never reads it into the field descriptor, so the stamp behavior silently no-ops on the Swift side either way. Workaround: stamp manually.
-:::
 
 ### D3 — name derivation {#d3-name-derivation}
 

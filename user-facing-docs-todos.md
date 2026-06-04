@@ -157,5 +157,12 @@ Client typed + cookbook updated; clone builds, dev gate green. Follow-ups:
 ### Wave 4 (done) — workflows
 Client typed (+ workflows slice of #991) + cookbook updated; clone builds, dev gate green. Follow-up: `docs/getting-started/workflows-and-prompts.md` + `guides/latest/AGENT_GUIDE_TO_PRIMITIVE_{WORKFLOWS,SCHEDULING_AND_REALTIME}.swift.md` (keyed → typed dot-access).
 
+### Wave 5 (done) — prompts, document-blob, importCsv, cache options, codegen
+Client + cookbook updated; clone builds, dev gate green (commit `ea7c67ca`). Follow-ups:
+- **prompts** → `docs/getting-started/workflows-and-prompts.md` + `guides/latest/AGENT_GUIDE_TO_PRIMITIVE_PROMPTS.swift.md` (untyped `result["…"]` reads → typed `ExecutePromptResult`).
+- **document-blob** → `guides/latest/AGENT_GUIDE_TO_PRIMITIVE_BLOBS.swift.md` + `docs/getting-started/swift-client.md` (typed `list`/`get`/`delete`).
+- **importCsv** → `docs/getting-started/working-with-databases.md` + `guides/latest/AGENT_GUIDE_TO_PRIMITIVE_DATABASES.swift.md` (CSV Import section — Swift now has `importCsv`).
+- **cache/codegen** → no required user-facing changes (cache options are internal; no page authors `enum`/`auto_stamp` today).
+
 ### Not yet done — the "feature tier" (entangled with the client core)
-`analytics`, `auth`, `cache`, and `model-surface` are **not** simple `[String:Any]` API files — they live in `JsBaoClient.swift` / `Internal/` / `Schema/` and are tied to feature-sized issues (#951/#963, #964, #994, #946/#947/#955/#992). They need focused individual work, not parallel typing.
+`analytics`, `auth`, and `model-surface` are **not** simple `[String:Any]` API files — they live in `JsBaoClient.swift` / `Internal/` / `Schema/` and are tied to feature-sized issues that need a decision (#951/#963 analytics namespace+engine, #964 auth scope, #946/#947/#955/#992 model-surface — the latter overlaps PR #923). (cache behavior is now done; #994.)

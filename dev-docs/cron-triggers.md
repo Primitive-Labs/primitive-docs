@@ -2,20 +2,6 @@
 
 Schedule workflow runs on a standard 5-field cron expression and manage their lifecycle.
 
-::: tip Now typed (Swift)
-The Swift `cronTriggers` surface is now fully typed to match JS
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)): `get` /
-`create` / `update` / `pause` / `resume` return `CronTriggerInfo`, `list`
-returns `CronTriggerListResult`, `create` / `update` take
-`CreateCronTriggerParams` / `UpdateCronTriggerParams`, `delete` returns
-`{ archived }` and `test` returns `{ started, runId?, instanceId?, error? }`.
-Decoding **throws** on a shape mismatch rather than silently coercing a
-malformed body to an empty `[:]` (fixes cron's slice of #991). `state` is a
-`CronTriggerState` enum on reads (incl. `.errorPaused`); `update` accepts the
-narrower `UpdateCronTriggerState` (`.active` / `.paused` / `.archived`), since
-`error_paused` is platform-set only.
-:::
-
 ## list()
 
 List all cron triggers for the current app. Archived triggers are excluded.

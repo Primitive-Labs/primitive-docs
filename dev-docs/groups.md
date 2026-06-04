@@ -4,14 +4,6 @@ Create and manage groups, their membership, pending invitations, and the
 documents and databases shared with them. The signed-in user's own memberships
 are reachable via `listUserMemberships`.
 
-::: tip Now typed
-The Swift `groups` surface is fully typed and matches JS field-for-field:
-named models (`GroupInfo`, `GroupMemberInfo`, `GroupMembershipInfo`,
-`PaginatedResult<GroupInfo>`, …), `Encodable` option structs for inputs, and a
-`GroupAddMemberResult` discriminated union for `addMember`
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
-
 ## create(params)
 
 Create a new group. `groupType`, `groupId`, and `name` are required;
@@ -121,14 +113,6 @@ instead.
 ## listUserMemberships(userId, options?)
 
 List every group a user belongs to.
-
-::: tip Now typed
-Both clients accept an optional server-side `groupType` filter and return typed
-`GroupMembershipInfo` rows. In JS pass `{ groupType }`; in Swift pass the
-`groupType:` parameter
-([#960](https://github.com/Primitive-Labs/js-bao-wss/issues/960),
-[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
 
 ::: code-group
 <<< ./snippets/groups/list-user-memberships.ts#example{ts} [JavaScript]

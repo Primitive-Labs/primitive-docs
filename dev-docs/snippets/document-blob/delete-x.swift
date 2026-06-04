@@ -7,9 +7,9 @@ func deleteX(
 ) async throws {
   // #region example
   let blobs = client.documents.blobs(documentId: documentId)
-  // Swift returns an untyped [String: Any] (vs JS `{ deleted }`).
+  // Returns a typed BlobDeleteResult ({ deleted }).
   let result = try await blobs.delete(blobId: blobId)
-  let deleted = result["deleted"] as? Bool ?? false
+  let deleted = result.deleted
   // #endregion example
   _ = deleted
 }

@@ -7,9 +7,9 @@ func get(
 ) async throws {
   // #region example
   let blobs = client.documents.blobs(documentId: documentId)
-  // Swift returns an untyped [String: Any].
+  // Returns a typed BlobInfo.
   let meta = try await blobs.get(blobId: blobId)
-  let contentType = meta["contentType"] as? String
+  let contentType = meta.contentType
   // #endregion example
   _ = (meta, contentType)
 }

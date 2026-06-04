@@ -2,14 +2,6 @@
 
 Manage app-level invitations and the deferred grants that resolve when invited users sign up.
 
-::: tip Swift: now typed
-The Swift client mirrors the JS named interfaces field-for-field — `InvitationQuota`,
-`AppInvitationInfo`, `CreateInvitationParams`, `InvitationListResult`, `AcceptInviteResult`
-(with nested `grantsResolved`), and the `DeferredGrant` union (`.document` / `.group`,
-discriminated on `type`). No more `[String: Any]` hand-casting
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
-
 ## quota()
 
 Check the caller's invitation quota. Admins/owners always get `unlimited: true`.

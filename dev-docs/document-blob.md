@@ -26,13 +26,6 @@ tracked by an issue.
 
 List blobs attached to this document.
 
-::: warning Swift parity gap
-JS returns a typed `BlobListResult<T>` (`{ items, cursor? }`) and accepts a
-`cursor` for pagination. Swift returns an untyped `[[String: Any]]` and drops the
-cursor entirely — callers stringly-key into each dict and there is no way to page
-(sweep blob D7, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
-
 ::: code-group
 <<< ./snippets/document-blob/list.ts#example{ts} [JavaScript]
 <<< ./snippets/document-blob/list.swift#example{swift} [Swift]
@@ -41,11 +34,6 @@ cursor entirely — callers stringly-key into each dict and there is no way to p
 ## get(blobId)
 
 Retrieve metadata for a single blob.
-
-::: warning Swift parity gap
-JS returns a typed `T` / `BlobInfo` (blob metadata). Swift returns an untyped `[String: Any]`,
-so callers stringly-key into the dict (sweep blob D8, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
 
 ::: code-group
 <<< ./snippets/document-blob/get.ts#example{ts} [JavaScript]
@@ -87,11 +75,6 @@ JS's `read` takes an `options` object (`as: "uint8array" | "arrayBuffer" | "blob
 ## delete(blobId)
 
 Delete a blob from the document.
-
-::: warning Swift parity gap
-JS returns a typed `{ deleted: boolean }`. Swift returns an untyped
-`[String: Any]` (sweep blob D9, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
 
 ::: warning Swift parity gap
 Beyond the result shape, JS `delete` also evicts the blob's local cache, cancels any

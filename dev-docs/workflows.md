@@ -10,19 +10,6 @@ its apply handler, and confirm. The low-level lease methods (`claimApply` /
 `confirmApply` / `releaseApply` / `getPendingApplies`) are shared across both
 SDKs; `define` registers an auto-apply handler that runs that sequence for you.
 
-::: tip Now typed
-The Swift `workflows` methods now return typed result structs that mirror the JS
-ones field-for-field — `StartWorkflowResult`, `WorkflowStatusResult`,
-`ListWorkflowRunsResult`, `ListWorkflowStepRunsResult`, `ClaimApplyResult`,
-`ConfirmApplyResult`, `ReleaseApplyResult`, and `[PendingApplyInfo]` — instead of
-`[String: Any]`. Read fields with dot access (`result.runId`,
-`status.normalizedStatus`). Opaque blobs (`output`, `meta`, step `config` /
-`input`, …) are `JSONValue?`. A malformed response body now **throws** on decode
-rather than coercing to an empty `[:]`
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954),
-[#991](https://github.com/Primitive-Labs/js-bao-wss/issues/991)).
-:::
-
 ## start(options)
 
 Start a workflow run and get back `{ runId, runKey, status, existing }`. In
@@ -56,10 +43,6 @@ Synchronously invoke a workflow and await its final envelope in one call. Only
 valid for workflows marked `syncCallable: true`. Every non-transport outcome
 **resolves** (failure / timeout surface as `status`, not a throw); only
 connectivity / abort-before-send errors reject.
-
-::: tip Now in Swift
-`runSync` is now available on the Swift client ([#956](https://github.com/Primitive-Labs/js-bao-wss/issues/956)) — it posts to `/workflows/:key/run-sync` and returns the typed `RunSyncWorkflowResult`. (Swift omits the JS `AbortSignal`, which the JS transport doesn't wire through either; cancel via the surrounding `Task` and read final state with `getStatus`.)
-:::
 
 ::: code-group
 <<< ./snippets/workflows/run-sync.ts#example{ts} [JavaScript]

@@ -2,10 +2,6 @@
 
 Send chat completions to the configured LLM provider and discover available models.
 
-::: tip Now typed
-Both Swift `LlmAPI` methods are fully typed ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). `chat` takes a typed `LlmChatOptions` — structured `ChatMessage`s, a `ChatAttachment` union (`.image`/`.audio`/`.pdf`), and `ReasoningOptions` — and returns an `LlmChatResponse`. `any` fields (`content`, `tools`, `tool_choice`, `plugins`, `annotations`, `raw`) carry as `JSONValue`.
-:::
-
 ::: warning Swift parity gap — no analytics events
 Swift `LlmAPI.chat` emits **no analytics events**. JS fires `prompt_started` / `prompt_succeeded` / `prompt_failed` around each chat request; on Swift the auto-events context getter hardcodes `isEnabled = true` but nothing actually fires, so iOS produces no client-side LLM analytics. Treat `llm` auto-events as JS-only until Swift wires the context ([#963](https://github.com/Primitive-Labs/js-bao-wss/issues/963), sweep llm D1).
 :::

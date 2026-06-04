@@ -2,17 +2,6 @@
 
 Bind a rule set, CEL trigger rules, and a metadata-access gate to a `databaseType` tag. A small CRUD surface over `/databases/types`.
 
-::: tip Now typed (Swift)
-The Swift client is now fully typed in parity with JS
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). Every method
-takes and returns named models: `DatabaseTypeConfigInfo`,
-`CreateDatabaseTypeConfigParams`, `UpdateDatabaseTypeConfigParams`, and `delete`
-resolves to a typed `SuccessResult` (`{ success }`). Decoding now throws on a
-shape mismatch instead of swallowing it to an empty dict. To clear a field on
-`update`, pass `.clear` (the typed equivalent of JS `null`); omit it to leave it
-unchanged. Opaque blobs like `triggers` are `[String: JSONValue]`.
-:::
-
 ## list()
 
 List every database type configuration for the current app.

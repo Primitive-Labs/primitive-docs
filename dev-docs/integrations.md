@@ -7,17 +7,6 @@ Proxy calls to configured third-party integrations through the server.
 Call a third-party integration through the server proxy and unwrap the
 upstream response.
 
-::: tip Now typed
-The response `body` is a `JSONValue` (JS's generic `T` defaults to `any`) —
-inspect it with `JSONValue`'s accessors/subscripts instead of casting from
-`Any?` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). The
-request `query` is `[String: JSONValue]` (mirroring JS's `Record<string, any>`),
-the request `body` is `JSONValue`, and `method`/`path` are now optional with no
-client-side default — omitting them sends no field, exactly like JS, so the
-server can apply the integration's configured defaults
-([#958](https://github.com/Primitive-Labs/js-bao-wss/issues/958)).
-:::
-
 ::: code-group
 <<< ./snippets/integrations/call.ts#example{ts} [JavaScript]
 <<< ./snippets/integrations/call.swift#example{swift} [Swift]

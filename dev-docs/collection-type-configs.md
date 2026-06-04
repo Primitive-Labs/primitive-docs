@@ -2,23 +2,6 @@
 
 Bind a rule set to a `collectionType` tag, governing access for app-defined collections. A small CRUD surface over `/collection-type-configs`.
 
-::: tip Now typed (Swift)
-The Swift client is fully typed for this surface, mirroring JS field-for-field
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)):
-`list` / `get` / `create` / `update` return `CollectionTypeConfigInfo`, `create`
-and `update` take `CreateCollectionTypeConfigParams` /
-`UpdateCollectionTypeConfigParams`, and `delete` returns `SuccessResult`
-(`{ success }`). Decode failures now throw rather than collapsing to an empty
-dict. On `update`, `ruleSetId` is a tri-state `Updatable<String>?` — omit to
-leave unchanged, `.value(id)` to set, `.clear` to remove (the equivalent of
-JS `null`).
-
-The `get` / `update` / `delete` path builders now percent-encode
-`collectionType` consistently with `.urlPathAllowed` and **throw**
-`invalidArgument` on an unencodable tag instead of silently falling back to the
-raw, unescaped value ([#596](https://github.com/Primitive-Labs/js-bao-wss/issues/596)).
-:::
-
 ## list()
 
 List every collection type configuration for the current app.

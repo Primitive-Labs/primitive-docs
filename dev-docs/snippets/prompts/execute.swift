@@ -1,7 +1,6 @@
 import JsBaoClient
 
-// Execute a prompt by key. Swift returns an untyped `[String: Any]`, so read
-// the result with dictionary casts (vs the JS `ExecutePromptResult`).
+// Execute a prompt by key. Both clients return a typed `ExecutePromptResult`.
 func execute(client: JsBaoClient, promptKey: String) async throws {
   // #region example
   let result = try await client.prompts.execute(
@@ -11,9 +10,8 @@ func execute(client: JsBaoClient, promptKey: String) async throws {
       modelOverride: "gpt-4o"
     )
   )
-  if let success = result["success"] as? Bool, success {
-    let output = result["output"] as? String
-    print(output ?? "")
+  if result.success {
+    print(result.output, result.metrics.totalTokens ?? 0)
   }
   // #endregion example
   _ = result

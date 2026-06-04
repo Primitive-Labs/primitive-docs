@@ -2,20 +2,6 @@
 
 Bind a rule set and an auto-add-creator policy to a `groupType` tag (e.g. `"team"`, `"organization"`). A small CRUD surface over `/group-type-configs`.
 
-::: tip Now typed
-The Swift client mirrors the JS interfaces field-for-field: `list` / `get` /
-`create` / `update` return `GroupTypeConfigInfo`, `create` takes
-`CreateGroupTypeConfigParams`, `update` takes `UpdateGroupTypeConfigParams`,
-and `delete` returns the typed `SuccessResult` (`{ success }`)
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). Decode
-failures now surface as thrown errors instead of being swallowed into empty
-dicts. On `update`, `ruleSetId` is tri-state via `Updatable<String>`: omit to
-leave unchanged, `.value("rs123")` to set, `.clear` to remove the current rule
-set (where JS passes `null`). The `groupType` path segment is now
-percent-encoded on `get` / `update` / `delete`, matching the JS client
-([#590](https://github.com/Primitive-Labs/js-bao-wss/issues/590)).
-:::
-
 ## list()
 
 List every group type configuration for the current app.

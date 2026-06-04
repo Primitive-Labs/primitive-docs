@@ -2,30 +2,6 @@
 
 Group documents into collections and manage their membership, group permissions, and pending invitations.
 
-::: tip Now typed (Swift)
-All 16 `CollectionsAPI` methods are fully typed in the Swift client, matching
-the JS named interfaces field-for-field
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)):
-
-- Inputs take typed option structs (`CreateCollectionParams`,
-  `UpdateCollectionParams`, `GrantCollectionGroupPermissionParams`,
-  `AddCollectionMemberParams`) instead of `[String: Any]` literals.
-- Outputs decode to named models (`CollectionInfo`, `CollectionDocumentInfo`,
-  `CollectionAccessInfo`, `PendingCollectionInvitationEntry`, …); paginated
-  reads return the shared `PaginatedResult<T>` (`.items` / `.cursor`).
-- **`addMember`** returns the `CollectionAddMemberResult` discriminated union
-  — `.direct(DirectCollectionAdd)` (`status` `"added"` / `"already_member"`)
-  or `.deferred(DeferredCollectionAdd)` (`"pending_signup"`). Build params
-  with `.user(...)` / `.email(...)` (userId XOR email,
-  [#671](https://github.com/Primitive-Labs/js-bao-wss/issues/671)).
-- **Mutators** (`delete` / `removeDocument` / `revokeGroupPermission` /
-  `removeMember`) return `SuccessResult { success }`; a malformed response now
-  throws a decode error rather than silently returning an empty dict.
-- **`listAll`** keeps its `limit` / `cursor` params and returns
-  `PaginatedResult<CollectionInfo>`; the cursor is now percent-encoded into
-  the request path.
-:::
-
 ## create(params)
 
 Create a new collection. `name` is required; `collectionType`/`contextId` are immutable after create.

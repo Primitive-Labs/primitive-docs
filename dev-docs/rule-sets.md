@@ -2,17 +2,6 @@
 
 Define, inspect, and simulate CEL-based access rule sets for resource types.
 
-::: tip Now typed
-Both surfaces use named types field-for-field — `RuleSetInfo`, `RuleSetSchema`,
-`CreateRuleSetParams` / `UpdateRuleSetParams`, the nested CEL `ModelRulesInfo` /
-`TriggerDefInfo` rule grammar, `TestRuleSetParams` / `RuleSetTestResult`, and
-`DebugRuleSetParams` / `RuleSetDebugResult`. `list` takes a typed
-`ListRuleSetsOptions`, and `delete` returns `SuccessResult`. CEL evaluation
-`context`, simulated `record` data, the schema `resourceTypes` map, and trace
-`args`/`result` stay opaque (`JSONValue`), mirroring JS's `any`
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
-
 ## create(params)
 
 Create a new rule set for a resource type, including its CEL trigger rules.
