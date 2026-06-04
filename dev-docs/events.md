@@ -186,21 +186,19 @@ JS delivers **deltas** — `added` / `updated` / `removed` arrays of client IDs.
 
 Fires when an internal KV cache entry (e.g. the `me` record) refreshes from the server.
 
-::: danger No Swift equivalent
-JavaScript-only — the Swift client emits no `cacheUpdated` event and has no `JsBaoEvent` case for it
-(sweep cache D7). It's also absent from the typed
-`JsBaoEvents` map, so subscribe through an untyped `on` cast.
-:::
+Now on both clients — Swift fires `.cacheUpdated` on network refresh with a typed
+`CacheUpdatedEvent` ([#1042](https://github.com/Primitive-Labs/js-bao-wss/issues/1042)).
 
+::: code-group
 <<< ./snippets/events/cache-updated.ts#example{ts} [JavaScript]
+<<< ./snippets/events/cache-updated.swift#example{swift} [Swift]
+:::
 
 ### cacheUpdateFailed
 
 Fires when an internal KV cache entry fails to refresh from the server.
 
-::: danger No Swift equivalent
-JavaScript-only — no Swift `JsBaoEvent` case (sweep cache D7). Like `cacheUpdated`, it's not in
-the typed `JsBaoEvents` map; subscribe via an untyped `on` cast.
-:::
-
+::: code-group
 <<< ./snippets/events/cache-update-failed.ts#example{ts} [JavaScript]
+<<< ./snippets/events/cache-update-failed.swift#example{swift} [Swift]
+:::

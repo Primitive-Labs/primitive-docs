@@ -3,15 +3,15 @@
 The typed model surface (`Task.save()`, `Task.query()`, …) — record CRUD, queries, aggregation, and change subscriptions on a generated model class. Records are imported from your generated models, not reached through `client.<x>`.
 
 ::: tip Divergent shape
-JavaScript exposes the whole surface as **static/instance methods on the generated `BaseModel` class** (`Task.query`, `task.save`). Swift exposes a `TypedModel<Task>` bound to one document: the typed reads/writes (`create`, `find`, `findAll`, `query`, `update`, `delete`, `findByUnique`) live on `TypedModel`, while `count` / `queryPaged` / `aggregate` / `upsert` / `subscribe` live on its `.dynamic` escape hatch. The biggest return-shape gap: JS `query()` returns a `PaginatedResult` (rows on `.data`, plus `.nextCursor` / `.hasMore`) whereas Swift `query()` returns the hydrated `[Task]` directly — cursor pagination moves to `.dynamic.queryPaged`. Tracked under [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946) / [#955](https://github.com/Primitive-Labs/js-bao-wss/issues/955) / [#947](https://github.com/Primitive-Labs/js-bao-wss/issues/947). Per-method divergences are noted inline.
+Both clients now expose the surface as one model per type. JavaScript uses **static/instance methods on the generated `BaseModel` class** (`Task.query`, `task.save`); Swift (post-[#918](https://github.com/Primitive-Labs/js-bao-wss/issues/918)) uses a matching **static `Model.*` facade** on the generated struct — reads are statics that span every open document by default (`Task.query`, `Task.count`, `Task.findAll`, `Task.find`, `Task.aggregate`, `Task.subscribe`), and writes are the instance `save(in:)` / `delete(in:)` that target one document and throw if it isn't open. The old per-document `TypedModel<Task>` wrapper and its `.dynamic` escape hatch are gone — app code only ever touches the facade. Two surface gaps remain vs JS: the model facade has no `findByUnique` / `upsert` / `queryOne` / cursor-paged `query` (filter and take `.first` / re-save by natural key instead), and Swift `query()` returns the hydrated `[Task]` directly rather than a `PaginatedResult` ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946) / [#955](https://github.com/Primitive-Labs/js-bao-wss/issues/955)). Per-method divergences are noted inline.
 :::
 
 ## save(options?)
 
-Construct a record and persist it. JS `save` accepts `SaveOptions` (`targetDocument`, `forceWrite`, `upsertOn`); in Swift a `TypedModel` is bound to one document, so the write targets that document.
+Construct a record and persist it. JS `save` accepts `SaveOptions` (`targetDocument`, `forceWrite`, `upsertOn`); Swift's instance `save(in:)` (the unified create/update from [#918](https://github.com/Primitive-Labs/js-bao-wss/issues/918)) takes an explicit `documentId` and throws if that document isn't open.
 
-::: danger Swift parity gap
-JS targets the active document by default (or `{ targetDocument }`); Swift's `TypedModel.create(_:)` writes to the document the model was constructed against, with no active-document defaulting. None of JS's `SaveOptions` are exposed on the Swift facade — `targetDocument` and `forceWrite` have no equivalent at all, and `upsertOn` is reachable only via the internal `.dynamic.upsert` (see below) (sweep D3/D4, [#947](https://github.com/Primitive-Labs/js-bao-wss/issues/947)).
+::: tip Divergent shape
+JS targets the active document by default (or `{ targetDocument }`); Swift's `save(in:)` always names the document explicitly — there's no active-document defaulting. The other `SaveOptions` aren't on the Swift facade: `forceWrite` has no equivalent, and `upsertOn` has no facade form — upsert by re-saving a record you looked up by its natural key (see [upsert](#upsert-save-with-upserton)) (sweep D3/D4, [#947](https://github.com/Primitive-Labs/js-bao-wss/issues/947)).
 :::
 
 ::: code-group
@@ -24,10 +24,10 @@ JS targets the active document by default (or `{ targetDocument }`); Swift's `Ty
 Look up a single record by its id. Resolves to null/nil when nothing matches.
 
 ::: tip Divergent shape
-JS `Task.find` is `async` (returns a `Promise`); Swift `tasks.find(_:)` is synchronous
-(reads from the local store, no `await`/`throws`). Swift also returns `nil` when the
-stored row has drifted from the typed shape — a decode miss is silently indistinguishable
-from "not found" (sweep model D-find).
+JS `Task.find` is `async` (returns a `Promise`); Swift `Task.find(_:)` is synchronous
+(reads from the local cross-document store, no `await`/`throws`). Swift also returns `nil`
+when the stored row has drifted from the typed shape — a decode miss is silently
+indistinguishable from "not found" (sweep model D-find).
 :::
 
 ::: code-group
@@ -40,7 +40,7 @@ from "not found" (sweep model D-find).
 Load every record of this model (no filter, no pagination).
 
 ::: tip Divergent shape
-JS `Task.findAll()` is `async`; Swift `tasks.findAll()` is synchronous (local-store
+JS `Task.findAll()` is `async`; Swift `Task.findAll()` is synchronous (local cross-document
 read). Swift silently drops rows that have drifted from the typed shape, so the
 returned count can be smaller than what's actually stored (sweep model D-findAll).
 :::
@@ -55,7 +55,7 @@ returned count can be smaller than what's actually stored (sweep model D-findAll
 Look up a record by a registered unique constraint without knowing its id. Pass an array for a compound constraint.
 
 ::: tip Divergent shape
-JS takes a bare value (`"alice@example.com"`) and an array for a compound constraint, all on one `async` `findByUnique`; Swift takes a typed `PrimitiveValue` (`.string(...)`) via `findByUnique(constraint:value:)` and a separate `values:` overload for compound constraints (synchronous, `throws`).
+JS has a dedicated `async` `findByUnique` (bare value, or an array for a compound constraint). The Swift model facade has **no** `findByUnique` — filter on the unique field and take `.first` (`Task.query(["email": "alice@example.com"]).first`); for a compound constraint, filter on every field of it ([#947](https://github.com/Primitive-Labs/js-bao-wss/issues/947)).
 :::
 
 ::: code-group
@@ -68,7 +68,7 @@ JS takes a bare value (`"alice@example.com"`) and an array for a compound constr
 Mongo-style filtered query.
 
 ::: tip Divergent shape
-JS returns a `PaginatedResult<Task>` — rows on `.data`, plus `.nextCursor` / `.hasMore`. Swift `query()` returns the hydrated `[Task]` directly (no wrapper); reach for `.dynamic.queryPaged` when you need a cursor ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
+JS returns a `PaginatedResult<Task>` — rows on `.data`, plus `.nextCursor` / `.hasMore`. Swift `Task.query()` returns the hydrated `[Task]` directly (no wrapper). It accepts a `limit` and an ordered `sortOrder` on `QueryOptions`, but returns no cursor, so cursor pagination isn't expressible on the facade today ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
 :::
 
 ::: code-group
@@ -90,7 +90,7 @@ Combine conditions with `$or` / `$and`.
 Fetch just the first match (with an optional sort). Resolves to null/nil when nothing matches.
 
 ::: tip Divergent shape
-JS has a dedicated `queryOne`; Swift has no `queryOne` on the typed facade — take `.first` of a sorted `query(...)` ([#955](https://github.com/Primitive-Labs/js-bao-wss/issues/955)).
+JS has a dedicated `queryOne`; the Swift model facade has none — take `.first` of a sorted `Task.query(...)` ([#955](https://github.com/Primitive-Labs/js-bao-wss/issues/955)).
 :::
 
 ::: code-group
@@ -102,8 +102,8 @@ JS has a dedicated `queryOne`; Swift has no `queryOne` on the typed facade — t
 
 Sort and paginate with a cursor.
 
-::: tip Divergent shape
-JS carries `PaginatedResult.nextCursor` forward via `uniqueStartKey` on the same `query()`. Swift pagination lives on `.dynamic.queryPaged` (the typed `query()` has no cursor); pass the ordered `sortOrder` and feed `nextCursor` back as `cursor:` ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
+::: danger Swift parity gap
+JS carries `PaginatedResult.nextCursor` forward via `uniqueStartKey` on the same `query()`. The Swift model facade has **no** cursor pagination: `Task.query` accepts `limit` and an ordered `sortOrder` but returns a plain `[Task]` with no `nextCursor` to advance, so only a single bounded, ordered page is expressible today ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
 :::
 
 ::: code-group
@@ -116,7 +116,7 @@ JS carries `PaginatedResult.nextCursor` forward via `uniqueStartKey` on the same
 Count records matching a filter (or all of them when omitted).
 
 ::: tip Divergent shape
-Swift `count` lives on `.dynamic`.
+JS `Task.count` is `async`; Swift `Task.count` is a synchronous static returning an `Int`, counting across every open document.
 :::
 
 ::: code-group
@@ -129,7 +129,7 @@ Swift `count` lives on `.dynamic`.
 Group-by aggregation with count/avg/sum, an optional filter, sort, and limit.
 
 ::: danger Swift parity gap
-Swift `aggregate` lives on `.dynamic` and returns untyped `[[String: Any]]` rows (vs JS's typed result). Its `groupBy` is `[String]` only, so two JS grouping shapes have no Swift form: StringSet-membership grouping (`{ field, contains }`) and the single-facet map (sweep D2, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
+Swift `Task.aggregate` is a static returning untyped `[[String: Any]]` rows (vs JS's typed result). Its `groupBy` is `[String]` only, so two JS grouping shapes have no Swift form: StringSet-membership grouping (`{ field, contains }`) and the single-facet map (sweep D2, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
 :::
 
 ::: code-group
@@ -142,7 +142,7 @@ Swift `aggregate` lives on `.dynamic` and returns untyped `[[String: Any]]` rows
 Subscribe to model changes (local edits and synced remote edits). Returns an unsubscribe function — always call it.
 
 ::: tip Divergent shape
-JS exposes `Task.subscribe`; in Swift it lives on `.dynamic.subscribe`.
+Both clients expose `Task.subscribe`. The Swift static fires the callback after any add/update/delete in any open document's copy of the model and returns an unsubscribe closure.
 :::
 
 ::: code-group
@@ -155,7 +155,7 @@ JS exposes `Task.subscribe`; in Swift it lives on `.dynamic.subscribe`.
 Insert-or-merge by a natural unique key, without knowing the existing record's id. The field must have a single-field unique constraint.
 
 ::: tip Divergent shape
-JS expresses this as `save({ upsertOn: "email" })` on the typed instance. Swift has no `save`-with-`upsertOn` on the facade — call `.dynamic.upsert(_:on:)`, which takes a `[String: PrimitiveValue]` dict ([#947](https://github.com/Primitive-Labs/js-bao-wss/issues/947)).
+JS expresses this as `save({ upsertOn: "email" })` on the typed instance. The Swift model facade has no `upsertOn` — look the record up by its unique field (`AppUser.query(["email": ...]).first`), mutate it in place if it exists or build a new one if it doesn't, then `save(in:)` (the unified create/update) ([#947](https://github.com/Primitive-Labs/js-bao-wss/issues/947)).
 :::
 
 ::: code-group
@@ -168,7 +168,7 @@ JS expresses this as `save({ upsertOn: "email" })` on the typed instance. Swift 
 Update a record: load it, change fields, persist.
 
 ::: tip Divergent shape
-JS mutates the loaded instance and calls `save()`. Swift applies a partial `[String: Any]` dict via `TypedModel.update(_:_:)` — unknown keys are dropped, and write failures are logged rather than thrown.
+Both clients now update the same way: load the record, mutate fields on the value, then persist. JS calls `save()`; Swift calls the instance `save(in:)` (the unified create/update — it writes in place when the record already exists), which throws if the named document isn't open.
 :::
 
 ::: code-group
@@ -181,7 +181,7 @@ JS mutates the loaded instance and calls `save()`. Swift applies a partial `[Str
 Delete a record by id.
 
 ::: tip Divergent shape
-JS loads the record and calls `delete()` on the instance; Swift deletes by id directly via `TypedModel.delete(_:)`.
+Both clients load the record and call `delete` on the instance. Swift's `delete(in:)` names the document to delete from and throws if it isn't open.
 :::
 
 ::: code-group

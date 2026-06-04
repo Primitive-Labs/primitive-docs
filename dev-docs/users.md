@@ -11,11 +11,10 @@ fields as JS — `refreshIfOlderThanMs`, `waitForLoad`, `refreshNetwork`,
 `serverTimeoutMs`), resolving the former generic-`FetchCachedOptions` gap
 (users D1).
 
-::: danger Swift parity gap
-`getBasic` still skips caching and the staleness options entirely when no
-cache facade is injected, where JS always caches (users D2) — confirm a cache
-is wired up if you rely on the offline/stale knobs.
-:::
+`getBasic` honors `GetUserOptions` and caches identically to JS through the
+standard client (a cache facade is always wired); constructed standalone without
+a facade (test-only), `waitForLoad` is still honored
+([#1041](https://github.com/Primitive-Labs/js-bao-wss/issues/1041)).
 
 ::: code-group
 <<< ./snippets/users/get-basic.ts#example{ts} [JavaScript]

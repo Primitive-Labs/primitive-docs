@@ -1,11 +1,13 @@
 import JsBaoClient
 
-// Update a record: look it up, then apply a partial `[String: Any]` change.
-// Unknown keys are dropped; write failures are logged, not thrown.
-func update(tasks: TypedModel<Task>, taskId: String) {
+// Update a record: load it, mutate fields on the value, then `save(in:)` it
+// back. `save(in:)` is the unified create/update — it writes in place when the
+// record already exists. Targets one open document; throws if it isn't open.
+func update(taskId: String, documentId: String) throws {
   // #region example
-  if let task = tasks.find(taskId) {
-    tasks.update(task.id, ["completed": true])
+  if var task = Task.find(taskId) {
+    task.completed = true
+    try task.save(in: documentId)
   }
   // #endregion example
 }

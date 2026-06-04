@@ -105,7 +105,10 @@ Delete a document from the server and evict its local data.
 
 ## open(documentId, options?)
 
-Open a document for editing.
+Open a document for editing. `OpenDocumentOptions` carries `availabilityWaitMs`
+(the `.network`-wait timeout, default 30s) and `deferNetworkSync` (open locally
+and start sync only on a later explicit `startNetworkSync`), matching JS
+([#1038](https://github.com/Primitive-Labs/js-bao-wss/issues/1038)).
 
 ::: tip Divergent shape (kept by design)
 JS returns `{ doc, metadata }`; Swift returns the `YDocument` directly and takes a typed `OpenDocumentOptions`. The bare `YDocument` is the ergonomic Swift shape — aligning the return to a `{ doc, metadata }` tuple is deferred rather than treated as a gap.

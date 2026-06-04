@@ -1,11 +1,11 @@
 import JsBaoClient
 
-// Aggregation lives on `.dynamic` and returns untyped `[[String: Any]]`
-// rows. `groupBy` is `[String]` only — the StringSet-membership grouping the
-// JS API accepts has no Swift form.
-func aggregate(tasks: TypedModel<Task>) {
+// Aggregation is the static `Task.aggregate` and returns untyped
+// `[[String: Any]]` rows. `groupBy` is `[String]` only — the StringSet-
+// membership grouping the JS API accepts has no Swift form.
+func aggregate() {
   // #region example
-  let stats = tasks.dynamic.aggregate(AggregateOptions(
+  let stats = Task.aggregate(AggregateOptions(
     groupBy: ["category"],
     operations: [
       AggregateOperation(type: .count),

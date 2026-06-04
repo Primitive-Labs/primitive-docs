@@ -137,6 +137,13 @@ Best-effort: per-blob failures are swallowed. `concurrency` defaults to 2.
 Return the current status of all tracked uploads for this document (newest first),
 scoped to this document.
 
+::: tip App-wide variants
+The same upload-queue verbs (`uploads`, `pauseUpload`, `resumeUpload`,
+`pauseAllUploads`, `resumeAllUploads`, `setUploadConcurrency`) also live on
+`client.documents` with an optional `documentId:` — omit it to operate across
+**all** documents ([#1038](https://github.com/Primitive-Labs/js-bao-wss/issues/1038)).
+:::
+
 ::: code-group
 <<< ./snippets/document-blob/uploads.ts#example{ts} [JavaScript]
 <<< ./snippets/document-blob/uploads.swift#example{swift} [Swift]

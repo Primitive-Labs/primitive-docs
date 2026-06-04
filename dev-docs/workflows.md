@@ -25,13 +25,6 @@ expected, not a gap (sweep workflows D3,
 [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
-::: danger Swift parity gap
-The `WorkflowStartedEvent` that follows `start` carries only
-`{ workflowKey, runId }` in Swift, vs the JS event's full 8-field payload — so
-Swift subscribers can't read the other fields off the start event (sweep
-workflows D2, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
-
 ::: code-group
 <<< ./snippets/workflows/start.ts#example{ts} [JavaScript]
 <<< ./snippets/workflows/start.swift#example{swift} [Swift]

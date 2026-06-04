@@ -1,22 +1,15 @@
 import JsBaoClient
 
-// Cursor pagination lives on `.dynamic.queryPaged` (the typed `query()`
-// returns plain rows with no cursor). Use `sortOrder` (ordered) when the sort
-// drives the cursor.
-func paginate(tasks: TypedModel<Task>) throws {
+// The model facade's `query` takes a `limit` and an ordered `sortOrder`, but
+// returns plain `[Task]` with no cursor — there is no `nextCursor` to carry
+// forward, so cursor pagination isn't expressible on the facade today. Use
+// `limit` + `sortOrder` for a bounded, ordered page.
+func paginate() {
   // #region example
-  let page1 = try tasks.dynamic.queryPaged(
+  let page = Task.query(
     ["completed": false],
     options: QueryOptions(sortOrder: [("priority", -1)], limit: 20)
   )
-
-  if let cursor = page1.nextCursor {
-    let page2 = try tasks.dynamic.queryPaged(
-      ["completed": false],
-      options: QueryOptions(sortOrder: [("priority", -1)], limit: 20, cursor: cursor)
-    )
-    _ = page2
-  }
   // #endregion example
-  _ = page1
+  _ = page
 }

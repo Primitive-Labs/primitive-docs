@@ -1,9 +1,9 @@
 import JsBaoClient
 
-// Count lives on `.dynamic` in Swift. Returns an `Int`.
-func count(tasks: TypedModel<Task>) {
+// Count records matching a filter across all open documents. Returns an `Int`.
+func count() {
   // #region example
-  let remaining = tasks.dynamic.count(["completed": false])
+  let remaining = Task.count(["completed": false])
   // #endregion example
   _ = remaining
 }

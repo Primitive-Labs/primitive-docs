@@ -211,16 +211,19 @@ Get the field schema for a model in a database.
 
 Connect to a database and get a `DoDb` for ad-hoc record query/find/save/count/aggregate.
 
-::: danger No Swift equivalent
-JavaScript-only — the Swift client has no `connect()` and no `DoDb` record
-surface, so the entire ad-hoc `query` / `find` / `save` / `patch` / `count` /
-`aggregate` API is absent on Swift (sweep databases D2). On Swift, read and
-write records through named operations (`executeOperation` / `executeBatch`)
-instead ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954),
-[#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
+::: tip Divergent shape
+Now on both clients ([#1019](https://github.com/Primitive-Labs/js-bao-wss/issues/1019)).
+Swift's `DoDb` methods take an explicit `modelName:` string (there's no pre-bound
+`db.User.*` accessor or model-class form) and are `async throws`; otherwise the
+surface matches — `save` / `patch` / `find` / `query` / `count` / `aggregate` /
+`increment` / `addToSet` / `removeFromSet` / `batch` + index management. The
+`syncIndexes` model-class form takes explicit desired state on Swift.
 :::
 
+::: code-group
 <<< ./snippets/databases/connect.ts#example{ts} [JavaScript]
+<<< ./snippets/databases/connect.swift#example{swift} [Swift]
+:::
 
 ## subscribe(databaseId, subscriptionKey, options)
 

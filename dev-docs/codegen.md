@@ -23,16 +23,16 @@ The same TOML produces structurally different output in each language:
 | | JavaScript (`js-bao-codegen-v2`) | Swift (`swift-bao-codegen`) |
 |---|---|---|
 | Generated type | a `class` extending `BaseModelImpl` (nearly empty body) | a `struct` conforming to `PrimitiveModel` |
-| CRUD path | inherited from the base class — `new Task({...})`, `task.save()`, `Task.find(...)` | through a `TypedModel<Task>(doc:)` wrapper that holds the doc handle |
+| CRUD path | inherited from the base class — `new Task({...})`, `task.save()`, `Task.find(...)` | a static `Task.*` facade for reads (`Task.query` / `Task.find` / …) plus instance `save(in:)` / `delete(in:)` for writes |
 | Generated body | empty (`class Task extends BaseModelImpl {}`) | full struct: stored properties + designated `init`, `init?(record:)`, `init?(row:)`, `primitiveValues()`, and a `primitiveSchema` literal |
 | Registration | a self-registering `index.ts` barrel — importing it registers every model | a `GeneratedModels.swift` barrel exposing `GeneratedModels.all` + `register(on:)` (Swift has no import-time side effects, so registration is one explicit call) |
 | How it runs | `npx js-bao-codegen-v2` (CLI) | the `JsBaoCodegenPlugin` SPM build plugin, run automatically during `swift build` |
 
-The struct-vs-class shape is intentional and documented at length (Swift structs can't inherit and protocols can't carry stored state, so each record needs real stored properties plus the four bridge methods). For the full rationale — and why CRUD goes through `TypedModel<T>` rather than statics on the type — see [`swift-client/docs/codegen.md`](https://github.com/Primitive-Labs/js-bao-wss/blob/main/swift-client/docs/codegen.md) in the js-bao-wss repo.
+The struct-vs-class shape is intentional and documented at length (Swift structs can't inherit and protocols can't carry stored state, so each record needs real stored properties plus the four bridge methods). The CRUD surface is the static `Model.*` facade the codegen bakes onto each struct ([#918](https://github.com/Primitive-Labs/js-bao-wss/issues/918)) — reads span every open document, writes target one via `save(in:)` / `delete(in:)` — so app code mirrors the JS client's one-model design without a per-document wrapper. For the full rationale see [`swift-client/docs/codegen.md`](https://github.com/Primitive-Labs/js-bao-wss/blob/main/swift-client/docs/codegen.md) in the js-bao-wss repo.
 
 ## Using a generated model
 
-This is the one compile-verified snippet on the page. It constructs a `Task` (from the fixture above) in each language. Note how the JS side instantiates the class directly and the Swift side constructs the struct and hands it to a `TypedModel<Task>` wrapper:
+This is the one compile-verified snippet on the page. It constructs a `Task` (from the fixture above) and persists it in each language. Note how the JS side instantiates the class and calls `task.save()`, while the Swift side constructs the struct and calls the instance `save(in:)` against a named document:
 
 ::: code-group
 <<< ./snippets/codegen/use-generated-model.ts#example{ts} [JavaScript]

@@ -76,10 +76,12 @@ Remove every entry from the cache.
 The JS cache emits `cacheUpdated` (`{ key, updatedAt, source, value }`) on every successful network
 refresh and `cacheUpdateFailed` (`{ key, error }`) on failure.
 
-::: danger No Swift equivalent
-JavaScript-only — the Swift `KvCache` has no emitter and fires no cache events (sweep cache D7; no
-issue number filed yet). These events are also not part of the typed public event map, so they are
-not surfaced through `client.on(...)`.
+::: tip Now on both clients
+Swift's `KvCache` now emits `cacheUpdated` / `cacheUpdateFailed` on network refresh / failure,
+surfaced through `client.events.on(.cacheUpdated)` / `.cacheUpdateFailed`
+([#1042](https://github.com/Primitive-Labs/js-bao-wss/issues/1042)). The JS `me`-record re-emit
+(`meUpdated` when `key == "me"`) is not yet wired on Swift — `.meUpdated` already fires from the
+WS path.
 :::
 
 ## KvCache.get / KvCache.set
