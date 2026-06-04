@@ -61,24 +61,25 @@ By default only admins can invite. To let regular members invite teammates, enab
 
 Admins and owners are exempt from the quota, and members can only invite other members (passing `role: "admin"` is rejected). Members check their quota before showing an invite UI:
 
-```typescript
-const quota = await client.invitations.quota();
-// { used: 2, limit: 5, remaining: 3, unlimited: false }
+::: code-group
 
-if (quota.unlimited || quota.remaining > 0) {
-  showInviteButton();
-}
-```
+<<< ../../examples/sharing/invitation-quota.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/invitation-quota.swift#example{swift} [Swift]
+
+:::
 
 Inviting over the quota returns a `403` with `error: "INVITATION_LIMIT_REACHED"`.
 
 ### Listing and Canceling
 
-```typescript
-const { items } = await client.invitations.list();
+::: code-group
 
-await client.invitations.delete(invitationId);
-```
+<<< ../../examples/sharing/invitation-list.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/invitation-list.swift#example{swift} [Swift]
+
+:::
 
 `delete` cascades — any pending document shares or group adds attached to the invitation are removed in the same operation.
 
@@ -86,16 +87,13 @@ await client.invitations.delete(invitationId);
 
 By default the platform sends invitation emails. To send branded emails from your own provider instead, suppress the platform email and drop the invitation's `inviteToken` into your own CTA URL:
 
-```typescript
-const invitation = await client.invitations.create({
-  email: "alice@example.com",
-  role: "member",
-  sendEmail: false, // suppress the platform email
-});
+::: code-group
 
-const acceptUrl = `https://myapp.example/invite/accept?inviteToken=${invitation.inviteToken}`;
-await myEmailService.send({ to: invitation.email, link: acceptUrl });
-```
+<<< ../../examples/sharing/invitation-custom-email.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/invitation-custom-email.swift#example{swift} [Swift]
+
+:::
 
 To look up the token for an existing invitation later — e.g. on a "resend invite" button — use `client.invitations.get(invitationId)`, which returns the full invitation including `inviteToken`.
 
@@ -105,22 +103,13 @@ Invitations carry more than app membership. When you [share a document](./workin
 
 When the recipient becomes a user, everything waiting for them applies atomically:
 
-```typescript
-// 1. Invite a teammate
-await client.invitations.create({ email: "newhire@example.com", role: "member" });
+::: code-group
 
-// 2. Share a project document with them (pending until signup)
-await client.documents.updatePermissions(projectDocId, {
-  email: "newhire@example.com",
-  permission: "read-write",
-});
+<<< ../../examples/sharing/invite-onboarding.ts#example{ts} [JavaScript]
 
-// 3. Add them to the engineering group (pending until signup)
-await client.groups.addMember("team", "engineering", { email: "newhire@example.com" });
+<<< ../../examples/sharing/invite-onboarding.swift#example{swift} [Swift]
 
-// When they sign up, all three apply in one transaction. They land in the
-// app with team-group access and the project already shared with them.
-```
+:::
 
 ## How Invitations Resolve
 

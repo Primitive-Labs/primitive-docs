@@ -472,12 +472,13 @@ The list is capped at 50 base emails per app, and a base cannot itself be a `+pr
 
 Each whitelisted base authorizes unlimited derived addresses of the form `<base-local>+primitivetest<suffix>@<base-domain>`. From the test side, sign in via the normal OTP flow using the magic code `000000`:
 
-```typescript
-// In an integration test
-await client.otpRequest("alice+primitivetest-teacher@example.com");
-await client.otpVerify("alice+primitivetest-teacher@example.com", "000000");
-// client is now authenticated; the access token expires in 30 minutes
-```
+::: code-group
+
+<<< ../../examples/auth/test-user-otp.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/test-user-otp.swift#example{swift} [Swift]
+
+:::
 
 The derived account must already exist as a user in this app — invite it ahead of time or seed it as part of test setup. The bypass never auto-provisions, which keeps a public-mode app from being signed up as `attacker+primitivetest@<whitelisted>`.
 

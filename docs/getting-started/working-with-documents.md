@@ -479,15 +479,13 @@ The most common case — you have a colleague's email but don't know (or care) w
 
 Batch shares can mix user IDs and emails:
 
-```typescript
-await client.documents.updatePermissions(documentId, {
-  permissions: [
-    { userId: "user-abc", permission: "read-write" },
-    { email: "alice@example.com", permission: "reader" },
-    { email: "bob@example.com", permission: "read-write" },
-  ],
-});
-```
+::: code-group
+
+<<< ../../examples/sharing/share-batch.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/share-batch.swift#example{swift} [Swift]
+
+:::
 
 To have the platform email the recipient, pass `sendEmail: true` along with a `documentUrl`, and make sure your app's base URL is configured — the server uses them to compose the share and accept links.
 
@@ -511,10 +509,13 @@ Sharing UIs typically show two sections: people who currently have access, and p
 
 One call handles both "currently has access" and "invited but hasn't signed up yet" — pass an email and the server removes the matching member *or* cancels the pending grant, whichever exists:
 
-```typescript
-await client.documents.removePermission(documentId, userId);
-await client.documents.removePermission(documentId, { email: "alice@example.com" });
-```
+::: code-group
+
+<<< ../../examples/sharing/share-remove.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/share-remove.swift#example{swift} [Swift]
+
+:::
 
 Use the email form whenever you don't want to think about whether the target has signed up yet.
 
@@ -522,18 +523,13 @@ Use the email form whenever you don't want to think about whether the target has
 
 Sharing one document at a time stops scaling as soon as access maps to a *set* of documents — a project's files, a course's materials, a client folder. A **collection** bundles documents so they can be shared as a unit: adding a member to a collection grants them access to every document currently in it *and* to any document added later. Remove a document from the collection (or a member from the collection) and the access goes with it.
 
-```typescript
-// Create a collection and put documents in it
-const collection = await client.collections.create({ name: "Project Phoenix" });
-await client.collections.addDocument(collection.collectionId, designDocId);
-await client.collections.addDocument(collection.collectionId, specDocId);
+::: code-group
 
-// One grant covers the whole set — including documents added later
-await client.collections.addMember(collection.collectionId, {
-  email: "alice@example.com",
-  permission: "read-write",
-});
-```
+<<< ../../examples/sharing/collection-create.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/collection-create.swift#example{swift} [Swift]
+
+:::
 
 Collections sit between single-document shares and groups: share a *document* when access is about that one thing, share a *collection* when access is about a set of documents, and use a *group* when access is about who someone is (a team, a role). Membership works like document sharing — add by user ID or by email (email adds to non-users resolve at signup, like any [deferred grant](./invitations.md#sharing-with-people-who-arent-users-yet)), and list current members and pending invitations:
 
