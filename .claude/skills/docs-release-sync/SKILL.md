@@ -9,11 +9,14 @@ A release summary lists everything that shipped; only some of it belongs in docu
 
 ## Step 1 — Inventory and open the sources
 
-Start with the source-stamp diff — it catches doc-impacting library changes the release summary may not mention:
+Start with the source-stamp diff — it catches doc-impacting library changes the release summary may not mention — then fast-forward the submodules so every source check in this pass reads the tip, not the last-stamped state:
 
 ```bash
 node scripts/stamp-sources.mjs --changes   # per-library commits since the last doc-truing pass
+pnpm submodules:update                     # fast-forward library_repos/* to their branch tips
 ```
+
+(Scan first — it reads the worktrees' fetched refs and prints the baseline diff regardless, but the order keeps the report honest.) Moving the submodules intentionally breaks the stamp gate until Step 4 restamps; if the pass ends with **no** doc changes (everything internal / pending release), don't restamp — reset the worktrees instead with `git submodule update --init` so the gate stays green and the baseline keeps resurfacing the deferred commits.
 
 **No release summary attached?** The scan IS the inventory: triage every listed commit through Step 2 (commit subjects carry the PR number — `gh pr view` it for detail). If the scan shows zero commits in every library, report "docs already current as of <stampedAt>" and stop. Everything below applies the same; the release-table parsing is simply skipped.
 
@@ -49,6 +52,6 @@ Verify anything you write against source per STYLE.md's source-of-truth map — 
 ## Step 4 — Close the loop
 
 1. Mirror every human-doc change into the matching agent guide template (and vice versa); `pnpm render:guides`.
-2. Update the submodules to the release's source state (`pnpm submodules:update` or pin the relevant commits), then **restamp**: `pnpm stamp:sources`. This rewrites `docs-sources.json` and `guides.json` `builtAgainst` and resets the baseline for the next `--changes` scan — only do it once the docs actually reflect those sources, and only after every item deferred as **pending release** has a recorded follow-up (the restamp removes those commits from the next scan, so an unrecorded deferral is lost).
+2. **Restamp**: `pnpm stamp:sources` (the submodules were already fast-forwarded in Step 1; pin them to a different commit first if the release maps to one). This rewrites `docs-sources.json` and `guides.json` `builtAgainst` and resets the baseline for the next `--changes` scan — only do it once the docs actually reflect those sources, and only after every item deferred as **pending release** has a recorded follow-up (the restamp removes those commits from the next scan, so an unrecorded deferral is lost). If the pass made no doc changes, skip the restamp and reset the worktrees instead (see Step 1).
 3. `pnpm check:examples` (includes the stamp-consistency gate) and `npx vitepress build docs`.
 4. Report: a table of every release item → disposition (`internal — no change` / `updated <pages>` / `proposed: <new section/page>` awaiting user input), plus anything the release contradicted in the docs that you couldn't resolve.
