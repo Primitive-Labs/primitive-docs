@@ -20,10 +20,10 @@ If you're working with an AI coding assistant, it can run `primitive guides list
 
 ## Installation
 
-Install the CLI globally via npm:
+Install the CLI globally:
 
 ```bash
-npm install -g primitive-admin
+pnpm add -g primitive-admin
 ```
 
 This installs the `primitive` command globally on your system.
@@ -408,7 +408,7 @@ primitive blob-buckets signed-url avatars <blobId> --expires 3600
 primitive blob-buckets delete avatars -y
 ```
 
-See [Blob Buckets](./blob-buckets.md).
+See [Blobs and Files](./blobs-and-files.md).
 
 ### Email Templates
 

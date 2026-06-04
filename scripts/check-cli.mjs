@@ -90,9 +90,20 @@ if (!rootHelp) {
 
 // ── Extract documented invocations ──────────────────────────────────────────
 const renderedSuffix = new RegExp(`\\.(${VARIANTS.map((v) => v.id).join("|")})\\.md$`);
+const guideFiles = readdirSync(join(ROOT, "guides", "latest"));
+// Agnostic builds (`<BASE>.md` with a matching `<BASE>.template.md`) are
+// rendered artifacts — scanning them would double-count their template.
+const templateBases = new Set(
+  guideFiles.filter((f) => f.endsWith(".template.md")).map((f) => f.replace(/\.template\.md$/, "")),
+);
 const sources = [
-  ...readdirSync(join(ROOT, "guides", "latest"))
-    .filter((f) => f.endsWith(".md") && !renderedSuffix.test(f))
+  ...guideFiles
+    .filter(
+      (f) =>
+        f.endsWith(".md") &&
+        !renderedSuffix.test(f) &&
+        !(!f.endsWith(".template.md") && templateBases.has(f.replace(/\.md$/, ""))),
+    )
     .map((f) => join(ROOT, "guides", "latest", f)),
   ...readdirSync(join(ROOT, "docs", "getting-started"))
     .filter((f) => f.endsWith(".md"))

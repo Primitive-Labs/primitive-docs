@@ -27,8 +27,9 @@ The platform emits these from the server. No client code required.
 
 | Category | Examples |
 |---|---|
-| Documents | `document.created`, `document.viewed`, `document.opened`, `document.updated`, `document.deleted`, `document.tag_added`, `document.tag_removed` |
+| Documents | `document.created`, `document.viewed` (fires on every document info fetch, including each open), `document.opened` (alias-resolved opens), `document.updated` (metadata changes — content edits aren't individually evented), `document.deleted`, `document.tag_added`, `document.tag_removed` |
 | Permissions | `permission.granted`, `permission.revoked`, `permission.pending.cancelled`, `ownership.transferred` |
+| Access requests | `access_request.created`, `access_request.approved`, `access_request.denied` |
 | Invitations | `invitation.sent`, `invitation.cancelled`, `invitation.declined` |
 | Auth & Users | `session.refreshed`, `user.removed`, `user.role_changed`, and API-token `created` / `revoked` (feature `token`) |
 | Workflows / Prompts | `workflow.started`, `workflow.completed`, `workflow.failed`, `prompt.executed` |
@@ -170,7 +171,7 @@ Every CLI query above is backed by an admin-only REST endpoint under `/app/{appI
 
 ### From a Workflow
 
-Workflows can run analytics queries as a step. This is the simplest way to ship a recurring digest, an admin email, or a Slack post that summarizes activity. See [Workflows](./workflows.md#analytics-query-step) for the full step reference.
+Workflows can run analytics queries as a step. This is the simplest way to ship a recurring digest, an admin email, or a Slack post that summarizes activity. See [Workflows](./workflows.md#analytics-steps) for the full step reference.
 
 ```toml
 [[steps]]
@@ -198,6 +199,6 @@ The **Analytics** section of the [Admin Console](./admin-console.md) shows usage
 
 ## Next Steps
 
-- **[Workflows](./workflows.md#analytics-query-step)** — Wire analytics into recurring workflows
+- **[Workflows](./workflows.md#analytics-steps)** — Wire analytics into recurring workflows
 - **[Admin Console](./admin-console.md)** — Visual analytics dashboards
 - **[Primitive CLI](./primitive-cli.md)** — Full `primitive analytics` reference

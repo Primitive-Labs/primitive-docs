@@ -1,6 +1,6 @@
 ---
 name: docs-release-sync
-description: Update the Primitive documentation from a platform release summary. Use this skill whenever given a production/agent release summary (a "# Production release YYYY-MM-DD (sha)" document with New Features / Bug Fixes / Notes-for-users tables referencing PR and issue numbers), or asked to "sync the docs with the release", "update docs for the latest release", or "what does this release change in the docs". Walks every release item, triages developer relevance, updates affected pages and guides, and proposes homes for new features.
+description: Update the Primitive documentation from a platform release summary, or from a library-commit scan when no summary is given. Use this skill whenever given a production/agent release summary (a "# Production release YYYY-MM-DD (sha)" document with New Features / Bug Fixes / Notes-for-users tables referencing PR and issue numbers), or asked to "sync the docs with the release", "update docs for the latest release", "what does this release change in the docs" — or, with no summary attached, "sync the docs with the libraries", "what changed since the last doc update", or a bare "run docs release sync". Walks every item, triages developer relevance, updates affected pages and guides, and proposes homes for new features.
 ---
 
 # Syncing Docs with a Platform Release
@@ -9,7 +9,17 @@ A release summary lists everything that shipped; only some of it belongs in docu
 
 ## Step 1 — Inventory and open the sources
 
-Parse every row of every table (New Features, Bug Fixes, Cleanup, Performance, Dependencies, Model Changes, Notes for users). For each referenced PR/issue, pull the detail you need:
+Start with the source-stamp diff — it catches doc-impacting library changes the release summary may not mention:
+
+```bash
+node scripts/stamp-sources.mjs --changes   # per-library commits since the last doc-truing pass
+```
+
+**No release summary attached?** The scan IS the inventory: triage every listed commit through Step 2 (commit subjects carry the PR number — `gh pr view` it for detail). If the scan shows zero commits in every library, report "docs already current as of <stampedAt>" and stop. Everything below applies the same; the release-table parsing is simply skipped.
+
+Scan-mode caveat: a commit on `main` is not necessarily *published*, and docs describe the published surface (CLI examples validate against the pinned `primitive-admin`). Before documenting a scanned change, confirm it's in the pinned package versions (`docs-sources.json`); if not, classify it **pending release** — record a follow-up (memory note or issue, per the validation-followups pattern) instead of a doc edit.
+
+With a summary, triage the scanned commits alongside the release items (same Step 2 classes), then parse every row of every table (New Features, Bug Fixes, Cleanup, Performance, Dependencies, Model Changes, Notes for users). For each referenced PR/issue, pull the detail you need:
 
 ```bash
 gh pr view <num> --repo Primitive-Labs/js-bao-wss            # description + linked issue
@@ -39,5 +49,6 @@ Verify anything you write against source per STYLE.md's source-of-truth map — 
 ## Step 4 — Close the loop
 
 1. Mirror every human-doc change into the matching agent guide template (and vice versa); `pnpm render:guides`.
-2. `pnpm check:examples` and `npx vitepress build docs`.
-3. Report: a table of every release item → disposition (`internal — no change` / `updated <pages>` / `proposed: <new section/page>` awaiting user input), plus anything the release contradicted in the docs that you couldn't resolve.
+2. Update the submodules to the release's source state (`pnpm submodules:update` or pin the relevant commits), then **restamp**: `pnpm stamp:sources`. This rewrites `docs-sources.json` and `guides.json` `builtAgainst` and resets the baseline for the next `--changes` scan — only do it once the docs actually reflect those sources, and only after every item deferred as **pending release** has a recorded follow-up (the restamp removes those commits from the next scan, so an unrecorded deferral is lost).
+3. `pnpm check:examples` (includes the stamp-consistency gate) and `npx vitepress build docs`.
+4. Report: a table of every release item → disposition (`internal — no change` / `updated <pages>` / `proposed: <new section/page>` awaiting user input), plus anything the release contradicted in the docs that you couldn't resolve.

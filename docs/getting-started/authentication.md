@@ -152,7 +152,7 @@ For reference, here's what the starter templates handle for you:
 
 ## Using the Client Directly
 
-The templates are optional. Everything they do runs on public client APIs, so any web framework (React, Svelte, vanilla JS) or any Swift app can implement the same flows directly. Install the client — `npm install js-bao-wss-client`, or add the Swift package — and initialize it:
+The templates are optional. Everything they do runs on public client APIs, so any web framework (React, Svelte, vanilla JS) or any Swift app can implement the same flows directly. Install the client — `pnpm add js-bao-wss-client`, or add the Swift package — and initialize it:
 
 ::: code-group
 

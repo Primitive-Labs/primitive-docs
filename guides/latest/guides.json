@@ -3,6 +3,15 @@
     "language": "ts",
     "platform": "web"
   },
+  "builtAgainst": {
+    "stampedAt": "2026-06-04",
+    "packages": {
+      "js-bao-wss-client": "2.0.0",
+      "js-bao": "0.5.1",
+      "primitive-admin": "1.0.49",
+      "primitive-app": "3.0.1"
+    }
+  },
   "guides": [
     {
       "topic": "authentication",
@@ -216,7 +225,7 @@
         "documents",
         "data-modeling",
         "authentication",
-        "sharing-and-invitations"
+        "invitations"
       ],
       "variants": [
         {
@@ -307,7 +316,7 @@
         "documents",
         "data-modeling",
         "users-and-groups",
-        "scheduling-and-realtime"
+        "workflows"
       ],
       "variants": [
         {
@@ -471,9 +480,10 @@
       "relatedGuides": [
         "prompts",
         "integrations",
-        "scheduling-and-realtime",
+        "databases",
         "blobs",
-        "analytics"
+        "analytics",
+        "app-secrets"
       ],
       "variants": [
         {
@@ -572,7 +582,8 @@
       ],
       "prerequisites": [],
       "relatedGuides": [
-        "workflows"
+        "workflows",
+        "app-secrets"
       ],
       "variants": [
         {
@@ -583,6 +594,46 @@
           "language": "swift",
           "file": "AGENT_GUIDE_TO_PRIMITIVE_INTEGRATIONS.swift.md"
         }
+      ]
+    },
+    {
+      "topic": "app-secrets",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_APP_SECRETS.md",
+      "description": "Server-side credential store — managing secrets with the CLI and referencing them from integrations, workflows, and database rules as {{ secrets.KEY }}",
+      "keywords": [
+        "secrets",
+        "app secrets",
+        "credentials",
+        "API keys",
+        "tokens",
+        "secrets.KEY",
+        "rotation",
+        "write-only",
+        "environment secrets"
+      ],
+      "useCases": [
+        "Storing API keys and tokens for external services",
+        "Referencing credentials from integration headers",
+        "Using secrets in workflow templates and CEL",
+        "Reading secrets in database access rules and trigger stamps",
+        "Rotating a credential without a config push",
+        "Keeping per-environment secret values"
+      ],
+      "concepts": [
+        "primitive secrets set",
+        "primitive secrets list",
+        "secrets.KEY",
+        "write-only store",
+        "per-app scope",
+        "defaultHeaders",
+        "step output snapshots"
+      ],
+      "prerequisites": [],
+      "relatedGuides": [
+        "integrations",
+        "workflows",
+        "databases",
+        "configuration"
       ]
     },
     {
@@ -694,8 +745,7 @@
       "relatedGuides": [
         "databases",
         "integrations",
-        "workflows",
-        "scheduling-and-realtime"
+        "workflows"
       ],
       "variants": [
         {
@@ -757,7 +807,7 @@
     },
     {
       "topic": "configuration",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_CONFIGURATION.ts.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_CONFIGURATION.md",
       "description": "Managing backend configuration as code — the TOML sync loop, directory map, environments, secrets, and headless CI auth",
       "keywords": [
         "configuration",
@@ -782,20 +832,13 @@
         "Storing app secrets referenced as {{ secrets.KEY }}",
         "Authenticating the CLI in CI pipelines"
       ],
-      "variants": [
-        {
-          "language": "ts",
-          "file": "AGENT_GUIDE_TO_PRIMITIVE_CONFIGURATION.ts.md"
-        },
-        {
-          "language": "swift",
-          "file": "AGENT_GUIDE_TO_PRIMITIVE_CONFIGURATION.swift.md"
-        }
+      "relatedGuides": [
+        "app-secrets"
       ]
     },
     {
       "topic": "access-control",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_ACCESS_CONTROL.ts.md",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_ACCESS_CONTROL.md",
       "description": "Writing CEL access rules — identity context, per-surface rule contexts (database ops, subscriptions, workflows), and rule sets for management operations",
       "keywords": [
         "access control",
@@ -817,16 +860,6 @@
         "Restricting who can start a workflow",
         "Governing who can create groups or manage members",
         "Testing and debugging CEL rules"
-      ],
-      "variants": [
-        {
-          "language": "ts",
-          "file": "AGENT_GUIDE_TO_PRIMITIVE_ACCESS_CONTROL.ts.md"
-        },
-        {
-          "language": "swift",
-          "file": "AGENT_GUIDE_TO_PRIMITIVE_ACCESS_CONTROL.swift.md"
-        }
       ]
     },
     {

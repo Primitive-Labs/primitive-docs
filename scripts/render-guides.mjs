@@ -6,14 +6,19 @@
 // scripts/variants.mjs, filling each placeholder with that example's corpus
 // region for the variant (platform override first, base-language fallback).
 //
+// Concept-only templates — no `{{#lang}}` blocks and no `{{ example: }}`
+// placeholders, so every variant renders byte-identically — build to a single
+// agnostic `<X>.md` instead, and guides.json lists no variants for them (the
+// CLI serves the default `file` for every language/platform request).
+//
 // All builds are committed so they're validated here and the CLI just fetches
 // the one matching the project's language/platform. Inline (non-placeholder)
 // blocks copy through unchanged.
 //
-//   node scripts/render-guides.mjs           # write every <X>.<variantId>.md
+//   node scripts/render-guides.mjs           # write the builds
 //   node scripts/render-guides.mjs --check    # verify committed builds are current (CI)
 
-import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { VARIANTS, exampleCandidates } from "./variants.mjs";
@@ -81,21 +86,39 @@ for (const t of templates) {
       catch { problems.push(`✘ ${t}: {{ example: ${m[1]} }} has no ${variant.id} corpus region`); }
     }
   }
-  for (const variant of VARIANTS) {
-    const out = join(GUIDES_DIR, `${base}.${variant.id}.md`);
-    const rendered = render(src, variant, problems, t);
+  // Concept-only template (every variant renders identically) → one agnostic
+  // build; otherwise one build per variant. The other mode's files are stale
+  // and must not linger (the CLI fetches whatever guides.json names).
+  const renders = VARIANTS.map((variant) => ({ variant, content: render(src, variant, problems, t) }));
+  const agnostic = renders.every((r) => r.content === renders[0].content);
+  const builds = agnostic
+    ? [{ file: `${base}.md`, content: renders[0].content }]
+    : renders.map((r) => ({ file: `${base}.${r.variant.id}.md`, content: r.content }));
+  const staleFiles = agnostic ? VARIANTS.map((v) => `${base}.${v.id}.md`) : [`${base}.md`];
+
+  for (const { file, content } of builds) {
+    const out = join(GUIDES_DIR, file);
     if (CHECK) {
       let current = "";
       try { current = readFileSync(out, "utf-8"); } catch { /* missing */ }
-      if (current !== rendered) problems.push(`✘ ${base}.${variant.id}.md is stale — run \`pnpm render:guides\``);
+      if (current !== content) problems.push(`✘ ${file} is stale — run \`pnpm render:guides\``);
     } else {
-      writeFileSync(out, rendered);
+      writeFileSync(out, content);
       written++;
+    }
+  }
+  for (const file of staleFiles) {
+    const p = join(GUIDES_DIR, file);
+    if (!existsSync(p)) continue;
+    if (CHECK) {
+      problems.push(`✘ ${file} should not exist (${agnostic ? "template is concept-only — single agnostic build" : "template has language-specific content — per-variant builds"}) — run \`pnpm render:guides\``);
+    } else {
+      unlinkSync(p);
     }
   }
 }
 
-console.log(`Guide templates: ${templates.length} → ${templates.length * VARIANTS.length} per-variant builds`);
+console.log(`Guide templates: ${templates.length} rendered`);
 if (problems.length) {
   console.error(`\n${problems.length} problem(s):`);
   for (const p of problems) console.error("  " + p);

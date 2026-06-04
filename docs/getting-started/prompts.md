@@ -82,24 +82,8 @@ Verification types include substring `contains`, regex pattern, JSON subset, and
 
 The result carries `output` (the generated text); pass `configId` to target a specific config instead of the active one.
 
-## Executing a Prompt from a Workflow
-
-Prompts and [workflows](./workflows.md) are parallel concepts: a prompt is a single managed LLM call, a workflow is a multi-step pipeline. Workflows can invoke prompts with the `prompt.execute` step:
-
-```toml
-[[steps]]
-id = "summarize"
-kind = "prompt.execute"
-promptKey = "my-summarizer"
-saveAs = "summary"
-
-[steps.variables]
-text = "{{ input.documentText }}"
-style = "professional"
-```
-
 ## Next Steps
 
-- **[Workflows](./workflows.md)** — Multi-step server-side automation
+- **[Workflows](./workflows.md)** — Multi-step pipelines that invoke prompts with the `prompt.execute` step
 - **[Analytics](./analytics.md)** — Prompt executions are tracked automatically (`prompt.executed`, durations, token counts)
 - **[Primitive CLI](./primitive-cli.md)** — Full CLI command reference

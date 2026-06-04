@@ -63,6 +63,8 @@ Documents must be opened before querying or modifying data within them.
 
 Documents are ready to be queried once the `.open()` call finishes. Applications should wait for all required documents to be opened and show a loading state until then, then track document-specific readiness explicitly. `open()` is idempotent — calling it on an already-open document is a no-op. Handle open failures explicitly: surface an error or redirect; don't silently continue.
 
+Open only the documents you need to query or want real-time updates from — every open document syncs continuously. Don't open documents you don't need, and close ones you're done with (see [Closing Documents](#closing-documents)).
+
 Track readiness with an `isReady` ref.
 
 **Wrong** — querying or saving before the document is open throws (or returns nothing for queries on no-document models):
@@ -82,6 +84,7 @@ const result = await TodoItem.query({});         // throws DocumentClosedError o
 - **Open after authentication, not before.** Gate on `userStore.isAuthenticated` (not `isInitialized`). The template's `AppLayout` already gates rendering on `isAuthenticated`, so components mounted inside it can call `open()` safely.
 - **Session-scoped documents** (small bounded set, < ~20): open once at app/layout level for the session.
 - **Route-scoped documents** (per-page, unbounded count, or transient): open on route entry, close on route leave. Render a loading state until `documents.open()` resolves and (with `useJsBaoDataLoader`) `initialDataLoaded` is true.
+- **Stray opens widen query scope** — JavaScript queries span every open document by default, so an unneeded open document doesn't just cost sync traffic, it changes query results.
 
 
 ### 2. Finding documents a user can access

@@ -12,7 +12,8 @@ Single-page review (docs-page-review) can't see cross-page problems: the same fa
 1. **Orphan pages** — every file in `docs/getting-started/` must appear in the sidebar (`docs/.vitepress/config.ts`). A page on disk but not in nav is either to be wired in or deleted (this exact failure shipped once: a stale near-duplicate of the landing page sat unlinked for months).
 2. **Build + links** — `npx vitepress build docs` (dead links fail), plus an anchor pass for `./page.md#anchor` references whose heading no longer exists.
 3. **Example parity inventory** — `node scripts/check-example-parity.mjs` for the set-wide lone-language list; judge each per STYLE.md's parity rules.
-4. **Structure mirror** — every concept page should have its agent-guide counterpart and vice versa (see docs-sync-check's mapping; performance and swift-client guides are the known exceptions).
+4. **Structure mirror** — every concept page should have its agent-guide counterpart and vice versa (see docs-sync-check's mapping; the performance guide is the known exception).
+5. **Manifest reference integrity** — every `relatedGuides`/`prerequisites` entry in `guides/latest/guides.json` must name an existing topic: `node scripts/sync-guides-json.mjs --check` (also part of `pnpm check:examples`). Dangling references send agents to `guides get <topic>` failures.
 
 ## Cross-page judgment passes
 

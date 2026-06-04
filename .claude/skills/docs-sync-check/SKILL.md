@@ -13,7 +13,7 @@ CLAUDE.md's standing rule: the human docs and agent guides must state the same f
 git diff --name-only HEAD -- docs/ guides/latest/   # or the relevant range/staged set
 ```
 
-The guide structure mirrors the page structure, so the counterpart is usually the matching name: `working-with-documents.md` ↔ `AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.template.md`, `workflows.md` ↔ `..._WORKFLOWS.template.md`, `invitations.md` ↔ `..._INVITATIONS.template.md`, `choosing-your-data-model.md` ↔ `..._DATA_MODELING.template.md`, `api-integrations.md` ↔ `..._INTEGRATIONS.template.md`, `blobs-and-files.md` ↔ `..._BLOBS.template.md`. Pages with no guide counterpart (landing, quick start, deploying, example apps, admin console, CLI) and guides with no page counterpart (performance, swift-client) sync against nothing — skip them.
+The guide structure mirrors the page structure, so the counterpart is usually the matching name: `working-with-documents.md` ↔ `AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.template.md` (its Document-Scoped Blobs section ↔ `..._BLOBS.template.md`), `workflows.md` ↔ `..._WORKFLOWS.template.md`, `invitations.md` ↔ `..._INVITATIONS.template.md`, `choosing-your-data-model.md` ↔ `..._DATA_MODELING.template.md`, `api-integrations.md` ↔ `..._INTEGRATIONS.template.md`, `blobs-and-files.md` ↔ `..._BLOB_BUCKETS.template.md` (the page is bucket-focused; document-scoped blobs live on the documents page). Pages with no guide counterpart (landing, quick start, example apps, admin console, CLI) and guides with no page counterpart (performance) sync against nothing — skip them.
 
 ## Step 2 — Extract and compare the changed claims
 
@@ -29,6 +29,7 @@ Tone, ordering, and depth differences are **not** findings. Only factual diverge
 
 - Templates changed → confirm builds were re-rendered: `node scripts/render-guides.mjs --check` (or run `pnpm render:guides`).
 - `pnpm check:examples` (includes the guides.json contract check).
+- Guide added/removed/renamed → `guides.json`'s hand-maintained `relatedGuides`/`prerequisites` must still name existing topics — `node scripts/sync-guides-json.mjs --check` validates this (also part of `check:examples`). When a guide is removed, repoint references to wherever its content moved, don't just delete them.
 - Never edit `.ts.md` / `.swift.md` directly — fixes go in the `.template.md`.
 
 ## Reporting

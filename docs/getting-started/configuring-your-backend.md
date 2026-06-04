@@ -44,7 +44,9 @@ config/
   collection-type-configs/*.toml  # Collection type configuration
 ```
 
-Every feature page in these docs that shows a TOML block — [Workflows](./workflows.md), [Prompts](./prompts.md), [API Integrations](./api-integrations.md), [Working with Databases](./working-with-databases.md), [Blob Buckets](./blob-buckets.md) — is describing one of these files. Define the entity in TOML, `primitive sync push`, and it's live.
+Every feature page in these docs that shows a TOML block — [Workflows](./workflows.md), [Prompts](./prompts.md), [API Integrations](./api-integrations.md), [Working with Databases](./working-with-databases.md), [Blobs and Files](./blobs-and-files.md) — is describing one of these files. Define the entity in TOML, `primitive sync push`, and it's live.
+
+Credentials never go in these files: config that needs an API key references it as <span v-pre>`{{ secrets.KEY }}`</span>, with the value stored server-side. See [App Secrets](./app-secrets.md).
 
 ## Environments
 

@@ -232,32 +232,6 @@ On iOS, codegen emits value-type `PrimitiveModel` structs (`Codable`, `Equatable
 - **Dates round-trip as ISO-8601 `String`s** — there's no native date type on the wire.
 - **Wire keys are forever** — renaming a TOML key orphans existing records on every platform. Keep wire keys snake_case so they round-trip cleanly between web and iOS, and add camelCase aliases in a `+Extensions.swift` companion if the Swift call sites read awkwardly.
 
-### Working with Model Instances
-
-CRUD on model instances (create / read / update / delete, queries, aggregation) is shown side-by-side in JavaScript and Swift in [CRUD Operations](#crud-operations) below.
-
-::: tip JavaScript-specific
-The value-handling caveats in this section apply to the **JavaScript** client only. In Swift, generated models are value-type `struct`s (Codable), so spreading/copying works normally and the gotchas below don't arise.
-:::
-
-A JavaScript model instance behaves like a normal object when you read and write individual fields:
-
-```typescript
-const todo = await Todo.find(id);
-console.log(todo.title);   // read
-todo.completed = true;     // write
-await todo.save();
-```
-
-But a JavaScript model instance is **not** a plain object: its fields are prototype getters, so the spread (`...`) and rest operators — which only copy own properties — quietly give you back an empty object:
-
-```typescript
-const copy = { ...todo };            // ❌ has none of todo's fields
-const { id, ...rest } = todo;        // ❌ `rest` is empty
-```
-
-Nothing throws — you just get partial data that surfaces later as a confusing "missing field" bug. When you need a plain object (to serialize, send to an integration, or duplicate a record), read the fields explicitly: `{ id: todo.id, title: todo.title }`. The reverse direction is fine — constructors, `save()`, and `query()` filters all accept plain objects.
-
 ### Iterating on the Schema
 
 You're free to evolve the schema as the app grows. A few rules of thumb:
@@ -419,7 +393,41 @@ For code that subscribes to client events directly on iOS (`client.events.on(...
 
 ## Creating and Opening Documents
 
-Open a document before querying or writing data in it. For a per-user singleton document (a personal app's "the user's data"), `getOrCreateWithAlias` resolves-or-creates atomically:
+Create a document with `documents.create()` — it returns the new document's metadata, including the `documentId` everything else keys off:
+
+::: code-group
+
+<<< ../../examples/documents/create-document.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/create-document.swift#example{swift} [Swift]
+
+:::
+
+A document must be **open** before you can read or write the data inside it — queries and saves only see open documents:
+
+::: code-group
+
+<<< ../../examples/documents/doc-open-query.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/doc-open-query.swift#example{swift} [Swift]
+
+:::
+
+The document is ready as soon as `open()` resolves — await it before the first query and show a loading state until then. `open()` is idempotent, so re-opening an already-open document is a no-op.
+
+Only keep open the documents you actually need — the ones you're querying or want real-time updates from. Every open document is synced continuously, and in JavaScript queries span all open documents by default, so an unneeded open document costs sync traffic and widens query results. Close documents you're done with:
+
+::: code-group
+
+<<< ../../examples/documents/close-document.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/close-document.swift#example{swift} [Swift]
+
+:::
+
+### Ensuring Exactly One Document with Aliases
+
+Some apps need exactly one document of a given kind — a personal app's "the user's data". Creating it with an **alias** guarantees one and only one exists, even when several devices race to create it: `getOrCreateWithAlias` resolves-or-creates atomically:
 
 ::: code-group
 
@@ -433,7 +441,7 @@ Open a document before querying or writing data in it. For a per-user singleton 
 Splitting this into a resolve followed by a create looks fine but has a race: two devices onboarding at the same moment both fall into the create branch and you lose one of the docs. `getOrCreateWithAlias` is a single atomic server-side upsert.
 :::
 
-Other patterns: **one document at a time** (list the user's owned documents, open the selected one) and **multiple open documents** (open several; in JavaScript a query then runs across all open documents, while in Swift each document has its own `TypedModel`).
+### Opening Documents on iOS
 
 On iOS, the canonical place to open documents and bind models is your `PrimitiveAppState` subclass — open in `connectClient()`, bind in the `onDocumentOpened` hook:
 
@@ -460,6 +468,18 @@ final class MyAppState: PrimitiveAppState {
 ```
 
 One `TypedModel` per record type per document. Prefer `makeTypedModel(doc:documentId:)` over direct construction — it also registers the model with the in-app Debug Inspector.
+
+## Common Document Usage Patterns
+
+A document is both the unit of sync and the unit of sharing, so "how many documents should my app have?" follows from how the data is shared. Three shapes cover most apps:
+
+**One document per user.** All of a user's data lives in a single private document, resolved with an alias at sign-in ([above](#ensuring-exactly-one-document-with-aliases)) and kept open for the whole session. The UI never mentions documents — users sign in and see their data. Personal task managers, journals, habit trackers.
+
+**One document per sharing context.** Anything shared as a unit — a project, a company's books, a household shopping list — gets its own document, shared with exactly the people in that context. Users work in one at a time: list them with the [`me` listing APIs](#finding-documents-a-user-can-access), open the selected one, and close it when they switch.
+
+**Many documents, queried together.** Apps like chat read across several sharing contexts at once — each channel is its own document, all open simultaneously. Tag documents at creation (`tags: ["channel"]`) so you can fetch the set with `me.ownedDocuments({ tag })`, then open each one. In JavaScript a query then spans all open documents; in Swift each document gets its own `TypedModel`. To share a set of documents as one unit, use [Collections](#collections) rather than sharing each individually.
+
+Whether a feature belongs in documents at all — versus a server-side database — is its own decision: see [Choosing Your Data Model](./choosing-your-data-model.md).
 
 ## Sharing Documents
 
@@ -599,6 +619,80 @@ Listed through a collection the user is a member of.
 :::
 
 `ownedDocuments` and `sharedDocuments` accept `tag` / `limit` / `cursor` for filtering and pagination.
+
+## Document-Scoped Blobs
+
+Documents can carry binary files — images, PDFs, attachments. Each blob belongs to one document and is reached through that document's blob context; uploads, downloads, and listing all hang off it. The key idea: **document-scoped blobs inherit the sharing of their document**. Anyone who can read the document can read its blobs, anyone with write access can add or delete them, and when you share the document its files come along — there's no separate permission system to manage. Each blob is capped at 10 MB.
+
+### Uploading Files
+
+::: code-group
+
+<<< ../../examples/blobs/doc-blob-upload.ts#example{ts} [JavaScript]
+
+<<< ../../examples/blobs/doc-blob-upload.swift#example{swift} [Swift]
+
+:::
+
+### Displaying Images
+
+::: code-group
+
+```typescript [JavaScript]
+const imageUrl = blobs.downloadUrl(blobId, { disposition: "inline" });
+```
+
+```swift [Swift]
+let imageUrl = blobs.downloadUrl(blobId: blobId, disposition: .inline)
+```
+
+:::
+
+```vue
+<template>
+  <img :src="imageUrl" alt="User uploaded image" />
+</template>
+```
+
+The URL includes authentication, so it only works for signed-in users with document access.
+
+### Downloading Files
+
+::: code-group
+
+<<< ../../examples/blobs/doc-blob-read.ts#example{ts} [JavaScript]
+
+<<< ../../examples/blobs/doc-blob-read.swift#example{swift} [Swift]
+
+:::
+
+`downloadUrl` is synchronous and authenticated.
+
+### Listing and Managing Blobs
+
+::: code-group
+
+<<< ../../examples/blobs/doc-blob-manage.ts#example{ts} [JavaScript]
+
+<<< ../../examples/blobs/doc-blob-manage.swift#example{swift} [Swift]
+
+:::
+
+### Caching and Upload Queuing
+
+Blob storage tolerates flaky connections:
+
+- **Uploads queue** when the network drops and complete automatically when it returns
+- **Downloaded files cache** locally, so repeat reads are instant
+- **Prefetch files** proactively to warm the cache:
+
+```typescript
+await blobs.prefetch([blobId1, blobId2], { concurrency: 4 });
+```
+
+Use the **Blob Explorer** in the [dev tools](./devtools.md) overlay to browse, upload, and manage blobs during development.
+
+For file storage that isn't tied to a document — avatars, workflow outputs, public assets, time-boxed download links — use a blob bucket instead: see [Blobs and Files](./blobs-and-files.md).
 
 ## Document Thumbnails and Metadata
 

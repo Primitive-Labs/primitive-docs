@@ -39,7 +39,7 @@ Each place a rule appears adds its own context on top — operation `params.*`, 
 |---|---|---|
 | Database operations (`access`, `defaultAccess`, per-param `access`) | Who can execute a query/mutation, or set a specific parameter | [Working with Databases](./working-with-databases.md#access-control-with-cel) |
 | Database subscriptions (`accessRule` + `filter`) | Who can subscribe, and which changes they receive | [Real-Time Subscriptions](./working-with-databases.md#real-time-subscriptions) |
-| Workflows (`accessRule`) | Who can start a run directly from a client | [Invoking Workflows](./workflows.md#via-inbound-webhooks) |
+| Workflows (`accessRule`) | Who can start a run directly from a client | [Controlling Access to Workflows](./workflows.md#controlling-access-to-workflows) |
 | Server-stamped fields (trigger `when` conditions) | Whether a computed field applies to this write | [Server-Stamped Fields](./working-with-databases.md#server-stamped-fields) |
 | Rule sets | Who can perform **management operations** on groups and collections | below |
 

@@ -44,7 +44,7 @@ primitive secrets set WEATHER_API_KEY --value "sk-..." --summary "Weather API ke
 primitive secrets list
 ```
 
-Secrets are resolved server-side when the request is proxied and are never exposed to your client code.
+Secrets are resolved server-side when the request is proxied and are never exposed to your client code. Secrets are a shared platform service — workflows and database rules can reference them too. See [App Secrets](./app-secrets.md).
 
 ## Syncing Configuration
 
@@ -106,23 +106,6 @@ Failed calls throw a typed error — branch on its code:
 
 :::
 
-## Using Integrations in Workflows
-
-Integrations can also be called as workflow steps:
-
-```toml
-[[steps]]
-id = "fetch-weather"
-kind = "integration.call"
-integrationKey = "weather-api"
-
-[steps.request]
-method = "GET"
-path = "/forecast/{{ input.city }}"
-```
-
-See [Workflows](./workflows.md) for more on workflow steps.
-
 ## CLI Reference
 
 ```bash
@@ -137,5 +120,5 @@ primitive integrations logs my-api       # View recent call logs
 
 ## Next Steps
 
-- **[Workflows](./workflows.md)** — Use integrations in automated workflows
+- **[Workflows](./workflows.md)** — Call integrations from a pipeline with the `integration.call` step
 - **[Primitive CLI](./primitive-cli.md)** — Full CLI command reference

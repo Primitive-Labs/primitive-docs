@@ -50,6 +50,15 @@ All steps support these in addition to their own:
 | `continueOnError` | Capture errors as `{ error, errorDetails, ok: false, errored: true }` instead of failing the workflow |
 | `strict` | Throw if any template expression in this step is unresolved |
 
+## Data flow
+
+A run threads one JSON context through every step:
+
+1. **Input**: one JSON object per run — the `start()`/`runSync()` input, the webhook's mapped payload, or the cron trigger's configured input. Validated against `inputSchema` when declared.
+2. **Step config is templated at execution time**: steps have no implicit input argument — `{{ ... }}` expressions in config strings resolve against the run context (`input`, `steps.<id>`, `outputs.<saveAs>`, `secrets`, `meta`, forEach vars) just before the step runs (see [Templating](#templating)).
+3. **Output recording**: each step's JSON result is stored as `steps[id]`; `saveAs = "name"` also registers it as `outputs.name` — a stable alias that survives step-id renames. The engine stamps the uniform verdict (`ok`, plus `skipped`/`errored`) on every entry.
+4. **Final result**: `outputs.output` if any step used `saveAs = "output"`, otherwise the full `outputs` map (see [Output contract](#output-contract)). Every step's input and output stays on the run record.
+
 ## Step types
 
 Every kind below is registered in `src/workflows/runner/default-registry.ts`. If a kind isn't listed here, it doesn't exist.
@@ -444,6 +453,21 @@ raw = "{{ steps.fetch.body }}"
 currency = "{{ input.currency }}"
 ```
 
+The referenced body (`transforms/normalize-order.rhai`):
+
+```
+let items = input.raw.items.filter(|i| i.qty > 0);
+let total = 0.0;
+for i in items { total += i.qty * i.price; }
+#{
+  currency: input.currency,
+  itemCount: items.len(),
+  total: total,
+}
+```
+
+Given `steps.fetch.body = { "items": [{ "sku": "a1", "qty": 2, "price": 5.0 }, { "sku": "b2", "qty": 0, "price": 9.0 }] }` and `input.currency = "USD"`, the step records `steps.normalize.output = { "currency": "USD", "itemCount": 1, "total": 10.0 }`.
+
 - `ref` (required) names a `Script` — a stored Rhai body, unique per app. Script bodies live in `transforms/<name>.rhai` in your sync directory and are mirrored to the server by `primitive sync push` (and pulled back by `primitive sync pull`); the `<name>` is the filename without `.rhai`. There is no separate `transforms` CLI command — scripts ride the normal sync flow.
 - `with` is the JSON context handed to the script. Inside the script the whole table is exposed as **`input.*`** (with `ctx.*` as an alias) — NOT as bare top-level variables. `let x = payload;` fails with `Variable not found: payload`; write `input.payload`. Also, `with` itself is a reserved Rhai keyword — a script can't declare a variable named `with`.
 - **Result nesting.** A script step's return value lands under `steps.<id>.output.*` (alongside `scriptMetrics` and the engine's `ok`) — unlike `transform`, whose result is the templated table directly (`steps.<id>.<field>`). Wire downstream templates/`runIf` as `{{ steps.normalize.output.total }}`, not `{{ steps.normalize.total }}`.
@@ -468,7 +492,7 @@ concurrency = 25             # per-page fan-out (default 25, max 100)
 onConflict = "skip"          # "skip" (default) | "refuse" if an iteration is already running
 onPartialFailure = "continue" # "continue" (default) | "fail"
 [steps.source]
-mode = "app"                 # "app" (all app users) | "analytics"
+mode = "app"                 # iterate the app's full user roster
 [steps.perUser]
 workflowKey = "process-one-user"   # the per-user workflow to run
 [steps.perUser.input]               # static input merged into each child run

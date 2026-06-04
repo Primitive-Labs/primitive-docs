@@ -62,6 +62,8 @@ Documents must be opened before querying or modifying data within them.
 
 Documents are ready to be queried once the `.open()` call finishes. Applications should wait for all required documents to be opened and show a loading state until then, then track document-specific readiness explicitly. `open()` is idempotent — calling it on an already-open document is a no-op. Handle open failures explicitly: surface an error or redirect; don't silently continue.
 
+Open only the documents you need to query or want real-time updates from — every open document syncs continuously. Don't open documents you don't need, and close ones you're done with (see [Closing Documents](#closing-documents)).
+
 
 The document-open lifecycle is owned by `PrimitiveAppState` (see [The `PrimitiveAppState` document lifecycle](#the-primitiveappstate-document-lifecycle) below). Subclass it, drive doc setup from `connectClient()`, and bind `TypedModel`s in `onDocumentOpened(doc:documentId:)`. For session-scoped documents (small bounded set), open once at launch; for transient per-item docs, open on view appear and close on disappear.
 

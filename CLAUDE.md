@@ -16,14 +16,15 @@ Both doc products draw code examples from one corpus so JS/Swift parity is mecha
 
 1. **`examples/<subject>/<op>.{ts,swift}`** — every example id exists for every base language (parity is enforced by `pnpm check:examples`, and examples are compiled against the real clients). The variant registry is `scripts/variants.mjs`.
 2. **Human docs** include examples directly: `::: code-group` blocks with `<<< ../../examples/<subject>/<op>.ts#example` / `.swift#example` tabs.
-3. **Agent guides** are *built artifacts*: edit only `AGENT_GUIDE_TO_*.template.md`, then run `pnpm render:guides` to produce the per-language `.ts.md` / `.swift.md` builds and sync `guides.json`. **Never edit `.ts.md`/`.swift.md` directly.** Templates have two substitution mechanisms:
+3. **Agent guides** are *built artifacts*: edit only `AGENT_GUIDE_TO_*.template.md`, then run `pnpm render:guides` to produce the builds and sync `guides.json`. Templates with language-specific content build to per-language `.ts.md` / `.swift.md`; concept-only templates (no lang blocks, no example placeholders) build to a single agnostic `.md` and list no variants in guides.json. **Never edit rendered builds directly.** Templates have two substitution mechanisms:
    - `{{ example: <subject>/<op> }}` — replaced with that variant's corpus example in a fenced block.
    - `{{#lang ts}} … {{/lang}}` / `{{#lang swift}} … {{/lang}}` — language-scoped prose (implementation notes, gotchas) rendered ONLY into that language's build. An iOS agent must never fetch JavaScript gotchas: language-specific prose goes in a lang block or doesn't exist. Shared concept prose stays neutral and unscoped. Platform gaps are never documented in either build — scope a one-language capability's section to that language's block and file the parity bug (see STYLE.md).
 4. **Guide structure mirrors page structure** — each concept page in `docs/getting-started/` has a same-boundary guide template (e.g. `workflows.md` ↔ `AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.template.md`), which is what makes the sync rule below checkable.
 
 Validation gates (run before declaring doc work done):
 
-- `pnpm check:examples` — example parity + compilation, TOML validity, guide render/registry checks, and validation of every documented CLI invocation against the *published* `primitive-admin`
+- `pnpm check:examples` — example parity + compilation, TOML validity, guide render/registry checks, validation of every documented CLI invocation against the *published* `primitive-admin`, and the source-stamp gate (`docs-sources.json` must match submodule HEADs + installed package versions)
+- `node scripts/stamp-sources.mjs --changes` — per-library commits since the last doc-truing pass (the doc-impact scan); `pnpm stamp:sources` resets the baseline once docs reflect those sources (also mirrors versions into `guides.json` `builtAgainst` and the site footer)
 - `npx vitepress build docs` — dead links fail the build
 - `node scripts/check-example-parity.mjs` — inventory of inline code fences and their language-parity classification
 

@@ -23,7 +23,7 @@
 //   node scripts/sync-guides-json.mjs           # update
 //   node scripts/sync-guides-json.mjs --check    # verify entries are current (CI)
 
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { VARIANTS, DEFAULT_VARIANT_ID, MANIFEST_DEFAULTS, manifestVariant } from "./variants.mjs";
@@ -56,18 +56,44 @@ if (JSON.stringify(manifest.defaults) !== JSON.stringify(MANIFEST_DEFAULTS)) {
 for (const g of manifest.guides) {
   const base = stripExt(g.file);
   if (!templated.has(base)) continue;
-  const wantFile = `${base}.${DEFAULT_VARIANT_ID}.md`;
-  const wantVariants = VARIANTS.map((v) => manifestVariant(v, base));
-  const ok =
-    g.file === wantFile && !("files" in g) && JSON.stringify(g.variants) === JSON.stringify(wantVariants);
+  // Concept-only templates build to a single agnostic `<BASE>.md` (see
+  // render-guides.mjs, which runs before this script) and list no variants —
+  // the CLI then serves the default `file` for every language/platform request.
+  const agnostic = existsSync(join(GUIDES_DIR, `${base}.md`));
+  const wantFile = agnostic ? `${base}.md` : `${base}.${DEFAULT_VARIANT_ID}.md`;
+  const wantVariants = agnostic ? undefined : VARIANTS.map((v) => manifestVariant(v, base));
+  const variantsOk = agnostic
+    ? !("variants" in g)
+    : JSON.stringify(g.variants) === JSON.stringify(wantVariants);
+  const ok = g.file === wantFile && !("files" in g) && variantsOk;
   if (ok) continue;
   if (CHECK) {
-    problems.push(`✘ ${g.topic}: guides.json entry not pointing at built ${base}.{${variantIds.join(",")}}.md variants`);
+    problems.push(
+      agnostic
+        ? `✘ ${g.topic}: guides.json entry should point at the agnostic ${base}.md with no variants`
+        : `✘ ${g.topic}: guides.json entry not pointing at built ${base}.{${variantIds.join(",")}}.md variants`,
+    );
   } else {
     g.file = wantFile;
-    g.variants = wantVariants;
+    if (agnostic) delete g.variants;
+    else g.variants = wantVariants;
     delete g.files;
     changed++;
+  }
+}
+
+// relatedGuides/prerequisites are hand-maintained topic references — verify
+// each names a topic that exists in this manifest. A guide removal/rename
+// otherwise leaves dangling references that the CLI surfaces to agents, who
+// then run `guides get <topic>` and hit "Guide not found".
+const topics = new Set(manifest.guides.map((g) => g.topic));
+for (const g of manifest.guides) {
+  for (const key of ["relatedGuides", "prerequisites"]) {
+    for (const ref of g[key] ?? []) {
+      if (!topics.has(ref)) {
+        problems.push(`✘ ${g.topic}: ${key} references unknown topic "${ref}"`);
+      }
+    }
   }
 }
 

@@ -42,50 +42,35 @@ primitive sync push --dir ./config
 
 `sync push` creates and updates the workflow's active configuration in place. Once `status = "active"`, the workflow can be invoked.
 
-## Step Types
+## Steps
 
-Every step has an `id` (unique within the workflow) and a `kind` (the step type). The kinds the engine supports:
+A workflow is a sequence of **steps**. Each step has an `id` (unique within the workflow) and a `kind` — what the step does — plus whatever configuration that kind needs. Steps run in order, and every step's output is recorded on the run and available to the steps after it.
+
+A few kinds you'll reach for constantly:
 
 | Kind | Purpose |
 |---|---|
-| `transform` | Shape a value with the templated `output` field — typically used for the workflow's final result |
-| `script` | Run a sandboxed, deterministic Rhai script to transform JSON (see [Script transforms](#script-transforms)) |
-| `iterate-users` | Restartable per-user fan-out: run sub-steps once for every app user |
-| `switch` | First-match branching across CEL `when` cases |
-| `delay` | Pause execution (`ms = 5000` or `"5 seconds"`) |
-| `event.wait` | Suspend until an external event with the matching type arrives |
-| `llm.chat` | LLM chat completion |
-| `gemini.generate` / `gemini.generateRaw` / `gemini.countTokens` | Google Gemini |
-| `prompt.execute` | Run a [managed prompt](./prompts.md) |
+| `transform` | Shape a value with the templated `output` field — typically the workflow's final result |
+| `llm.chat` / `prompt.execute` | LLM chat completion, or run a [managed prompt](./prompts.md) |
 | `integration.call` | Call an external API via a configured integration |
-| `database.query` / `mutate` / `count` / `aggregate` / `pipeline` / `applyToQuery` | Run registered database operations |
-| `group.addMember` / `removeMember` / `checkMembership` / `listMembers` / `listUserMemberships` | Group membership operations |
-| `collect` | Auto-paginate any step that returns `{ items, cursor }` |
-| `workflow.call` | Run a child workflow synchronously, inline |
-| `workflow.start` + `workflow.await` | Fan out child workflows in parallel, then wait |
-| `email.send` | Send an email (template-based or inline) |
-| `blob.upload` / `blob.download` / `blob.signedUrl` | Read, write, or sign blob URLs |
-| `analytics.write` / `analytics.query` | Emit analytics events or query server-side aggregates |
-| `noop` | Return `{ message, payload }`; useful as a placeholder |
+| `database.query` / `database.mutate` | Run registered database operations |
+| `email.send` | Send an email |
 
-There's no batch-write step: to apply a set of database updates, run `forEach` over a `database.mutate` step, or use `database.applyToQuery` to update every record matching a server-side filter.
+The full catalog — branching, delays, fan-out to child workflows, blob and analytics steps, and more — is in the [Step Reference](#step-reference) at the end of this page.
 
-## Template Syntax
+## How Data Flows Through a Run
 
-Templates use double braces. They reference the workflow's run context:
+A run carries a single growing JSON context from the first step to the last:
 
-```
-{{ input.fieldName }}             # Workflow input
-{{ steps.<id>.field }}            # Output from a previous step (by step id)
-{{ outputs.<saveAs>.field }}      # Output from a step that used saveAs
-{{ secrets.API_KEY }}             # App secret (read-only)
-{{ input.name | default:"Anonymous" }}   # Filters with single |
-{{ input.title || "Untitled" }}            # Fallback with double || (or)
-```
+1. **Every run starts with one JSON object — the input.** It's the `input` passed to `start()` or `runSync()`, a webhook's (mapped) payload, or a cron trigger's configured input. If the workflow declares an `inputSchema`, the input is validated against it first.
 
-Four built-in helpers are always available — <span v-pre>`{{ now }}`</span> (ISO timestamp), <span v-pre>`{{ today }}`</span> (YYYY-MM-DD), <span v-pre>`{{ uuid }}`</span>, <span v-pre>`{{ ulid }}`</span>. They re-evaluate on every reference.
+2. **Steps read from the context through templates.** A step has no implicit input argument. Just before it runs, the <span v-pre>`{{ ... }}`</span> expressions in its config strings are resolved against the run context — `input.*` plus the recorded output of every step that already ran — and the step executes with that filled-in config. An email step's <span v-pre>`to = "{{ input.userEmail }}"`</span> and an LLM message's <span v-pre>`content = "Summarize: {{ steps.fetch.body }}"`</span> are both reading the context this way.
 
-When the entire string is one expression (<span v-pre>`"{{ steps.fetch.items }}"`</span>), the raw array or object is returned. Otherwise expressions are coerced to strings and interpolated.
+3. **Every step's output is recorded.** Whatever a step produces (always JSON) is stored on the run as `steps.<id>`. Give the step `saveAs = "name"` and the same value is also available as `outputs.name` — a stable alias later steps can use without depending on the step's id. The engine also stamps each entry with a verdict — `ok`, plus `skipped` or `errored` when relevant — that later steps can branch on.
+
+4. **The run's final output.** When the last step finishes, the workflow's result is `outputs.output` — the value saved by a step with `saveAs = "output"` — or the whole `outputs` map if no step used that name. The standard pattern is to end with a `transform` step that sets `saveAs = "output"` and explicitly shapes the return value. The full step-by-step record (each step's input and output) stays on the run for inspection.
+
+Template syntax, filters, and built-in helpers are covered in the [Template Reference](#template-reference) at the end of this page.
 
 ## Conditional Execution
 
@@ -123,6 +108,8 @@ Four ways to start a run, all hitting the same workflow definition:
 | **Client call (sync)** | Short, latency-sensitive calls: validation, lookups, webhook-style responses |
 | **Cron trigger** | Anything on a clock: digests, cleanup, periodic syncs |
 | **Inbound webhook** | External services pushing events: Stripe, GitHub, Slack |
+
+Client invocations are gated by the workflow's access rule — see [Controlling Access to Workflows](#controlling-access-to-workflows) below.
 
 ### From Your App (Asynchronous)
 
@@ -279,6 +266,21 @@ primitive webhooks events <webhook-id>
 primitive webhooks rotate-secret <webhook-id>
 ```
 
+## Controlling Access to Workflows
+
+Every workflow can carry an `accessRule` — a CEL expression in the `[workflow]` block that decides who may start a run:
+
+```toml
+[workflow]
+key = "generate-report"
+name = "Generate Report"
+accessRule = "hasRole('admin') || isMemberOf('team', 'ops')"
+```
+
+With no rule, any signed-in member of the app can start the workflow; admins and owners always pass regardless of the rule. The rule is evaluated on every client invocation — asynchronous or synchronous — and when another workflow invokes this one through a `workflow.call` step. Cron triggers and inbound webhooks have their own controls and skip it; that's what makes the [webhook lock-down pattern](#via-inbound-webhooks) work.
+
+Push the rule with `primitive sync push` like any other workflow config, or change it in place with `primitive workflows update <id> --access-rule "<CEL>"`. For the rule language and the identity context available to it (`hasRole`, `isMemberOf`, `memberGroups`), see [Access Control](./access-control.md).
+
 ## Testing and Debugging Workflows
 
 **Test cases** live alongside the workflow and run against the real engine:
@@ -312,17 +314,361 @@ let steps = result["items"] as? [[String: Any]] ?? []
 
 :::
 
-## Script Transforms
+## Syncing Workflow Config
+
+```bash
+# Initialize config
+primitive sync init --dir ./config
+
+# Pull current server config
+primitive sync pull --dir ./config
+
+# Edit TOML files locally...
+
+# See what changed
+primitive sync diff --dir ./config
+
+# Push changes
+primitive sync push --dir ./config
+```
+
+When a workflow needs flags `sync push` doesn't carry (`requiresClientApply`, `syncCallable`, queue caps), set them with `primitive workflows update`.
+
+For reusable step blocks, lift them into `<workflowDir>/../workflow-fragments/<name>.toml` and reference them from a workflow via `include = ["<name>"]`. The CLI flattens fragment references before push; `primitive workflows expand <workflow.toml>` prints the expanded result for debugging.
+
+## Step Reference
+
+Every step has an `id` (unique within the workflow) and a `kind` (the step type). The kinds the engine supports, each described below:
+
+| Kind | Purpose |
+|---|---|
+| `transform` | Shape a value with the templated `output` field — typically used for the workflow's final result |
+| `script` | Run a sandboxed, deterministic Rhai script to transform JSON |
+| `iterate-users` | Restartable per-user fan-out: run a child workflow once for every app user |
+| `switch` | First-match branching across CEL `when` cases |
+| `delay` | Pause execution (`ms = 5000` or `"5 seconds"`) |
+| `event.wait` | Suspend until an external event with the matching type arrives |
+| `llm.chat` | LLM chat completion |
+| `gemini.generate` / `gemini.generateRaw` / `gemini.countTokens` | Google Gemini |
+| `prompt.execute` | Run a [managed prompt](./prompts.md) |
+| `integration.call` | Call an external API via a configured integration |
+| `database.query` / `mutate` / `count` / `aggregate` / `pipeline` / `applyToQuery` | Run registered database operations |
+| `group.addMember` / `removeMember` / `checkMembership` / `listMembers` / `listUserMemberships` | Group membership operations |
+| `collect` | Auto-paginate any step that returns `{ items, cursor }` |
+| `workflow.call` | Run a child workflow synchronously, inline |
+| `workflow.start` + `workflow.await` | Fan out child workflows in parallel, then wait |
+| `email.send` | Send an email (template-based or inline) |
+| `blob.upload` / `blob.download` / `blob.signedUrl` | Read, write, or sign blob URLs |
+| `analytics.write` / `analytics.query` | Emit analytics events or query server-side aggregates |
+| `noop` | Return `{ message, payload }`; useful as a placeholder |
+
+### `transform`
+
+Returns its templated `output` table — the workhorse for shaping a final result or restructuring data between steps. Given run input `{ "name": "Ada" }` and a prior step `fetch` whose output is `{ "items": ["alpha", "beta"] }`:
+
+```toml
+[[steps]]
+id = "final"
+kind = "transform"
+saveAs = "output"
+[steps.output]
+greeting = "Hello {{ input.name }}"
+items = "{{ steps.fetch.items }}"     # single-expression mode preserves arrays
+```
+
+The step's result is the templated table itself — `steps.final` (and `outputs.output`, via `saveAs`) becomes:
+
+```json
+{ "greeting": "Hello Ada", "items": ["alpha", "beta"] }
+```
+
+### `script`
 
 For data shaping that's more involved than a templated `transform` step — reshaping nested JSON, computing derived fields, filtering and mapping arrays — a `script` step runs a sandboxed [Rhai](https://rhai.rs/) script over its JSON input and returns JSON. Scripts are **deterministic and side-effect-free** (no network, no clock, no storage), so they're safe to retry and easy to test.
 
-Author script bodies as `transforms/<name>.rhai` files in your sync directory and push them with `primitive sync push`. Two wiring details: the step's `with` table reaches the script as `input.*` (not bare variables), and the script's return value lands under `steps.<id>.output.*` for later steps.
+A script body lives in your sync directory as `transforms/<name>.rhai` and is pushed with `primitive sync push`:
 
-## Email Steps
+```
+// transforms/normalize-order.rhai
+let items = input.raw.items.filter(|i| i.qty > 0);
+let total = 0.0;
+for i in items { total += i.qty * i.price; }
+#{
+  currency: input.currency,
+  itemCount: items.len(),
+  total: total,
+}
+```
 
-The `email.send` step sends an email from inside a workflow. It has two modes.
+The step names the script with `ref` and feeds it input through the `with` table — inside the script, `with` is read as `input.*` (not bare variables):
 
-### Template Mode
+```toml
+[[steps]]
+id = "normalize"
+kind = "script"
+ref = "normalize-order"     # the script's name: transforms/normalize-order.rhai
+saveAs = "order"
+[steps.with]
+raw = "{{ steps.fetch.body }}"
+currency = "{{ input.currency }}"
+```
+
+Given `steps.fetch.body` of `{ "items": [ { "sku": "a1", "qty": 2, "price": 5.0 }, { "sku": "b2", "qty": 0, "price": 9.0 } ] }` and input `{ "currency": "USD" }`, the script returns:
+
+```json
+{ "currency": "USD", "itemCount": 1, "total": 10.0 }
+```
+
+One wiring detail: a script's return value lands under `steps.<id>.output.*` — later steps read <span v-pre>`{{ steps.normalize.output.total }}`</span>, not <span v-pre>`{{ steps.normalize.total }}`</span> (unlike `transform`, whose result is the table directly).
+
+### `iterate-users`
+
+Fans another workflow out across **every user in the app**, once per user, as a restartable singleton — built for big per-user batch jobs (backfills, digests) that must survive restarts without re-processing completed users:
+
+```toml
+[[steps]]
+id = "backfill"
+kind = "iterate-users"
+iterationName = "2026-06-prefs-backfill"   # stable name; identifies this iteration
+pageSize = 100
+concurrency = 25
+[steps.source]
+mode = "app"                 # iterate the app's user roster
+[steps.perUser]
+workflowKey = "process-one-user"   # the workflow to run once per user
+[steps.perUser.input]
+reason = "preferences backfill"    # static input merged into each child run
+```
+
+`source` selects which users to iterate — `mode = "app"` walks the app's full user roster, fetched in pages of `pageSize`. For each user, the step starts a child run of the workflow named by `perUser.workflowKey` (a separate workflow you define), passing the user's id plus anything in `perUser.input` as that run's input, with up to `concurrency` child runs in flight per page. Prefer this over a hand-rolled `forEach` when the fan-out is app-wide and long-running.
+
+### `switch`
+
+First-match branching: `when` cases are CEL expressions evaluated top-to-bottom, and the first truthy case's `output` is returned:
+
+```toml
+[[steps]]
+id = "tier"
+kind = "switch"
+saveAs = "plan"
+
+[[steps.cases]]
+when = "input.score >= 90"
+[steps.cases.output]
+label = "gold"
+
+[[steps.cases]]
+when = "input.score >= 70"
+[steps.cases.output]
+label = "silver"
+
+[steps.default]
+[steps.default.output]
+label = "standard"
+```
+
+`default` is opt-in — without it, a no-match fails the step.
+
+### `delay`
+
+Pauses the run:
+
+```toml
+[[steps]]
+id = "wait"
+kind = "delay"
+ms = 5000               # number, or "5 seconds" / "200ms"
+```
+
+### `event.wait`
+
+Suspends the workflow until a matching external event is delivered to the run:
+
+```toml
+[[steps]]
+id = "wait-approval"
+kind = "event.wait"
+type = "user-approval"
+timeout = 86400000      # milliseconds
+```
+
+### `llm.chat`
+
+LLM chat completion:
+
+```toml
+[[steps]]
+id = "ask"
+kind = "llm.chat"
+model = "gpt-4o-mini"
+saveAs = "answer"
+
+[[steps.messages]]
+role = "system"
+content = "You are concise."
+
+[[steps.messages]]
+role = "user"
+content = "{{ input.question }}"
+```
+
+Optional fields include `temperature`, `top_p`, `tools`, and `tool_choice`. Output is typically `{ content, role, metrics }`. To control max tokens or version your prompts, use `prompt.execute` with a [managed prompt](./prompts.md) instead.
+
+### `gemini.generate`
+
+Calls Google Gemini. `gemini.generateRaw` takes the same shape forwarded as a raw API payload; `gemini.countTokens` returns a token count.
+
+```toml
+[[steps]]
+id = "extract"
+kind = "gemini.generate"
+model = "models/gemini-2.5-flash"
+
+[steps.prompt]
+[[steps.prompt.messages]]
+role = "user"
+[[steps.prompt.messages.parts]]
+type = "text"
+text = "Summarize: {{ input.content }}"
+```
+
+### `prompt.execute`
+
+Runs a [managed prompt](./prompts.md) — versioned, testable, and configured outside the workflow:
+
+```toml
+[[steps]]
+id = "summarize"
+kind = "prompt.execute"
+promptKey = "summarizer"      # must be active
+saveAs = "summary"
+
+[steps.variables]
+text = "{{ input.content }}"
+```
+
+### `integration.call`
+
+Calls an external API through a configured [integration](./api-integrations.md), with credentials resolved server-side:
+
+```toml
+[[steps]]
+id = "fetch"
+kind = "integration.call"
+integrationKey = "weather-api"
+saveAs = "weather"
+
+[steps.request]
+method = "GET"
+path = "/current"
+
+[steps.request.query]
+city = "{{ input.city }}"
+```
+
+Keep credentials in the integration config (where <span v-pre>`{{ secrets.* }}`</span> resolves server-side) rather than passing them through `request.headers` — that way secrets never appear in workflow step output snapshots.
+
+### Database Steps
+
+`database.query`, `database.mutate`, `database.count`, `database.aggregate`, `database.pipeline`, and `database.applyToQuery` run [registered database operations](./working-with-databases.md). All take `databaseId`, `operationName`, and optional `params`:
+
+```toml
+[[steps]]
+id = "list"
+kind = "database.query"
+databaseId = "{{ input.dbId }}"
+operationName = "listActiveUsers"
+limit = 50
+saveAs = "users"
+[steps.params]
+status = "active"
+
+[[steps]]
+id = "mark-overdue"
+kind = "database.applyToQuery"
+databaseId = "{{ input.dbId }}"
+operationName = "mark-overdue"
+[steps.params]
+now = "{{ now }}"
+```
+
+There's no batch-write step: to apply a set of database updates, run `forEach` over a `database.mutate` step, or use `database.applyToQuery` to update every record matching a server-side filter.
+
+### Group Steps
+
+`group.addMember`, `group.removeMember`, `group.checkMembership`, `group.listMembers`, and `group.listUserMemberships` manage [groups](./users-and-groups.md) from a workflow:
+
+```toml
+[[steps]]
+id = "add"
+kind = "group.addMember"
+groupType = "team"
+groupId = "{{ input.teamId }}"
+userId = "{{ input.userId }}"   # or email = "...", not both
+```
+
+Group steps evaluate the group type's rule sets like any other caller; rules can match workflow-issued operations with `fromWorkflow("workflowKey")` — see [Access Control](./access-control.md).
+
+### `collect`
+
+Auto-paginates any step that returns `{ items, cursor }` (or `{ data, nextCursor }`), merging all pages into one result:
+
+```toml
+[[steps]]
+id = "all-users"
+kind = "collect"
+itemsField = "data"
+cursorField = "nextCursor"
+maxPages = 20
+
+[steps.step]
+kind = "database.query"
+databaseId = "{{ input.dbId }}"
+operationName = "listUsers"
+limit = 100
+```
+
+### `workflow.call`
+
+Runs a child workflow synchronously, inline. The child gets its own isolated `input` — it does not see the parent's steps or outputs:
+
+```toml
+[[steps]]
+id = "onboard"
+kind = "workflow.call"
+workflowKey = "onboard-user"
+[steps.input]
+userId = "{{ input.userId }}"
+```
+
+### `workflow.start` + `workflow.await`
+
+Fan-out: start child workflows in parallel (typically with `forEach`), then wait for them all:
+
+```toml
+[[steps]]
+id = "start-all"
+kind = "workflow.start"
+forEach = "steps.get-users.data"
+as = "user"
+workflowKey = "process-item"
+[steps.input]
+userId = "{{ user.id }}"
+
+[[steps]]
+id = "results"
+kind = "workflow.await"
+runs = "steps.start-all"
+onPartialFailure = "fail"       # fail (default) | continue
+```
+
+`workflow.await` returns `{ completed, failed, allSucceeded }`.
+
+### `email.send`
+
+Sends an email from inside a workflow. It has two modes.
+
+#### Template Mode
 
 Use a registered email template — either a built-in type (`magic-link`, `otp`, `document-share`, etc.) or a custom one you registered:
 
@@ -346,7 +692,7 @@ primitive email-templates set order-confirmation \
   --html-file ./order.html
 ```
 
-### Inline Mode
+#### Inline Mode
 
 For one-off or dynamically constructed emails, specify subject and body directly in the step:
 
@@ -372,11 +718,40 @@ to = "{{ addr }}"
 templateType = "announcement"
 ```
 
-## Analytics Query Step
+### Blob Steps
 
-Workflows can query analytics data server-side — the simplest way to ship a recurring digest, an admin email, or a Slack post that summarizes activity:
+`blob.upload`, `blob.download`, and `blob.signedUrl` read, write, and sign URLs for files in [blob buckets](./blobs-and-files.md) — the standard way to hand a generated file (a PDF report, an export) to users:
 
 ```toml
+[[steps]]
+id = "save"
+kind = "blob.upload"
+bucketKey = "reports"
+filename = "{{ meta.workflowRunId }}.pdf"
+contentType = "application/pdf"
+contentBase64 = "{{ steps.gen.bytesBase64 }}"
+
+[[steps]]
+id = "url"
+kind = "blob.signedUrl"
+bucketKey = "reports"
+blobId = "{{ steps.save.blobId }}"
+expiresInSeconds = 3600
+```
+
+`blob.upload` returns the `blobId`; `blob.signedUrl` mints a time-limited URL you can email or return to the client. See [Blobs and Files](./blobs-and-files.md#using-buckets-in-workflows) for the full pattern.
+
+### Analytics Steps
+
+`analytics.write` emits analytics events from a workflow; `analytics.query` reads server-side aggregates — the simplest way to ship a recurring digest, an admin email, or a Slack post that summarizes activity:
+
+```toml
+[[steps]]
+id = "log"
+kind = "analytics.write"
+action = "report.generated"
+feature = "reports"
+
 [[steps]]
 id = "top-users-weekly"
 kind = "analytics.query"
@@ -386,52 +761,84 @@ limit = 25
 saveAs = "topUsers"
 ```
 
-Query types are dotted strings — `overview.dau`, `daily-active`, `cohort-retention`, `users.top`, `events.grouped`, `workflows.top`, and friends. The runner is **default-deny**: non-admin callers are rejected, so keep analytics workflows locked down with `accessRule = "hasRole('admin')"` (or fire them via cron).
+Query types are dotted strings — `overview.dau`, `daily-active`, `cohort-retention`, `users.top`, `events.grouped`, `workflows.top`, and friends. The query runner is **default-deny**: non-admin callers are rejected, so keep analytics workflows locked down with `accessRule = "hasRole('admin')"` (or fire them via cron).
 
 For the full picture — what events are emitted, the client-side `logEvent` API, and how to read metrics back — see [Analytics](./analytics.md).
 
-## Calling External APIs from a Workflow
+### `noop`
 
-Integrations let workflows call external APIs with server-side credentials — see [API Integrations](./api-integrations.md) for defining one. In a workflow, use the `integration.call` step:
+Returns `{ message, payload }` unchanged. Useful as a placeholder while sketching a workflow's shape:
 
 ```toml
 [[steps]]
-id = "fetch-weather"
-kind = "integration.call"
-integrationKey = "weather-api"
-
-[steps.request]
-method = "GET"
-path = "/forecast/{{ input.city }}"
+id = "todo"
+kind = "noop"
+message = "replace with the real enrichment step"
 ```
 
-Keep credentials in the integration config (where <span v-pre>`{{ secrets.* }}`</span> resolves server-side) rather than passing them through `request.headers` — that way secrets never appear in workflow step output snapshots.
+## Template Reference
 
-## Syncing Workflow Config
+Templates are how steps read the run context (see [How Data Flows Through a Run](#how-data-flows-through-a-run)). Expressions use double braces:
 
-```bash
-# Initialize config
-primitive sync init --dir ./config
-
-# Pull current server config
-primitive sync pull --dir ./config
-
-# Edit TOML files locally...
-
-# See what changed
-primitive sync diff --dir ./config
-
-# Push changes
-primitive sync push --dir ./config
+```
+{{ input.fieldName }}             # Workflow input
+{{ steps.<id>.field }}            # Output from a previous step (by step id)
+{{ outputs.<saveAs>.field }}      # Output from a step that used saveAs
+{{ secrets.API_KEY }}             # App secret (read-only)
+{{ input.name | default:"Anonymous" }}   # Filters with single |
+{{ input.title || "Untitled" }}            # Fallback with double || (or)
 ```
 
-When a workflow needs flags `sync push` doesn't carry (`requiresClientApply`, `syncCallable`, queue caps), set them with `primitive workflows update`.
+When the entire string is one expression (<span v-pre>`"{{ steps.fetch.items }}"`</span>), the raw array or object is returned. Otherwise expressions are coerced to strings and interpolated.
 
-For reusable step blocks, lift them into `<workflowDir>/../workflow-fragments/<name>.toml` and reference them from a workflow via `include = ["<name>"]`. The CLI flattens fragment references before push; `primitive workflows expand <workflow.toml>` prints the expanded result for debugging.
+`secrets.*` reads from your app's server-side secret store — see [App Secrets](./app-secrets.md) for managing values and where they're safe to reference.
+
+### Built-In Helpers
+
+Four zero-argument helpers are always available. They re-evaluate on every reference — <span v-pre>`{{ now }} {{ now }}`</span> produces two different timestamps:
+
+| Name | Returns |
+|---|---|
+| `now` | Current ISO 8601 timestamp |
+| `today` | Current UTC date as `YYYY-MM-DD` |
+| `uuid` | Fresh random UUID v4 |
+| `ulid` | Fresh random ULID (lexicographically sortable) |
+
+```toml
+[[steps]]
+id = "name-report"
+kind = "transform"
+[steps.output]
+filename = "report-{{ today }}-{{ ulid }}.pdf"
+generatedAt = "{{ now }}"
+```
+
+### Fallbacks and Filters
+
+Use `||` for fallbacks and a single `|` to chain filters:
+
+```
+{{ input.title || 'Untitled' }}
+{{ input.data | json }}                  # pretty JSON
+{{ input.tags | join: ', ' }}
+{{ input.users | pluck: 'email' | uniq }}
+{{ input.list | sort: 'name' | first }}
+{{ input.text | upper | truncate: '100' }}
+{{ input.amount | toFixed: '2' }}
+{{ input.id | expect: 'string' }}        # throws on type mismatch
+```
+
+Filters cover type handling (`json`, `string`, `number`, `boolean`, `default`, `expect`), strings (`upper`, `lower`, `trim`, `split`, `replace`, `truncate`, `startsWith`, `endsWith`, `contains`), arrays (`length`, `first`, `last`, `keys`, `values`, `join`, `pluck`, `where`, `sort`, `reverse`, `flatten`, `uniq`, `compact`, `slice`, `concat`), numbers (`round`, `floor`, `ceil`, `abs`, `toFixed`), and dates (`toISOString`).
+
+Templates have **no arithmetic** — <span v-pre>`{{ a + b }}`</span> won't resolve. Do math in a `script` step or a filter chain.
+
+### Unresolved Paths
+
+In interpolation mode an unresolved path renders as `<missing: steps.x.y>`, so the gap is visible in step output and logs. In single-expression mode it resolves to `null`, so downstream `runIf` comparisons work naturally. Set `strict = true` on a step to make any unresolved template path fail the step instead.
 
 ## Next Steps
 
 - **[Prompts](./prompts.md)** — Versioned, testable LLM prompt templates
 - **[Working with Databases](./working-with-databases.md)** — Server-side structured storage
-- **[Blob Buckets](./blob-buckets.md)** — General-purpose file storage
+- **[Blobs and Files](./blobs-and-files.md)** — General-purpose file storage
 - **[Primitive CLI](./primitive-cli.md)** — Full CLI command reference

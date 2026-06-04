@@ -1,0 +1,22 @@
+{
+  "stampedAt": "2026-06-04",
+  "libraries": {
+    "js-bao-wss": {
+      "commit": "01707b043ce20bf549d8f45ec4ded30d3ca0e462",
+      "npm": {
+        "js-bao-wss-client": "2.0.0",
+        "js-bao": "0.5.1",
+        "primitive-admin": "1.0.49"
+      }
+    },
+    "primitive-app-dev": {
+      "commit": "fc60fa5743eb4af883b7edb09713ec1429c7d4d9",
+      "npm": {
+        "primitive-app": "3.0.1"
+      }
+    },
+    "swift-primitive-app-dev": {
+      "commit": "a290e9aa4a0d180d7ac0dfddee5b20e179baa7f3"
+    }
+  }
+}
