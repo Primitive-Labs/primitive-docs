@@ -1,7 +1,8 @@
 # Deploying Primitive apps to production
 
-Each platform ships through its native channel: the **web** template deploys to Cloudflare Workers; the **iOS** template ships through TestFlight and the App Store with Fastlane. This guide is the reference for both deploy paths.
+This guide is the reference for shipping a Primitive app to production through its native distribution channel.
 
+{{#lang ts}}
 ## Web (Cloudflare Workers)
 
 The web template deploys to Cloudflare Workers via `pnpm cf-deploy <environment>`. You need a Cloudflare account with Workers deploy access.
@@ -68,7 +69,9 @@ REFRESH_PROXY_COOKIE_PATH = "/proxy/"
 ```
 
 The deploy reads `.env.{environment}` and the matching `[env.{environment}]` block.
+{{/lang}}
 
+{{#lang swift}}
 ## iOS (TestFlight and the App Store)
 
 Simulator builds run unsigned. A team ID + Apple Developer account ($99/year) is required only for physical devices, TestFlight, and the App Store.
@@ -291,3 +294,4 @@ bundle exec fastlane ios release
 ### CI
 
 Both `./run-ios.sh` and `bundle exec fastlane ios beta` run in GitHub Actions on a macOS runner. Base64-encode `api_key.p8` into a secret and decode it before the lane runs.
+{{/lang}}

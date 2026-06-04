@@ -14,7 +14,7 @@ This guide catalogs the patterns that reliably cut cold-load time, the anti-patt
 | Replace several related ops with a `pipeline` op | one round trip instead of many |
 | Use bulk third-party endpoints (e.g. `/v7/finance/quote?symbols=`) instead of one call per ID | one HTTP per page instead of N |
 | Move third-party API calls to a server-side cron + cache | zero client calls per page |
-| `Promise.all` independent waits | wall-clock cut by serialization length |
+| Parallelize independent awaits | wall-clock cut by serialization length |
 | Defer non-critical work off the cold path (memberships, auth config, prefs init) | one or more sequential round trips removed from first paint |
 | Render with stale/imported values immediately, refresh in background | first paint independent of slow upstream |
 | Pure-compute over cached source data instead of reloading | next render is ~free |

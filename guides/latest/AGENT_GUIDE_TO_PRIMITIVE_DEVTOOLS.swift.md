@@ -18,6 +18,14 @@ capabilities:
 
 The tools are active only in development builds and never ship to production.
 
+## Server Timing
+
+Every REST response from the platform (`/app/{appId}/api/*` and `/admin/api/*`)
+carries a `Server-Timing: total;dur=<int-ms>` header attributing the request's
+server-side handler time. The header is listed in `Access-Control-Expose-Headers`,
+so any HTTP tooling — or the response object of a raw fetch — can read it when
+attributing a slow request to server work vs. transport.
+
 
 The tools are the **Debug Inspector**: a dev-only panel served by the running app
 and opened in a web browser. The inspector compiles to zero code in release builds
@@ -87,17 +95,20 @@ Create a record by hand:
 
 ### Surfacing your models
 
-The Records table lists the models your app state exposes. Conform your
-`PrimitiveAppState` subclass to `InspectableModelHost` and return one
-`InspectableModel` per model:
+Models created with `makeTypedModel(doc:documentId:)` appear in the Records
+table automatically — the base `PrimitiveAppState` conforms to
+`InspectableModelHost`, and its default `inspectableModels` reads the registry
+that `makeTypedModel(...)` populates. The standard path needs no inspector glue.
+
+For models that don't go through `makeTypedModel` (a hand-built `BaoModel<T>`,
+a `DynamicModel`), `override` the `open var inspectableModels` and append:
 
 ```swift
-extension MyAppState: InspectableModelHost {
-  var inspectableModels: [InspectableModel] {
-    guard let docId = modelsDocId else { return [] }   // the doc currently open
-    var out: [InspectableModel] = []
-    if let m = taskModel    { out.append(.from(m, documentId: docId)) }
-    if let m = productModel { out.append(.from(m, documentId: docId)) }
+class MyAppState: PrimitiveAppState {
+  override var inspectableModels: [InspectableModel] {
+    guard let docId = modelsDocId else { return super.inspectableModels }
+    var out = super.inspectableModels        // keep the auto-registered models
+    if let m = legacyTaskModel { out.append(.from(m, documentId: docId)) }
     return out
   }
 }

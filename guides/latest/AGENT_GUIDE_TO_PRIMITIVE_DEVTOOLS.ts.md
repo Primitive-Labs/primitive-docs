@@ -18,6 +18,14 @@ capabilities:
 
 The tools are active only in development builds and never ship to production.
 
+## Server Timing
+
+Every REST response from the platform (`/app/{appId}/api/*` and `/admin/api/*`)
+carries a `Server-Timing: total;dur=<int-ms>` header attributing the request's
+server-side handler time. The header is listed in `Access-Control-Expose-Headers`,
+so any HTTP tooling — or the response object of a raw fetch — can read it when
+attributing a slow request to server work vs. transport.
+
 The tools are a single browser overlay (the **DevTools** overlay) provided by the
 `primitiveDevTools` Vite plugin, opened from a floating button in the running app.
 It is active only when:

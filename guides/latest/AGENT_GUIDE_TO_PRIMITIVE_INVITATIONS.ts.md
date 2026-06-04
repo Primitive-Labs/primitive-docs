@@ -192,15 +192,10 @@ The client surfaces server errors as `Error("HTTP <status>: <jsonBody>")`. Parse
 
 Capture the `inviteToken` from the mint response if you need to build accept URLs later — the deferred-result fields above carry it on the same call that creates the grant.
 
-For resend / lookup after the initial response is gone, use `client.invitations.get(invitationId)`:
+For resend / lookup after the initial response is gone, fetch the invitation by id and rebuild the accept URL from its `inviteToken`. The returned record carries `invitationId`, `email`, `role`, `invitedBy`, `invitedAt`, `expiresAt`, `accepted`, `acceptedAt`, `source`, `note`, `inviteToken`, and a computed `status` (`"pending" | "expired" | "accepted"`).
 
 ```typescript
 const inv = await client.invitations.get(invitationId);
-// AppInvitationInfo:
-// { invitationId, email, role, invitedBy, invitedAt, expiresAt,
-//   accepted, acceptedAt, source, note, inviteToken,
-//   status: "pending" | "expired" | "accepted" }
-
 const acceptUrl = `${myApp.baseUrl}/invite/accept?inviteToken=${inv.inviteToken}`;
 await myEmailService.send({ to: inv.email, link: acceptUrl });
 ```

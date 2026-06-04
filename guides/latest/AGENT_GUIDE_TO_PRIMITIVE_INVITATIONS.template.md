@@ -105,16 +105,17 @@ client.invitations.revokeDeferredGrant(deferredId, "document" | "group");
 {{/lang}}
 {{#lang swift}}
 ```swift
-client.invitations.create(email:role:expiresAt:source:note:sendEmail:)  // -> AppInvitationInfo
-client.invitations.list(limit:cursor:)                  // -> { items, cursor }   (admin/owner only)
-client.invitations.delete(invitationId)                 // CASCADES to deferred grants
-client.invitations.quota()                              // -> { used, limit, remaining, unlimited }
-client.invitations.accept(inviteToken)                  // authenticated cross-identity acceptance
-client.invitations.listDeferredGrants(email:type:limit:)  // admin debug only
-client.invitations.revokeDeferredGrant(deferredId, "document" | "group")
+client.invitations.create(params: [String: Any]) async throws -> [String: Any]   // keys: email, role?, expiresAt?, source?, note?, sendEmail?
+client.invitations.list(limit:cursor:) async throws -> [String: Any]              // -> { items, cursor }   (admin/owner only)
+client.invitations.delete(invitationId:) async throws -> [String: Any]            // CASCADES to deferred grants
+client.invitations.quota() async throws -> [String: Any]                          // -> { used, limit, remaining, unlimited }
+client.invitations.get(invitationId:) async throws -> [String: Any]               // -> invitation dict (includes inviteToken + status)
+client.invitations.accept(inviteToken:) async throws -> [String: Any]             // authenticated cross-identity acceptance
+client.invitations.listDeferredGrants(type:email:limit:) async throws -> [String: Any]  // admin debug only
+client.invitations.revokeDeferredGrant(deferredId:type:) async throws -> [String: Any]  // type: "document" | "group"
 ```
 
-`AppInvitationInfo` items returned by `list()` carry: `invitationId`, `email`, `role`, `invitedBy`, `invitedAt`, `expiresAt`, `accepted`, `acceptedAt`, `source`, `note`, `inviteToken`. Derive a `"pending" | "expired" | "accepted"` status on the client from `accepted` + `expiresAt` if you need it on a list row.
+Responses are untyped `[String: Any]` dictionaries. The `items` array returned by `list()` carries entries with: `invitationId`, `email`, `role`, `invitedBy`, `invitedAt`, `expiresAt`, `accepted`, `acceptedAt`, `source`, `note`, `inviteToken`. Derive a `"pending" | "expired" | "accepted"` status from `accepted` + `expiresAt` if you need it on a list row; `get()` also returns a computed `status`.
 {{/lang}}
 
 The cascading delete is `client.invitations.delete(id)` — there is **no `client.invitations.revoke()`**.
@@ -152,24 +153,29 @@ await client.invitations.create({ email, role: "member" });
 {{#lang swift}}
 ```swift
 // Admins/owners: any role
-try await client.invitations.create(email: "alice@example.com", role: "member")
+_ = try await client.invitations.create(params: [
+  "email": "alice@example.com",
+  "role": "member",  // or "admin" / "owner" (admin/owner only)
+])
 
 // Full options
-try await client.invitations.create(
-  email: "alice@example.com",
-  role: "member",
-  expiresAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(7 * 86400)),
-  source: "team-onboarding-flow",
-  note: "Backend hire — Q2 cohort",
-  sendEmail: true
-)
+_ = try await client.invitations.create(params: [
+  "email": "alice@example.com",
+  "role": "member",
+  "expiresAt": ISO8601DateFormatter().string(from: Date().addingTimeInterval(7 * 86400)),
+  "source": "team-onboarding-flow",
+  "note": "Backend hire — Q2 cohort",
+  "sendEmail": true,
+])
 
 // Members: gate on quota first
 let quota = try await client.invitations.quota()
-if !quota.unlimited && quota.remaining <= 0 {
+let unlimited = quota["unlimited"] as? Bool ?? false
+let remaining = quota["remaining"] as? Int ?? 0
+if !unlimited && remaining <= 0 {
   return showQuotaExhausted()
 }
-try await client.invitations.create(email: email, role: "member")
+_ = try await client.invitations.create(params: ["email": email, "role": "member"])
 ```
 {{/lang}}
 
@@ -220,22 +226,26 @@ When a send fails, the client throws an `HttpError` carrying a typed `serverCode
 
 Capture the `inviteToken` from the mint response if you need to build accept URLs later — the deferred-result fields above carry it on the same call that creates the grant.
 
-{{#lang ts}}
-For resend / lookup after the initial response is gone, use `client.invitations.get(invitationId)`:
+For resend / lookup after the initial response is gone, fetch the invitation by id and rebuild the accept URL from its `inviteToken`. The returned record carries `invitationId`, `email`, `role`, `invitedBy`, `invitedAt`, `expiresAt`, `accepted`, `acceptedAt`, `source`, `note`, `inviteToken`, and a computed `status` (`"pending" | "expired" | "accepted"`).
 
+{{#lang ts}}
 ```typescript
 const inv = await client.invitations.get(invitationId);
-// AppInvitationInfo:
-// { invitationId, email, role, invitedBy, invitedAt, expiresAt,
-//   accepted, acceptedAt, source, note, inviteToken,
-//   status: "pending" | "expired" | "accepted" }
-
 const acceptUrl = `${myApp.baseUrl}/invite/accept?inviteToken=${inv.inviteToken}`;
 await myEmailService.send({ to: inv.email, link: acceptUrl });
 ```
+{{/lang}}
+{{#lang swift}}
+```swift
+let inv = try await client.invitations.get(invitationId: invitationId)
+let inviteToken = inv["inviteToken"] as? String ?? ""
+let email = inv["email"] as? String ?? ""
+let acceptUrl = "\(myApp.baseURL)/invite/accept?inviteToken=\(inviteToken)"
+try await myEmailService.send(to: email, link: acceptUrl)
+```
+{{/lang}}
 
 Permissions for `invitations.get`: app admin/owner, OR the invitation's original inviter. Members who did not create the invitation receive 403 — `inviteToken` is a bearer credential, so read access is intentionally narrow.
-{{/lang}}
 
 ### Token-based acceptance (authenticated caller)
 
@@ -333,18 +343,22 @@ async function onboardTeammate(email: string, projectDocId: string) {
 ```swift
 func onboardTeammate(email: String, projectDocId: String) async throws {
   let quota = try await client.invitations.quota()
-  if !quota.unlimited && quota.remaining <= 0 {
+  let unlimited = quota["unlimited"] as? Bool ?? false
+  let remaining = quota["remaining"] as? Int ?? 0
+  if !unlimited && remaining <= 0 {
     throw OnboardingError.quotaExhausted
   }
 
-  try await client.invitations.create(email: email, role: "member")
+  _ = try await client.invitations.create(params: ["email": email, "role": "member"])
 
-  try await client.documents.updatePermissions(
-    projectDocId,
-    permissions: [.init(email: email, permission: "read-write")]
+  _ = try await client.documents.updatePermissions(
+    documentId: projectDocId,
+    params: ["permissions": [["email": email, "permission": "read-write"]]]
   )
 
-  try await client.groups.addMember("team", "engineering", email: email)
+  _ = try await client.groups.addMember(
+    groupType: "team", groupId: "engineering", params: ["email": email]
+  )
 }
 ```
 {{/lang}}
