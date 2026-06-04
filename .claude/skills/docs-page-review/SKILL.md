@@ -43,6 +43,12 @@ node scripts/check-example-parity.mjs docs/getting-started/<page>.md --json
 
 For each `lone-js` / `lone-swift` block, judge: would a reader on the other platform be stuck without a counterpart? Protocol illustrations and platform-specific tooling sections are fine alone; core usage examples are not. Where parity matters, the preferred fix is promoting the example into the `examples/` corpus (which enforces parity mechanically), not hand-writing a second inline block.
 
+For **agent guide templates**, also sweep for compilable code that bypassed the corpus: ts/swift fences written inline in the template, and especially code fences inside `{{#lang}}` blocks (which additionally hide the code from the other language's build). Either is a finding — such code gets no compile gate and no parity enforcement; the fix is a corpus pair plus a `{{ example: }}` placeholder. Lang blocks are for prose; inline fences are for what can't compile standalone (shell, TOML, output shapes). A quick inventory:
+
+```bash
+grep -n '```\(ts\|typescript\|js\|javascript\|swift\)' guides/latest/*.template.md
+```
+
 ### 5. Facts (`--verify` mode — slower, run when asked or when the page makes API/limit claims)
 
 For every API name, CLI flag, limit, enum, and behavioral claim, verify per STYLE.md's "Facts and verification" section — it includes the source-of-truth map (everything is checked out under `library_repos/`): published CLI via `--help`, client API in `library_repos/js-bao-wss/src/client/api/`, server limits in controller source, TOML shapes against the sync serializers/parsers and template engine in `js-bao-wss`. The `primitive-app-demo` projects are reference, not ground truth — never settle a correctness question from them. Treat numbers, enum value lists, and TOML field names with the most suspicion — they are the most common fiction. Remember released ≠ merged. For broad pages, fan this lens out to an Explore subagent.

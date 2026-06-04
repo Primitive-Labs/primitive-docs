@@ -15,6 +15,7 @@ The repo's Claude Code skills (`.claude/skills/`) drive the editorial loop. Pick
 |---|---|---|
 | Write or edit any page or guide | **docs-editorial** | The writing standards (altitude tiers, never-say rules, platform treatment). Triggers on any doc edit; `STYLE.md` is the full canon. |
 | Update docs because the libraries changed | **docs-next-sync** | The continuous truing pass on `next`: scans every library commit since the last pass, triages developer relevance, updates pages and guides together. |
+| Work through the docs issue backlog | **docs-issue-sweep** | Triages this repo's open GitHub issues, presents a plan, then implements each accepted fix on its own branch and PRs it into `next` with full validation. |
 | Publish docs for a production release | **docs-publish-release** | Merges `next → main` at the release SHA and verifies the release summary is covered. **The only path that publishes.** |
 | Review a page or a diff | **docs-page-review** | Per-page editorial review against the standards. |
 | Confirm docs and guides still agree | **docs-sync-check** | Run before committing anything that touched only one side of a docs ↔ guides pair. |
