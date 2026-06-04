@@ -42,15 +42,15 @@ Swift takes a `String` only (sweep cache D9).
 
 Fetch from an HTTP endpoint with automatic caching keyed on the request.
 
-::: warning Swift parity gap — P0 wrong-results behavior bug
-JS serializes `query` into the request URL and folds `query` (plus `body` for non-GET) into the
-cache key. **Swift silently drops `query` from both the request and the cache key**, never includes
-`body` in the key, and ignores `serverTimeoutMs`/offline options — even though `FetchCachedOptions`
-advertises them as live. As a result, Swift sends **unfiltered** requests and POSTs with different
-bodies **collide on a single cache entry** (stale/wrong results), with no error raised. Behavioral
-P0 — no issue number filed yet (sweep cache D1 / D8); `query` being typed `[String: Any]` with no
-array/nested encoding is sweep cache D2. The shapes also differ: JS takes a single `req` object,
-Swift takes positional params (typedness tracked under
+::: warning Partially fixed — advertised options still no-op
+**Fixed ([#994](https://github.com/Primitive-Labs/js-bao-wss/issues/994)):** Swift now appends `query`
+to the request URL (so a filtered request actually filters server-side, instead of caching the
+unfiltered response under a query-specific key) and folds the request `body` into the cache key for
+non-GET methods (so two POSTs to the same path with different bodies no longer collide on one entry).
+**Still divergent:** `fetchCached`/`fetchHttp` ignore `serverTimeoutMs` and offline gating even though
+`FetchCachedOptions` advertises them (sweep cache D8); `query` is typed `[String: Any]` with flat
+scalar encoding only (sweep cache D2); and the call shape differs (JS takes a single `req` object,
+Swift positional params; typedness under
 [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 

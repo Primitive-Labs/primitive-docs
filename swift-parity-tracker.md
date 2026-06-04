@@ -34,7 +34,7 @@ Deferred features noted by agents: gemini/llm analytics events (#963).
 **Remaining — NOT simple typing (entangled with the client core + feature-sized):**
 - `analytics` (methods on `JsBaoClient.swift` + `AnalyticsQueue`) — #951 namespace + #963 auto-event engine + typed `AnalyticsEventInput`.
 - `auth` (`JsBaoClient.swift` + `Internal/AuthController.swift`) — #964 option surfaces / `AUTH_CODES`; passkeys are native (proposals #928–931).
-- `cache` (`Internal/KvCache.swift` CacheFacade) — #994 `fetchHttp` wrong-results + no-op options.
+- `cache` (`Internal/KvCache.swift` CacheFacade) — **#994 wrong-results FIXED** (`fetchHttp` now sends `query` + folds `body` into the key); remaining: `fetchCached` advertised options (`serverTimeoutMs`/offline) still no-op, and `[String:Any]` typedness (#954).
 - `model-surface` (`Schema/DynamicModel.swift`, `MultiDocModel.swift`) — #946/#947/#955/#992, architectural (paged query, active-doc defaulting, sync find/findAll).
 These touch shared core files (can't be parallel-typed) and are the feature tier; do them as focused, individual efforts.
 
