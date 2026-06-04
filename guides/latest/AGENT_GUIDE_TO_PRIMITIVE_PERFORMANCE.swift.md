@@ -2,7 +2,7 @@
 
 Audience: agents building apps on the Primitive platform.
 
-Most slow Primitive apps aren't slow because Primitive is slow — they're slow because of patterns that quietly multiply round trips. Agents are particularly susceptible: the LLM-default approach to "fetch X for each Y" is to write a `for` loop with an `await` inside, and every such loop becomes an N+1.
+Most slow Primitive apps aren't slow because Primitive is slow — they're slow because of patterns that quietly multiply round trips. Agents are particularly susceptible: the default approach to "fetch X for each Y" is to write a loop with an `await` inside, and every such loop becomes an N+1.
 
 This guide catalogs the patterns that reliably cut cold-load time, the anti-patterns they replace, and how to measure both. Each pattern stands alone; the closing checklist orders them by impact for triaging a slow page.
 
@@ -14,11 +14,11 @@ This guide catalogs the patterns that reliably cut cold-load time, the anti-patt
 | Replace several related ops with a `pipeline` op | one round trip instead of many |
 | Use bulk third-party endpoints (e.g. `/v7/finance/quote?symbols=`) instead of one call per ID | one HTTP per page instead of N |
 | Move third-party API calls to a server-side cron + cache | zero client calls per page |
-| `Promise.all` independent waits | wall-clock cut by serialization length |
+| Parallelize independent awaits | wall-clock cut by serialization length |
 | Defer non-critical work off the cold path (memberships, auth config, prefs init) | one or more sequential round trips removed from first paint |
 | Render with stale/imported values immediately, refresh in background | first paint independent of slow upstream |
 | Pure-compute over cached source data instead of reloading | next render is ~free |
-| `client.databases.subscribe` for cache invalidation | warm SPA navigation can be 0 round trips |
+| `client.databases.subscribe` for cache invalidation | warm navigation between screens can be 0 round trips |
 
 The rest of this guide explains each in detail with the patterns and the anti-patterns they replace.
 
@@ -39,15 +39,15 @@ Both look correct in isolation. Both are bugs.
 
 ### Anti-pattern
 
-A page needs several pieces of data from the same database:
+A page needs several pieces of data from the same database, fetched one at a time:
 
-```ts
+```swift
 // 5 sequential round trips to the SAME database
-const groups = await db.executeOperation("listGroups");
-const accounts = await db.executeOperation("listAccounts");
-const holdings = await db.executeOperation("listHoldings");
-const targets  = await db.executeOperation("listAllTargets");
-const latest   = await db.executeOperation("listLatestSnapshot");
+let groups = try await db.executeOperation(name: "listGroups")
+let accounts = try await db.executeOperation(name: "listAccounts")
+let holdings = try await db.executeOperation(name: "listHoldings")
+let targets = try await db.executeOperation(name: "listAllTargets")
+let latest = try await db.executeOperation(name: "listLatestSnapshot")
 ```
 
 Each call has its own request/response overhead. They serialize even though none depend on each other.
@@ -89,8 +89,8 @@ Whenever a page reads three or more independent collections from the same databa
 
 ### Gotchas
 
-- Pipeline steps need an explicit `filter` field, even if empty (`"filter": {}`). Omitting it makes `primitive sync push` 400 silently.
-- Each step's `limit` matters — pipelines don't paginate. Pick limits that comfortably cover real data without blowing past the reasonable size of a single response.
+- Pipeline steps need an explicit `filter` field, even if empty (`"filter": {}`). Omitting it fails `primitive sync push` with a 400 (`query step requires a "filter" field`) attributed to that operation.
+- Each step's `limit` matters — pipelines don't paginate. Per-step `limit` caps at 1000, a pipeline allows at most 10 steps, and step types are `query`/`count`/`aggregate` only. Pick limits that comfortably cover real data without blowing past the reasonable size of a single response.
 - Pipelines only span one database. If the page also needs data from a *different* database, that's a second call (e.g. a per-user portfolio DB plus a shared securities-ref DB).
 
 See [Databases — Pipeline operations](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md#pipeline--multi-step-read-operations) for the full pipeline reference.
@@ -99,11 +99,14 @@ See [Databases — Pipeline operations](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md#pi
 
 ### Anti-pattern
 
-```ts
-for (const group of groups) {
-  const targets = await db.executeOperation("listTargetsByGroup", {
-    params: { groupId: group.id },
-  });
+A per-item operation called once for every item in a collection:
+
+```swift
+for group in groups {
+  let targets = try await db.executeOperation(
+    name: "listTargetsByGroup",
+    params: ["groupId": group.id]
+  )
   // ...use targets
 }
 ```
@@ -123,16 +126,16 @@ access = "user.userId == database.metadata.ownerId"
 definition = '{"filter":{},"sort":{"groupId":1},"limit":1000}'
 ```
 
-```ts
-const all = await db.executeOperation("listAllTargets");
-const byGroup = new Map<string, Target[]>();
-for (const t of all.data) {
-  const list = byGroup.get(t.groupId) ?? [];
-  list.push(t);
-  byGroup.set(t.groupId, list);
+Call it once, then group client-side:
+
+```swift
+let all = try await db.executeOperation(name: "listAllTargets")
+var byGroup: [String: [Target]] = [:]
+for t in all.data {
+  byGroup[t.groupId, default: []].append(t)
 }
-for (const group of groups) {
-  const targets = byGroup.get(group.id) ?? [];
+for group in groups {
+  let targets = byGroup[group.id] ?? []
   // ...
 }
 ```
@@ -147,10 +150,12 @@ Any time you find an `await ...executeOperation(...)` inside a `for` loop. This 
 
 ### Anti-pattern
 
-```ts
-const a = await db.executeOperation("opA");
-const b = await db.executeOperation("opB");
-const c = await db.executeOperation("opC");
+Three independent reads awaited one after another:
+
+```swift
+let a = try await db.executeOperation(name: "opA")
+let b = try await db.executeOperation(name: "opB")
+let c = try await db.executeOperation(name: "opC")
 ```
 
 Three sequential round trips even though none depends on the others.
@@ -173,20 +178,22 @@ Any sequence of `await` calls where the second doesn't read the first's result. 
 
 ### Gotcha
 
-Don't blindly `Promise.all` everything — if call 2 needs call 1's result (e.g. `getSecuritiesBySymbols(symbols)` where `symbols` comes from the holdings query), they have to stay sequential. Two reads of holdings (once for symbols, once for the page) is worse than one read followed by securities serial.
+Don't parallelize blindly — if call 2 needs call 1's result (e.g. `getSecuritiesBySymbols(symbols)` where `symbols` comes from the holdings query), they have to stay sequential. Two reads of holdings (once for symbols, once for the page) is worse than one read followed by securities serial.
 
 ## Pattern 4 — Bulk-call third-party APIs through integrations
 
 ### Anti-pattern
 
-```ts
+One proxy call per ID — here, 21 calls for 21 symbols:
+
+```swift
 // 21 individual proxy calls for 21 symbols
-for (const symbol of symbols) {
-  await client.integrations.call({
+for symbol in symbols {
+  _ = try await client.integrations.call(
     integrationKey: "yahoo-finance",
-    path: `/v8/finance/chart/${symbol}`,
+    path: "/v8/finance/chart/\(symbol)"
     // ...
-  });
+  )
 }
 ```
 
@@ -226,54 +233,56 @@ The cleanest formulation: **fire-and-forget on init, await on use.**
 
 ### Anti-pattern
 
-```ts
-async function initialize() {
-  // Always loaded, even on pages that never consult it
-  authConfig.value = await client.getAuthConfig();
-  // Always loaded, even though only some pages care about memberships
-  memberships.value = await client.groups.listUserMemberships(userId);
+An init routine that eagerly awaits everything before signalling the app is ready:
+
+```swift
+func initialize() async throws {
+  // Always loaded, even on screens that never consult it
+  authConfig = try await client.getAuthConfig()
+  // Always loaded, even though only some screens care about memberships
+  memberships = try await client.groups.listUserMemberships(userId: userId)
   // Always awaited before isAuthenticated flips true
-  await initializeUserPrefs();
-  isAuthenticated.value = true;
+  try await initializeUserPrefs()
+  isAuthenticated = true
 }
 ```
 
-Every page pays for things only some pages need.
+Every screen pays for things only some screens need.
 
 ### Pattern
 
-```ts
-async function initialize() {
-  await client.me.get();           // Genuinely required
-  isAuthenticated.value = true;    // Page can render now
+Await only what first paint genuinely requires; kick off the rest in the background and expose a lazy, de-duped accessor each consumer can await on demand:
 
-  // Background — pages that need them await whenXReady()
-  if (!prefsReadyPromise) {
-    prefsReadyPromise = initializeUserPrefs().catch(/* ... */);
+```swift
+func initialize() async throws {
+  try await client.me.get()        // Genuinely required
+  isAuthenticated = true           // View can render now
+
+  // Background — callers that need them await whenXReady()
+  if prefsReadyTask == nil {
+    prefsReadyTask = Task { try? await initializeUserPrefs() }
   }
-  void refreshGroupMemberships();
+  Task { await refreshGroupMemberships() }
 }
 
 // Lazy: idempotent, de-duped
-const loadAuthConfig = async (): Promise<void> => {
-  if (authConfig.value !== null) return;
-  if (authConfigPromise) return authConfigPromise;
-  authConfigPromise = (async () => {
-    const config = await client.getAuthConfig();
-    authConfig.value = normalize(config);
-  })();
-  return authConfigPromise;
-};
+func loadAuthConfig() async {
+  if authConfig != nil { return }
+  if let task = authConfigTask { return await task.value }
+  let task = Task { normalize(try await client.getAuthConfig()) }
+  authConfigTask = task
+  authConfig = await task.value
+}
 
 // Awaitable for callers that need it
-const whenMembershipsReady = async (): Promise<void> => {
-  if (isMembershipsReady.value) return;
-  if (membershipsPromise) return membershipsPromise;
-  return refreshGroupMemberships();
-};
+func whenMembershipsReady() async {
+  if isMembershipsReady { return }
+  if let task = membershipsTask { return await task.value }
+  await refreshGroupMemberships()
+}
 ```
 
-Pages that actually need the data do `void store.loadAuthConfig()` in their `onMounted` (no await — UI updates reactively when it lands), or `await store.whenMembershipsReady()` if they need a definitive value before proceeding (e.g. a route guard with a group check).
+Screens that actually need the data kick off `loadAuthConfig()` in a detached `Task` as the view appears (the UI updates reactively when it lands), or `await whenMembershipsReady()` if they need a definitive value before proceeding (e.g. a navigation guard with a group check).
 
 ### Decision rule
 
@@ -286,18 +295,20 @@ Pages that actually need the data do `void store.loadAuthConfig()` in their `onM
 If you cache a value in `userPrefs` (which itself loads via the root doc) and then `await ensurePrefsReady()` before reading the cache, you just re-serialized the same work you were trying to background. Either:
 
 - Use the cached value optimistically and fire a fallback in parallel (see Pattern 7), OR
-- Cache somewhere that doesn't need to be loaded first (localStorage), OR
+- Cache somewhere that doesn't need to be loaded first (on-device key/value storage), OR
 - Accept that this particular value isn't worth caching here.
 
 ## Pattern 6 — Render with stored values, refresh reactively
 
 ### Anti-pattern
 
-```ts
-async function onMounted() {
-  await livePriceStore.start();   // Awaits a third-party round trip
-  data.value = await loadDashboard(dbStore);
-  isReady.value = true;
+First paint awaits a third-party round trip before rendering anything:
+
+```swift
+func onAppear() async throws {
+  try await livePriceStore.start()   // Awaits a third-party round trip
+  data = try await loadDashboard(dbStore)
+  isReady = true
 }
 ```
 
@@ -305,23 +316,26 @@ First paint is now gated on a third-party API.
 
 ### Pattern
 
-```ts
-async function onMounted() {
+Render from the source data plus whatever values are already cached, then kick off the refresh in the background and recompute reactively when fresh values land:
+
+```swift
+func onAppear() async throws {
   // Load the source data; render with whatever prices are cached now
   // (typically the import-time price, or the previous refresh).
-  sourceData = await loadSourceData(dbStore);
-  data.value = compute(sourceData, livePriceStore.prices);
-  isReady.value = true;
+  sourceData = try await loadSourceData(dbStore)
+  data = compute(sourceData, livePriceStore.prices)
+  isReady = true
 
-  // Kick off the price refresh in the background. The watch below
+  // Kick off the price refresh in the background; the observer below
   // recomputes when fresh prices arrive.
-  void livePriceStore.setSymbols(symbolsFromSource(sourceData));
+  Task { await livePriceStore.setSymbols(symbolsFromSource(sourceData)) }
 }
 
-watch(() => livePriceStore.lastFetchedAt, () => {
-  if (!sourceData) return;
-  data.value = compute(sourceData, livePriceStore.prices);
-});
+// React to the published lastFetchedAt on the price store
+func onPricesChanged() {
+  guard let sourceData else { return }
+  data = compute(sourceData, livePriceStore.prices)
+}
 ```
 
 First paint stops waiting on the slowest upstream. The user sees something immediately; values quietly refresh when fresh data lands.
@@ -338,12 +352,12 @@ Pattern 8 — moving the third-party call to a server-side cron means the "cache
 
 ### Anti-pattern
 
-A reactive watch that triggers a full re-render reloads *all* the underlying data every time:
+A reactive observer that triggers a full re-render reloads *all* the underlying data every time:
 
-```ts
-watch(() => livePriceStore.lastFetchedAt, async () => {
-  data.value = await loadDashboard(dbStore);  // Re-runs every DB query
-});
+```swift
+func onPricesChanged() async throws {
+  data = try await loadDashboard(dbStore)  // Re-runs every DB query
+}
 ```
 
 Every 30-min price refresh re-fetches groups, accounts, holdings, targets, and securities. Dozens of round trips for a price update that should just recompute a few percentages.
@@ -357,54 +371,58 @@ Split load into:
 
 Cache the source. Recompute on price update; refetch only when source changed:
 
-```ts
-let sourceData: SourceData | null = null;
+```swift
+var sourceData: SourceData?
 
-onMounted(async () => {
-  sourceData = await loadSourceData(dbStore);
-  data.value = compute(sourceData, livePriceStore.prices);
-  isReady.value = true;
-});
+func onAppear() async throws {
+  sourceData = try await loadSourceData(dbStore)
+  data = compute(sourceData!, livePriceStore.prices)
+  isReady = true
+}
 
-watch(() => livePriceStore.lastFetchedAt, () => {
-  if (!sourceData) return;
-  data.value = compute(sourceData, livePriceStore.prices);
-});
+func onPricesChanged() {
+  guard let sourceData else { return }
+  data = compute(sourceData, livePriceStore.prices)
+}
 ```
 
-Combine with a Pinia store keyed by a "version" derived from your data to share the cache across SPA navigations and invalidate it via `client.databases.subscribe` when something actually changes:
+Hold the source in a shared, observable store so the cache survives navigation between screens, and invalidate it via `client.databases.subscribe` when something actually changes upstream:
 
-```ts
-export const useSourceStore = defineStore("source", () => {
-  const source = ref<SourceData | null>(null);
-  const loadedAt = ref<number | null>(null);
-  let inFlight: Promise<SourceData> | null = null;
+```swift
+@MainActor
+final class SourceStore: ObservableObject {
+  @Published private(set) var source: SourceData?
+  private var loadedAt: Date?
+  private var inFlight: Task<SourceData, Error>?
 
-  async function ensureLoaded(): Promise<SourceData> {
-    if (source.value) return source.value;
-    if (inFlight) return inFlight;
-    inFlight = loadSourceData(dbStore).then((s) => {
-      source.value = s;
-      loadedAt.value = Date.now();
-      return s;
-    }).finally(() => { inFlight = null; });
-    return inFlight;
+  func ensureLoaded() async throws -> SourceData {
+    if let source { return source }
+    if let inFlight { return try await inFlight.value }
+    let task = Task { try await loadSourceData(dbStore) }
+    inFlight = task
+    defer { inFlight = nil }
+    let s = try await task.value
+    source = s
+    loadedAt = Date()
+    return s
   }
-  function invalidate() { source.value = null; }
+  func invalidate() { source = nil }
 
   // Wire up DB subscribe once on first use. `subscribe` takes the database id,
   // a server-registered subscription key, and an options object carrying the
   // `onChange` callback (plus any `params` forwarded to the subscription's
   // filter CEL).
-  client.databases.subscribe(dbId, "source-changes", { onChange: invalidate });
-
-  return { source, ensureLoaded, invalidate };
-});
+  func observe(dbId: String) {
+    client.databases.subscribe(databaseId: dbId, key: "source-changes") { [weak self] _ in
+      self?.invalidate()
+    }
+  }
+}
 ```
 
-SPA navigation between pages then becomes ~zero network calls until something actually changes upstream. The DB-subscribe handler also catches changes from other tabs / sessions for free.
+Navigating between screens then becomes ~zero network calls until something actually changes upstream. The DB-subscribe handler also catches changes from other devices / sessions for free.
 
-See [Scheduling and real-time — subscriptions](AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md) for the `databases.subscribe` API.
+See [Databases — real-time subscriptions](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md#real-time-subscriptions) for the `databases.subscribe` API.
 
 ## Pattern 8 — Server-side cron for stale-tolerant third-party data
 
@@ -430,14 +448,14 @@ See [Workflows — cron triggers](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md) and [Da
 
 ## Pattern 9 — Bound how often you talk to your own server
 
-The Primitive client persists auth tokens locally and the local-first documents are cached in IndexedDB. That makes it easy to forget that some things genuinely require a round trip.
+The Primitive client persists auth tokens locally and caches local-first documents on the device. That makes it easy to forget that some things genuinely require a round trip.
 
 ### Useful questions before adding a new fetch on a hot path
 
 - Does this value change often, or is it effectively static for this user (e.g. database ID, app config, user profile)?
-- Can it be derived from data the page already loaded?
-- If it's per-user but stable, should it live in `userPrefs` (synced across the user's devices) or `localStorage` (per-device, no round trip to read)?
-- Is there a single page that needs it, or is it shared? Shared → Pinia store, computed once.
+- Can it be derived from data the screen already loaded?
+- If it's per-user but stable, should it live in `userPrefs` (synced across the user's devices) or in on-device storage (per-device, no round trip to read)?
+- Is there a single screen that needs it, or is it shared? Shared → a store computed once.
 
 ## Anti-patterns to grep for
 
@@ -445,37 +463,35 @@ When auditing an existing Primitive app, these usually find real wins:
 
 | Pattern | What to grep |
 |---|---|
-| N+1 in a loop | `for.*await.*executeOperation` (regex) |
+| N+1 in a loop | `for .* in` followed by `try await .*executeOperation` |
 | Per-symbol third-party call | calls to `client.integrations.call` inside a loop |
-| Eager full-reload on every state change | `watch(..., async () => { ... await load... })` |
-| Awaiting non-critical init | `await client.getAuthConfig()`, `await listUserMemberships`, `await initializeUserPrefs()` inside `initialize()` / `completeAuthentication()` |
-| Cached value behind a re-block | `await ensurePrefsReady(); const cached = getPref(...)` (yes — really) |
-| Sequential awaits | three or more consecutive `await db.executeOperation(...)` lines |
+| Eager full-reload on every state change | a change observer whose body does `try await load…` |
+| Awaiting non-critical init | `try await client.getAuthConfig()`, `try await listUserMemberships`, `try await initializeUserPrefs()` inside `initialize()` / `completeAuthentication()` |
+| Cached value behind a re-block | `await ensurePrefsReady(); let cached = getPref(...)` (yes — really) |
+| Sequential awaits | three or more consecutive `try await db.executeOperation(...)` lines |
 
 ## Measuring
 
 Before optimizing, instrument so you can tell whether a change actually helped. The cheapest setup that's worked well:
 
-```ts
-// Inside the page that matters most (HomePage / dashboard equivalent)
-onMounted(async () => {
-  const t0 = performance.now();
+```swift
+// Inside the view that matters most (HomeView / dashboard equivalent)
+func onAppear() async throws {
+  let t0 = Date()
   // ...load and render...
-  isReady.value = true;
-  console.log(`[PERF] first paint ${(performance.now() - t0).toFixed(0)}ms`);
-  (window as any).__firstPaintMs = performance.now() - t0;
-  (window as any).__dashboardReady = true;
-});
+  isReady = true
+  let ms = Date().timeIntervalSince(t0) * 1000
+  print("[PERF] first paint \(Int(ms))ms")
+}
 ```
 
-Then drive the page from outside (e.g., browser automation) and read `window.__firstPaintMs` after each navigation. Run several times — the first cold load is always slower (Vite warm-up, OS caches, etc.). Use the median of 3-5 runs.
+Capture the first-paint timing across several launches — the first cold load is always slower (OS caches still warming, etc.). Use the median of 3-5 runs.
 
 For correctness verification across phases, hash a digest of the rendered data:
 
-```ts
-const json = JSON.stringify(normalize(data.value));   // round numbers, sort keys
-const hash = await crypto.subtle.digest("SHA-256",
-  new TextEncoder().encode(json));
+```swift
+let json = try JSONEncoder().encode(normalize(data))   // round numbers, sort keys
+let hash = SHA256.hash(data: json)
 ```
 
 If the hash changes between phases, you've broken something. If it doesn't, the change is at least correct on this dataset.
@@ -484,7 +500,7 @@ If the hash changes between phases, you've broken something. If it doesn't, the 
 
 For a new Primitive page that feels slow, run through these in order:
 
-1. **Count network requests on cold load** (DevTools Network tab, filtered to your API host). Is it more than 5? Each one is a candidate for elimination.
+1. **Count network requests on cold load** (filtered to your API host). Is it more than 5? Each one is a candidate for elimination.
 2. **Identify the critical path** — which calls block first paint? Which fire in parallel?
 3. **Bundle related queries** into a pipeline (Pattern 1).
 4. **Replace N+1 ops with bulk ops** (Pattern 2).
@@ -492,5 +508,5 @@ For a new Primitive page that feels slow, run through these in order:
 6. **Move third-party calls server-side** if practical (Pattern 8), otherwise switch to bulk endpoints (Pattern 4).
 7. **Render with stale data, refresh reactively** for non-critical freshness (Pattern 6).
 8. **Defer non-critical init** (Pattern 5) — but watch for the re-block trap.
-9. **Cache source data in a Pinia store with DB-subscribe invalidation** (Pattern 7) so warm SPA navigation is ~free.
+9. **Cache source data in a shared store with DB-subscribe invalidation** (Pattern 7) so warm navigation between screens is ~free.
 10. **Measure after each change.** Confirm the win is real and the output hash is stable.

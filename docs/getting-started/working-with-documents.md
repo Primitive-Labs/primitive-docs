@@ -2,10 +2,6 @@
 
 Documents are Primitive's local-first collaborative storage. A document is a container that holds your data models — synced across devices, shared with other users, and available offline. This guide covers document concepts, data modeling, and CRUD operations.
 
-::: tip Two clients, one API
-The examples below are shown in both **JavaScript** (`js-bao` / `js-bao-wss-client`) and **Swift** (the iOS/macOS client) — pick the tab for your platform. The API shape and semantics line up across both; where they differ, the text calls it out. Every snippet is compiled against the real client as part of the docs build.
-:::
-
 ## Document Concepts
 
 ### Private by Default
@@ -28,9 +24,251 @@ Documents work best under ~10MB each. For most apps this means thousands of reco
 
 ## Defining Models
 
-Models define the shape of your data — like `Task`, `Project`, or `Contact`. Models are authored in TOML (`models.toml` for JavaScript, `schema.toml` for Swift — same format) and typed classes are generated from that file: `npx js-bao-codegen-v2` for JavaScript, `swift-bao-codegen` for Swift.
+Models define the typed shape of the data your app stores in documents — like `Task`, `Project`, or `Contact`. **All document interaction happens through models**: you author them in one TOML file, codegen produces the typed classes/structs, and every read and write goes through those types.
 
-The full authoring loop — field types, options, relationships, uniqueness, and schema evolution — is covered in [Defining Your Models](./defining-your-models.md). Everything below assumes a generated `Task` model.
+| | Web (Vue) | iOS (SwiftUI) |
+|---|---|---|
+| Schema file | `src/models/models.toml` | `Sources/<App>/Models/schema.toml` |
+| Codegen | `pnpm codegen` (run after editing) | Automatic on build (`./run-ios.sh` regenerates first; `swift build` runs the SPM plugin) |
+| Output | `*.generated.ts` classes + `@/models` barrel | `PrimitiveModel` structs in `Models/Generated/` |
+
+The TOML dialect is identical on both platforms — the same schema file works for web and iOS clients sharing an app.
+
+::: info Documents vs. databases
+This models-and-codegen loop is how **documents** work. Server-side **databases** are different: the client interface there is *registered operations* (with codegen over the operations, not models), and a database's optional schema is an advisory map rather than an enforced contract — see [Working with Databases](./working-with-databases.md).
+:::
+
+### Why TOML + Codegen
+
+Defining models in TOML, with codegen producing the TypeScript classes, gives you:
+
+- **Reviewable diffs** — your data model lives in one config file, versioned alongside your code. A schema change is one diff, not many.
+- **Strong typing for free** — the generator emits typed `*Attrs` interfaces, model classes, and traversal methods for declared relationships. You can't typo a field name.
+- **Auto-registration** — the generated `src/models/index.ts` barrel registers every model with `js-bao` exactly once at app startup. Nothing to remember to wire up.
+- **Sync validation at boot** — the barrel checks that `models.toml` and the generated classes match. If they're out of sync, the app throws at startup and tells you to re-run codegen.
+
+### The Authoring Loop
+
+A typical model change is three small steps: edit the TOML, regenerate, use the types.
+
+::: code-group
+
+```bash [Web (Vue)]
+# 1. Edit src/models/models.toml
+# 2. Regenerate:
+pnpm codegen
+# 3. Import from @/models and use like any other class
+```
+
+```bash [iOS (SwiftUI)]
+# 1. Edit Sources/<App>/Models/schema.toml
+# 2. Regenerate — codegen is wired into both build paths:
+./run-ios.sh        # regenerates, then builds + launches (Xcode path)
+swift build         # the SPM plugin regenerates automatically
+# 3. Consume the generated structs through TypedModel<T>
+```
+
+:::
+
+On web, the `codegen` script runs `npx js-bao-codegen-v2 -i src/models/models.toml -o src/models` under the hood. On iOS, `swift-bao-codegen` writes into `Models/Generated/` (gitignored, regenerated every build).
+
+::: warning Never edit generated files
+The codegen output — `*.generated.ts` + the `src/models/index.ts` barrel on web, `Models/Generated/*.swift` on iOS — is overwritten on each run. Make all changes in the TOML. For custom behavior on top of a generated type: on web, define free functions in `src/lib/`; on iOS, add a companion extension file *alongside* (not inside) `Models/Generated/`, e.g. `Models/TaskRecord+Extensions.swift` — the codegen sweep only touches files carrying its generated banner, so extensions survive each regen.
+:::
+
+::: warning iOS: build through run-ios.sh after schema changes
+If you edit `schema.toml` and then hit **Run in Xcode directly**, Xcode compiles whatever stale files are already in `Models/Generated/` with no error pointing at the cause. Build through `./run-ios.sh` (it regenerates first), or run `swift build` once before the Xcode build.
+:::
+
+### Authoring `models.toml`
+
+Each model is a top-level `[models.<name>]` block. Fields go under `[models.<name>.fields.<fieldName>]`. Relationships go under `[models.<name>.relationships.<relName>]`.
+
+Field option names use `snake_case` in TOML (the loader maps them to camelCase at runtime).
+
+```toml
+[models.todos.fields.id]
+type = "id"
+auto_assign = true
+indexed = true
+
+[models.todos.fields.title]
+type = "string"
+indexed = true
+
+[models.todos.fields.completed]
+type = "boolean"
+default = false
+
+[models.todos.fields.priority]
+type = "number"
+default = 0
+
+[models.todos.fields.due_date]
+type = "date"
+
+[models.todos.fields.tags]
+type = "stringset"
+max_count = 10
+```
+
+#### Field Types
+
+| Type        | TypeScript    | Description                          | Common Options                  |
+| ----------- | ------------- | ------------------------------------ | ------------------------------- |
+| `id`        | `string`      | Unique identifier                    | `auto_assign = true`, `indexed` |
+| `string`    | `string`      | Text value                           | `indexed`, `default`, `unique`  |
+| `number`    | `number`      | Numeric value                        | `indexed`, `default`            |
+| `boolean`   | `boolean`     | True/false                           | `default`                       |
+| `date`      | `string`      | ISO-8601 timestamp string            | `indexed`                       |
+| `stringset` | `StringSet`   | Set-of-strings (tags, categories)    | `max_count`                     |
+
+#### Field Options
+
+```toml
+[models.tasks.fields.id]
+type = "id"
+auto_assign = true     # server-assigns a ULID on save
+indexed = true         # required for fast lookup by id
+
+[models.tasks.fields.email]
+type = "string"
+unique = true          # single-field uniqueness — enables upsertOn
+indexed = true
+
+[models.tasks.fields.priority]
+type = "number"
+default = 0
+
+[models.tasks.fields.tags]
+type = "stringset"
+max_count = 10
+```
+
+#### Unique Constraints
+
+Two ways to enforce uniqueness:
+
+**Single-field uniqueness** — set `unique = true` on the field. This also enables `upsertOn` for that field on save.
+
+```toml
+[models.users.fields.email]
+type = "string"
+unique = true
+indexed = true
+```
+
+**Composite (multi-field) uniqueness** — declare a named constraint with `[[models.<name>.unique_constraints]]`.
+
+```toml
+[[models.categories.unique_constraints]]
+name = "name_parent_unique"
+fields = ["name", "parentId"]
+```
+
+The constraint `name` is what you pass to `upsertByUnique` / `findByUnique` at runtime.
+
+### Relationships
+
+Declare relationships in TOML and codegen emits typed traversal methods on the generated interfaces.
+
+```toml
+# Author hasMany Posts
+[models.authors.relationships.posts]
+type = "hasMany"
+model = "posts"
+related_id_field = "authorId"
+order_by_field = "createdAt"
+order_direction = "DESC"
+
+# Post refersTo Author
+[models.posts.relationships.author]
+type = "refersTo"
+model = "authors"
+related_id_field = "authorId"
+```
+
+After `pnpm codegen`, the generated interfaces include typed traversal methods:
+
+```typescript
+import { Author, Post } from "@/models";
+
+const author = await Author.queryOne({ id: authorId });
+const posts = await author.posts();        // PaginatedResult<Post>
+const firstPost = posts.data[0];
+const backRef = await firstPost.author();  // Author | null
+```
+
+| Relationship type | Returns                            | Required options                            |
+| ----------------- | ---------------------------------- | ------------------------------------------- |
+| `hasMany`         | `Promise<PaginatedResult<T>>`      | `model`, `related_id_field`                 |
+| `refersTo`        | `Promise<T \| null>`               | `model`, `related_id_field`                 |
+| `refersToMany`    | `Promise<T[]>`                     | `model`, `source_field` (an array of IDs)   |
+
+Optional ordering: `order_by_field` and `order_direction = "ASC" | "DESC"` apply to `hasMany` and `refersToMany`.
+
+### Using Generated Models
+
+Always import from the barrel, never directly from a `*.generated.ts` file:
+
+```typescript
+import { Todo, Author, Post } from "@/models";
+
+// Create
+const todo = new Todo({ title: "Review PR", priority: 2 });
+await todo.save();
+
+// Query
+const open = await Todo.query({ completed: false });
+```
+
+The barrel runs `attachAndRegisterModel` for every model exactly once — that's why importing from `@/models` is essential. Importing directly from `Todo.generated.ts` skips registration, which fails at runtime with "Model not properly initialized" on the first save or query.
+
+On iOS, codegen emits value-type `PrimitiveModel` structs (`Codable`, `Equatable`, `Hashable`) — set `class_name = "TaskRecord"` on the model block to control the Swift type name. You consume them through a `TypedModel<T>` bound to an open document (see [Working with Documents](./working-with-documents.md#creating-and-opening-documents)). A few Swift conventions worth knowing:
+
+- **IDs are `String`** — generate with `UUID().uuidString` when the caller doesn't supply one.
+- **`type = "number"` codegens a `Double`** — cast to `Int` on read if you need to.
+- **No nulls** — the CRDT layer doesn't model `nil`. Use `""` / `0` for absent values and check them explicitly.
+- **Dates round-trip as ISO-8601 `String`s** — there's no native date type on the wire.
+- **Wire keys are forever** — renaming a TOML key orphans existing records on every platform. Keep wire keys snake_case so they round-trip cleanly between web and iOS, and add camelCase aliases in a `+Extensions.swift` companion if the Swift call sites read awkwardly.
+
+### Working with Model Instances
+
+CRUD on model instances (create / read / update / delete, queries, aggregation) is shown side-by-side in JavaScript and Swift in [CRUD Operations](#crud-operations) below.
+
+::: tip JavaScript-specific
+The value-handling caveats in this section apply to the **JavaScript** client only. In Swift, generated models are value-type `struct`s (Codable), so spreading/copying works normally and the gotchas below don't arise.
+:::
+
+A JavaScript model instance behaves like a normal object when you read and write individual fields:
+
+```typescript
+const todo = await Todo.find(id);
+console.log(todo.title);   // read
+todo.completed = true;     // write
+await todo.save();
+```
+
+But a JavaScript model instance is **not** a plain object: its fields are prototype getters, so the spread (`...`) and rest operators — which only copy own properties — quietly give you back an empty object:
+
+```typescript
+const copy = { ...todo };            // ❌ has none of todo's fields
+const { id, ...rest } = todo;        // ❌ `rest` is empty
+```
+
+Nothing throws — you just get partial data that surfaces later as a confusing "missing field" bug. When you need a plain object (to serialize, send to an integration, or duplicate a record), read the fields explicitly: `{ id: todo.id, title: todo.title }`. The reverse direction is fine — constructors, `save()`, and `query()` filters all accept plain objects.
+
+### Iterating on the Schema
+
+You're free to evolve the schema as the app grows. A few rules of thumb:
+
+- **Add new fields freely** — js-bao stores documents as Yjs CRDTs, so adding an optional field is a no-op for existing records.
+- **Adding `default` doesn't backfill** — existing records keep their absent values; `default` only applies to records created after the change. Read sites should treat the field as optional.
+- **Don't remove fields** — the underlying Yjs data is still there. Mark unused fields with a TOML comment instead, and stop reading them.
+- **Renaming a field is a breaking change** — pick a new field with a new name, write to both during a migration window, then stop writing the old one. Add `default` only for the new field.
+- **Adding a `unique = true` constraint to an existing field** can fail at save time if existing records collide. Inspect the data before tightening uniqueness.
+
+The `index.ts` barrel will throw at startup if `models.toml` and the generated classes drift apart. If you see that error, run `pnpm codegen` and commit the regenerated files.
 
 ## CRUD Operations
 
@@ -46,7 +284,7 @@ A record is created and saved locally first, then synced in the background.
 
 :::
 
-In JavaScript a model is a class with instance `.save()`; in Swift a `TypedModel<Task>` (bound to one document) does the writes. In single-document mode the JS save targets the active document; otherwise pass `{ targetDocument }`.
+In single-document mode a JavaScript `save()` targets the active document; otherwise pass `{ targetDocument }`.
 
 ### Read
 
@@ -60,7 +298,6 @@ Find by id, query with filters, get the first match, or count.
 
 :::
 
-`query()` returns a `PaginatedResult` in JavaScript — rows are on `.data`. In Swift, `query()` returns the rows directly and `count` lives on the `.dynamic` layer.
 
 ### Update
 
@@ -72,7 +309,7 @@ Find by id, query with filters, get the first match, or count.
 
 :::
 
-Both look the record up first. JavaScript mutates the loaded object and saves it; Swift applies a partial update keyed by id.
+Both look the record up first, then apply the change.
 
 ### Delete
 
@@ -96,7 +333,11 @@ Save-or-update by a unique field (such as `email`) without knowing the existing 
 
 :::
 
-For composite keys, use `upsertByUnique(constraintName, …)` — see [Defining Your Models](./defining-your-models.md).
+For composite keys, use `upsertByUnique(constraintName, …)` — see [Unique Constraints](#unique-constraints) above.
+
+::: tip iOS semantics
+Under a bound `TypedModel`, reads are **synchronous** against the local CRDT (`tasks.findAll()`, `tasks.query([...])` — no `await`). `create` is the only CRUD call that throws (it validates required fields, types, and unique constraints); `update`/`delete` don't throw, and unknown field keys in an `update` payload are dropped silently. Writes are local-first: visible to local reads on the next line, synced to peers in the background.
+:::
 
 ## Querying
 
@@ -164,7 +405,17 @@ Data can change from sync (another user edited it). Subscribe to keep your UI cu
 
 :::
 
-Most apps don't call `subscribe` directly in views — they use a framework helper that wraps it: **`useJsBaoDataLoader`** (the Vue composable in the web template) and **`BaoDataLoader`** (the SwiftUI loader in `PrimitiveApp`). Both handle document readiness, debounced reloads, and a loaded/empty/loading phase. See the [Swift Client guide](./swift-client.md) for the SwiftUI pattern.
+Most apps don't call `subscribe` directly in views — each starter template ships a framework helper that wraps it: **`useJsBaoDataLoader`** (Vue composable) and **`BaoDataLoader`** (SwiftUI loader in `PrimitiveApp`). Both handle document readiness, debounced reloads, and a loaded/empty/loading phase:
+
+::: code-group
+
+<<< ../../examples/documents/dataloader-glue.ts#example{ts} [Web (Vue)]
+
+<<< ../../examples/documents/dataloader-glue.swift#example{swift} [iOS (SwiftUI)]
+
+:::
+
+For code that subscribes to client events directly on iOS (`client.events.on(...)`): the returned `EventSubscription` must be **stored on a property** or it's dropped immediately, use `[weak self]` in the closure, and cancel on teardown with `sub?.cancel()`.
 
 ## Creating and Opening Documents
 
@@ -178,11 +429,41 @@ Open a document before querying or writing data in it. For a per-user singleton 
 
 :::
 
+::: tip Why getOrCreateWithAlias?
+Splitting this into a resolve followed by a create looks fine but has a race: two devices onboarding at the same moment both fall into the create branch and you lose one of the docs. `getOrCreateWithAlias` is a single atomic server-side upsert.
+:::
+
 Other patterns: **one document at a time** (list the user's owned documents, open the selected one) and **multiple open documents** (open several; in JavaScript a query then runs across all open documents, while in Swift each document has its own `TypedModel`).
+
+On iOS, the canonical place to open documents and bind models is your `PrimitiveAppState` subclass — open in `connectClient()`, bind in the `onDocumentOpened` hook:
+
+```swift
+@MainActor
+final class MyAppState: PrimitiveAppState {
+  @Published private(set) var tasks: TypedModel<TaskRecord>?
+
+  override func connectClient() async {
+    await super.connectClient()
+    guard let client else { return }
+    let result = try? await client.documents.getOrCreateWithAlias(
+      alias: DocumentAlias(scope: .user, aliasKey: "library"),
+      title: "Library"
+    )
+    guard let id = result?.documentId else { return }
+    await selectDocumentAwaiting(id)
+  }
+
+  override func onDocumentOpened(doc: YDocument, documentId: String) async {
+    tasks = makeTypedModel(doc: doc, documentId: documentId)
+  }
+}
+```
+
+One `TypedModel` per record type per document. Prefer `makeTypedModel(doc:documentId:)` over direct construction — it also registers the model with the in-app Debug Inspector.
 
 ## Sharing Documents
 
-Share by user id, by email (the grant resolves at signup if they aren't a member yet), or with an entire group.
+Documents are private until you grant a permission level (`reader` | `read-write` | `owner`, see [the table above](#private-by-default)) to a user, an email, or a group:
 
 ::: code-group
 
@@ -192,7 +473,78 @@ Share by user id, by email (the grant resolves at signup if they aren't a member
 
 :::
 
-For the full sharing story — member invitations with quotas, email-based grants, and access requests — see [Sharing and Invitations](./sharing-and-invitations.md).
+### Share by Email
+
+The most common case — you have a colleague's email but don't know (or care) whether they've signed up yet. If the email belongs to an existing user, access is granted immediately. If not, the share waits and applies automatically when they sign up — see [Invitations](./invitations.md#how-invitations-resolve) for how that resolution works. Repeated shares to the same recipient are idempotent — the latest `permission` wins.
+
+Batch shares can mix user IDs and emails:
+
+::: code-group
+
+<<< ../../examples/sharing/share-batch.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/share-batch.swift#example{swift} [Swift]
+
+:::
+
+To have the platform email the recipient, pass `sendEmail: true` along with a `documentUrl`, and make sure your app's base URL is configured — the server uses them to compose the share and accept links.
+
+### Share with a Group
+
+Grant document access to everyone in a group (the `grantGroupPermission` call in the example above). When group membership changes, document access updates automatically.
+
+### Who Has Access? (Members + Pending)
+
+Sharing UIs typically show two sections: people who currently have access, and people who've been invited but haven't signed up yet:
+
+::: code-group
+
+<<< ../../examples/sharing/document-members.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/document-members.swift#example{swift} [Swift]
+
+:::
+
+### Removing Someone
+
+One call handles both "currently has access" and "invited but hasn't signed up yet" — pass an email and the server removes the matching member *or* cancels the pending grant, whichever exists:
+
+::: code-group
+
+<<< ../../examples/sharing/share-remove.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/share-remove.swift#example{swift} [Swift]
+
+:::
+
+Use the email form whenever you don't want to think about whether the target has signed up yet.
+
+## Collections
+
+Sharing one document at a time stops scaling as soon as access maps to a *set* of documents — a project's files, a course's materials, a client folder. A **collection** bundles documents so they can be shared as a unit: adding a member to a collection grants them access to every document currently in it *and* to any document added later. Remove a document from the collection (or a member from the collection) and the access goes with it.
+
+::: code-group
+
+<<< ../../examples/sharing/collection-create.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/collection-create.swift#example{swift} [Swift]
+
+:::
+
+Collections sit between single-document shares and groups: share a *document* when access is about that one thing, share a *collection* when access is about a set of documents, and use a *group* when access is about who someone is (a team, a role). Membership works like document sharing — add by user ID or by email (email adds to non-users resolve at signup, like any [deferred grant](./invitations.md#sharing-with-people-who-arent-users-yet)), and list current members and pending invitations:
+
+::: code-group
+
+<<< ../../examples/sharing/collection-access.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/collection-access.swift#example{swift} [Swift]
+
+:::
+
+```typescript
+const pending = await client.collections.listPendingInvitations(collectionId);
+// [{ email, permission, invitationId, ... }]
+```
 
 ## Finding Documents a User Can Access
 
@@ -246,7 +598,7 @@ Listed through a collection the user is a member of.
 
 :::
 
-`ownedDocuments` and `sharedDocuments` both return the `{ items, cursor }` envelope and accept `tag` / `limit` / `cursor`. (In JavaScript, `ownedDocuments()` returns a flat array by default and the `{ items, cursor }` page when you pass `returnPage: true`; Swift always returns the envelope.)
+`ownedDocuments` and `sharedDocuments` accept `tag` / `limit` / `cursor` for filtering and pagination.
 
 ## Document Thumbnails and Metadata
 
@@ -264,12 +616,46 @@ Documents carry presentation fields you can update at any time.
 
 ## Document Access Requests
 
-A `403` from getting a document can include a `canRequestAccess` hint. Users with a document link can submit a request, and document owners can approve or deny it. See [Sharing and Invitations](./sharing-and-invitations.md#document-access-requests).
+When a user has a document link (or ID) but no permission, they can request access — the Google-Docs-style "Request access" flow. A `403` from `client.documents.get(documentId)` includes a `canRequestAccess` hint when the document accepts requests:
+
+```typescript
+try {
+  await client.documents.get(documentId);
+} catch (err) {
+  if (err.code === "DOC_ACCESS_DENIED" && err.details?.canRequestAccess) {
+    // Show a "Request access" button
+  }
+}
+```
+
+The full flow — submit a request (`permission` is required), then an owner lists and approves:
+
+::: code-group
+
+<<< ../../examples/sharing/request-access.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/request-access.swift#example{swift} [Swift]
+
+:::
+
+Owners can also deny, optionally pointing the requester at the document's canonical URL:
+
+```typescript
+await client.documents.denyAccessRequest(documentId, requestId, {
+  documentUrl: "https://myapp.example/docs/sales-handbook",
+});
+```
+
+The requester gets an email with the outcome either way. To show pending requests in an owner's UI, fetch them when the view opens:
+
+```typescript
+const requests = await client.documents.listAccessRequests(documentId);
+```
+
+Behavior worth knowing: requests expire after 30 days, a requester can't re-submit while a request for the same document is pending, and a resolved request can't be re-resolved.
 
 ## Next Steps
 
 - **[Choosing Your Data Model](./choosing-your-data-model.md)** — When to use documents vs. databases
-- **[Defining Your Models](./defining-your-models.md)** — TOML authoring, codegen, relationships, schema evolution
-- **[Sharing and Invitations](./sharing-and-invitations.md)** — Full sharing, invitations, and access requests
-- **[Swift Client](./swift-client.md)** — iOS/macOS setup, `TypedModel`, and the SwiftUI data loader
+- **[Invitations](./invitations.md)** — App membership, and how shares to not-yet-users resolve
 - **[Working with Databases](./working-with-databases.md)** — Server-side structured storage

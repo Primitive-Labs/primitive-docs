@@ -470,7 +470,7 @@ expectedOutputContains = '["Bob","teacher"]'                # JSON array string
 expectedJsonSubset = '{"status":"ok"}'                      # JSON string
 ```
 
-Key-based refs (`configName`, `evaluatorPromptKey`, `evaluatorConfigName`) are portable across apps. Legacy ID-based refs (`configId`, `evaluatorPromptId`, `evaluatorConfigId`) are still accepted but tied to a specific app.
+Key-based refs (`configName`, `evaluatorPromptKey`, `evaluatorConfigName`) are portable across apps. ID-based refs (`configId`, `evaluatorPromptId`, `evaluatorConfigId`) are also accepted but tied to a specific app — prefer the key-based forms.
 
 ### What `sync pull` actually writes
 
@@ -599,7 +599,7 @@ primitive sync push --dir ./config                  # apply
 
 ### Gemini
 
-```toml
+```toml novalidate
 provider = "gemini"
 model = "models/gemini-3.5-flash"         # fast/cheap (GA)
 model = "models/gemini-3-flash-preview"   # fast/cheap
@@ -610,7 +610,7 @@ The `gemini` provider enforces a server-side allowlist of model names; a model n
 
 ### OpenRouter (everything else)
 
-```toml
+```toml novalidate
 provider = "openrouter"
 model = "anthropic/claude-3-5-sonnet"
 model = "openai/gpt-4o"
@@ -656,13 +656,13 @@ The first arg is the `promptKey`, NOT the `promptId`. The endpoint is `POST /pro
 
 ### Don't do this
 
-```typescript
-// WRONG — passing promptId instead of promptKey
-await client.prompts.execute("01HXY...PROMPT_ID", { variables: {} });
+```swift
+// WRONG — passing the prompt id instead of the prompt key
+try await client.prompts.execute("01HXY...PROMPT_ID", variables: [:])
 // → 404. Use the key from the TOML.
 
 // WRONG — expecting a top-level variable
-await client.prompts.execute("p", { variables: { name: "Alice" } });
+try await client.prompts.execute("p", variables: ["name": "Alice"])
 // template: "Hi {{ name }}"   ← won't resolve, renders as "Hi "
 // Fix: template: "Hi {{ input.name }}"
 ```

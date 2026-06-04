@@ -1,0 +1,22 @@
+import JsBaoClient
+
+// Create a collection, put documents in it, and share the whole set at once.
+func createCollection(
+  client: JsBaoClient,
+  designDocId: String,
+  specDocId: String
+) async throws {
+  // #region example
+  // Create a collection and put documents in it
+  let collection = try await client.collections.create(params: ["name": "Project Phoenix"])
+  let collectionId = collection["collectionId"] as? String ?? ""
+  _ = try await client.collections.addDocument(collectionId: collectionId, documentId: designDocId)
+  _ = try await client.collections.addDocument(collectionId: collectionId, documentId: specDocId)
+
+  // One grant covers the whole set — including documents added later
+  _ = try await client.collections.addMember(
+    collectionId: collectionId,
+    params: ["email": "alice@example.com", "permission": "read-write"]
+  )
+  // #endregion example
+}

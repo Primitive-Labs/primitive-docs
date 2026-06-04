@@ -9,15 +9,32 @@ Implementing auth flows for Primitive apps. All methods live on `JsBaoClient` (p
 | OAuth (Google) | Primary auth, redirect-based |
 | Magic Link | Passwordless email link |
 | OTP | 6-digit email code (10 min expiry) |
+{{#lang ts}}
 | Passkey | WebAuthn for returning users (requires existing account) |
+{{/lang}}
 
 Each method must be enabled in the Admin Console. Check availability with `getAuthConfig()` before showing UI.
+
+## Client Setup (no template required)
+
+All flows below run on a plain client — no starter template needed:
+
+{{ example: auth/initialize-client }}
+
+{{#lang ts}}
+In the starter template this wiring is owned for you by the template's `userStore`.
+{{/lang}}
+{{#lang swift}}
+In the starter template this wiring is owned for you by `PrimitiveAppState.initialize()` + `PrimitiveAuthManager`.
+{{/lang}}
 
 ## Discovering Available Methods
 
 {{ example: auth/get-auth-config }}
 
-`hasOAuth` is true when Google OAuth is enabled (the flag defaults to enabled when both `googleClientId` and the server-side `googleClientSecret` are configured). `hasPasskey` requires `passkeyEnabled` plus a non-empty `passkeyRpConfig` map. `magicLinkEnabled` and `otpEnabled` default to `true` unless explicitly disabled in the Admin Console.
+`hasOAuth` is true when Google OAuth is enabled (the flag defaults to enabled when both `googleClientId` and the server-side `googleClientSecret` are configured). `magicLinkEnabled` and `otpEnabled` default to `true` unless explicitly disabled in the Admin Console.
+{{#lang ts}}
+`hasPasskey` requires `passkeyEnabled` plus a non-empty `passkeyRpConfig` map.
 
 ### Passkey RP config (`passkeyRpConfig`)
 
@@ -31,6 +48,29 @@ Each method must be enabled in the Admin Console. Check availability with `getAu
 ```
 
 `getAuthConfig()` returns the effective map. Configure passkeys via `passkeyRpConfig`.
+{{/lang}}
+
+## Server App Settings ↔ Client Contract
+
+Server-side app settings must align with the origin the client app is served from. Inspect with `primitive apps get`; the relevant fields:
+
+| Server field | Contract | Set via |
+|---|---|---|
+| `corsAllowedOrigins` | Must contain the exact serving origin (scheme+host+port). `corsMode` defaults to `custom` — an empty list blocks every cross-origin request. | `primitive apps update --cors-origins "<o1>,<o2>"` |
+| `redirectUris` | OAuth callbacks are validated against this whitelist — a non-listed callback URL returns 400 `Invalid redirect URI`. | Admin Console only (no CLI flag) |
+| `baseUrl` | Used for links in auth emails / redirects. | `primitive apps update --base-url <url>` |
+{{#lang ts}}
+| Provider toggles | `--google-oauth`/`--magic-link`/`--otp`/`--passkey <bool>` — what `getAuthConfig()` reports. | `primitive apps update` |
+{{/lang}}
+{{#lang swift}}
+| Provider toggles | `--google-oauth`/`--magic-link`/`--otp <bool>` — what `getAuthConfig()` reports. | `primitive apps update` |
+{{/lang}}
+
+{{#lang ts}}
+**CORS misconfiguration blocks bootstrap.** When the serving origin is missing from `corsAllowedOrigins`, the browser blocks the client's bootstrap refresh (`POST …/api/auth/refresh` → 403, no `access-control-allow-origin`): `initializeClient` throws `initializeClient refresh failed (network)` before `getAuthConfig()` is reached, and the template app's login surfaces the error. Fix by adding the serving origin (`primitive apps update --cors-origins`; inspect with `primitive apps get`). Common triggers: serving on a non-default port, or a newly deployed domain.
+{{/lang}}
+
+Dev → prod checklist: add the production origin to `corsAllowedOrigins`, add the production OAuth callback to `redirectUris` (Admin Console), update `baseUrl`, and re-check `getAuthConfig()` reports the expected methods.
 
 ---
 
@@ -40,13 +80,12 @@ Each method must be enabled in the Admin Console. Check availability with `getAu
 
 {{ example: auth/oauth }}
 
+{{#lang ts}}
 `startOAuthFlow` throws `Error("OAuth not configured")` if `oauthRedirectUri` was not passed to `initializeClient`. The browser navigates away — code after the call doesn't run on success.
-
-On Swift, `startOAuthFlow(redirectUri:continueUrl:)` takes an explicit `redirectUri` and **returns** the authorization URL to open yourself (e.g. via `ASWebAuthenticationSession`) rather than redirecting the browser.
 
 **`autoOAuth` client option.** Pass `autoOAuth: true` (with `oauthRedirectUri`) to `initializeClient` and the client will auto-redirect to OAuth whenever it comes back online without a valid token (e.g. a refresh failed, or there was no persisted token). For apps where OAuth is the only sign-in path this avoids hand-rolling the "no token, send to login" branch. Leave it off if you have multiple sign-in methods or want to render your own login screen first.
 
-Optional second argument supports waitlist enrollment and invite-token acceptance (TypeScript client only — the Swift `startOAuthFlow` has no waitlist/inviteToken options):
+Optional second argument supports waitlist enrollment and invite-token acceptance:
 
 ```typescript
 await client.startOAuthFlow(continueUrl, {
@@ -54,11 +93,16 @@ await client.startOAuthFlow(continueUrl, {
   inviteToken: tokenFromEmail,
 });
 ```
+{{/lang}}
+{{#lang swift}}
+`startOAuthFlow(redirectUri:continueUrl:)` takes an explicit `redirectUri` and **returns** the authorization URL to open yourself (e.g. via `ASWebAuthenticationSession`). It throws `OAuth not configured` if OAuth is unavailable.
+{{/lang}}
 
 ### Handle the callback (instance method — preferred)
 
-When the callback page can construct a client (you already have the JWT or are happy to re-init):
+When the callback page can construct a client (you already have the JWT or are happy to re-init), extract `code`/`state` from the callback and pass them to `handleOAuthCallback`:
 
+{{#lang ts}}
 ```typescript
 const params = new URLSearchParams(window.location.search);
 const code = params.get("code");
@@ -70,9 +114,21 @@ if (code && state) {
   window.location.href = "/";
 }
 ```
+{{/lang}}
+{{#lang swift}}
+```swift
+// `code` and `state` come from the redirect URI delivered to your
+// ASWebAuthenticationSession completion handler.
+if !code.isEmpty && !state.isEmpty {
+  try await client.handleOAuthCallback(code: code, state: state)
+  // Token now stored, WebSocket reconnected. Navigate.
+}
+```
+{{/lang}}
 
 ### Handle the callback (static method — when no client yet)
 
+{{#lang ts}}
 ```typescript
 import { JsBaoClient } from "js-bao-wss-client";
 
@@ -87,11 +143,22 @@ const token = await JsBaoClient.exchangeOAuthCode({
 });
 // Persist however your app does (storage / cookie / pass to initializeClient)
 ```
-
-Swift exposes the same static helper as `JsBaoClient.exchangeOAuthCode(apiUrl:appId:code:state:)`, but **without** the refresh-proxy parameters — it always exchanges the code directly.
+{{/lang}}
+{{#lang swift}}
+```swift
+let token = try await JsBaoClient.exchangeOAuthCode(
+  apiUrl: apiUrl,
+  appId: appId,
+  code: code,
+  state: state
+)
+// Persist however your app does (e.g. Keychain), or pass to the client.
+```
+{{/lang}}
 
 **Don't:**
 
+{{#lang ts}}
 ```typescript
 // WRONG — startOAuthFlow does not return a token. It redirects.
 const token = await client.startOAuthFlow();
@@ -99,6 +166,13 @@ const token = await client.startOAuthFlow();
 // WRONG — handleOAuthCallback does not return the token either; it stores it.
 const { token } = await client.handleOAuthCallback(code, state);
 ```
+{{/lang}}
+{{#lang swift}}
+```swift
+// WRONG — handleOAuthCallback does not return the token; it stores it.
+let token = try await client.handleOAuthCallback(code: code, state: state)
+```
+{{/lang}}
 
 ---
 
@@ -108,11 +182,12 @@ const { token } = await client.handleOAuthCallback(code, state);
 
 {{ example: auth/magic-link }}
 
-The TypeScript `magicLinkRequest` accepts an optional `redirectUri` (defaulting to the client's `oauthRedirectUri`) and throws `Error("Redirect URI not configured")` if neither is set. On Swift, `magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument, and `magicLinkVerify(token:)` returns the raw `[String: Any]` response (no `inviteToken` option).
+{{#lang ts}}
+`magicLinkRequest` accepts an optional `redirectUri` (defaulting to the client's `oauthRedirectUri`) and throws `Error("Redirect URI not configured")` if neither is set.
 
-### Reading the token (web callback page)
+### Reading the token (callback page)
 
-On the web the callback page reads `?magic_token=...` off the URL and feeds it to `magicLinkVerify`:
+The callback page reads `?magic_token=...` off the URL and feeds it to `magicLinkVerify`:
 
 ```typescript
 const magicToken = new URLSearchParams(window.location.search).get("magic_token");
@@ -129,11 +204,19 @@ The query param name is **`magic_token`** (not `token`, `magicToken`, or `code`)
 
 The callback URL may also carry `?purpose=login-add-passkey`. The server appends this when the link was sent for an existing user the platform thinks should add a passkey (e.g. they signed in via OTP/magic-link but have no passkey on file). The `magicLinkVerify` call itself is unchanged — apps that read `purpose` from the URL can use it as a hint to route the user to passkey registration after sign-in instead of straight to the home screen.
 
-To accept an invitation server-side at verify time (so the deferred grant resolves to the signing-in user even when emails differ), pass `inviteToken` (TypeScript client only — the Swift `magicLinkVerify` has no `inviteToken` option):
+To accept an invitation server-side at verify time (so the deferred grant resolves to the signing-in user even when emails differ), pass `inviteToken`:
 
 ```typescript
 await client.magicLinkVerify(magicToken, { inviteToken: inviteTokenFromUrl });
 ```
+{{/lang}}
+{{#lang swift}}
+`magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument. `magicLinkVerify(token:)` returns the raw `[String: Any]` response.
+
+### Reading the token
+
+The magic-link callback delivers the token as a `magic_token` value (not `token`, `magicToken`, or `code`). Read it from the redirect URI and pass it to `magicLinkVerify(token:)`.
+{{/lang}}
 
 ---
 
@@ -141,11 +224,19 @@ await client.magicLinkVerify(magicToken, { inviteToken: inviteTokenFromUrl });
 
 {{ example: auth/otp }}
 
-The TypeScript `otpVerify` also accepts an `{ inviteToken }` option; the Swift `otpVerify(email:code:)` does not, and returns the raw `[String: Any]` response.
+{{#lang ts}}
+`otpVerify` also accepts an `{ inviteToken }` option to accept an invitation at verify time.
+{{/lang}}
+{{#lang swift}}
+`otpVerify(email:code:)` returns the raw `[String: Any]` response.
+{{/lang}}
 
 ### Error handling
 
-`AuthError` is thrown for non-2xx responses with a machine-readable `code`. Import from the package:
+`AuthError` is thrown for non-2xx responses with a machine-readable code.
+
+{{#lang ts}}
+Import from the package and switch on `err.code`:
 
 ```typescript
 import { AuthError, AUTH_CODES } from "js-bao-wss-client";
@@ -186,17 +277,45 @@ try {
 
 The exported `AUTH_CODES` constant covers: `ADDED_TO_WAITLIST`, `INVITATION_REQUIRED`, `DOMAIN_NOT_ALLOWED`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `PASSKEY_NOT_ENABLED`, `MAGIC_LINK_NOT_ENABLED`, `WAITLIST_ENTRY_UPDATED`, `INVITE_TOKEN_INVALID`, `INVITE_TOKEN_EXPIRED`, `INVITE_ALREADY_ACCEPTED`. The server may also return `RATE_LIMITED`, `OTP_MAX_ATTEMPTS`, and `RESERVED_EMAIL_FOR_ADMIN` — compare those as string literals.
 
-> **Caveat on `OTP_NOT_ENABLED`.** The constant is defined and exported, but the OTP request endpoint currently returns a plain 400 with the message `"OTP authentication is not enabled for this app"` and **no `code` field** when OTP is disabled. Don't rely on switching on `OTP_NOT_ENABLED` to detect that case — gate the OTP UI on `getAuthConfig().otpEnabled` up front instead.
+> **Caveat on `OTP_NOT_ENABLED`.** The constant is defined and exported, but the OTP request endpoint returns a plain 400 with the message `"OTP authentication is not enabled for this app"` and **no `code` field** when OTP is disabled. Don't rely on switching on `OTP_NOT_ENABLED` to detect that case — gate the OTP UI on `getAuthConfig().otpEnabled` up front instead.
 
 The same `AuthError` codes apply to `magicLinkRequest`/`magicLinkVerify` and `passkey*` methods.
+{{/lang}}
+{{#lang swift}}
+`AuthError` carries an optional `code: AuthCode?` enum — switch on `error.code`:
 
-On Swift, `AuthError` carries an optional `code: AuthCode?` enum (cases like `.invalidToken`, `.invitationRequired`, `.domainNotAllowed`, `.passkeyNotEnabled`, `.magicLinkNotEnabled`, `.inviteTokenInvalid`, `.inviteTokenExpired`, `.inviteAlreadyAccepted`, `.addedToWaitlist`, `.waitlistEntryUpdated`) — switch on `error.code` rather than importing an `AUTH_CODES` constant. There is no Swift equivalent of the JS `AUTH_CODES` object.
+```swift
+do {
+  let result = try await client.otpVerify(email: email, code: code)
+} catch let error as AuthError {
+  switch error.code {
+  case .invalidToken,          // bad/expired code
+       .invitationRequired,    // invite-only app, no invitation
+       .domainNotAllowed,      // domain-mode app, email not in allowed domains
+       .magicLinkNotEnabled,   // magic link off in admin console
+       .inviteTokenInvalid,    // bad invite token
+       .inviteTokenExpired,    // invite token expired
+       .inviteAlreadyAccepted, // invite already used
+       .addedToWaitlist,       // waitlist enabled, user added
+       .waitlistEntryUpdated:  // existing waitlist entry updated
+    showUserMessage(error.message)
+  default:
+    throw error
+  }
+}
+```
+
+> **Caveat on OTP disabled.** When OTP is disabled the request endpoint returns a plain 400 with the message `"OTP authentication is not enabled for this app"` and no machine-readable code. Don't rely on a code to detect that case — gate the OTP UI on `getAuthConfig()`'s `otpEnabled` up front instead.
+
+The same `AuthError` codes apply to `magicLinkRequest`/`magicLinkVerify`.
+{{/lang}}
 
 ---
 
+{{#lang ts}}
 ## Passkeys
 
-> **TypeScript-only.** The passkey methods (`passkeyAuthStart`/`Finish`, `passkeyRegisterStart`/`Finish`, `passkeyList`/`Update`/`Delete`) have **no Swift client equivalent** — the WebAuthn flow is web-specific (it relies on the browser's `@simplewebauthn/browser` helpers). The blocks below are TypeScript only.
+WebAuthn passkeys for returning users, built on the browser's `@simplewebauthn/browser` helpers.
 
 `passkeyAuthStart` works without an existing session (used to sign in). `passkeyRegisterStart` and management methods require an authenticated client.
 
@@ -256,12 +375,16 @@ const { passkeys } = await client.passkeyList();
 await client.passkeyUpdate(passkeyId, { deviceName: "Work Laptop" });
 await client.passkeyDelete(passkeyId);
 ```
+{{/lang}}
 
 ---
 
 ## Auth Events
 
-These are the canonical events. `auth-failed` and `auth:onlineAuthRequired` are the ones most apps must handle. (Event registration is framework glue; the snippets below are the TypeScript `client.on(...)` form. The Swift client exposes the same events through `client.events.on(...)` with typed event structs.)
+These are the canonical events. `auth-failed` and `auth:onlineAuthRequired` are the ones most apps must handle.
+
+{{#lang ts}}
+Register handlers with `client.on(...)`:
 
 ```typescript
 // Token refresh failed or server invalidated session — prompt re-login.
@@ -311,6 +434,47 @@ client.on("auth-failed", promptLogin);
 client.on("auth:onlineAuthRequired", promptLogin);
 client.on("auth:state", ({ authenticated }) => { if (!authenticated) promptLogin(); });
 ```
+{{/lang}}
+{{#lang swift}}
+Register handlers with `client.events.on(...)`, which delivers typed event structs:
+
+```swift
+// Token refresh failed or server invalidated session — prompt re-login.
+client.events.on(.authFailed) { event in
+  redirectToLogin()
+}
+
+// Token applied successfully (login, refresh, or OAuth callback).
+client.events.on(.authSuccess) { event in
+  // event.cause names the operation that produced the token.
+  // Treat unknown values as a generic success — the set may grow.
+}
+
+// Came back online without a valid token. Show sign-in.
+client.events.on(.onlineAuthRequired) { _ in
+  promptSignIn()
+}
+
+// Generic state-machine event — fires on transitions.
+client.events.on(.authState) { event in
+  // event.mode: "online" | "offline" | "none" | "auto"
+}
+
+client.events.on(.logout) { _ in clearSensitiveUI() }
+client.events.on(.logoutComplete) { _ in navigateHome() }
+```
+
+### Minimal handler
+
+```swift
+func promptLogin() { navigateToLogin() }
+client.events.on(.authFailed) { _ in promptLogin() }
+client.events.on(.onlineAuthRequired) { _ in promptLogin() }
+client.events.on(.authState) { event in if !event.authenticated { promptLogin() } }
+```
+
+Subscriptions are retained for the lifetime of the client; keep a reference to any token the API returns if you need to unsubscribe earlier.
+{{/lang}}
 
 ---
 
@@ -326,7 +490,7 @@ Admins can disable a user's access to a single app without deleting their global
 
 When `status === "disabled"`:
 
-- Every auth-completion endpoint (passkey, OAuth callback, magic-link verify, OTP verify) rejects with `AUTH_USER_DISABLED` before issuing tokens.
+- Every auth-completion endpoint (OAuth callback, magic-link verify, OTP verify, and any other sign-in path) rejects with `AUTH_USER_DISABLED` before issuing tokens.
 - The user's open WebSocket connections are force-disconnected by the server's connection layer.
 - Existing access tokens are revoked; in-flight workflow runs the user started are terminated.
 
@@ -349,6 +513,7 @@ The admin console exposes the same toggles. App code does not need to special-ca
 
 To read or manually set the token:
 
+{{#lang ts}}
 ```typescript
 client.getToken(); // string | null
 
@@ -356,8 +521,6 @@ client.getToken(); // string | null
 // auth-success and pushes through the normal apply-token pipeline.
 client.setToken(jwt, { cause: "external" });
 ```
-
-On Swift, the equivalent of `setToken` is `client.updateToken(_:cause:)`. There is **no top-level `getToken()` on the Swift client** — read the token via the JWT payload (`client.getJwtPayload()`) or track it from the `authSuccess` event.
 
 **Don't:**
 
@@ -368,12 +531,34 @@ client.auth.setToken(jwt);
 // WRONG — opening documents before auth is ready throws or fails silently.
 const doc = await client.openDocument(id);     // before await client.waitForAuthReady()
 ```
+{{/lang}}
+{{#lang swift}}
+```swift
+// Manually set a token (e.g. obtained out-of-band). Triggers authSuccess
+// and pushes through the normal apply-token pipeline.
+client.updateToken(jwt, cause: "external")
+
+// Read the current token via the decoded JWT payload, or track it from the
+// authSuccess event.
+let payload = client.getJwtPayload()
+```
+
+**Don't:**
+
+```swift
+// WRONG — opening documents before auth is ready throws or fails silently.
+let doc = try await client.openDocument(id)  // before try await client.waitForAuthReady()
+```
+{{/lang}}
 
 ---
 
 ## JWT Persistence
 
-Optional — persists the JWT to storage so a page reload doesn't require re-authentication.
+Optional — persists the JWT so a relaunch doesn't require re-authentication.
+
+{{#lang ts}}
+Opt in at `initializeClient` and the token is written to browser storage:
 
 ```typescript
 import { initializeClient } from "js-bao-wss-client";
@@ -410,6 +595,10 @@ const client = await initializeClient({
 ```
 
 `baseUrl` must be a same-origin worker that forwards `/auth/*` and `/oauth/callback` to `/app/:appId/api/auth/*`. When configured, `magicLinkVerify`, `otpVerify`, `handleOAuthCallback`, `logout`, and the OAuth-code static helper all route through the proxy.
+{{/lang}}
+{{#lang swift}}
+The client persists the token to the Keychain across app launches. `waitForAuthBootstrap()` restores any persisted session, so an authenticated user stays signed in on relaunch. Tokens within ~2 min of expiry are not reused, and are cleared on logout and on `authFailed`.
+{{/lang}}
 
 ---
 
@@ -417,7 +606,8 @@ const client = await initializeClient({
 
 {{ example: auth/logout }}
 
-The TypeScript `logout` accepts a richer options object than the Swift `logout(wipeLocal:)`:
+{{#lang ts}}
+`logout` accepts an options object to control teardown:
 
 ```typescript
 await client.logout({
@@ -429,15 +619,22 @@ await client.logout({
 });
 ```
 
-The Swift client takes only `wipeLocal` (`redirectTo`, `revokeOffline`, `clearOfflineIdentity`, and `waitForDisconnect` are TypeScript-only). Logout fires `auth:logout` immediately and `auth:logout:complete` when finished.
+Logout fires `auth:logout` immediately and `auth:logout:complete` when finished.
+{{/lang}}
+{{#lang swift}}
+`logout(wipeLocal:)` takes a single `wipeLocal` flag (delete locally cached document data + KV cache). Logout fires `logout` immediately and `logoutComplete` when finished.
+{{/lang}}
 
 ---
 
-## Auth State in Apps (Vue/template-aware)
+## Auth State in Apps
 
-The [primitive-app-template](https://github.com/AnchorPal/primitive-app-template) provides a `userStore` (Pinia) and `AppLayout` that implement these patterns. If you're not using the template, replicate the same gates.
+Gate the app's main layout on auth state so child views can assume an authenticated user, and react to auth loss centrally. The starter template implements this gate; if you're not using it, replicate it.
 
-### Two key flags
+{{#lang ts}}
+The template ([primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template)) provides a `userStore` (Pinia) and `AppLayout`.
+
+### Two key flags (template store)
 
 - **`isInitialized`** — one-way. Becomes `true` once the store has wired listeners and loaded auth config. Does not mean the user is signed in. Used by router guards.
 - **`isAuthenticated`** — live reactive. Can flip in either direction at any time (token expiry, server invalidation, login).
@@ -467,12 +664,39 @@ watch(
   { immediate: true }
 );
 ```
+{{/lang}}
+{{#lang swift}}
+The template ([swift-primitive-app-dev](https://github.com/Primitive-Labs/swift-primitive-app-dev)) provides `PrimitiveAppState` + `PrimitiveAuthManager` (`@Published isAuthenticated`/`userId`/`loginState`) and `AuthGateView`.
+
+### Layout gate (recommended default)
+
+`AuthGateView(appState:appName:authManager:) { content }` is the layout gate — it walks initializing → login (`PrimitiveLoginView`) → connecting → connected and only renders `content` when connected, so views inside never null-check the user:
+
+```swift
+AuthGateView(appState: appState, appName: "MyApp", authManager: authManager) {
+  RootView()  // user guaranteed non-nil inside here
+}
+```
+
+### Reactive observers (downstream state)
+
+Subscribe to `authManager.$isAuthenticated` (Combine) to initialize or reset downstream state on transitions:
+
+```swift
+authManager.$isAuthenticated
+  .sink { isAuth in
+    if isAuth { Task { await myStore.initialize() } }
+    else { myStore.reset() }
+  }
+  .store(in: &cancellables)
+```
+{{/lang}}
 
 ### Initialization order
 
-1. Auth ready (`isAuthenticated === true` or `await client.waitForAuthReady()`)
+1. Auth ready (`isAuthenticated` true, or `await client.waitForAuthReady()`)
 2. Open documents (`documents.open(...)`)
-3. Query data (e.g., `useJsBaoDataLoader` with `documentReady`)
+3. Query data
 
 Don't open documents or hit data APIs before step 1.
 
@@ -488,10 +712,11 @@ Implications:
 2. **Domain-mode apps re-validate at resolution.** Deferred grants for emails outside allowed domains are silently dropped.
 3. **`invitation`/`accepted` WS events fire after resolution** — subscribe to refresh the inviter's UI.
 
-See the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md#deferred-grants).
+See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-grants).
 
 ---
 
+{{#lang ts}}
 ## Invite Token Persistence Across Auth Round-Trips (Template Pattern)
 
 When an invitation link carries an `inviteToken` query parameter and the recipient is not signed in, the token must survive the auth redirect so the server can resolve deferred grants atomically at verification time.
@@ -528,6 +753,7 @@ The token is saved to `sessionStorage` under the key `"primitive:pendingInviteTo
 If you're using the template, this route is already wired in `src/router/routes.ts`. Point your invitation emails at `${yourApp.baseUrl}/invite/accept?inviteToken=${token}`. You do **not** need to rebuild any of this.
 
 **When building on the raw API** (without the template): stash and restore the token manually, pass it to the auth method that completes sign-in, and clear it immediately afterward. The `isPlausibleInviteToken` helper (16–512 chars, URL-safe charset) guards against obviously invalid input before touching storage.
+{{/lang}}
 
 ---
 
@@ -535,6 +761,7 @@ If you're using the template, this route is already wired in `src/router/routes.
 
 There is **no `primitive test-users` CLI command**. The bypass is server-side: an OTP request for an email shaped like `<base-local>+primitivetest<suffix>@<base-domain>` accepts the magic code `"000000"` instead of the emailed code, but **only when the base address is on the app's `testAccountBaseEmails` whitelist**.
 
+{{#lang ts}}
 ```typescript
 // Requires the app owner to have added "alice@example.com" to the app's
 // testAccountBaseEmails whitelist. Then any `alice+primitivetest<suffix>@example.com`
@@ -545,11 +772,24 @@ const { user } = await client.otpVerify("alice+primitivetest@example.com", "0000
 // Role-distinguished derivatives (Gmail/Workspace deliver them to the same inbox):
 await client.otpRequest("alice+primitivetest-teacher@example.com");
 ```
+{{/lang}}
+{{#lang swift}}
+```swift
+// Requires the app owner to have added "alice@example.com" to the app's
+// testAccountBaseEmails whitelist. Then any `alice+primitivetest<suffix>@example.com`
+// derivative becomes a test account that accepts code "000000".
+_ = try await client.otpRequest(email: "alice+primitivetest@example.com")
+let result = try await client.otpVerify(email: "alice+primitivetest@example.com", code: "000000")
+
+// Role-distinguished derivatives (Gmail/Workspace deliver them to the same inbox):
+_ = try await client.otpRequest(email: "alice+primitivetest-teacher@example.com")
+```
+{{/lang}}
 
 Guardrails:
 
 - Per-app whitelist. The base address (`alice@example.com`) must be on the app's `testAccountBaseEmails` list — explicit owner consent.
-- Only `+primitivetest<suffix>` derivatives are eligible. The bare base is never a test account, and the legacy `+primitive` form is no longer accepted.
+- Only `+primitivetest<suffix>` derivatives are eligible. The bare base is never a test account.
 - The derived user must already exist as an `AppUser` in this app — bypass never auto-provisions.
 - Issued tokens are short-lived (~30 minutes) and carry a `primitiveBypass: true` claim that gets re-checked on every request, so removing the base from the whitelist revokes sessions immediately.
 - `+primitivetest*` accounts can sign in as ordinary members but are reserved at admin / owner / invitation boundaries — they cannot hold those roles.
@@ -584,7 +824,8 @@ Overrides are tracked by `primitive sync` (TOML in `email-templates/`). Custom t
 
 1. Call `getAuthConfig()` to discover enabled methods before rendering UI.
 2. Implement at least one primary method (OAuth or Magic Link).
-3. Build a callback route for OAuth (`?code=&state=`) and Magic Link (`?magic_token=`).
+3. Handle the OAuth callback (`code` + `state`) and the Magic Link `magic_token`.
+{{#lang ts}}
 4. Listen to `auth-failed` and `auth:onlineAuthRequired` (minimum) to prompt re-login.
 5. Catch `AuthError` and switch on `err.code` (use `AUTH_CODES` constants).
 6. Gate your app layout on `isAuthenticated` so child components can assume `currentUser`.
@@ -592,3 +833,12 @@ Overrides are tracked by `primitive sync` (TOML in `email-templates/`). Custom t
 8. Sequence: auth ready → open documents → query data.
 9. Offer passkey registration when `promptAddPasskey` is true after magic-link/OTP verify.
 10. Customize email templates via CLI if you need branded auth emails.
+{{/lang}}
+{{#lang swift}}
+4. Listen to `authFailed` and `onlineAuthRequired` (minimum) to prompt re-login.
+5. Catch `AuthError` and switch on `error.code`.
+6. Gate your app layout on `isAuthenticated` (via `AuthGateView`) so child views can assume an authenticated user.
+7. Observe `authManager.$isAuthenticated` in downstream state (it changes both directions).
+8. Sequence: auth ready → open documents → query data.
+9. Customize email templates via CLI if you need branded auth emails.
+{{/lang}}

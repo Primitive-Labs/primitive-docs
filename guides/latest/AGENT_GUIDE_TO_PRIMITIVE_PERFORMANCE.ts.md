@@ -2,7 +2,7 @@
 
 Audience: agents building apps on the Primitive platform.
 
-Most slow Primitive apps aren't slow because Primitive is slow — they're slow because of patterns that quietly multiply round trips. Agents are particularly susceptible: the LLM-default approach to "fetch X for each Y" is to write a `for` loop with an `await` inside, and every such loop becomes an N+1.
+Most slow Primitive apps aren't slow because Primitive is slow — they're slow because of patterns that quietly multiply round trips. Agents are particularly susceptible: the default approach to "fetch X for each Y" is to write a loop with an `await` inside, and every such loop becomes an N+1.
 
 This guide catalogs the patterns that reliably cut cold-load time, the anti-patterns they replace, and how to measure both. Each pattern stands alone; the closing checklist orders them by impact for triaging a slow page.
 
@@ -14,11 +14,11 @@ This guide catalogs the patterns that reliably cut cold-load time, the anti-patt
 | Replace several related ops with a `pipeline` op | one round trip instead of many |
 | Use bulk third-party endpoints (e.g. `/v7/finance/quote?symbols=`) instead of one call per ID | one HTTP per page instead of N |
 | Move third-party API calls to a server-side cron + cache | zero client calls per page |
-| `Promise.all` independent waits | wall-clock cut by serialization length |
+| Parallelize independent awaits | wall-clock cut by serialization length |
 | Defer non-critical work off the cold path (memberships, auth config, prefs init) | one or more sequential round trips removed from first paint |
 | Render with stale/imported values immediately, refresh in background | first paint independent of slow upstream |
 | Pure-compute over cached source data instead of reloading | next render is ~free |
-| `client.databases.subscribe` for cache invalidation | warm SPA navigation can be 0 round trips |
+| `client.databases.subscribe` for cache invalidation | warm navigation between screens can be 0 round trips |
 
 The rest of this guide explains each in detail with the patterns and the anti-patterns they replace.
 
@@ -39,7 +39,7 @@ Both look correct in isolation. Both are bugs.
 
 ### Anti-pattern
 
-A page needs several pieces of data from the same database:
+A page needs several pieces of data from the same database, fetched one at a time:
 
 ```ts
 // 5 sequential round trips to the SAME database
@@ -88,8 +88,8 @@ Whenever a page reads three or more independent collections from the same databa
 
 ### Gotchas
 
-- Pipeline steps need an explicit `filter` field, even if empty (`"filter": {}`). Omitting it makes `primitive sync push` 400 silently.
-- Each step's `limit` matters — pipelines don't paginate. Pick limits that comfortably cover real data without blowing past the reasonable size of a single response.
+- Pipeline steps need an explicit `filter` field, even if empty (`"filter": {}`). Omitting it fails `primitive sync push` with a 400 (`query step requires a "filter" field`) attributed to that operation.
+- Each step's `limit` matters — pipelines don't paginate. Per-step `limit` caps at 1000, a pipeline allows at most 10 steps, and step types are `query`/`count`/`aggregate` only. Pick limits that comfortably cover real data without blowing past the reasonable size of a single response.
 - Pipelines only span one database. If the page also needs data from a *different* database, that's a second call (e.g. a per-user portfolio DB plus a shared securities-ref DB).
 
 See [Databases — Pipeline operations](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md#pipeline--multi-step-read-operations) for the full pipeline reference.
@@ -97,6 +97,8 @@ See [Databases — Pipeline operations](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md#pi
 ## Pattern 2 — Replace N+1 with a bulk op
 
 ### Anti-pattern
+
+A per-item operation called once for every item in a collection:
 
 ```ts
 for (const group of groups) {
@@ -122,6 +124,8 @@ access = "user.userId == database.metadata.ownerId"
 definition = '{"filter":{},"sort":{"groupId":1},"limit":1000}'
 ```
 
+Call it once, then group client-side:
+
 ```ts
 const all = await db.executeOperation("listAllTargets");
 const byGroup = new Map<string, Target[]>();
@@ -145,6 +149,8 @@ Any time you find an `await ...executeOperation(...)` inside a `for` loop. This 
 ## Pattern 3 — Parallelize independent awaits
 
 ### Anti-pattern
+
+Three independent reads awaited one after another:
 
 ```ts
 const a = await db.executeOperation("opA");
@@ -172,11 +178,13 @@ Any sequence of `await` calls where the second doesn't read the first's result. 
 
 ### Gotcha
 
-Don't blindly `Promise.all` everything — if call 2 needs call 1's result (e.g. `getSecuritiesBySymbols(symbols)` where `symbols` comes from the holdings query), they have to stay sequential. Two reads of holdings (once for symbols, once for the page) is worse than one read followed by securities serial.
+Don't parallelize blindly — if call 2 needs call 1's result (e.g. `getSecuritiesBySymbols(symbols)` where `symbols` comes from the holdings query), they have to stay sequential. Two reads of holdings (once for symbols, once for the page) is worse than one read followed by securities serial.
 
 ## Pattern 4 — Bulk-call third-party APIs through integrations
 
 ### Anti-pattern
+
+One proxy call per ID — here, 21 calls for 21 symbols:
 
 ```ts
 // 21 individual proxy calls for 21 symbols
@@ -225,6 +233,8 @@ The cleanest formulation: **fire-and-forget on init, await on use.**
 
 ### Anti-pattern
 
+An init routine that eagerly awaits everything before signalling the app is ready:
+
 ```ts
 async function initialize() {
   // Always loaded, even on pages that never consult it
@@ -237,9 +247,11 @@ async function initialize() {
 }
 ```
 
-Every page pays for things only some pages need.
+Every screen pays for things only some screens need.
 
 ### Pattern
+
+Await only what first paint genuinely requires; kick off the rest in the background and expose a lazy, de-duped accessor each consumer can await on demand:
 
 ```ts
 async function initialize() {
@@ -272,7 +284,7 @@ const whenMembershipsReady = async (): Promise<void> => {
 };
 ```
 
-Pages that actually need the data do `void store.loadAuthConfig()` in their `onMounted` (no await — UI updates reactively when it lands), or `await store.whenMembershipsReady()` if they need a definitive value before proceeding (e.g. a route guard with a group check).
+Screens that actually need the data call `void store.loadAuthConfig()` as the view appears (no await — the UI updates reactively when it lands), or `await store.whenMembershipsReady()` if they need a definitive value before proceeding (e.g. a navigation guard with a group check).
 
 ### Decision rule
 
@@ -285,12 +297,14 @@ Pages that actually need the data do `void store.loadAuthConfig()` in their `onM
 If you cache a value in `userPrefs` (which itself loads via the root doc) and then `await ensurePrefsReady()` before reading the cache, you just re-serialized the same work you were trying to background. Either:
 
 - Use the cached value optimistically and fire a fallback in parallel (see Pattern 7), OR
-- Cache somewhere that doesn't need to be loaded first (localStorage), OR
+- Cache somewhere that doesn't need to be loaded first (on-device key/value storage), OR
 - Accept that this particular value isn't worth caching here.
 
 ## Pattern 6 — Render with stored values, refresh reactively
 
 ### Anti-pattern
+
+First paint awaits a third-party round trip before rendering anything:
 
 ```ts
 async function onMounted() {
@@ -303,6 +317,8 @@ async function onMounted() {
 First paint is now gated on a third-party API.
 
 ### Pattern
+
+Render from the source data plus whatever values are already cached, then kick off the refresh in the background and recompute reactively when fresh values land:
 
 ```ts
 async function onMounted() {
@@ -337,7 +353,7 @@ Pattern 8 — moving the third-party call to a server-side cron means the "cache
 
 ### Anti-pattern
 
-A reactive watch that triggers a full re-render reloads *all* the underlying data every time:
+A reactive observer that triggers a full re-render reloads *all* the underlying data every time:
 
 ```ts
 watch(() => livePriceStore.lastFetchedAt, async () => {
@@ -371,7 +387,7 @@ watch(() => livePriceStore.lastFetchedAt, () => {
 });
 ```
 
-Combine with a Pinia store keyed by a "version" derived from your data to share the cache across SPA navigations and invalidate it via `client.databases.subscribe` when something actually changes:
+Hold the source in a shared, observable store so the cache survives navigation between screens, and invalidate it via `client.databases.subscribe` when something actually changes upstream:
 
 ```ts
 export const useSourceStore = defineStore("source", () => {
@@ -401,9 +417,9 @@ export const useSourceStore = defineStore("source", () => {
 });
 ```
 
-SPA navigation between pages then becomes ~zero network calls until something actually changes upstream. The DB-subscribe handler also catches changes from other tabs / sessions for free.
+Navigating between screens then becomes ~zero network calls until something actually changes upstream. The DB-subscribe handler also catches changes from other devices / sessions for free.
 
-See [Scheduling and real-time — subscriptions](AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md) for the `databases.subscribe` API.
+See [Databases — real-time subscriptions](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md#real-time-subscriptions) for the `databases.subscribe` API.
 
 ## Pattern 8 — Server-side cron for stale-tolerant third-party data
 
@@ -429,14 +445,14 @@ See [Workflows — cron triggers](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md) and [Da
 
 ## Pattern 9 — Bound how often you talk to your own server
 
-The Primitive client persists auth tokens locally and the local-first documents are cached in IndexedDB. That makes it easy to forget that some things genuinely require a round trip.
+The Primitive client persists auth tokens locally and caches local-first documents on the device. That makes it easy to forget that some things genuinely require a round trip.
 
 ### Useful questions before adding a new fetch on a hot path
 
 - Does this value change often, or is it effectively static for this user (e.g. database ID, app config, user profile)?
-- Can it be derived from data the page already loaded?
-- If it's per-user but stable, should it live in `userPrefs` (synced across the user's devices) or `localStorage` (per-device, no round trip to read)?
-- Is there a single page that needs it, or is it shared? Shared → Pinia store, computed once.
+- Can it be derived from data the screen already loaded?
+- If it's per-user but stable, should it live in `userPrefs` (synced across the user's devices) or in on-device storage (per-device, no round trip to read)?
+- Is there a single screen that needs it, or is it shared? Shared → a store computed once.
 
 ## Anti-patterns to grep for
 
@@ -467,7 +483,7 @@ onMounted(async () => {
 });
 ```
 
-Then drive the page from outside (e.g., browser automation) and read `window.__firstPaintMs` after each navigation. Run several times — the first cold load is always slower (Vite warm-up, OS caches, etc.). Use the median of 3-5 runs.
+Then drive the page from outside (e.g., browser automation) and read `window.__firstPaintMs` after each navigation. Run several times — the first cold load is always slower (dev-server warm-up, OS caches, etc.). Use the median of 3-5 runs.
 
 For correctness verification across phases, hash a digest of the rendered data:
 
@@ -483,7 +499,7 @@ If the hash changes between phases, you've broken something. If it doesn't, the 
 
 For a new Primitive page that feels slow, run through these in order:
 
-1. **Count network requests on cold load** (DevTools Network tab, filtered to your API host). Is it more than 5? Each one is a candidate for elimination.
+1. **Count network requests on cold load** (filtered to your API host). Is it more than 5? Each one is a candidate for elimination.
 2. **Identify the critical path** — which calls block first paint? Which fire in parallel?
 3. **Bundle related queries** into a pipeline (Pattern 1).
 4. **Replace N+1 ops with bulk ops** (Pattern 2).
@@ -491,5 +507,5 @@ For a new Primitive page that feels slow, run through these in order:
 6. **Move third-party calls server-side** if practical (Pattern 8), otherwise switch to bulk endpoints (Pattern 4).
 7. **Render with stale data, refresh reactively** for non-critical freshness (Pattern 6).
 8. **Defer non-critical init** (Pattern 5) — but watch for the re-block trap.
-9. **Cache source data in a Pinia store with DB-subscribe invalidation** (Pattern 7) so warm SPA navigation is ~free.
+9. **Cache source data in a shared store with DB-subscribe invalidation** (Pattern 7) so warm navigation between screens is ~free.
 10. **Measure after each change.** Confirm the win is real and the output hash is stable.

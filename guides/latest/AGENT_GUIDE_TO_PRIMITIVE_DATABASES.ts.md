@@ -1,10 +1,8 @@
-# Working with Databases in the Primitive platform (js-bao-wss-client)
+# Working with Databases in the Primitive platform
 
 Guidelines for building apps with Primitive's server-side database storage.
 
-> **Swift parity:** the database **client** calls below exist in both languages (Swift takes `name:` + an `options:` dict, e.g. `executeOperation(databaseId:name:options:)`). **`client.databases.subscribe(...)` is JavaScript-only** — Swift has no DB subscriptions; poll via `executeOperation`. Operation/model definitions are TOML (language-neutral).
-
-## Client operations (JavaScript + Swift)
+## Client operations
 
 ### Run a registered operation
 
@@ -142,7 +140,7 @@ primitive sync pull            # Pull current config from server
 primitive sync diff            # Preview changes
 primitive sync push            # Push local config to server
 primitive sync push --dry-run  # See what would change without applying
-# Override with a fixed path (legacy):
+# Override with a fixed path:
 primitive sync init --dir ./config
 primitive sync push --dir ./config
 ```
@@ -162,7 +160,7 @@ Each file in `database-types/` defines a database type with its triggers and ope
 
 **TOML quoting tip:** CEL expressions containing apostrophes (e.g., `isMemberOf('class-teachers', database.id)`) must use triple-quoted strings in TOML, because single-quoted TOML strings don't support escaping. Use `'''...'''` for literal strings or `"""..."""` for basic strings:
 
-```toml
+```toml novalidate
 # WRONG — TOML parse error due to apostrophes in single-quoted string:
 access = 'isMemberOf('team', database.metadata.teamId)'
 
@@ -279,9 +277,6 @@ primitive databases records models <id>
 primitive databases records describe <id> <model>
 primitive databases records query <id> <model> --filter '{"status":"open"}'
 
-# TypeScript codegen from database-type TOML (record interfaces + op param/result types)
-primitive databases codegen --sync-dir ./config --output ./src/generated/db
-
 # Data migration (records + indexes + constraints; type config excluded — run sync push on target first)
 primitive databases export <id> --output ./out
 primitive databases import ./out --overwrite [--dry-run]
@@ -291,6 +286,12 @@ primitive databases import-csv <database-id> <file.csv> --model <name> \
   [--operation seed_save] [--column-map '{"CSV Header":"field"}'] \
   [--types '{"price":"number"}'] [--id-column <col>] [--batch-size 5000] \
   [--delimiter ,] [--dry-run] [--stop-on-error] [--json]
+```
+
+Generate TypeScript record interfaces and op param/result types from the database-type TOML:
+
+```bash
+primitive databases codegen --sync-dir ./config --output ./src/generated/db
 ```
 
 **Codegen enum / union / required typing.** When a field or an operation param restricts a string to a fixed set of values, codegen emits a TypeScript string-literal union (e.g. `status: "open" | "in-progress" | "closed"`) instead of `string`, and enum params are validated server-side as well. Fields that operation params mark `required` are emitted as non-optional on the generated record interface. This keeps generated types aligned with the server's validation instead of widening everything to `string`.
@@ -432,7 +433,9 @@ access = "true"
 definition = '{"filter":{"priceCents":{"$gt":0}}}'
 ```
 
-Adding the `[models.product.fields.*]` blocks above means any future `[[operations]]` that references `product.nameTypo` (instead of `name`) is rejected at push time, before it can return broken data.
+Adding the `[models.product.fields.*]` blocks above means any future `[[operations]]` that references `product.nameTypo` (instead of `name`) is rejected at push time, before it can return broken data. Note the 422 *message* doesn't name the offending field — the unresolved refs are in the response payload's `refs` array.
+
+**Field types — no object/JSON type.** `[models.*.fields.*]` accepts `string`, `number`, `boolean`, `date`, `id`, `stringset` only. `type = "object"` fails with `TOML_PARSE_ERROR: Invalid field type` — even though operation **params** do accept `"object"`. To store a structured payload (nested objects/arrays), declare the field as `string`, write JSON-encoded values, and parse on the consumer side — e.g. `parse_json(input.payload)` in a workflow `script` step.
 
 **Dynamic references.** Some refs can't be statically checked — for example, `modelName = "$params.kind"` (model determined at call time), a raw `filter` or `projection` lifted from `$params`, `record[expr]` field access, or lambda bodies inside pipelines. These are surfaced as *warnings*, not errors. The op is accepted, but the schema-edit gate later flags them so the operator can review whether the dynamic reference is still consistent with the new schema.
 
@@ -526,7 +529,7 @@ Used **as string values inside operation definitions** (filter values, data fiel
 | `$user.userId` | Current user's ID |
 | `$now` | Current ISO 8601 timestamp |
 | `$database.id` | The database instance ID |
-| `$database.celContext.key` | Value from database CEL context (`null` if key missing) — `$database.metadata.key` is a legacy alias |
+| `$database.celContext.key` | Value from database CEL context (`null` if key missing) — `$database.metadata.key` resolves to the same value |
 | `$params.fieldName` | Caller-provided parameter (`undefined` if not passed) |
 | `$steps.stepName.<accessor>` | Pipeline cross-step reference (see Pipelines) |
 
@@ -551,6 +554,32 @@ params = '{"authorId":{"type":"string","required":false}}'
 | `{"authorId":""}` | `{"status":"approved","authorId":""}` (matches empty string — only `undefined` drops) |
 
 > **Gotcha:** If a filter or data field references `$params.X` but `X` isn't declared in `params`, the substitution always resolves to `undefined` and the key silently drops — your operation becomes a match-all for that field, or your save omits the field entirely. The validator catches obvious cases at registration time, but always double-check the params schema covers every `$params.*` reference.
+
+### Boolean gate conditions
+
+Substitution variables (`$database.metadata.*`, `$params.*`, `$steps.*`) can appear **directly as elements** in `$and`/`$or` arrays (not as key-value pairs). The resolved boolean value gates that branch:
+
+| Value | In `$and` | In `$or` |
+|-------|-----------|----------|
+| `true` | No-op — remaining conditions apply | Short-circuits to match-all |
+| `false` / `null` / missing | Short-circuits to no-match (empty result, no DB hit) | Removed — other branches still apply |
+
+**Common use case — per-database feature flag:**
+
+```json
+{
+  "filter": {
+    "$or": [
+      { "authorId": "$user.userId" },
+      { "$and": ["$database.metadata.peerVisibility", { "status": "approved" }] }
+    ]
+  }
+}
+```
+
+When `$database.metadata.peerVisibility` is `true`, the `$and` branch includes approved posts. When it's `false` or missing, the branch short-circuits to no-match — users only see their own records. A missing key evaluates to `null`, so the gate is safely closed before the flag is set.
+
+This also works with `$steps.*` references in pipelines (see [Settings record pattern](#settings-record-pattern)).
 
 ### Operation types
 
@@ -601,7 +630,7 @@ params = '{"title":{"type":"string","required":true}}'
 
 **Response:** `{ results: [{ success: true, id: "..." }] }`
 
-**`upsertOn`** — pass `"upsertOn": "$params.email"` in a `save` op to create-or-update by a unique field value instead of requiring an explicit `id`. The server looks up a record where that field equals the provided value; if found, it patches it; if not, it inserts a new record. Useful for "ensure this user exists with these attributes" patterns:
+**`upsertOn`** — pass the **field name** (`"upsertOn": "email"`, NOT a `$params.*` substitution) in a `save` op to create-or-update by a unique field instead of requiring an explicit `id`. The match **value** comes from `data` — the server looks up a record where that field equals `data.<field>`; if found, it patches it; if not, it inserts a new record. Useful for "ensure this user exists with these attributes" patterns:
 
 ```toml
 [[operations]]
@@ -609,9 +638,14 @@ name = "ensureContact"
 type = "mutation"
 modelName = "contacts"
 access = "hasRole('admin')"
-definition = '{"operations":[{"op":"save","upsertOn":"$params.email","data":{"email":"$params.email","name":"$params.name","updatedAt":"$now"}}]}'
+definition = '{"operations":[{"op":"save","upsertOn":"email","data":{"email":"$params.email","name":"$params.name","updatedAt":"$now"}}]}'
 params = '{"email":{"type":"string","required":true},"name":{"type":"string","required":true}}'
 ```
+
+Two failure modes to know:
+
+- `"upsertOn": "$params.email"` gets **value-substituted** like any other definition string, so the server receives the email *value* as the field name and rejects with `upsertOn field 'alice@example.com' must be present in data and not null/empty`.
+- `upsertOn` requires a registered **unique index** on the field at runtime — `unique = true` in the type schema is not sufficient. Without one, saves fail with `upsertOn field '<field>' does not have a registered unique index`. Create it once per database: `primitive databases indexes create <database-id> --model <model> --field <field> --unique`.
 
 #### Count — count matching records
 
@@ -715,7 +749,7 @@ The client library is used at runtime to create database instances, execute oper
   // db: { databaseId, title, databaseType, celContext, permission, createdBy, ... }
 ```
 
-`db.databaseType` is the configured type; `db.celContext` holds the per-database CEL context dict (`db.metadata` is the legacy alias for the same field).
+`db.databaseType` is the configured type; `db.celContext` holds the per-database CEL context dict (`db.metadata` resolves to the same field).
 
 ### Listing and fetching databases
 
@@ -797,7 +831,7 @@ Callers can override `limit`, `cursor`, and `direction` at call time:
 
 ### Managing database CEL context
 
-The CEL context (formerly called "metadata") stores per-database values that operations and triggers can reference via `$database.celContext.*` (or the legacy alias `$database.metadata.*`):
+The CEL context stores per-database values that operations and triggers can reference via `$database.celContext.*` (`$database.metadata.*` resolves to the same values):
 
 ```typescript
   await client.databases.updateCelContext(databaseId, {
@@ -806,15 +840,13 @@ The CEL context (formerly called "metadata") stores per-database values that ope
   });
 ```
 
-`client.databases.updateMetadata(databaseId, {...})` is the legacy alias for the same call (JavaScript).
+`client.databases.updateMetadata(databaseId, {...})` is an alias for the same call.
 
-Via CLI (new preferred form):
+Via CLI:
 
 ```bash
 primitive databases cel-context update <database-id> --data '{"teamId":"team-alpha"}'
 primitive databases cel-context get <database-id>
-# Legacy alias still works:
-primitive databases metadata update <database-id> --data '{"teamId":"team-alpha"}'
 ```
 
 ## Direct Record Operations
@@ -927,32 +959,6 @@ Multiple filters on different fields are implicitly combined with AND:
 { category: "electronics", $or: [{ onSale: true }, { price: { $lt: 20 } }] }
 ```
 
-### Boolean gate conditions
-
-Substitution variables (`$database.metadata.*`, `$params.*`, `$steps.*`) can appear **directly as elements** in `$and`/`$or` arrays (not as key-value pairs). The resolved boolean value gates that branch:
-
-| Value | In `$and` | In `$or` |
-|-------|-----------|----------|
-| `true` | No-op — remaining conditions apply | Short-circuits to match-all |
-| `false` / `null` / missing | Short-circuits to no-match (empty result, no DB hit) | Removed — other branches still apply |
-
-**Common use case — per-database feature flag:**
-
-```json
-{
-  "filter": {
-    "$or": [
-      { "authorId": "$user.userId" },
-      { "$and": ["$database.metadata.peerVisibility", { "status": "approved" }] }
-    ]
-  }
-}
-```
-
-When `$database.metadata.peerVisibility` is `true`, the `$and` branch includes approved posts. When it's `false` or missing, the branch short-circuits to no-match — users only see their own records. A missing key evaluates to `null`, so the gate is safely closed before the flag is set.
-
-This also works with `$steps.*` references in pipelines (see [Settings record pattern](#settings-record-pattern)).
-
 ### Sort, limit, pagination
 
 ```typescript
@@ -1049,11 +1055,11 @@ const result = await db.aggregate("orders", {
 });
 ```
 
-## Defining Models
+## Client-Side Models (Direct Record Access Only)
 
-Databases are schemaless on the server — you can save any JSON records without defining models. Defining models gives you type safety, autoregistration, and automatic index syncing on connect.
+**Registered operations are the primary client interface for databases and need no client-side models** — the operation layer is typed by `primitive databases codegen` (see TypeScript codegen above). The models below apply only to the **direct record access** path (owner/manager `DoDb` handles): there, defining js-bao models gives you type safety, autoregistration, and automatic index syncing on connect. The database itself stays schemaless — `modelName` is a collection label and the server accepts any JSON for it.
 
-The canonical workflow is TOML + codegen, the same one used for document-backed models. Declare each model in `src/models/models.toml`, run `npx js-bao-codegen-v2`, and import the generated class from `@/models`:
+The TOML dialect is the same one documents use. Declare each model in `src/models/models.toml`, run `npx js-bao-codegen-v2`, and import the generated class from `@/models`:
 
 ```toml
 # src/models/models.toml
@@ -1084,7 +1090,7 @@ const db = client.databases.connect(databaseId);
 await db.syncIndexes(Task);
 ```
 
-The same TOML powers documents and client-side database models. See the [Defining Your Models guide](https://docs.primitive.com/getting-started/defining-your-models) (or the [Documents agent guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#defining-models)) for the full TOML reference: field types, options, relationships, unique constraints, and schema iteration.
+The same TOML powers documents and client-side database models. See the [Documents agent guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#defining-models) for the full TOML reference: field types, options, relationships, unique constraints, and schema iteration.
 
 If you want the server to enforce that registered operations only reference fields you've declared, declare those same models *inside the database type config* (`config/database-types/<type>.toml`) using `[models.<Name>.fields.<field>]` blocks. The CLI sync push extracts that subtree and stores it as the type's `schema`, which the op-edit and schema-edit gates check against — see [Schema gate](#schema-gate).
 
@@ -1120,7 +1126,7 @@ export { Task };
 
 This produces the same runtime artifact as codegen output, but you lose the auto-registered barrel and the boot-time TOML/code consistency check. Reach for it only if TOML+codegen genuinely doesn't fit your build setup; the migration path back to TOML is `npx js-bao-codegen-v2 migrate`.
 
-Database field types: `id` (primary key, use `auto_assign = true` for ULIDs), `string`, `number`, `boolean`, `date`, `stringset` (set-of-strings field — use with `addToSet`/`removeFromSet`).
+Database field types: `id` (primary key, use `auto_assign = true` for ULIDs), `string`, `number`, `boolean`, `date`, `stringset` (set-of-strings field — use with `addToSet`/`removeFromSet`). There is no object/JSON field type — store structured payloads as JSON strings and parse on read.
 
 ### Indexes
 
@@ -1223,7 +1229,15 @@ For a unified "all DBs I can access" view, combine `databases.list()` with `grou
 
 ## Real-Time Subscriptions
 
-Databases push changes to connected clients over WebSocket. Subscriptions are **type-scoped** — defined once on the database type config and applied to every database of that type. The model key is `(appId, databaseType, subscriptionKey)`.
+Databases push changes to connected clients over WebSocket. A subscription answers "how does the client find out something changed?" — the client registers interest in a named subscription, and the server pushes batched record changes as they happen. Subscriptions are **type-scoped** — one definition per `(databaseType, subscriptionKey)` applies to every database of that type. The model key is `(appId, databaseType, subscriptionKey)`. Max 20 subscriptions per database type.
+
+### Mental model
+
+- Subscriptions deliver **deltas only**. Always pair a subscription with an initial `executeOperation` load (see [Canonical Pattern: Load + Subscribe](#canonical-pattern-load--subscribe)).
+- The **writer's connection** is excluded from fanout, not the writer's **user**. Another connection of the same user (e.g. another tab) still receives the change. Use `isOrigin` / `isOriginUser` to suppress optimistic echoes.
+- Subscriptions require both `access` and `filter` CEL. `access` is checked once at subscribe time with full user/membership context; `filter` runs per change with a narrow context (no memberships, no `database.*`).
+- There is **no replay on reconnect** — the client auto re-issues the subscription, but changes missed while disconnected are gone. Re-load if you need consistency.
+- `subscribe()` returns an `unsub()` function — there is **no** event-emitter API (`.on()` / `.unsubscribe()`). Call `unsub()` on teardown or you leak `ConnectionMapping` rows and dead callbacks.
 
 ### Registering a subscription
 
@@ -1243,7 +1257,7 @@ modelName = "ticket"
 accessRule = "user.userId != ''"
 filter = "record.data.assigneeId == user.userId && record.data.status == 'open'"
 select = ["id", "title", "priority", "updatedAt"]
-emit = ["enter", "leave"]
+emit = ["enter", "update", "leave"]
 
 [[subscriptions]]
 subscriptionKey = "tickets-by-team"
@@ -1257,69 +1271,158 @@ teamId = { type = "string", required = true }
 
 `primitive sync push` creates new subscriptions, updates changed ones, and deletes keys present on the server but missing from the TOML. `primitive sync pull` round-trips subscriptions back into `[[subscriptions]]` blocks.
 
-**Via admin HTTP API** — POST/PUT/DELETE directly from a server-side client:
+**Via admin HTTP API** — POST/PUT/DELETE directly against `/databases/types/<databaseType>/subscriptions` from a server-side client that holds admin permission:
 
 ```typescript
-await adminClient.fetch(
-  `/databases/types/support-desk/subscriptions`,
-  {
-    method: "POST",
-    body: JSON.stringify({
+  await adminClient.makeRequest(
+    "POST",
+    "/databases/types/support-desk/subscriptions",
+    {
       subscriptionKey: "my-open-tickets",
       displayName: "My open tickets",
       modelName: "ticket",
       access: "user.userId != ''",
       filter: "record.data.assigneeId == user.userId && record.data.status == 'open'",
-      // Optional: only send these fields in each change frame
       select: ["id", "title", "priority", "updatedAt"],
-      // Optional: only deliver these change types ("enter" | "update" | "leave")
-      emit: ["enter", "leave"],
-      // Optional: declared params bound to the subscriber
-      params: { teamId: { type: "string", required: false } },
-    }),
-  },
-);
+      emit: ["enter", "update", "leave"],
+    },
+  );
 ```
 
-Field semantics:
+Endpoints:
 
-- `subscriptionKey` — unique within the type. Clients reference it when subscribing. Must not contain `#`. Re-creating a subscription with the same key after deletion returns HTTP 409 if an archived row still holds the key — use a different key or hard-delete first.
-- `displayName` — required human label.
-- `modelName` — the model whose changes drive the subscription.
-- `access` / `accessRule` (CEL, required) — evaluated at subscribe time; false → subscribe is rejected. Must be a non-empty string. The TOML field is `accessRule`; the HTTP API field is `access`.
-- `filter` (CEL, required) — evaluated per-change, per-subscriber against `record.*` (with payload nested under `record.data.*`) and `record.previousData.*`. Only matches are delivered. Cannot grant access `access` denies. Must be a non-empty string — use `"true"` for "match every change `access` allowed". **Cannot reference `database.*`** — a `filter` that references `database.celContext.*` or `database.metadata.*` is rejected with HTTP 400 at save time.
-- `select` (string array) — narrows `data` (and `previousData`) to the listed fields **server-side**. Omit to send full records. Use `select` to keep sensitive fields off the wire entirely.
-- `emit` (string array) — one or more of `"enter"`, `"update"`, `"leave"`. Restricts which `changeType` values are delivered (see frame shape below). Omit for all.
-- `params` — declared params bound to the subscriber, exposed as `params.*` in `access` and `filter`. Supported types: `string`, `number`, `boolean`. Type checks are strict — no coercion. Max 5 entries.
+- `GET /databases/types/<databaseType>/subscriptions` — list active subscriptions for the type.
+- `POST /databases/types/<databaseType>/subscriptions` — create. Returns 409 if the `subscriptionKey` collides with an existing (or archived) subscription — use a different key or hard-delete first.
+- `GET /databases/types/<databaseType>/subscriptions/<subscriptionKey>` — read one.
+- `PUT /databases/types/<databaseType>/subscriptions/<subscriptionKey>` — update (`filter`, `access`, `select`, `emit`, `params` are all patchable).
+- `DELETE /databases/types/<databaseType>/subscriptions/<subscriptionKey>` — hard-delete.
 
-CEL context differs between the two phases:
+Field reference:
 
-- `access` (subscribe time): `user.userId`, `user.role`, `database.id`, `database.celContext.*` (also `database.metadata.*`), `params.*`, plus `isMemberOf`, `memberGroups`, `hasRole`.
-- `filter` (per-change broadcast): `user.userId` (the subscriber), `record.modelName`, `record.op`, `record.id`, `record.data.<fieldName>` (post-write payload), `record.previousData.<fieldName>` (pre-write payload, when present), and `params.*`. Memberships and `database.*` are **not** bound at filter time — put group-based and database-context-based authorization in `access`, not `filter`.
+| Field | TOML key | HTTP key | Required | Notes |
+|-------|----------|----------|----------|-------|
+| Subscription key | `subscriptionKey` | `subscriptionKey` | Yes | Per-`(app, databaseType)` unique. Clients reference it on `subscribe()`. Must NOT contain `#`. |
+| Display name | `displayName` | `displayName` | Yes | Human label. |
+| Model name | `modelName` | `modelName` | Yes | Scopes the subscription to one model. |
+| Access rule | `accessRule` | `access` | Yes | CEL — evaluated once at subscribe time. Non-empty string required. |
+| Filter | `filter` | `filter` | Yes | CEL — evaluated per change. Non-empty string required (use `"true"` for "match every change `access` allowed"). **Cannot reference `database.*`** — rejected with HTTP 400 at save time. |
+| Select | `select` | `select` | No | Array of field names to project `data` / `previousData` to before broadcast, **server-side**. Fields not listed never leave the server — use it to keep sensitive fields off the wire. |
+| Emit | `emit` | `emit` | No | Array restricting delivered `changeType` values: `"enter"`, `"update"`, `"leave"`. Omit for all. |
+| Params | `[subscriptions.params]` | `params` | No | `{ <name>: { type: "string" \| "number" \| "boolean", required?: boolean } }`. Strict type checks (no coercion). Max 5. Bound at subscribe time, exposed as `params.*` in `access` and `filter`. |
+
+Note the wire-format difference: the TOML field is `accessRule`; the HTTP API field is `access`. POSTing `accessRule` to the HTTP API is rejected with `access (CEL expression) is required`.
+
+### CEL context (access vs. filter)
+
+The two phases see different contexts:
+
+`access` (subscribe time — full context, evaluated once):
+
+| Variable | Notes |
+|----------|-------|
+| `user.userId`, `user.role` | `role` is the caller's app role. |
+| `database.id` | The database instance ID. |
+| `database.celContext.*` | The database's CEL context (also `database.metadata.*`). |
+| `isMemberOf(type, id)`, `memberGroups(type)`, `hasRole(role)` | Membership/role helpers. |
+| `params.*` | Subscriber-supplied params. |
+
+`filter` (per-change broadcast — narrow context, NO memberships, NO `database.*`):
+
+| Variable | Notes |
+|----------|-------|
+| `user.userId` | The subscriber's user id. |
+| `user.role` | **Always `""` empty string in filter context.** Don't rely on it. |
+| `record.modelName`, `record.op`, `record.id` | Top-level change metadata. |
+| `record.data.<fieldName>` | Post-write record fields. `null` on `delete`. |
+| `record.previousData.<fieldName>` | Pre-write row, when available (patch/delete). `null` on a fresh insert. |
+| `params.*` | Bound params from `subscribe()`. |
+
+`filter` cannot grant access that `access` denies — they're ANDed. Put group-based and database-context-based authorization in `access`, not `filter`. In `filter`, record payload fields live under `record.data.*` — `record.<fieldName>` does NOT work (only `record.modelName`, `record.op`, `record.id` are top-level).
 
 ### Subscribing from the client
 
-> **JavaScript only.** `client.databases.subscribe(...)` has no Swift equivalent — the Swift `DatabasesAPI` exposes no `subscribe`. Swift apps poll via `executeOperation` instead.
+`subscribe()` returns an `unsub()` function (synchronously). There is no event-emitter API.
 
 ```typescript
 const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
-  params: { teamId: "team-1" },
   onChange: (event) => {
-    // event.changes: Array of { op, changeType, modelName, id, data?, previousData? }
-    if (event.isOrigin) return;     // this tab already applied the change optimistically
+    // event.type === "db.change"
+    // event.databaseId, event.subscriptionKey, event.timestamp
+    // event.originConnectionId, event.originUserId, event.isOrigin, event.isOriginUser
+    if (event.isOrigin) return;  // this tab wrote it; UI already updated
     for (const change of event.changes) {
       // change.op:         "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet"
       // change.changeType: "enter" | "update" | "leave"
+      // change.modelName, change.id
+      // change.data, change.previousData  (subject to the subscription's `select`)
       applyChange(change);
     }
   },
 });
 
-// Later:
+// Later — REQUIRED for cleanup
 unsub();
 ```
 
-`subscribe` returns synchronously; the unsubscribe callback returns immediately. The client auto-reissues `db.subscribe` on WebSocket reconnect.
+Parameterized:
+
+```typescript
+const unsub = client.databases.subscribe(databaseId, "tickets-by-team", {
+  params: { teamId: "eng" },
+  onChange: (event) => { ... },
+});
+```
+
+The client auto-reissues `db.subscribe` on WebSocket reconnect — no app code needed.
+
+#### Wrong
+
+```typescript
+// WRONG — there is no .on() / .unsubscribe() / "reconnected" event.
+const sub = await client.databases.database(databaseId).subscribe("my-open-tickets");
+sub.on("change", handler);
+sub.on("reconnected", refetch);
+sub.unsubscribe();
+
+// WRONG — onChange receives an envelope with `changes[]`, not a single record.
+onChange: (record) => render(record);
+
+// WRONG — record payload fields are nested under `record.data`, not spread on `record`.
+filter: "record.assigneeId == user.userId"
+// CORRECT:
+filter: "record.data.assigneeId == user.userId"
+```
+
+### Change envelope shape
+
+```typescript
+interface DatabaseChangePayload {
+  type: "db.change";
+  databaseId: string;
+  subscriptionKey: string;
+  timestamp: string;             // ISO
+  /** Writer's connection id, or null for server-side writes (cron, workflow, admin). */
+  originConnectionId: string | null;
+  /** Writer's user id, or null for server-side writes. */
+  originUserId: string | null;
+  /** True iff this exact connection produced the write. Synthesized per recipient. */
+  isOrigin: boolean;
+  /** True iff any session signed in as the current user produced the write. */
+  isOriginUser: boolean;
+  changes: DatabaseChangeEvent[]; // 1+ changes; batched per write op
+}
+
+interface DatabaseChangeEvent {
+  op: "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet";
+  /** Filter-set transition. "enter" for newly matching rows, "update" for in-set
+   * changes, "leave" for rows that no longer match. */
+  changeType?: "enter" | "update" | "leave";
+  modelName: string;
+  id: string;
+  data?: any;          // present on save/patch/increment/addToSet/removeFromSet, subject to `select`
+  previousData?: any;  // present on patch/delete, subject to `select`
+}
+```
 
 ### Change-frame origin attribution
 
@@ -1332,23 +1435,92 @@ Every `db.change` frame carries who produced the write so subscribers can suppre
 | `isOrigin` | Synthesized per-recipient: `true` iff `originConnectionId` matches this client's current WS connection id |
 | `isOriginUser` | Synthesized per-recipient: `true` iff any tab/process signed in as the receiver wrote it. Differs from `isOrigin` across tabs of the same user — useful for cache invalidation that only cares about user identity. |
 
-On WS reconnect the local connection id rotates, so a frame for the writer's own pre-reconnect write may arrive with `isOrigin: false`. That's expected and harmless because the writer-exclusion server-side fanout still drops the frame from the writing connection itself.
+On WS reconnect the local connection id rotates, so a frame for the writer's own pre-reconnect write may arrive with `isOrigin: false`. That's expected and harmless because the writer-exclusion server-side fanout still drops the frame from the writing connection itself. `isOriginUser` is the stable cross-tab signal — use it for cache invalidation that doesn't care which tab made the write.
+
+### Reconnect & cleanup behavior
+
+- The WS client persists the registry of `(databaseId, subscriptionKey, params, onChange)` tuples and re-issues `db.subscribe` automatically when the socket reopens. No app code needed.
+- **No replay** of changes that occurred while disconnected. If you need consistency on reconnect, re-run your initial-load query.
+- The writer's connection is excluded from broadcast via `excludeConnectionId`. The writer's user is NOT excluded — other tabs/devices of the same user receive the change.
+- Auth refresh that does NOT require a hard reconnect leaves subscriptions intact. A hard reconnect re-runs the registry pass (so `access` is re-evaluated against the current user/memberships).
+- **Workflow mutations fan out too.** A `database.mutate` step in a workflow wakes up every matching subscription. Workflow (and cron-spawned) writes arrive with `originConnectionId: null` / `originUserId: null` and both `isOrigin` flags `false` — the subscription doesn't know or care that the write came from a server-side automation.
+
+### Canonical Pattern: Load + Subscribe
+
+```typescript
+async function liveTickets(databaseId: string) {
+  // 1. Initial load — full current state.
+  const { data: tickets } = await client.databases.executeOperation(
+    databaseId,
+    "list-my-open-tickets",
+  );
+  const byId = new Map(tickets.map(t => [t.id, t]));
+  render(Array.from(byId.values()));
+
+  // 2. Subscribe for delta updates.
+  const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
+    onChange: (event) => {
+      for (const change of event.changes) {
+        if (change.op === "delete") {
+          byId.delete(change.id);
+        } else {
+          // save / patch / increment / addToSet / removeFromSet
+          byId.set(change.id, change.data);
+        }
+      }
+      render(Array.from(byId.values()));
+    },
+  });
+
+  // 3. Return teardown — call this on unmount.
+  return unsub;
+}
+```
+
+Make the initial-load operation's filter and the subscription's `filter` semantically equivalent. If they diverge, the UI will flicker (records the operation returned but the subscription never updates, or vice versa).
+
+There is no built-in "reconnected" callback. If you need to re-run the initial load after a disconnect, listen for status events on the client itself — `JsBaoClient` extends `Observable`, so `client.on("status", ({ status }) => { ... })` lets you trigger your loader when the WS comes back up.
 
 ### Critical Rules
 
 1. **Always pair initial load with subscription.** Subscriptions deliver deltas only — fetch initial state with a regular `executeOperation` call and keep the query's filter semantically equivalent to the subscription's `filter`.
-2. **Writer's connection is excluded server-side.** The connection that triggered the mutation does not receive the change event back.
-3. **No replay on reconnect.** Re-query on reconnect; the server does not buffer missed changes.
-4. **Workflow mutations fan out too.** A `database.mutate` step in a workflow wakes up every matching subscription. Workflow writes arrive with `originConnectionId: null` / `originUserId: null` and both `isOrigin` flags `false`.
-5. **`select` is privacy-affecting.** Fields not listed never leave the worker. Use it instead of trying to scrub fields client-side.
+2. **Subscriptions require both `access` and `filter`** — non-empty CEL strings. `access` runs once at subscribe time with full context; `filter` runs per change with no memberships and no `database.*`. Use `"true"` for `filter` if `access` is the only narrowing you need.
+3. **In `filter`, record fields live under `record.data.*`** — not `record.<fieldName>`. Only `record.modelName`, `record.op`, `record.id` are top-level.
+4. **Writer's connection is excluded server-side, not the writer's user.** Another connection of the same user (e.g. another tab) still receives the change. Use `isOrigin` / `isOriginUser` to suppress optimistic echoes.
+5. **No replay on reconnect.** Re-query on reconnect; the server does not buffer missed changes.
+6. **`unsub()` leaks if not called.** Each `subscribe()` returns an `unsub` function. Call it on view teardown or you accumulate `ConnectionMapping` rows and dead callbacks.
+7. **Workflow mutations fan out too.** A `database.mutate` step wakes up every matching subscription. Workflow/cron writes arrive with `originConnectionId: null` / `originUserId: null` and both `isOrigin` flags `false`.
+8. **`select` is privacy-affecting.** Fields not listed never leave the server. Use it instead of trying to scrub fields client-side.
 
-See the [Scheduling and Real-Time guide](AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md) for the full walkthrough.
+### Anti-patterns
+
+- Polling a database on an interval to find changes. Use a subscription.
+- Putting `isMemberOf()` or per-user membership logic in subscription `filter` — `filter` has no membership data. Put it in `access`.
+- Writing `record.fieldName` in `filter` — record payload fields live under `record.data.fieldName`.
+- Sending an empty / missing `filter` on POST or PUT — both `access` and `filter` are required non-empty CEL strings. Use `"true"` if you don't want filter narrowing.
+- Sending the body field `accessRule` to the HTTP API — the wire-format field name is `access`.
+- Assuming the writer's own mutation comes back through THEIR subscription on the SAME connection — it doesn't. (Other connections of the same user DO receive it.)
+- Relying on replay after disconnect. There is none. Re-load if you need consistency.
+- Forgetting to call the returned `unsub()`. Leaks `ConnectionMapping` rows and registry entries.
+- Subscribing on every render. Subscribe once per view, unsub on unmount.
+- Creating >20 subscriptions per database type. Consolidate.
+
+### Debugging subscriptions
+
+- Subscribe call returns an error message (sent over WS as `type: "error"`, `context: "db.subscribe"`):
+  - `"Database not found"` / `"Subscription not found"` — wrong id/key or archived.
+  - `"Access denied to subscription"` — `access` returned false. Test the rule against the caller's user/memberships.
+  - `"Missing required parameter: ..."` / `"Undeclared parameter: ..."` / `"Parameter ... must be of type ..."` — params don't match schema.
+- Changes aren't arriving — verify (a) the write completed, (b) the subscription's `filter` matches the actual record (remember `record.data.field`, not `record.field`), (c) the subscriber's connection is still open.
+- "Seeing my own writes" — only happens if a different connection performed the write (e.g. another tab) or you have a client-side optimistic update on the same path.
+
+For driving subscriptions from a scheduled write (a cron-triggered workflow mutating a database), see the [Workflows agent guide](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md#cron-triggers). The cron-spawned mutation is just a normal write; the subscription doesn't know cron exists.
 
 ## Schema Introspection
 
 Databases are schemaless — the system tracks fields and inferred types as records are written.
 
-List the models (collections) in a database via the raw records endpoint:
+List the models (collections) in a database via the raw records endpoint `GET /app/<appId>/api/databases/<databaseId>/records/models` (returns `{ models: ["contacts", "orders", "products"] }`).
 
 ```typescript
 const response = await fetch(
@@ -1370,7 +1542,17 @@ Inferred types: `string`, `number`, `boolean`, `array`, `object`.
 
 ## CSV Import
 
-> **JavaScript only.** The rich `importCsv` API below (raw-CSV parsing, `columnMap`, per-row `transform`, `onProgress`) is JavaScript-only. The Swift client exposes `databases.importRows(databaseId:operationName:rows:batchSize:)`, which takes **pre-parsed** row dicts and batches them through `executeBatch` — parse the CSV with a third-party parser first, and do any column mapping / coercion yourself before calling.
+For one-off, non-programmatic bulk loads, use the CLI path:
+
+```bash
+primitive databases import-csv <database-id> <file.csv> --model products \
+  --column-map '{"Product Name":"name","Unit Price":"price"}' \
+  --types '{"price":"number"}' --id-column SKU
+```
+
+The CLI imports through a registered batch (bulk) save operation — `--operation` defaults to `seed_save`, so the database type needs a save-like op (`{ modelName, id, data }`) by that name (or pass your own). `--batch-size` defaults to 5000, `--delimiter` to `,`; use `--dry-run` to report row/batch counts without writing and `--stop-on-error` to abort on the first failing chunk (default is best-effort continue).
+
+For programmatic imports with per-row `transform` or progress callbacks, use `importCsv()` from app code:
 
 ```typescript
 import { Product } from "./models";
@@ -1400,16 +1582,6 @@ const result = await client.databases.importCsv(databaseId, {
 });
 // result: { imported: number, failed: number, errors: [...], indexesCreated: number, durationMs: number }
 ```
-
-For one-off, non-programmatic bulk loads there's also a CLI path:
-
-```bash
-primitive databases import-csv <database-id> <file.csv> --model products \
-  --column-map '{"Product Name":"name","Unit Price":"price"}' \
-  --types '{"price":"number"}' --id-column SKU
-```
-
-The CLI imports through a registered batch (bulk) save operation — `--operation` defaults to `seed_save`, so the database type needs a save-like op (`{ modelName, id, data }`) by that name (or pass your own). `--batch-size` defaults to 5000, `--delimiter` to `,`; use `--dry-run` to report row/batch counts without writing and `--stop-on-error` to abort on the first failing chunk (default is best-effort continue). Use `importCsv()` from app code when you need per-row `transform` or progress callbacks; use the CLI for ad-hoc imports from a terminal.
 
 ### Database design
 

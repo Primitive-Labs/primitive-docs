@@ -1,0 +1,410 @@
+{
+  "metadata": {
+    "skill_name": "docs-page-review",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-06-04T00:15:21Z",
+    "evals_run": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 0,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8,
+        "passed": 4,
+        "failed": 1,
+        "total": 5,
+        "time_seconds": 79.9,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Flags the web/browser-only framing (architecture diagram says 'Your App (Browser)', 'local in-browser database', JS-only stack) as a platform-neutrality violation given iOS is a first-class platform",
+          "passed": true,
+          "evidence": "Finding #3 (high): cites \"Your app reads and writes to a local **in-browser** database\", \"Your App (Browser)\" diagram, and contradicts \"multi-platform positioning (web + iOS)\"; invokes STYLE.md Platform treatment ('On the device', 'the client' \u2014 not 'in the browser')."
+        },
+        {
+          "text": "Flags mechanism-level detail as wrong altitude for an overview page (the defineModelSchema/JsBaoClient code samples and package-by-package stack detail)",
+          "passed": true,
+          "evidence": "Finding #1 (high): \"This section shows a full defineModelSchema block, a new JsBaoClient({...}) block, and names three packages with their internal roles \u2014 exactly the mechanism/API-shape detail the ceiling forbids.\""
+        },
+        {
+          "text": "Flags the 'runs on edge infrastructure' line (or equivalent) as an infrastructure-internals leak",
+          "passed": true,
+          "evidence": "Finding 2 flags the diagram/prose naming \"edge infrastructure\" as an infra-internals violation citing STYLE.md"
+        },
+        {
+          "text": "Findings cite which standard/rule is violated and propose concrete fixes (not just observations)",
+          "passed": true,
+          "evidence": "Every finding has a Fix column and cites a rule, e.g. #2 quotes STYLE.md \"No infrastructure internals... Describe developer-facing behavior\" with fix \"Drop the diagram entirely\"; #5 cites the Voice ban on 'production-ready'/'scales'."
+        },
+        {
+          "text": "Review classifies the page as a landing/overview-tier page and judges it against that tier",
+          "passed": true,
+          "evidence": "Header: \"**Tier: Landing / overview.** Per STYLE.md the entry altitude is 'capabilities and value \u2014 what you get,' and the hard ceiling is 'never name mechanisms...'\"; verdict judges it as \"over-scoped for its tier.\""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 202.6,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies that the documented access policies (public/authenticated/owner/cel) don't match the real enum (public-read/authenticated/owner-only)",
+          "passed": true,
+          "evidence": "Finding #1 (high): \"Access-policy table lists public / authenticated / owner / cel. Actual enum ... is exactly public-read / authenticated / owner-only. public, owner, and cel are not valid values.\""
+        },
+        {
+          "text": "Identifies that the documented TTL tiers (1-hour/1-day/30-days/persistent) don't match the real tiers (1d/3d/14d/28d/180d/365d/permanent)",
+          "passed": true,
+          "evidence": "Finding #4 (high): \"TTL-tier table values 1-hour / 1-day / 30-days / persistent are all fictional. Actual BlobBucketTtlTier ... is 1d / 3d / 14d / 28d / 180d / 365d / permanent.\""
+        },
+        {
+          "text": "Identifies that the [blobBucket] TOML table name and/or the inline [blobBucket.rules] CEL block don't match the real sync format ([bucket]; CEL rules not a released bucket surface)",
+          "passed": true,
+          "evidence": "Finding #8 (table name [blobBucket]\u2192[bucket], displayName\u2192name) plus finding #5: \"The [blobBucket.rules] table with read/write/delete keys does not exist \u2014 sync only accepts a ruleSetId string.\""
+        },
+        {
+          "text": "Identifies the metadata-vs-tags mismatch (uploads accept tags: string[]; there is no arbitrary metadata field for CEL rules to reference)",
+          "passed": true,
+          "evidence": "Finding #7: \"The real upload surface takes tags: string[] (BlobUploadParams.tags) ... the API 'has no arbitrary metadata field.'\""
+        },
+        {
+          "text": "Flags the shipped 'Content review needed' warning box as something that must not be published",
+          "passed": true,
+          "evidence": "Finding #7 explicitly flags \"a ::: warning Content review needed admitting the API ... STYLE.md 'No inconsistency asides' ... Remove the parenthetical (105) and the warning callout (115-117).\""
+        },
+        {
+          "text": "Does not invent additional false facts (no claims contradicting the source it cites)",
+          "passed": true,
+          "evidence": "\"What is correct\" section confirms the example-corpus includes exist and are parity-clean (\"all referenced files exist\"), the 100MB limit, CLI flags, and workflow steps \u2014 all consistent with ground truth. No false facts found; the false claim seen in the baseline (example files missing) is explicitly contradicted here."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.75,
+        "passed": 3,
+        "failed": 1,
+        "total": 4,
+        "time_seconds": 154.4,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies that reference-depth/advanced material (e.g. conditional-filter boolean gates, optional-filter substitution semantics, schema-gate error codes, operation timing) exceeds getting-started altitude or needs moving/condensing",
+          "passed": true,
+          "evidence": "Findings #5 (schema-gate error codes OPERATION_REFERENCES_UNDEFINED etc. \"reference-table depth\"), #6 (Operation Timing _timing breakdown \"debugging-internals reference\"), #7 (Conditional Filters/Boolean Gates truth tables \"exceeds the concept-page ceiling\")."
+        },
+        {
+          "text": "Makes an ordering/structure point: advanced material should sit below (not between/above) introductory and common-path content, or the page should be restructured along those lines",
+          "passed": true,
+          "evidence": "Verdict: \"the second half drifts to agent-guide altitude.\" Findings note placement (e.g. #6 \"Sits below 'Common Patterns' so it isn't a ramp violation\"; #7 \"correctly placed *low* on the page (good ramp)\") and the disposition is to relocate deep material to the agent guide/reference, keeping the ramp ordering."
+        },
+        {
+          "text": "Flags the '(SQLite-backed)' implementation-internal mention in the intro",
+          "passed": false,
+          "evidence": "No finding mentions 'SQLite-backed' or the storage engine. The standards findings (#1 JavaScript-only, #2 legacy alias, #3 truncation loop) and altitude findings do not include the SQLite intro leak that the without_skill run caught (its defect #3)."
+        },
+        {
+          "text": "Proposes concrete dispositions (condense, move to reference/agent docs, reorder) rather than only describing problems",
+          "passed": true,
+          "evidence": "Every finding has a Fix proposing concrete disposition, e.g. #4 \"Collapse to a short reference to access-control.md plus only the database-specific surface\"; #6 \"Reduce to one sentence ... or remove; let the guide carry the phase names.\""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.67,
+        "passed": 2,
+        "failed": 1,
+        "total": 3,
+        "time_seconds": 166.3,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies the template-variable namespace error: prompt templates read {{ input.* }}, not {{ variables.* }} as the page documents",
+          "passed": true,
+          "evidence": "Finding 1 (high/facts): templates documented under variables.* but engine places execution-time variables under input; fix replaces variables. with input. throughout"
+        },
+        {
+          "text": "Identifies that the documented prompt TOML shape is wrong (template text belongs on a [[configs]] entry as userPromptTemplate; [prompt] uses displayName, and has no body field)",
+          "passed": false,
+          "evidence": "Review does not identify the TOML shape problem \u2014 the [prompt] name/body example is not flagged; only the namespace error is found"
+        },
+        {
+          "text": "Verifies claims against actual source rather than asserting from intuition (cites files/paths as evidence)",
+          "passed": true,
+          "evidence": "Cites the template engine behavior and traced the render context (\"The template engine places execution-time variables under the context key input\"); agent verified against block-executor.ts/templates.ts"
+        },
+        {
+          "text": "Does not pad the review with manufactured findings beyond the real ones (at most ~5 minor/low suggestions)",
+          "passed": true,
+          "evidence": "Single high finding plus clean-lens statements; no padded minor findings (0 low-severity rows)"
+        },
+        {
+          "text": "States explicitly that the rest of the page conforms / is clean",
+          "passed": true,
+          "evidence": "Verdict: \"Well-structured and on-altitude \u2014 the ramp is monotonic... the platform/standards lenses are clean, and example parity is satisfied\"; lens-by-lens clean passes listed"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 0,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8,
+        "passed": 4,
+        "failed": 1,
+        "total": 5,
+        "time_seconds": 90.6,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Flags the web/browser-only framing (architecture diagram says 'Your App (Browser)', 'local in-browser database', JS-only stack) as a platform-neutrality violation given iOS is a first-class platform",
+          "passed": true,
+          "evidence": "Blocking issue #2: \"Prose is browser-centric, not platform-neutral \u2014 and the page is effectively web/Vue-only\"; cites \"Your App (Browser)\" header, \"runs in the browser\", JS-only Stack, and contradiction with \"web AND iOS both first-class\"."
+        },
+        {
+          "text": "Flags mechanism-level detail as wrong altitude for an overview page (the defineModelSchema/JsBaoClient code samples and package-by-package stack detail)",
+          "passed": true,
+          "evidence": "Blocking issue #1: \"Code blocks exceed the landing-tier ceiling \u2014 name mechanisms and API shapes\" \u2014 calls out the defineModelSchema block and new JsBaoClient({...}) block as schema syntax / specific API shapes."
+        },
+        {
+          "text": "Flags the 'runs on edge infrastructure' line (or equivalent) as an infrastructure-internals leak",
+          "passed": true,
+          "evidence": "Section \"3. Infrastructure-internals leak\" flags the \"runs on edge infrastructure\" line with the STYLE.md rule and a fix"
+        },
+        {
+          "text": "Findings cite which standard/rule is violated and propose concrete fixes (not just observations)",
+          "passed": true,
+          "evidence": "Each issue cites a rule and gives a **Fix**, e.g. #3 cites feedback_no_cloudflare_internals_in_docs / STYLE.md 'No infrastructure internals' and fixes by dropping 'that runs on edge infrastructure'."
+        },
+        {
+          "text": "Review classifies the page as a landing/overview-tier page and judges it against that tier",
+          "passed": true,
+          "evidence": "\"**Tier:** Landing / overview. Per the repo style guide, the entry altitude for this tier is *capabilities and value \u2014 what you get*, and its **ceiling** is: 'Never name mechanisms...'\" \u2014 and judges overshoot against that ceiling."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.67,
+        "passed": 4,
+        "failed": 2,
+        "total": 6,
+        "time_seconds": 187.5,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies that the documented access policies (public/authenticated/owner/cel) don't match the real enum (public-read/authenticated/owner-only)",
+          "passed": true,
+          "evidence": "C2: \"Actual valid policies ... public-read, authenticated, owner-only. The page uses public, authenticated, owner, cel: public \u2192 must be public-read ... owner \u2192 must be owner-only ... cel \u2192 does not exist.\""
+        },
+        {
+          "text": "Identifies that the documented TTL tiers (1-hour/1-day/30-days/persistent) don't match the real tiers (1d/3d/14d/28d/180d/365d/permanent)",
+          "passed": true,
+          "evidence": "C1: \"Actual valid tiers ... 1d, 3d, 14d, 28d, 180d, 365d, permanent. The page documents 1-hour, 1-day, 30-days, persistent \u2014 none of these exist.\""
+        },
+        {
+          "text": "Identifies that the [blobBucket] TOML table name and/or the inline [blobBucket.rules] CEL block don't match the real sync format ([bucket]; CEL rules not a released bucket surface)",
+          "passed": true,
+          "evidence": "C4: \"Table is [bucket], not [blobBucket]\"; C3: \"no inline rules mechanism ... [blobBucket.rules] TOML ... is silently ignored \u2014 and the table name is wrong anyway.\""
+        },
+        {
+          "text": "Identifies the metadata-vs-tags mismatch (uploads accept tags: string[]; there is no arbitrary metadata field for CEL rules to reference)",
+          "passed": true,
+          "evidence": "M1: \"uploads accept tags: string[] (client BlobUploadParams.tags ...) and that there is no arbitrary metadata field. This is accurate.\""
+        },
+        {
+          "text": "Flags the shipped 'Content review needed' warning box as something that must not be published",
+          "passed": false,
+          "evidence": "C3 references the page's \"::: warning Content review needed (115-117)\" but only as evidence it 'half-acknowledges the metadata-vs-tags problem' \u2014 it never says the warning box itself must not be published/shipped. M1 says delete the CEL section, not the warning-as-publishing-violation. No explicit 'must not ship this warning box' finding."
+        },
+        {
+          "text": "Does not invent additional false facts (no claims contradicting the source it cites)",
+          "passed": false,
+          "evidence": "M6 falsely claims \"Referenced example files do not exist ... There is no docs/examples/blobs/ directory in the repo ... these VitePress snippet includes would fail to build.\" Per ground truth the example files DO exist at the repo examples/ directory \u2014 this is an invented false fact."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 127.9,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies that reference-depth/advanced material (e.g. conditional-filter boolean gates, optional-filter substitution semantics, schema-gate error codes, operation timing) exceeds getting-started altitude or needs moving/condensing",
+          "passed": true,
+          "evidence": "Altitude section: \"Schema Gate (335-378) names specific server error codes ... reference-manual depth\"; Structure #2 \"Conditional Filters (Boolean Gates) is too deep for this page\"; #3 \"Operation Timing ... is a debugging/reference detail.\""
+        },
+        {
+          "text": "Makes an ordering/structure point: advanced material should sit below (not between/above) introductory and common-path content, or the page should be restructured along those lines",
+          "passed": true,
+          "evidence": "Structure #1: \"Flat, undifferentiated section list ... no grouping into 'core path' vs 'going further' ... either (a) splitting the advanced half into a separate page, or (b) adding a 'Beyond the basics' divider ... and demoting the deep sections beneath it.\""
+        },
+        {
+          "text": "Flags the '(SQLite-backed)' implementation-internal mention in the intro",
+          "passed": true,
+          "evidence": "Defect #3: \"'SQLite-backed' (line 3) leaks the storage engine. Per the repo's standard of describing developer-facing impact rather than backend internals, 'SQLite-backed' should be dropped.\""
+        },
+        {
+          "text": "Proposes concrete dispositions (condense, move to reference/agent docs, reorder) rather than only describing problems",
+          "passed": true,
+          "evidence": "Recommended actions: \"Add a 'core vs. advanced' boundary. Insert a divider after 'Access Control with CEL' and move (or relocate to a reference/patterns page) Conditional Filter Gates, Optional Filter Fields ... Schema Gate error codes, Operation Timing ...\""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.67,
+        "passed": 2,
+        "failed": 1,
+        "total": 3,
+        "time_seconds": 208.8,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies the template-variable namespace error: prompt templates read {{ input.* }}, not {{ variables.* }} as the page documents",
+          "passed": true,
+          "evidence": "Findings #1/#3 (high/facts): {{ variables.* }} namespace wrong; fix to {{ input.* }}"
+        },
+        {
+          "text": "Identifies that the documented prompt TOML shape is wrong (template text belongs on a [[configs]] entry as userPromptTemplate; [prompt] uses displayName, and has no body field)",
+          "passed": true,
+          "evidence": "Finding #2 (high/facts): prompt-level name/body do not exist; displayName + [[configs]].userPromptTemplate is the real schema"
+        },
+        {
+          "text": "Verifies claims against actual source rather than asserting from intuition (cites files/paths as evidence)",
+          "passed": true,
+          "evidence": "Cites real config files and source; \"most facts check out against the published CLI and client API\""
+        },
+        {
+          "text": "Does not pad the review with manufactured findings beyond the real ones (at most ~5 minor/low suggestions)",
+          "passed": true,
+          "evidence": "Three high findings, all real; no manufactured minors (0 low-severity rows); lenses reported clean"
+        },
+        {
+          "text": "States explicitly that the rest of the page conforms / is clean",
+          "passed": true,
+          "evidence": "\"Ramp and altitude \u2014 clean\", \"Tone and audience \u2014 clean\", page \"well-structured and rides a clean ramp\""
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 0.805,
+        "stddev": 0.1406,
+        "min": 0.67,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 150.8,
+        "stddev": 51.5211,
+        "min": 79.9,
+        "max": 202.6
+      },
+      "tokens": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.785,
+        "stddev": 0.1559,
+        "min": 0.67,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 153.7,
+        "stddev": 54.2393,
+        "min": 90.6,
+        "max": 208.8
+      },
+      "tokens": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.02",
+      "time_seconds": "-2.9",
+      "tokens": "+0"
+    }
+  },
+  "notes": []
+}

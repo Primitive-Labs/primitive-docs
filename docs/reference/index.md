@@ -2,80 +2,6 @@
 
 Generated reference documentation for each project.
 
-## js-bao
-
-### Api
-
-- ** Media**
-  - [model-autogen-plan](/reference/js-bao/api/_media/model-autogen-plan)
-  - [model-migration-guide](/reference/js-bao/api/_media/model-migration-guide)
-- **Classes**
-  - [BaseModel](/reference/js-bao/api/classes/BaseModel)
-  - [DatabaseEngine](/reference/js-bao/api/classes/DatabaseEngine)
-  - [DocumentClosedError](/reference/js-bao/api/classes/DocumentClosedError)
-  - [DocumentResolutionError](/reference/js-bao/api/classes/DocumentResolutionError)
-  - [Logger](/reference/js-bao/api/classes/Logger)
-  - [ModelRegistry](/reference/js-bao/api/classes/ModelRegistry)
-  - [RecordNotFoundError](/reference/js-bao/api/classes/RecordNotFoundError)
-  - [StringSet](/reference/js-bao/api/classes/StringSet)
-  - [UniqueConstraintViolationError](/reference/js-bao/api/classes/UniqueConstraintViolationError)
-- **Enumerations**
-  - [LogLevel](/reference/js-bao/api/enumerations/LogLevel)
-- **Functions**
-  - [attachAndRegisterModel](/reference/js-bao/api/functions/attachAndRegisterModel)
-  - [attachSchemaToClass](/reference/js-bao/api/functions/attachSchemaToClass)
-  - [autoRegisterModel](/reference/js-bao/api/functions/autoRegisterModel)
-  - [clearMetaSyncCache](/reference/js-bao/api/functions/clearMetaSyncCache)
-  - [createModelClass](/reference/js-bao/api/functions/createModelClass)
-  - [defineModelSchema](/reference/js-bao/api/functions/defineModelSchema)
-  - [discoverModelNames](/reference/js-bao/api/functions/discoverModelNames)
-  - [discoverSchema](/reference/js-bao/api/functions/discoverSchema)
-  - [dumpYDocToPlain](/reference/js-bao/api/functions/dumpYDocToPlain)
-  - [generateULID](/reference/js-bao/api/functions/generateULID)
-  - [inferFieldType](/reference/js-bao/api/functions/inferFieldType)
-  - [initJsBao](/reference/js-bao/api/functions/initJsBao)
-  - [loadSchemaFromToml](/reference/js-bao/api/functions/loadSchemaFromToml)
-  - [loadSchemaFromTomlString](/reference/js-bao/api/functions/loadSchemaFromTomlString)
-  - [registerFunctionDefault](/reference/js-bao/api/functions/registerFunctionDefault)
-  - [resetJsBao](/reference/js-bao/api/functions/resetJsBao)
-  - [schemaToToml](/reference/js-bao/api/functions/schemaToToml)
-  - [summarizePlainYDoc](/reference/js-bao/api/functions/summarizePlainYDoc)
-  - [syncInferredMeta](/reference/js-bao/api/functions/syncInferredMeta)
-  - [syncModelMeta](/reference/js-bao/api/functions/syncModelMeta)
-- **Interfaces**
-  - [ConnectedDocument](/reference/js-bao/api/interfaces/ConnectedDocument)
-  - [DatabaseConfig](/reference/js-bao/api/interfaces/DatabaseConfig)
-  - [DiscoveredConstraint](/reference/js-bao/api/interfaces/DiscoveredConstraint)
-  - [DiscoveredField](/reference/js-bao/api/interfaces/DiscoveredField)
-  - [DiscoveredModel](/reference/js-bao/api/interfaces/DiscoveredModel)
-  - [DiscoveredRelationship](/reference/js-bao/api/interfaces/DiscoveredRelationship)
-  - [DiscoveredSchema](/reference/js-bao/api/interfaces/DiscoveredSchema)
-  - [DocumentConnectionEvent](/reference/js-bao/api/interfaces/DocumentConnectionEvent)
-  - [DocumentManager](/reference/js-bao/api/interfaces/DocumentManager)
-  - [DumpOptions](/reference/js-bao/api/interfaces/DumpOptions)
-  - [DumpSummary](/reference/js-bao/api/interfaces/DumpSummary)
-  - [DumpSummaryEntry](/reference/js-bao/api/interfaces/DumpSummaryEntry)
-  - [FieldOptions](/reference/js-bao/api/interfaces/FieldOptions)
-  - [IncludeSpec](/reference/js-bao/api/interfaces/IncludeSpec)
-  - [InitJsBaoOptions](/reference/js-bao/api/interfaces/InitJsBaoOptions)
-  - [InitJsBaoResult](/reference/js-bao/api/interfaces/InitJsBaoResult)
-  - [ModelOptions](/reference/js-bao/api/interfaces/ModelOptions)
-  - [PaginatedResult](/reference/js-bao/api/interfaces/PaginatedResult)
-  - [PaginationOptions](/reference/js-bao/api/interfaces/PaginationOptions)
-  - [QueryOptions](/reference/js-bao/api/interfaces/QueryOptions)
-  - [SaveOptions](/reference/js-bao/api/interfaces/SaveOptions)
-- **Type Aliases**
-  - [DocumentConnectionCallback](/reference/js-bao/api/type-aliases/DocumentConnectionCallback)
-  - [DocumentFilter](/reference/js-bao/api/type-aliases/DocumentFilter)
-  - [DocumentPermissionHint](/reference/js-bao/api/type-aliases/DocumentPermissionHint)
-  - [InferAttrs](/reference/js-bao/api/type-aliases/InferAttrs)
-  - [ModelConstructor](/reference/js-bao/api/type-aliases/ModelConstructor)
-  - [PlainYDoc](/reference/js-bao/api/type-aliases/PlainYDoc)
-  - [ProjectionSpec](/reference/js-bao/api/type-aliases/ProjectionSpec)
-  - [QueryResult](/reference/js-bao/api/type-aliases/QueryResult)
-- [globals](/reference/js-bao/api/globals)
-- [README](/reference/js-bao/api/README)
-
 ## js-bao-wss-client
 
 ### Api
@@ -90,12 +16,10 @@ Generated reference documentation for each project.
   - [attachAndRegisterModel](/reference/js-bao-wss-client/api/functions/attachAndRegisterModel)
   - [createModelClass](/reference/js-bao-wss-client/api/functions/createModelClass)
   - [defineModelSchema](/reference/js-bao-wss-client/api/functions/defineModelSchema)
-  - [discoverSchema](/reference/js-bao-wss-client/api/functions/discoverSchema)
   - [generateULID](/reference/js-bao-wss-client/api/functions/generateULID)
   - [initializeClient](/reference/js-bao-wss-client/api/functions/initializeClient)
   - [initJsBao](/reference/js-bao-wss-client/api/functions/initJsBao)
   - [isJsBaoError](/reference/js-bao-wss-client/api/functions/isJsBaoError)
-  - [loadSchemaFromTomlString](/reference/js-bao-wss-client/api/functions/loadSchemaFromTomlString)
 - **Interfaces**
   - [AcceptInviteResult](/reference/js-bao-wss-client/api/interfaces/AcceptInviteResult)
   - [AddManagerParams](/reference/js-bao-wss-client/api/interfaces/AddManagerParams)
@@ -170,11 +94,6 @@ Generated reference documentation for each project.
   - [DirectCollectionAdd](/reference/js-bao-wss-client/api/interfaces/DirectCollectionAdd)
   - [DirectGroupAdd](/reference/js-bao-wss-client/api/interfaces/DirectGroupAdd)
   - [DirectPermissionGrant](/reference/js-bao-wss-client/api/interfaces/DirectPermissionGrant)
-  - [DiscoveredConstraint](/reference/js-bao-wss-client/api/interfaces/DiscoveredConstraint)
-  - [DiscoveredField](/reference/js-bao-wss-client/api/interfaces/DiscoveredField)
-  - [DiscoveredModel](/reference/js-bao-wss-client/api/interfaces/DiscoveredModel)
-  - [DiscoveredRelationship](/reference/js-bao-wss-client/api/interfaces/DiscoveredRelationship)
-  - [DiscoveredSchema](/reference/js-bao-wss-client/api/interfaces/DiscoveredSchema)
   - [DOClientEngine](/reference/js-bao-wss-client/api/interfaces/DOClientEngine)
   - [DocumentAccessResult](/reference/js-bao-wss-client/api/interfaces/DocumentAccessResult)
   - [DocumentAliasesAPI](/reference/js-bao-wss-client/api/interfaces/DocumentAliasesAPI)
@@ -318,6 +237,7 @@ Generated reference documentation for each project.
 - **Variables**
   - [ANALYTICS_UNAUTHENTICATED_USER](/reference/js-bao-wss-client/api/variables/ANALYTICS_UNAUTHENTICATED_USER)
   - [AUTH_CODES](/reference/js-bao-wss-client/api/variables/AUTH_CODES)
+  - [discoverSchema](/reference/js-bao-wss-client/api/variables/discoverSchema)
 - [globals](/reference/js-bao-wss-client/api/globals)
 - [README](/reference/js-bao-wss-client/api/README)
 

@@ -4,7 +4,7 @@ Guidelines for modeling user relationships and managing access control with Prim
 
 ## Core operations
 
-The key client calls, compiled against the real clients as part of the docs build. The dense reference below adds the result shapes, discriminated-union branching, and CEL access-control detail.
+The key client calls, compiled against the real clients as part of the docs build. The dense reference below adds the result shapes, result-status branching, and CEL access-control detail.
 
 ### Look up users
 
@@ -122,23 +122,22 @@ The user lookup surface — single fetch, batch fetch, and email lookup — is s
 There is no `list()` or `get()` method on `client.users`. The current authenticated user lives on a separate namespace: `client.me.get()` returns the current user's profile (cached, with the same `GetUserOptions` knobs). To enumerate or search users in the app, use the REST endpoint or the CLI:
 
 ```bash
-# Paginated list of app users
-primitive users list [--limit N] [--cursor <next>]
+# List app users
+primitive users list
 
-# Substring search by name (minimum 2 characters per term; tokens AND-combined)
-# Backed by a global search index on User.name.
-primitive users list --name "ali"
+# --search: ULID → userId lookup; '@' → email lookup; otherwise substring
+# name search (backed by a global search index on User.name).
+primitive users list --search "ali"
 ```
 
-```typescript
-// Direct API call for in-app pickers
-const res = await fetch(`/app/${appId}/api/users?name=${encodeURIComponent("ali")}&limit=20`, {
-  headers: { Authorization: `Bearer ${token}` },
-});
-const { items, nextCursor } = await res.json();
+For in-app user pickers, call the REST endpoint directly:
+
+```
+GET /app/{appId}/api/users?name=ali&limit=20
+Authorization: Bearer <token>
 ```
 
-User search returns rows of `{ userId, email, name, avatarUrl, role, addedAt }` filtered to members of the current app.
+It returns `{ items, nextCursor }`, where each row is `{ userId, email, name, avatarUrl, role, addedAt }` filtered to members of the current app.
 
 ### App roles
 
@@ -273,19 +272,10 @@ If the group type has `autoAddCreator: true` (default), the creator is automatic
 
 ### Add members
 
-```typescript
-// By user ID — always direct
-await client.groups.addMember("team", "engineering", { userId: "user-456" });
+Add a member by `userId` (always direct) or by `email` (direct if the email maps to an app user, deferred otherwise). Pass **either** `userId` or `email`, never both — the server rejects requests carrying both.
+`AddGroupMemberParams` is a discriminated union and the types enforce the either/or at compile time.
 
-// By email — direct if the email maps to an app user, deferred otherwise
-const result = await client.groups.addMember("team", "engineering", {
-  email: "alice@example.com",
-});
-```
-
-`AddGroupMemberParams` is a discriminated union — pass **either** `userId` or `email`, never both. The TS types enforce this.
-
-`addMember` returns `DirectGroupAdd | DeferredGroupAdd` — branch on `status`:
+`addMember` returns a result you branch on by `status` (`DirectGroupAdd | DeferredGroupAdd`):
 
 ```typescript
   const result = await client.groups.addMember("team", "engineering", { email });
@@ -307,27 +297,17 @@ const result = await client.groups.addMember("team", "engineering", {
 
 Status meanings:
 - `"added"` — new membership created. `{ userId, userName?, userEmail?, addedAt, addedBy }`.
-- `"already_member"` — idempotent no-op. `addedAt`/`addedBy` reflect the pre-existing row. Replaces the old HTTP 409 response.
+- `"already_member"` — idempotent no-op. `addedAt`/`addedBy` reflect the pre-existing row.
 - `"pending_signup"` — email not yet an app user. Server created an `AppInvitation` + `DeferredGroupAdd`: `{ email, appInvitationCreated, deferredId, expiresAt, groupType, groupId, invitationId, inviteToken }`. Use `inviteToken` to build your own accept URL; the platform's default email is sent unless the underlying invitation was created with `sendEmail: false`.
 
 Until a deferred add resolves, `isMemberOf` returns false for that email's user — do not assume membership before sign-up/accept.
 
 **Don't do this:**
 
-```typescript
-// BAD — mixing userId and email is rejected by the type system AND the server
-await client.groups.addMember("team", "engineering", {
-  userId: "user-456",
-  email: "alice@example.com",
-});
+- **Don't pass both `userId` and `email`** in one call — it's rejected.
+- **Don't assume the result is always direct.** When the email isn't an app user yet, `status` is `"pending_signup"` and there is no `userId` on the result — always branch on `status` before reading direct-add fields.
 
-// BAD — assuming the result is always direct. If the email isn't an app user
-// yet, result.userId is undefined.
-const r = await client.groups.addMember("team", "engineering", { email });
-console.log(r.userId); // TypeError when r.status === "pending_signup"
-```
-
-See the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md) for the full deferred-grant lifecycle and the token-based acceptance path.
+See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-grants) for the full deferred-grant lifecycle and the token-based acceptance path.
 
 ### List members
 
@@ -372,7 +352,8 @@ Use this to render the "pending members" section of a group sharing UI without h
   // [{ groupType, groupId, name, description?, addedAt, addedBy }]
 ```
 
-`name` is joined from `AppGroup` at call time; orphan rows (membership pointing at a deleted group) are skipped. In TypeScript, pass `{ groupType }` to filter to a single type — a server-side SK-range push-down, not a post-query JS filter. (The Swift client returns all memberships; filter client-side.)
+`name` is joined from `AppGroup` at call time; orphan rows (membership pointing at a deleted group) are skipped.
+Pass `{ groupType }` to filter to a single type — a server-side range push-down, not a post-query filter.
 
 ## Group Type Configuration
 
@@ -520,7 +501,7 @@ access: "has(database.metadata.teamId) && isMemberOf('team', database.metadata.t
 Rule sets control who can manage groups (`category: "group"`) and group members (`category: "member"`). Each `(category, operation)` pair holds a CEL expression evaluated against the requesting user and the target group.
 
 **Valid operations:**
-- `category: "group"` — `create`, `edit`, `delete`, `get` (the read op was renamed from `list` to `get` to match the single-resource controller method; rule sets persisted before the rename keep working via a `get` → `list` alias, but new TOML configs must use `get`).
+- `category: "group"` — `create`, `edit`, `delete`, `get` (the read op; use `get` in TOML configs).
 - `category: "member"` — `create`, `edit`, `delete`, `list`.
 
 There is no `read` or `update` — use `edit`. There is no `add` — use `create` (for `member.create` = "add member").
@@ -603,7 +584,7 @@ Plus all CEL functions: `isMemberOf`, `memberGroups`, `hasRole`, `now()`, `fromW
 
 **Don't do this — rule CEL footguns:**
 
-```toml
+```toml novalidate
 # BAD — `user.appRole` does not exist. Use user.role.
 create = "user.appRole == 'admin'"
 
@@ -668,7 +649,7 @@ Collections (see the [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#col
 
 **Resource type:** `collection`. **Categories and operations:**
 
-- `category: "collection"` — `create`, `edit`, `delete`, `get` (the read op was renamed from `list` to `get` for parity with `group.get`; rule sets persisted before the rename keep working via a `get` → `list` alias, but new TOML configs must use `get`).
+- `category: "collection"` — `create`, `edit`, `delete`, `get` (the read op, parallel to `group.get`; use `get` in TOML configs).
 - `category: "document"` — `add`, `remove`, `list` (controls which documents the collection can hold).
 - `category: "member"` — `add`, `remove`, `list`.
 
@@ -684,7 +665,7 @@ Collections (see the [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#col
 | `member.add` / `remove` | `user.userId == collection.createdBy` | Creator only |
 | `member.list` | `user.userId == collection.createdBy \|\| hasCollectionAccess(collection.collectionId)` | Creator or collection member |
 
-Per-op fallback applies — configured ops always win, missing ops resolve against this table. A `CollectionTypeConfig` row whose `ruleSetId` is null is an explicit opt-out and denies everything except admin/owner. Self-leave on `member.remove` is currently NOT short-circuited and returns 403 for non-creator readers/writers.
+Per-op fallback applies — configured ops always win, missing ops resolve against this table. A `CollectionTypeConfig` row whose `ruleSetId` is null is an explicit opt-out and denies everything except admin/owner. A non-creator reader/writer removing their own membership via `member.remove` is denied (403) unless the rule set grants it.
 
 ### CEL context for collection rule sets
 
@@ -813,7 +794,7 @@ type = "query"
 modelName = "grades"
 access = "true"
 definition = '{"filter":{"studentId":"$params.studentId"},"sort":{"date":-1}}'
-params = '{"studentId":{"type":"string","required":true,"access":"value in memberGroups(\'parent-of\')"}}'
+params = '''{"studentId":{"type":"string","required":true,"access":"value in memberGroups('parent-of')"}}'''
 ```
 
 The per-parameter `access` expression ensures parents can only view their own children's grades.
@@ -890,7 +871,7 @@ await client.groups.addMember("team", "backend", { userId });
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `addMember` returns `status: "pending_signup"` | Email isn't an app user yet | Expected. Membership resolves when they sign up or accept via `inviteToken`. Render a pending-members UI; cancel via `removeMember({ email })` or `invitations.revokeDeferredGrant(deferredId, "group")`. |
-| `addMember` returns `status: "already_member"` | User already in the group | Idempotent — no error. Replaces the previous HTTP 409 response. |
+| `addMember` returns `status: "already_member"` | User already in the group | Idempotent — no error. |
 | 409 on `groups.create` | A group with that `(groupType, groupId)` already exists | Use a different `groupId` or call `groups.get` first. |
 | 403 on `groups.create` (member role) | The group type has a `GroupTypeConfig` row with no rule set attached (explicit opt-out), OR a configured `group.create` rule denied the caller | Either delete the `GroupTypeConfig` row to fall back to the permissive default (`group.create = "true"`), attach a rule set with a permissive `group.create`, or call as an owner/admin. |
 | 403 on `groups.create` with `groupType` starting with `_` | Reserved system group type | Pick a different prefix. |

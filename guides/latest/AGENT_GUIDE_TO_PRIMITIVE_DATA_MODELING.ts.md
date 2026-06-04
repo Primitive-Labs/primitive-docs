@@ -6,7 +6,7 @@ How to choose between **documents** and **databases**, and how to combine them. 
 
 | | **Documents** (js-bao) | **Databases** (js-bao-wss) |
 |---|---|---|
-| Backed by | Yjs CRDT + IndexedDB cache, synced over WebSocket | Isolated server-side store (SQLite), called over HTTPS |
+| Backed by | Yjs CRDT, cached on-device and synced over WebSocket | Isolated server-side store (SQLite), called over HTTPS |
 | Where data lives | On every client that has access, plus the server | Server only |
 | Reads | Local, synchronous after `documents.open()` | Network round-trip per call |
 | Writes | Local first, async sync to server, automatic CRDT merge | Network round-trip; last-write-wins per field |
@@ -149,9 +149,7 @@ filter = "record.assigneeId == user.userId && record.status == 'open'"
 select = ["id", "title", "priority", "updatedAt"]  # optional projection
 ```
 
-<!-- Inline (not templatized): database-level subscriptions are TypeScript-only.
-     `client.databases.subscribe` has no Swift counterpart, so this block stays a
-     raw TS fence rather than a {{ example }} placeholder. -->
+Subscribe from the client and pair it with an operation call for the initial state:
 
 ```typescript
 const initial = await client.databases.executeOperation(dbId, "listMyTickets", {});
@@ -163,7 +161,7 @@ const unsub = client.databases.subscribe(dbId, "my-open-tickets", {
 });
 ```
 
-Database subscriptions are available in the TypeScript client. Subscriptions deliver deltas only — always pair with an operation call for the initial state, and use semantically equivalent filters. See the Databases guide for the full frame shape (`originConnectionId`, `originUserId`, `isOrigin`, `isOriginUser`, `changeType`).
+Subscriptions deliver deltas only — always pair with an operation call for the initial state, and use semantically equivalent filters. See the Databases guide for the full frame shape (`originConnectionId`, `originUserId`, `isOrigin`, `isOriginUser`, `changeType`).
 
 ## Worked architectures
 
@@ -183,7 +181,7 @@ Documents only. One document per workspace. Owner shares with teammates via grou
 ### Multi-tenant SaaS / project management
 
 - **Document** per user for personal preferences, dashboard layout.
-- **Database** per organization (`type: "org"`) and **per project** (`type: "project"`). Per-project DOs scale and isolate independently. Group membership (`team`, `admin`) gates operations.
+- **Database** per organization (`type: "org"`) and **per project** (`type: "project"`). Each database is an isolated instance, so per-project databases scale and fail independently. Group membership (`team`, `admin`) gates operations.
 
 ### E-commerce
 

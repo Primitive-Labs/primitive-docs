@@ -62,6 +62,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      # Drift gate: example parity, TS compile (the Swift compile gate needs
+      # an Apple host and is skipped here — the Checks workflow's macOS job
+      # covers it pre-merge), rendered guides current, guides.json current,
+      # TOML examples valid, CLI invocations valid against primitive-admin.
+      - name: Check examples, TOML, and CLI invocations
+        run: pnpm check:examples
+
       - name: Build documentation
         run: pnpm docs:build:ci
 

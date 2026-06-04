@@ -2,22 +2,23 @@
 
 Guidelines for AI agents implementing analytics tracking in Primitive apps.
 
-> **JavaScript-only client API.** The custom-event client surface (`client.analytics.logEvent/logSnapshot/setPlanOverride/setAppVersionOverride`) exists **only in the JavaScript client**. The Swift client has internal analytics plumbing (auto-events, an `AnalyticsQueue`) but exposes **no public `client.analytics` API** — do not write Swift snippets that call `client.analytics.*`. Server-side auto-tracking applies to all platforms; read analytics via CLI/REST/workflow steps.
-
 ## Overview
 
-Primitive provides built-in analytics via `client.analytics`. Events are buffered client-side, batched over WebSocket, and stored server-side for querying. The system handles offline persistence, rate limiting, and automatic lifecycle events out of the box.
+Primitive provides built-in analytics. The platform tracks user activity and resource lifecycle automatically and stores events server-side for querying. The system handles offline persistence, rate limiting, and automatic lifecycle events out of the box.
 
-**Key constraints:**
-- Every analytics event requires an authenticated user. Events without a `user_ulid` are dropped silently. Use `ANALYTICS_UNAUTHENTICATED_USER` for pre-auth screens.
-- A tenant ID (resolved automatically from `client.appId`) must also be present, or the event is dropped.
+Read aggregated analytics (DAU/WAU/MAU, retention, top users, event feeds) through the `primitive` CLI, the REST API, or workflow steps — covered below.
 
 ---
 
 ## What's Tracked Automatically (Zero Developer Work)
 
-Initializing `JsBaoClient` with default options gets you DAU/WAU/MAU tracking, session analytics, document/permission audit trails, and full workflow/prompt/integration observability with no `logEvent` calls.
+Standing up an app gets you DAU/WAU/MAU tracking, session analytics, document/permission audit trails, and full workflow/prompt/integration observability with no instrumentation.
 
+**Key constraints for custom events:**
+- Every analytics event requires an authenticated user. Events without a `user_ulid` are dropped silently. Use the unauthenticated-user constant for pre-auth screens.
+- A tenant ID (resolved automatically from the client's `appId`) must also be present, or the event is dropped.
+
+{{#lang ts}}
 ### Client-Side Auto Events
 
 All enabled by default. The client automatically emits these lifecycle events:
@@ -37,6 +38,7 @@ All enabled by default. The client automatically emits these lifecycle events:
 | `prompt_started` | `gemini` | on | Gemini `generate` / `countTokens` / `generateRaw` begins |
 | `prompt_succeeded` | `gemini` | on | Gemini `generate` / `countTokens` / `generateRaw` succeeds |
 | `prompt_failed` | `gemini` | on | Gemini `generate` / `countTokens` / `generateRaw` fails |
+{{/lang}}
 
 ### Server-Side Events
 
@@ -74,15 +76,21 @@ The platform emits these from the server. No client code at all.
 
 Workflow and prompt events also record `duration_ms` and LLM token counts (`input_tokens`, `output_tokens`, `total_tokens`) when available.
 
+{{#lang ts}}
 ### Auto-Populated Fields
 
 Every event (auto or custom) gets these populated automatically:
 
 `tenant_id` (from `client.appId`), `route` (from `window.location.pathname`), `device_type`, `os_name`, `os_version`, `browser_name`, `browser_version`, `plan` (default `"unknown"`), `connection_id`.
+{{/lang}}
 
-### Offline Persistence
+### Offline Persistence and Rate Limiting
 
-Events are persisted to IndexedDB while offline (cap **1 MiB**). When the buffer exceeds the cap, the **oldest** events are dropped. On reconnect, persisted events are flushed automatically. Rate limiting still applies: **300 events/minute, burst cap 60 tokens**. No special code needed.
+Events are buffered on the device and persisted locally while offline; persisted events are flushed automatically when the WebSocket reconnects. A rate limiter caps emission at **300 events/minute with a 60-token burst** — events over the cap are dropped silently. No special code needed.
+
+{{#lang ts}}
+The offline buffer is persisted to IndexedDB with a **1 MiB** cap; when it exceeds the cap the **oldest** events are dropped.
+{{/lang}}
 
 ---
 
@@ -90,32 +98,31 @@ Events are persisted to IndexedDB while offline (cap **1 MiB**). When the buffer
 
 ### Basic Event
 
-```typescript
-client.analytics.logEvent({
-  action: "photo_uploaded",
-  feature: "gallery",
-  user_ulid: currentUserUlid,
-});
-```
+`action` and `user_ulid` are required; `feature` (defaults to `"unspecified"`) groups related events.
 
+{{ example: analytics/log-event }}
+
+{{#lang ts}}
 `action` and `user_ulid` are required by the TypeScript interface. At runtime, `user_ulid` will be back-filled from the queue's user-resolver if you omit it AND the resolver returns a value — but the type checker won't let you omit it, so always pass it explicitly (or use `ANALYTICS_UNAUTHENTICATED_USER`).
+{{/lang}}
+{{#lang swift}}
+`logAnalyticsEvent` takes a `[String: Any]` dictionary. If `user_ulid` is omitted it is back-filled from the client's current user, or set to the unauthenticated-user constant when no user is signed in.
+{{/lang}}
 
 ### Event with Context
 
-```typescript
-client.analytics.logEvent({
-  action: "search_executed",
-  feature: "search",
-  user_ulid: currentUserUlid,
-  context_json: {
-    query: "quarterly report",
-    resultCount: 42,
-  },
-});
-```
+Pass a `context_json` object for per-event debug data. The serialized payload is bounded at **1 KiB**, so keep it small — don't dump request bodies or full reports.
 
-`context_json` accepts a `Record<string, unknown>` or a JSON string. It is serialized then **truncated to 1 KiB** of UTF-8 (truncation respects code-point boundaries). If you pass an object and don't override defaults, the queue auto-includes `ua`, `language`, and `screen` dimensions.
+{{ example: analytics/log-event-context }}
 
+{{#lang ts}}
+`context_json` accepts a `Record<string, unknown>` or a JSON string. It is serialized then truncated to 1 KiB of UTF-8 (truncation respects code-point boundaries). If you pass an object and don't override defaults, the queue auto-includes `ua`, `language`, and `screen` dimensions.
+{{/lang}}
+{{#lang swift}}
+`context_json` accepts a `[String: Any]` dictionary. If its serialized size exceeds 1 KiB, the field is dropped from the event before sending.
+{{/lang}}
+
+{{#lang ts}}
 ### AnalyticsEventInput Fields
 
 | Field | Type | Required | Description |
@@ -165,30 +172,24 @@ client.analytics.logSnapshot({ screen: "settings", tab: "billing" });
 ```
 
 This logs an event with `action: "_snapshot"`, `feature: "_state"`, and your context as `context_json`.
+{{/lang}}
 
 ---
 
 ## Pre-Auth Events
 
-Events with no authenticated user are dropped. To log on pre-auth screens (landing pages, sign-up flow), pass `ANALYTICS_UNAUTHENTICATED_USER`:
+Events with no authenticated user are dropped. To log on pre-auth screens (landing pages, sign-up flow), pass the unauthenticated-user constant as the `user_ulid`. Its value is `"UNAUTHENTICATED"`. Use sparingly — most analytics should be tied to real users.
 
-```typescript
-import { ANALYTICS_UNAUTHENTICATED_USER } from "js-bao-wss-client";
-
-client.analytics.logEvent({
-  action: "landing_page_view",
-  feature: "onboarding",
-  user_ulid: ANALYTICS_UNAUTHENTICATED_USER,
-});
-```
-
-The constant value is `"UNAUTHENTICATED"`. Use sparingly — most analytics should be tied to real users.
+{{ example: analytics/log-event-preauth }}
 
 ---
 
 ## Manual Flush
 
-Events are buffered and auto-flushed every **100ms** or when the buffer reaches **25 KiB**. The client **also auto-flushes on `beforeunload`, on tab visibility hidden, and when the WebSocket reconnects**, so you rarely need to call `flush()` manually.
+Events are buffered and flushed automatically — including when the WebSocket reconnects — so you rarely need to flush manually. Call `flush` to force a send (e.g. before an explicit teardown).
+
+{{#lang ts}}
+The queue auto-flushes every **100ms** or when the buffer reaches **25 KiB**, and the client also flushes on `beforeunload`, on tab visibility hidden, and on reconnect.
 
 ```typescript
 client.analytics.flush();
@@ -201,23 +202,26 @@ Pre-existing browser hooks (added by the client itself):
 - `status` → on reconnect, flushes
 
 So **don't** add your own `beforeunload → flush` listener — it's redundant and `session_end` is already handled.
+{{/lang}}
+{{#lang swift}}
+The queue auto-flushes every **100ms** (or earlier when batched). `client.destroy()` cancels the flush timer and triggers a final flush before storage closes, so you don't need a manual flush on teardown.
+
+```swift
+client.flushAnalytics()
+```
+{{/lang}}
 
 ---
 
 ## Plan and App Version Overrides
 
-If your app reports its plan/version dynamically (e.g. after an in-app upgrade), set them on the client. They flow into every subsequent event automatically.
+If your app reports its plan/version dynamically (e.g. after an in-app upgrade), set them on the client. They flow into every subsequent event automatically. Pass `null`/`nil` to clear an override.
 
-```typescript
-client.analytics.setPlanOverride("pro");
-client.analytics.setAppVersionOverride("2.1.4");
-
-// Pass null/undefined to clear an override
-client.analytics.setPlanOverride(null);
-```
+{{ example: analytics/analytics-overrides }}
 
 ---
 
+{{#lang ts}}
 ## Configuring Auto Events
 
 Pass `analyticsAutoEvents` to the constructor. All sub-options default to enabled.
@@ -248,8 +252,7 @@ Accepted shapes:
 - `syncErrors`: `boolean | { enabled?: boolean; minIntervalMs?: number }`
 - `blobUploads`: `{ start?: boolean; success?: boolean; failure?: boolean }`
 - `llm`, `gemini`: `boolean | { start?: boolean; success?: boolean; failure?: boolean }`
-
-Options accepted but currently no-ops (do not rely on): `boot`, `firstDocOpen`, `firstDocEdit`, `offlineRecovery`, `serviceWorker`.
+{{/lang}}
 
 ---
 
@@ -367,11 +370,12 @@ These fields are absent (or zero) when the event type doesn't produce them.
 
 1. **Use verb_noun action names** — `"photo_uploaded"`, `"report_generated"`, `"settings_changed"`.
 2. **Group with `feature`** — set consistently to enable per-feature dashboards (`"gallery"`, `"settings"`, `"billing"`).
-3. **Keep `context_json` small** — truncated to 1 KiB. Don't dump request bodies or full reports.
+3. **Keep `context_json` small** — bounded at 1 KiB. Don't dump request bodies or full reports.
 4. **Don't log high-frequency events** — rate limiter caps at 300/min with burst 60. Design around meaningful actions, not continuous telemetry.
-5. **Don't add your own `beforeunload` flush** — the client already does this.
-6. **Don't toggle no-op options** (`boot`, `firstDocOpen`, `firstDocEdit`, `offlineRecovery`, `serviceWorker`) and assume something happens.
-7. **Use `setPlanOverride` / `setAppVersionOverride`** instead of passing `plan` / `app_version` on every `logEvent` call.
+5. **Use the override setters** instead of passing `plan` / `app_version` on every event.
+
+{{#lang ts}}
+6. **Don't add your own `beforeunload` flush** — the client already does this.
 
 ---
 
@@ -423,3 +427,4 @@ client.analytics.logEvent({
 
 // No need for a beforeunload flush — the client adds one automatically.
 ```
+{{/lang}}

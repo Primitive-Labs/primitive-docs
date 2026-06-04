@@ -19,3 +19,4 @@ examples/_harness/swift/Sources/
 examples/_harness/ts/.build-dev/
 dev-docs/.vitepress/cache/
 dev-docs/.vitepress/dist/
+scripts/.build/

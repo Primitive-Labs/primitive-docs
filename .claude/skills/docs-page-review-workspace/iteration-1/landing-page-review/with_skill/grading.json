@@ -1,0 +1,62 @@
+{
+  "expectations": [
+    {
+      "text": "Flags the web/browser-only framing (architecture diagram says 'Your App (Browser)', 'local in-browser database', JS-only stack) as a platform-neutrality violation given iOS is a first-class platform",
+      "passed": true,
+      "evidence": "Finding #3 (high): cites \"Your app reads and writes to a local **in-browser** database\", \"Your App (Browser)\" diagram, and contradicts \"multi-platform positioning (web + iOS)\"; invokes STYLE.md Platform treatment ('On the device', 'the client' \u2014 not 'in the browser')."
+    },
+    {
+      "text": "Flags mechanism-level detail as wrong altitude for an overview page (the defineModelSchema/JsBaoClient code samples and package-by-package stack detail)",
+      "passed": true,
+      "evidence": "Finding #1 (high): \"This section shows a full defineModelSchema block, a new JsBaoClient({...}) block, and names three packages with their internal roles \u2014 exactly the mechanism/API-shape detail the ceiling forbids.\""
+    },
+    {
+      "text": "Flags the 'runs on edge infrastructure' line (or equivalent) as an infrastructure-internals leak",
+      "passed": true,
+      "evidence": "Finding 2 flags the diagram/prose naming \"edge infrastructure\" as an infra-internals violation citing STYLE.md"
+    },
+    {
+      "text": "Findings cite which standard/rule is violated and propose concrete fixes (not just observations)",
+      "passed": true,
+      "evidence": "Every finding has a Fix column and cites a rule, e.g. #2 quotes STYLE.md \"No infrastructure internals... Describe developer-facing behavior\" with fix \"Drop the diagram entirely\"; #5 cites the Voice ban on 'production-ready'/'scales'."
+    },
+    {
+      "text": "Review classifies the page as a landing/overview-tier page and judges it against that tier",
+      "passed": true,
+      "evidence": "Header: \"**Tier: Landing / overview.** Per STYLE.md the entry altitude is 'capabilities and value \u2014 what you get,' and the hard ceiling is 'never name mechanisms...'\"; verdict judges it as \"over-scoped for its tier.\""
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 1,
+    "total": 5,
+    "pass_rate": 0.8
+  },
+  "claims": [
+    {
+      "claim": "The JsBaoClient constructor options apiUrl/wsUrl/appId/models match the source",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Review verifies against library_repos/js-bao-wss/src/client/JsBaoClient.ts; consistent with the without_skill run's independent verification."
+    },
+    {
+      "claim": "The lone-JS blocks should be removed rather than given Swift parity (no bug to file)",
+      "type": "quality",
+      "verified": true,
+      "evidence": "Reasonable disposition given the page is landing-tier and the ceiling forbids the code regardless of language."
+    }
+  ],
+  "timing": {
+    "executor_duration_seconds": 79.9,
+    "total_duration_seconds": 79.9
+  },
+  "eval_feedback": {
+    "suggestions": [
+      {
+        "assertion": "Flags the 'console-only settings (like OAuth client credentials)' aside as an inconsistency aside that shouldn't be documented",
+        "reason": "Neither the with_skill nor without_skill run flagged this aside \u2014 verify the fixture index.md actually contains a 'console-only settings (like OAuth client credentials)' aside. If it does not, this assertion is unsatisfiable and should be dropped or rewritten to match the fixture."
+      }
+    ],
+    "overall": "Assertions are discriminating and substance-checking. The OAuth-aside assertion failed on both runs, which suggests either the content isn't in the fixture or it's too easy to overlook \u2014 worth confirming against the fixture."
+  }
+}
