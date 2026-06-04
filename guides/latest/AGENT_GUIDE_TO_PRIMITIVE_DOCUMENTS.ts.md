@@ -1253,7 +1253,7 @@ Use these methods to confirm the server has received your writes before taking i
   await client.documents.waitForInSync(documentId);
 ```
 
-The point-in-time checks return `false` if the client is disconnected or the check times out (JS accepts an optional `timeoutMs`; Swift's `includesWrites` / `inSync` are synchronous local reads). The `waitFor*` polling helpers exist on both `documents.*` and the client root: `waitForWriteConfirmation` returns true on success / false on timeout, and `waitForInSync` throws on timeout.
+The point-in-time checks (`includesWrites` / `inSync`) return `false` if the client is disconnected or the check times out; both clients accept an optional `timeoutMs` and do an async WebSocket state-vector round-trip (`stateVectorCheck`). For a cheap synchronous read of the last-known local sync state, use `isSynced(documentId)`. The `waitFor*` polling helpers exist on both `documents.*` and the client root: `waitForWriteConfirmation` returns true on success / false on timeout, and `waitForInSync` throws on timeout.
 
 ### Updating Document Metadata
 

@@ -1,13 +1,13 @@
 import JsBaoClient
 
-// Commit a locally-created (localOnly) document to the server. On Swift this is
-// a top-level client method rather than a `documents.*` namespaced one.
+// Commit a locally-created (localOnly) document to the server, namespaced under
+// `documents.*`. Returns a typed CommitOfflineCreateResult.
 func commitOfflineCreate(client: JsBaoClient, documentId: String) async throws {
   // #region example
-  let result = try await client.commitOfflineCreate(
+  let result = try await client.documents.commitOfflineCreate(
     documentId: documentId,
-    onExists: "link"
+    options: CommitOfflineCreateOptions(onExists: .link)
   )
   // #endregion example
-  _ = result // ["created": true] / ["linked": true] / ["reason": "exists"]
+  _ = result // CommitOfflineCreateResult(created:linked:reason:)
 }

@@ -1,17 +1,13 @@
 import JsBaoClient
 
-func downloadUrl(
+func pauseUpload(
   client: JsBaoClient,
   documentId: String,
   blobId: String
 ) {
   // #region example
   let blobs = client.documents.blobs(documentId: documentId)
-  let url = blobs.downloadUrl(
-    blobId: blobId,
-    disposition: .attachment,
-    attachmentFilename: "report.pdf"  // overrides the download filename
-  )
+  let paused = blobs.pauseUpload(blobId: blobId)  // true if an in-progress upload was paused
   // #endregion example
-  _ = url
+  _ = paused
 }

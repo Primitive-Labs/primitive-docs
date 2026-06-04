@@ -1,10 +1,10 @@
 import JsBaoClient
 
-// Check whether client and server hold identical document state. Swift is a
-// synchronous local read (vs JS's async state-vector round-trip).
-func inSync(client: JsBaoClient, documentId: String) {
+// Check whether client and server hold identical document state via an async
+// WebSocket state-vector round-trip. Resolves false when offline or on timeout.
+func inSync(client: JsBaoClient, documentId: String) async {
   // #region example
-  let synced = client.documents.inSync(documentId: documentId)
+  let synced = await client.documents.inSync(documentId: documentId)
   // #endregion example
   _ = synced
 }

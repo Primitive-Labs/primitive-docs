@@ -1,25 +1,25 @@
 import Foundation
 import JsBaoClient
 
-func upload(
+func uploadFile(
   client: JsBaoClient,
   documentId: String,
   data: Data
 ) async throws {
   // #region example
   let blobs = client.documents.blobs(documentId: documentId)
-  let result = try await blobs.upload(
+  // Like upload(), but returns the narrowed queue shape ({ blobId, numBytes,
+  // bytesTransferred }) and queues for background transfer when the immediate
+  // upload can't complete.
+  let result = try await blobs.uploadFile(
     data: data,
     options: BlobUploadSourceOptions(
-      filename: "notes.txt",
-      contentType: "text/plain",
-      disposition: .attachment,  // or .inline
-      retainLocal: true  // keep bytes cached locally after upload (default)
+      filename: "large.bin",
+      contentType: "application/octet-stream"
     )
   )
   let blobId = result.blobId
   let numBytes = result.numBytes
-  let contentType = result.contentType
   // #endregion example
-  _ = (blobId, numBytes, contentType)
+  _ = (blobId, numBytes)
 }

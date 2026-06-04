@@ -1,9 +1,12 @@
 import JsBaoClient
 
-// Evict a single document's local data from the device. Swift takes no force
-// option and does not throw.
-func evict(client: JsBaoClient, documentId: String) async {
+// Evict a single document's local data from the device. A doc with unsynced
+// local changes throws unless `force: true` is passed.
+func evict(client: JsBaoClient, documentId: String) async throws {
   // #region example
-  await client.documents.evict(documentId: documentId)
+  try await client.documents.evict(
+    documentId: documentId,
+    options: EvictDocumentOptions(force: true)
+  )
   // #endregion example
 }

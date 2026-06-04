@@ -9,12 +9,11 @@ with `client.document(id).blobs()` (JS) or `client.documents.blobs(documentId:)`
 
 Upload a blob attached to the document, hashing and deduplicating automatically.
 
-::: danger Swift parity gap
-JS accepts `File | Blob | Uint8Array | ArrayBuffer` and the `retainLocal` option;
-Swift's `upload(data:options:)` takes only `Data` (filename/contentType must be
-passed explicitly) and has no `retainLocal` (sweep blob D12). The `Data`-only source
-is web-vs-native by design, but `retainLocal` has no Swift equivalent and is not
-tracked by an issue.
+::: tip Source type differs by platform
+Swift's `upload(data:options:)` now supports the `retainLocal` option (defaults to
+`true`, matching JS). The only remaining difference is the source type: JS accepts
+`File | Blob | Uint8Array | ArrayBuffer`, while Swift takes raw `Data` with
+`filename`/`contentType` passed explicitly — web-vs-native by design.
 :::
 
 ::: code-group
@@ -42,14 +41,9 @@ Retrieve metadata for a single blob.
 
 ## downloadUrl(blobId, params?)
 
-Build a direct, authenticated download URL for a blob (synchronous).
-
-::: danger Swift parity gap
-JS accepts both `disposition` and `attachmentFilename`. Swift's
-`downloadUrl(blobId:disposition:)` supports `disposition` only — there is no way to
-override the download filename from the Swift client (sweep blob D-downloadUrl; not
-tracked by an issue).
-:::
+Build a direct, authenticated download URL for a blob (synchronous). Both clients
+accept `disposition` and `attachmentFilename`; the filename is RFC 5987-encoded
+into the URL.
 
 ::: code-group
 <<< ./snippets/document-blob/download-url.ts#example{ts} [JavaScript]
@@ -87,14 +81,9 @@ text form via `read(blobId, { as: "text" })` and JSON-parses for typed shapes.
 
 ## delete(blobId)
 
-Delete a blob from the document. Swift's `delete` now **evicts the blob from the
-local cache** (#965), so a subsequent `read` won't serve the deleted blob stale.
-
-::: warning Upload-queue side effects are JS-only
-JS `delete` additionally cancels any queued upload for the blob and emits
-`queue-drained`. Swift has no upload-queue facade, so those queue-specific side
-effects don't apply (part of the by-design upload-queue exclusion, sweep blob D13).
-:::
+Delete a blob from the document. Both clients **evict the blob from the local
+cache** (so a subsequent `read` won't serve it stale), **cancel any queued upload**
+for that blob, and emit `queue-drained` once the queue empties.
 
 ::: code-group
 <<< ./snippets/document-blob/delete-x.ts#example{ts} [JavaScript]
@@ -103,15 +92,14 @@ effects don't apply (part of the by-design upload-queue exclusion, sweep blob D1
 
 ## uploadFile(source, options?)
 
-Upload a file and queue it for background transfer when the upload queue is active.
+Upload a file and queue it for background transfer when the immediate upload can't
+complete. Like `upload`, but returns the narrowed `{ blobId, numBytes,
+bytesTransferred }` queue shape.
 
-::: danger No Swift equivalent
-JavaScript-only — the Swift document-blob context exposes only `upload(data:)`, with
-no separate queued-upload entry point. Part of the upload-queue facade that is absent
-on Swift (sweep blob D13; not tracked by an issue).
-:::
-
+::: code-group
 <<< ./snippets/document-blob/upload-file.ts#example{ts} [JavaScript]
+<<< ./snippets/document-blob/upload-file.swift#example{swift} [Swift]
+:::
 
 ## proxyUrl(blobId, options?)
 
@@ -146,55 +134,48 @@ Best-effort: per-blob failures are swallowed. `concurrency` defaults to 2.
 
 ## uploads()
 
-Return the current status of all tracked uploads for this document.
+Return the current status of all tracked uploads for this document (newest first),
+scoped to this document.
 
-::: danger No Swift equivalent
-JavaScript-only — the upload-queue facade is not re-exported on the Swift
-document-blob context (sweep blob D13; not tracked by an issue).
-:::
-
+::: code-group
 <<< ./snippets/document-blob/uploads.ts#example{ts} [JavaScript]
+<<< ./snippets/document-blob/uploads.swift#example{swift} [Swift]
+:::
 
 ## pauseUpload(blobId)
 
-Pause an in-progress upload by blob ID.
+Pause an in-progress upload by blob ID. Returns `true` if a matching, pausable
+upload for this document was paused.
 
-::: danger No Swift equivalent
-JavaScript-only — upload-queue control, part of the queue facade absent on Swift
-(sweep blob D13; not tracked by an issue).
-:::
-
+::: code-group
 <<< ./snippets/document-blob/pause-upload.ts#example{ts} [JavaScript]
+<<< ./snippets/document-blob/pause-upload.swift#example{swift} [Swift]
+:::
 
 ## resumeUpload(blobId)
 
-Resume a paused upload by blob ID.
+Resume a paused upload by blob ID. Returns `true` if a matching, paused upload for
+this document was resumed.
 
-::: danger No Swift equivalent
-JavaScript-only — upload-queue control, part of the queue facade absent on Swift
-(sweep blob D13; not tracked by an issue).
-:::
-
+::: code-group
 <<< ./snippets/document-blob/resume-upload.ts#example{ts} [JavaScript]
+<<< ./snippets/document-blob/resume-upload.swift#example{swift} [Swift]
+:::
 
 ## pauseAll()
 
 Pause all in-progress uploads for this document.
 
-::: danger No Swift equivalent
-JavaScript-only — upload-queue control, part of the queue facade absent on Swift
-(sweep blob D13; not tracked by an issue).
-:::
-
+::: code-group
 <<< ./snippets/document-blob/pause-all.ts#example{ts} [JavaScript]
+<<< ./snippets/document-blob/pause-all.swift#example{swift} [Swift]
+:::
 
 ## resumeAll()
 
 Resume all paused uploads for this document.
 
-::: danger No Swift equivalent
-JavaScript-only — upload-queue control, part of the queue facade absent on Swift
-(sweep blob D13; not tracked by an issue).
-:::
-
+::: code-group
 <<< ./snippets/document-blob/resume-all.ts#example{ts} [JavaScript]
+<<< ./snippets/document-blob/resume-all.swift#example{swift} [Swift]
+:::

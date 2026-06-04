@@ -6,19 +6,20 @@ Create, open, share, and sync collaborative Yjs documents. Blob attachments are 
 
 Create a new document. **Local-first** on both clients: the document is written
 locally and is immediately usable, the server commit races in the background,
-and `localOnly: true` keeps it on-device (commit it later with the top-level
-`client.commitOfflineCreate`). A create issued while offline queues rather than
-failing. The response carries the document's `metadata` blob — use
+and `localOnly: true` keeps it on-device (commit it later with
+`client.documents.commitOfflineCreate`). A create issued while offline queues
+rather than failing. The response carries the document's `metadata` blob — use
 `createWithAlias` when you need the id back.
 
-::: tip Divergent shape
-Like js-bao, Swift's `documents.create` forwards to the authoritative
-`client.createDocument(options:)` — same local-first flow, including the
-create-time `metadata` blob being replayed into the server commit
-([#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852),
-[#673](https://github.com/Primitive-Labs/js-bao-wss/issues/673)). The only
-difference: `documents.create` returns just `{ metadata }`, whereas
-`client.createDocument` also hands back the writable document handle.
+::: tip Aligned
+`documents.create` returns `{ metadata }` on both clients — same local-first
+flow, including the create-time `metadata` blob being replayed into the server
+commit ([#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852),
+[#673](https://github.com/Primitive-Labs/js-bao-wss/issues/673)). Swift
+additionally exposes a lower-level `client.createDocument(options:)` that hands
+back the writable document handle alongside the metadata — a Swift-only
+convenience on the authoritative method, not a divergence in the documented
+`documents.create` surface.
 :::
 
 ::: code-group
@@ -281,11 +282,10 @@ Deny a pending access request (owner/admin only).
 
 ## inSync(documentId, timeoutMs?)
 
-Check whether client and server hold identical document state.
-
-::: tip Divergent by design
-JS does an async state-vector round-trip over the WebSocket; Swift keeps this as a cheap **synchronous local read**. The async network-round-trip behavior is available separately on Swift via `waitForInSync` / `waitForWriteConfirmation`, so this divergence is intentional rather than a gap.
-:::
+Check whether client and server hold identical document state. Both clients do
+an async state-vector round-trip over the WebSocket (`stateVectorCheck`) and
+resolve `false` when offline or the check times out. For a cheap synchronous
+read of the last-known local sync state, use `isSynced(documentId)` instead.
 
 ::: code-group
 <<< ./snippets/documents/in-sync.ts#example{ts} [JavaScript]
@@ -294,11 +294,9 @@ JS does an async state-vector round-trip over the WebSocket; Swift keeps this as
 
 ## includesWrites(documentId, timeoutMs?)
 
-Check whether the server has all of this client's writes.
-
-::: tip Divergent by design
-JS does an async state-vector round-trip over the WebSocket; Swift keeps this as a cheap **synchronous local read**. The async network-round-trip behavior is available separately on Swift via `waitForInSync` / `waitForWriteConfirmation`, so this divergence is intentional rather than a gap.
-:::
+Check whether the server has all of this client's writes. Both clients do an
+async state-vector round-trip over the WebSocket (`stateVectorCheck`) and
+resolve `false` when offline or the check times out.
 
 ::: code-group
 <<< ./snippets/documents/includes-writes.ts#example{ts} [JavaScript]
@@ -307,11 +305,9 @@ JS does an async state-vector round-trip over the WebSocket; Swift keeps this as
 
 ## waitForWriteConfirmation(documentId, timeoutMs?, pollMs?)
 
-Wait until the server confirms it has all of this client's writes.
-
-::: tip Divergent shape
-JS resolves to a `boolean`; Swift throws on timeout.
-:::
+Wait until the server confirms it has all of this client's writes. Both clients
+poll the `stateVectorCheck` round-trip's `includesWrites` and resolve to a
+`boolean` — `true` once confirmed, `false` on timeout (neither throws).
 
 ::: code-group
 <<< ./snippets/documents/wait-for-write-confirmation.ts#example{ts} [JavaScript]
@@ -329,8 +325,8 @@ Wait until client and server hold identical document state.
 
 ## isSynced(documentId)
 
-Check whether a document's local state is synced (synchronous, local). On
-Swift this is an alias of `inSync(...)`.
+Check whether a document's local state is synced (synchronous, local). This is
+the cheap local read; `inSync(...)` is the async server round-trip.
 
 ::: code-group
 <<< ./snippets/documents/is-synced.ts#example{ts} [JavaScript]
@@ -369,8 +365,12 @@ List the IDs of all currently open documents (synchronous, local).
 
 Get the current user's permission level for a document (local).
 
-::: tip Divergent by design
-JS returns a string literal union (or `null`); Swift returns a typed `DocumentPermission?` enum. Swift's typed enum is the idiomatic, safer shape — this divergence is intentional and kept.
+::: tip Equivalent shapes
+JS returns a string literal union (or `null`); Swift returns a typed
+`DocumentPermission?` enum whose raw values are exactly those strings
+(`"owner"`, `"read-write"`, `"reader"`, `"admin"`). The enum is the idiomatic
+Swift representation of a TS string-literal union — same values, not a
+behavioral divergence.
 :::
 
 ::: code-group
@@ -380,11 +380,9 @@ JS returns a string literal union (or `null`); Swift returns a typed `DocumentPe
 
 ## getLocalMetadata(documentId)
 
-Get locally cached metadata for a document.
-
-::: tip Divergent by design
-JS is an async accessor (IndexedDB is inherently asynchronous); Swift reads synchronously from local SQLite. This is a platform constraint, not a gap.
-:::
+Get locally cached metadata for a document. `async` on both clients — JS's
+IndexedDB read is inherently asynchronous; Swift declares it `async` to match
+even though its SQLite / in-memory read is synchronous under the hood.
 
 ::: code-group
 <<< ./snippets/documents/get-local-metadata.ts#example{ts} [JavaScript]
@@ -393,11 +391,9 @@ JS is an async accessor (IndexedDB is inherently asynchronous); Swift reads sync
 
 ## evict(documentId, opts?)
 
-Evict a single document's local data from the device.
-
-::: tip Divergent shape
-JS accepts `{ force }`; the Swift wrapper takes no options and does not throw.
-:::
+Evict a single document's local data from the device. Both clients accept
+`{ force }` and throw when the doc has unsynced local changes unless `force` is
+set.
 
 ::: code-group
 <<< ./snippets/documents/evict.ts#example{ts} [JavaScript]
@@ -406,11 +402,9 @@ JS accepts `{ force }`; the Swift wrapper takes no options and does not throw.
 
 ## evictAll(opts?)
 
-Evict all locally stored document data.
-
-::: tip Divergent shape
-JS accepts `{ onlySynced }`; the Swift wrapper takes no options (evicts everything).
-:::
+Evict all locally stored document data. Both clients accept `{ onlySynced }` —
+when set, documents with unsynced local changes are preserved rather than
+dropped.
 
 ::: code-group
 <<< ./snippets/documents/evict-all.ts#example{ts} [JavaScript]
@@ -437,11 +431,9 @@ Check whether a document has a local copy stored on this device.
 
 ## listPendingCreates()
 
-List documents created locally but not yet committed to the server.
-
-::: tip Divergent shape
-JS is async and returns `{ documentId, title?, createdAt }` objects; Swift is synchronous and returns just the `[String]` document IDs.
-:::
+List documents created locally but not yet committed to the server. Both
+clients are async and return `{ documentId, title?, createdAt }` entries (Swift:
+`PendingCreateInfo`).
 
 ::: code-group
 <<< ./snippets/documents/list-pending-creates.ts#example{ts} [JavaScript]
@@ -452,12 +444,13 @@ JS is async and returns `{ documentId, title?, createdAt }` objects; Swift is sy
 
 Commit a locally-created (`localOnly`) document to the server.
 
-::: tip Divergent shape
-JS namespaces this under `documents.commitOfflineCreate`; Swift exposes it as a
-top-level `client.commitOfflineCreate(documentId:onExists:)`. Same flow — it
-replays the pending create's stashed `title`/`tags`/`metadata` into the server
-POST. Pair it with a `localOnly: true` create (or any create made while
-offline) to push the doc up once you're back online.
+::: tip Aligned
+Namespaced under `documents.commitOfflineCreate` on both clients (Swift also
+keeps the lower-level top-level `client.commitOfflineCreate(documentId:onExists:)`
+this forwards to). Same flow — it replays the pending create's stashed
+`title`/`tags`/`metadata` into the server POST, and returns
+`{ created, linked?, reason? }`. Pair it with a `localOnly: true` create (or any
+create made while offline) to push the doc up once you're back online.
 :::
 
 ::: code-group
@@ -467,11 +460,8 @@ offline) to push the doc up once you're back online.
 
 ## cancelPendingCreate(documentId, opts?)
 
-Cancel a pending local create.
-
-::: tip Divergent shape
-JS accepts `{ evictLocal }` and may throw; the Swift wrapper takes no options and does not throw.
-:::
+Cancel a pending local create. Both clients accept `{ evictLocal }` to also drop
+the document's local data after cancelling.
 
 ::: code-group
 <<< ./snippets/documents/cancel-pending-create.ts#example{ts} [JavaScript]

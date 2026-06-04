@@ -9,7 +9,7 @@ export function downloadUrl(
   const blobs = client.document(documentId).blobs();
   const url = blobs.downloadUrl(blobId, {
     disposition: "attachment",
-    attachmentFilename: "report.pdf", // JS-only
+    attachmentFilename: "report.pdf", // overrides the download filename
   });
   // #endregion example
   return url;
