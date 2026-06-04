@@ -1,35 +1,36 @@
 # analytics — `client.analytics`
 
-Emit custom analytics events and control the analytics pipeline.
+Emit custom analytics events and control the analytics pipeline. Both clients
+expose a typed `client.analytics` namespace backed by a buffering queue that
+batches events, rate-limits, persists across launches, and flushes on connect.
 
-::: warning Swift parity gap
-There is no `client.analytics` namespace in Swift. The surface is flattened onto the client as four
-mis-named, **untyped `[String: Any]`** methods (`client.logAnalyticsEvent(...)`, `client.flushAnalytics()`,
-`client.setAnalyticsPlanOverride(...)`, `client.setAnalyticsAppVersionOverride(...)`) where JS uses the
-typed `client.analytics.logEvent({ ... })` namespace, and Swift has no `logSnapshot`
-([#951](https://github.com/Primitive-Labs/js-bao-wss/issues/951), [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#963](https://github.com/Primitive-Labs/js-bao-wss/issues/963)).
-:::
+The queue stamps each event with the signed-in `user_ulid` (falling back to the
+`UNAUTHENTICATED` sentinel), a timestamp, and any `plan` / `app_version`
+overrides, then sends batches over the WebSocket once connected.
 
-::: warning Swift parity gap — client-side auto-events do NOT fire (P0)
-Lifecycle auto-events that JS emits automatically (`boot`, `dailyAuth`, `returnActive`,
-`firstDocOpen`/`firstDocEdit`, `offlineRecovery`, `syncErrors`, `blobUploads`, `serviceWorker`,
-`sessionEnd`, `llm`/`gemini`) are **not emitted by the Swift client at all** — it ships zero
-client-side auto-event instrumentation, and the `analyticsAutoEvents` config option that gates them in
-JS does not exist on Swift `JsBaoClientOptions` (the persistence record exists but nothing fires it).
-Any "enabled by default / fires automatically" framing applies to **JavaScript only**; iOS gets a
-silent product-analytics blackout for everything except events you `logEvent` by hand
-([#951](https://github.com/Primitive-Labs/js-bao-wss/issues/951), [#963](https://github.com/Primitive-Labs/js-bao-wss/issues/963)).
+::: warning Swift parity gap — per-feature auto-events not yet instrumented
+The engine and **session lifecycle** auto-events are in place on Swift (the
+queue auto-flushes on connect and on app background/terminate, and emits a
+`session_end` event with the session `duration_ms`). The broader per-feature
+auto-event catalog JS emits from instrumented call sites — `boot`, `dailyAuth`,
+`returnActive`, `firstDocOpen`/`firstDocEdit`, `offlineRecovery`, `syncErrors`,
+`blobUploads`, `serviceWorker`, and the `llm`/`gemini` call-path events — is
+**not yet wired** on Swift, and the `analyticsAutoEvents` config option that
+gates them in JS does not exist on `JsBaoClientOptions`. Until those call sites
+are instrumented, iOS emits only `session_end` + whatever you `logEvent` by
+hand ([#963](https://github.com/Primitive-Labs/js-bao-wss/issues/963)).
 :::
 
 ## logEvent(event)
 
-Emit a custom analytics event. `action` and `user_ulid` are required.
+Emit a custom analytics event. `action` is required; `user_ulid` is filled from
+the signed-in user when omitted.
 
-::: warning Swift parity gap
-"Required" holds for JS only. JS takes a typed object (`client.analytics.logEvent({ action, user_ulid, … })`)
-where the compiler enforces the required keys; Swift takes an untyped `[String: Any]`
-(`client.logAnalyticsEvent([...])`) with no compile-time check, so a missing `action`/`user_ulid` is
-not caught (sweep analytics D5; [#951](https://github.com/Primitive-Labs/js-bao-wss/issues/951)).
+::: tip Divergent shape
+JS takes an inline typed object (`client.analytics.logEvent({ action, … })`);
+Swift takes a typed `AnalyticsEventInput` struct with the same snake_case fields
+(`client.analytics.logEvent(AnalyticsEventInput(action: …))`). Same fields,
+compile-time-checked on both sides.
 :::
 
 ::: code-group
@@ -37,21 +38,32 @@ not caught (sweep analytics D5; [#951](https://github.com/Primitive-Labs/js-bao-
 <<< ./snippets/analytics/log-event.swift#example{swift} [Swift]
 :::
 
+## logSnapshot(context?)
+
+Emit a snapshot event (`action: "_snapshot"`, `feature: "_state"`) with
+arbitrary context. No-ops when there is no signed-in user.
+
+::: code-group
+<<< ./snippets/analytics/log-snapshot.ts#example{ts} [JavaScript]
+<<< ./snippets/analytics/log-snapshot.swift#example{swift} [Swift]
+:::
+
 ## flush()
 
-Force-flush the buffered analytics queue immediately.
+Force-flush the buffered analytics queue immediately. Also runs automatically on
+(re)connect and, on iOS, when the app backgrounds or terminates.
 
 ::: code-group
 <<< ./snippets/analytics/flush.ts#example{ts} [JavaScript]
 <<< ./snippets/analytics/flush.swift#example{swift} [Swift]
 :::
 
-## logSnapshot(context?)
+## setPlanOverride(plan) / setAppVersionOverride(version)
 
-Emit a snapshot event with arbitrary context.
+Override the `plan` and `app_version` fields stamped on every subsequent event.
+Pass `null` (JS) / `nil` (Swift) to clear an override.
 
-::: warning No Swift equivalent
-JavaScript-only — the Swift client has no `logSnapshot` (and no `client.analytics` namespace to hang it on) ([#951](https://github.com/Primitive-Labs/js-bao-wss/issues/951), [#963](https://github.com/Primitive-Labs/js-bao-wss/issues/963)).
+::: code-group
+<<< ./snippets/analytics/overrides.ts#example{ts} [JavaScript]
+<<< ./snippets/analytics/overrides.swift#example{swift} [Swift]
 :::
-
-<<< ./snippets/analytics/log-snapshot.ts#example{ts} [JavaScript]

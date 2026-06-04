@@ -164,5 +164,27 @@ Client + cookbook updated; clone builds, dev gate green (commit `ea7c67ca`). Fol
 - **importCsv** → `docs/getting-started/working-with-databases.md` + `guides/latest/AGENT_GUIDE_TO_PRIMITIVE_DATABASES.swift.md` (CSV Import section — Swift now has `importCsv`).
 - **cache/codegen** → no required user-facing changes (cache options are internal; no page authors `enum`/`auto_stamp` today).
 
-### Not yet done — the "feature tier" (entangled with the client core)
-`analytics`, `auth`, and `model-surface` are **not** simple `[String:Any]` API files — they live in `JsBaoClient.swift` / `Internal/` / `Schema/` and are tied to feature-sized issues that need a decision (#951/#963 analytics namespace+engine, #964 auth scope, #946/#947/#955/#992 model-surface — the latter overlaps PR #923). (cache behavior is now done; #994.)
+### Wave 6 (done) — analytics namespace + session auto-events (#951, #963)
+Client + cookbook updated; clone builds (commit `90ca6dad`), dev gate green. The
+scattered untyped top-level methods (`logAnalyticsEvent([String:Any])`,
+`flushAnalytics()`, `setAnalytics*Override`) are replaced by a typed
+`client.analytics` namespace (`logEvent(AnalyticsEventInput)` / `logSnapshot(context:)`
+/ `flush()` / `setPlanOverride` / `setAppVersionOverride`); old methods kept for
+back-compat. Session lifecycle auto-events now fire (`session_end` w/ `duration_ms`
+on background/terminate; flush-on-connect). Follow-ups:
+- **user-facing docs** → if/when an analytics page exists under `docs/` or a
+  `guides/latest/AGENT_GUIDE_TO_PRIMITIVE_ANALYTICS.swift.md`, switch any Swift
+  example from `client.logAnalyticsEvent([...])` to
+  `client.analytics.logEvent(AnalyticsEventInput(...))` and document `logSnapshot`.
+  (No such user-facing page exists today — net-new when authored.)
+- **remaining `#963`** → per-feature auto-event catalog (boot/dailyAuth/
+  firstDocOpen/offlineRecovery/syncErrors/blobUploads/serviceWorker/llm-gemini) +
+  the `analyticsAutoEvents` config option are **deferred** — each needs a call-site
+  hook across `JsBaoClient.swift`, a much larger pass than the engine itself.
+
+### Deferred — the rest of the "feature tier"
+`auth` and `model-surface` are tied to feature-sized issues and were **deferred by
+decision (2026-06-04)**: #964 auth scope = defer all (native passkeys/OAuth are
+#928/#929); #854/#946/#947/#955/#992 model-surface = defer until PR #923 (the
+one-model `Model.*` API) merges. They live in `JsBaoClient.swift` / `Internal/` /
+`Schema/`, not simple `[String:Any]` API files. (cache behavior is done; #994.)
