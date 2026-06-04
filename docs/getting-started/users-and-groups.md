@@ -12,7 +12,7 @@ Every authenticated user gets a profile managed by the platform:
 | `email` | User's email address |
 | `name` | Display name |
 | `avatarUrl` | Profile picture URL |
-| `appRole` | Legacy role field |
+| `appRole` | The user's app role (`owner`, `admin`, or `member`) |
 | `addedAt` | When the user joined |
 
 ::: warning Don't Duplicate
@@ -74,7 +74,7 @@ The `addMember` result is a discriminated union — branch on `status`:
 | `"already_member"` | Existing member (idempotent — no error) |
 | `"pending_signup"` | Email is not yet an app user; a deferred add was created. Carries `invitationId` and `inviteToken` for custom invitation emails |
 
-See [Sharing and Invitations](./sharing-and-invitations.md#sending-your-own-invitation-emails) for what to do with `inviteToken`.
+See [Sending Your Own Invitation Emails](./invitations.md#sending-your-own-invitation-emails) for what to do with `inviteToken`.
 
 ### Email-Based Adds Work for Non-Members Too
 
@@ -82,7 +82,7 @@ If the email you pass to `addMember` doesn't match an existing app user, the ser
 
 This means you can onboard someone into the right team *before* they've created an account — and `isMemberOf` checks start working the moment they sign up, no admin action needed.
 
-See [Sharing and Invitations](./sharing-and-invitations.md) for the full picture (invitation lifecycle, cascade on revoke, domain-mode re-validation).
+See [Invitations](./invitations.md) for the full picture (invitation lifecycle, cascade on revoke, domain re-validation).
 
 ::: warning CEL membership resolves at signup
 `isMemberOf('team', 'engineering')` returns `false` for a pending (not-yet-signed-up) member until their signup completes. If a workflow or operation needs to act "as if" the person were already a member, wait until the `invitation`/`accepted` event fires.
@@ -121,70 +121,24 @@ Grant document access to an entire group instead of individual users:
 
 All members of the group receive the specified permission level. When membership changes, document access updates automatically.
 
-## Groups and Databases
+## Groups in Access Rules
 
-Use CEL functions to check group membership in database operation access expressions. The platform exposes three group-related helpers: `isMemberOf(groupType, groupId)` (two args, strict match), `memberGroups(groupType)` (returns the array of `groupId`s the caller belongs to), and `hasRole(role)` (checks the caller's app role — `"owner"`, `"admin"`, or `"member"`).
+Groups are the workhorse of [access control](./access-control.md): server-side access rules check membership with `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`, and `hasRole(role)` instead of hard-coding user IDs:
 
 ```toml novalidate
 # Only members of the engineering team
 access = "isMemberOf('team', 'engineering')"
 
-# App-level admins or owners
-access = "hasRole('admin') || hasRole('owner')"
-
-# Members of any team
-access = "size(memberGroups('team')) > 0"
-```
-
-### Common Access Patterns
-
-**Team-based workspace access:**
-```toml
 # Users can only see records for teams they belong to
 access = "params.teamId in memberGroups('team')"
-params = [{ name = "teamId", type = "TEXT", required = true }]
-```
 
-**Role-based access (read vs. write):**
-```toml
-# App admins can edit; team members can view.
-# Group-level "admin" isn't a built-in concept — model it as a separate
-# group type (e.g. groupType: "team-admin") and check membership there.
-[[types.operations]]
-name = "update-settings"
-access = "hasRole('admin') || hasRole('owner') || isMemberOf('team-admin', params.teamId)"
-
-[[types.operations]]
-name = "view-settings"
-access = "isMemberOf('team', params.teamId)"
-```
-
-**Organization hierarchy:**
-```toml
-# Member of either the parent org or the team can access
+# Member of either the parent org or the team
 access = "isMemberOf('org', params.orgId) || isMemberOf('team', params.teamId)"
 ```
 
-## Rule Sets
+One modeling note: group-level "admin" isn't a built-in concept — model it as a separate group type (e.g. `team-admin`) and check membership there.
 
-Database operations use CEL expressions (like `isMemberOf('team', 'engineering')`) to control who can run a specific query or mutation. Rule sets serve a different purpose — they control who can perform **management operations** on platform resources like groups, collections, and database types.
-
-For example, a rule set can define who is allowed to add or remove members from a group, or who can create new groups of a certain type:
-
-```bash
-primitive rule-sets create "team-management" \
-  --resource-type group \
-  --rules '{
-    "group":  { "create": "true",                                                     "edit": "user.userId == group.createdBy", "delete": "user.userId == group.createdBy" },
-    "member": { "create": "isMemberOf(group.groupType, group.groupId)",               "edit": "user.userId == group.createdBy", "delete": "user.userId == group.createdBy" }
-  }'
-```
-
-Bind the rule set to a group type via a `GroupTypeConfig` — declare it in `config/group-type-configs/<type>.toml` and run `primitive sync push --dir ./config`, or call `client.groupTypeConfigs.create({ groupType, ruleSetId })` from the SDK. Collection rule sets work the same way — use `--resource-type collection` and bind via `client.collectionTypeConfigs` (or `config/collection-type-configs/<type>.toml`).
-
-App owners and admins bypass rule-set evaluation entirely; rules apply to regular members. Group types with no config row fall back to permissive built-in defaults (any member can `create`; the creator can `edit`/`delete` and manage members; the creator and direct members can read). To **deny** an op for everyone except admins/owners, attach a rule set with that op set to `"false"` (or omit the rule set entirely on a `GroupTypeConfig` row to use that row as an explicit opt-out).
-
-Rule sets are versioned and include built-in testing and debugging tools — you can evaluate rules against simulated requests with `client.ruleSets.test()` before deploying them.
+Who can *manage* groups themselves — create groups of a type, add or remove members — is governed by **rule sets** bound to the group type. See [Access Control](./access-control.md#rule-sets-governing-management-operations).
 
 ## Best Practices
 
@@ -196,7 +150,7 @@ Rule sets are versioned and include built-in testing and debugging tools — you
 
 ## Next Steps
 
-- **[Sharing and Invitations](./sharing-and-invitations.md)** — Invitations, email-based shares, collections, access requests
-- **[Working with Databases](./working-with-databases.md)** — Use groups in database access control
+- **[Access Control](./access-control.md)** — The CEL rules your groups plug into
+- **[Invitations](./invitations.md)** — App membership and deferred grants for not-yet-users
 - **[Working with Documents](./working-with-documents.md)** — Share documents with groups
 - **[Authentication](./authentication.md)** — How users get authenticated

@@ -14,7 +14,7 @@ Authentication runs against server-side **app settings** that must line up with 
 | Setting | What it does | How to set |
 |---|---|---|
 | **CORS allowed origins** | The whitelist of origins allowed to call the Primitive API from a browser. Your serving origin (scheme + host + port) must be listed. | `primitive apps update --cors-origins "http://localhost:5173,https://myapp.com"` or Admin Console |
-| **Redirect URIs** | The whitelist of OAuth callback URLs. The callback your app uses must match exactly, or the OAuth callback fails with `Invalid redirect URI`. | Admin Console (no CLI flag) |
+| **Redirect URIs** | The whitelist of OAuth callback URLs. The callback your app uses must match exactly, or the OAuth callback fails with `Invalid redirect URI`. | Admin Console |
 | **Base URL** | Where the app is served — used for links in auth emails and redirects. | `primitive apps update --base-url "https://myapp.com"` |
 
 Inspect all three anytime with `primitive apps get`.
@@ -127,7 +127,7 @@ Any sign-in method resolves pending invitations and email-based shares automatic
 
 From the end-user's perspective: they sign in for the first time, and the things other people invited them into are already there. No manual "accept invitation" step.
 
-See [Sharing and Invitations](./sharing-and-invitations.md) for how to create these shares.
+See [Invitations](./invitations.md) and [Sharing Documents](./working-with-documents.md#sharing-documents) for how to create these shares.
 
 ## Disabling a User Per App
 
@@ -137,30 +137,9 @@ Display `AUTH_USER_DISABLED` in your sign-in UI as a distinct error so the user 
 
 ## Test User Sign-In for Automated Testing
 
-For automated tests, Primitive supports a `+primitivetest` OTP bypass. Each app maintains a `testAccountBaseEmails` whitelist of base addresses (e.g. `alice@example.com`). For any whitelisted base, derived addresses of the form `<base-local>+primitivetest<suffix>@<base-domain>` skip the real email send on `otpRequest` and accept the magic code `000000` on `otpVerify`, returning a 30-minute token.
+For integration tests and local dev, Primitive supports a `+primitivetest` OTP bypass: whitelist a base email per app, and derived addresses like `alice+primitivetest-teacher@example.com` sign in through the normal OTP flow with the magic code `000000` — no real email round-trip. One mailbox covers a whole fleet of role-distinguished test users.
 
-A single base authorizes unlimited role-distinguished derivatives — Gmail and Google Workspace deliver every `<base>+anything@<domain>` to the same inbox, so one real mailbox covers a fleet of test users:
-
-```
-alice+primitivetest@example.com
-alice+primitivetest-teacher@example.com
-alice+primitivetest-student@example.com
-alice+primitivetest.ci-001@example.com
-```
-
-The suffix matches `[A-Za-z0-9._-]*` (possibly empty). Only single-`+` shapes are accepted: `alice+team+primitivetest-x@…` does not match.
-
-Guardrails worth knowing:
-
-- **Per-app whitelist.** A derived address is honored only when its base appears on this app's `testAccountBaseEmails` list. Apps without a whitelist have no bypass at all.
-- **AppUser must already exist.** The bypass never auto-provisions. The derived account has to be a member of the app — through normal invitation, signup, or a deferred grant — before `000000` will let it in. This keeps a public-mode app from being signed up as `attacker+primitivetest@<whitelisted>`.
-- **30-minute tokens.** Access tokens issued via this path expire after 30 minutes regardless of your normal session length, and carry a `primitiveBypass: true` claim. The whitelist is re-checked on each request, so removing a base from the list revokes its derived sessions immediately.
-- **Reserved at admin/role/invitation boundaries.** A `+primitivetest*` email may sign in as an ordinary `member` user but cannot hold admin or owner privileges, and cannot be the recipient of an admin/role invitation. Attempts return `RESERVED_EMAIL_FOR_ADMIN`.
-- **Whitelist limits.** Up to 50 base emails per app. A base may not itself be a `+primitivetest` derivative.
-
-Use this for integration tests and local dev. Do not rely on it for staging or production flows.
-
-Manage the `testAccountBaseEmails` whitelist either from the [Primitive CLI](./primitive-cli.md#test-users-for-automated-testing) (`primitive apps update --test-account-bases …`) or in the [Admin Console](./admin-console.md) settings UI. See the CLI page for managing the whitelist and signing in from a test.
+See [Test Users for Automated Testing](./primitive-cli.md#test-users-for-automated-testing) on the CLI page for setup, the sign-in pattern, and the security guardrails.
 
 ## How It Works Under the Hood
 
@@ -247,5 +226,5 @@ And sign out:
 ## Next Steps
 
 - **[Users and Groups](./users-and-groups.md)** — Organize users and manage access control
-- **[Sharing and Invitations](./sharing-and-invitations.md)** — Invitations, email-based shares, access requests
+- **[Invitations](./invitations.md)** — Access modes, invitations, and how email-based shares resolve
 - **[Overview](/)** — See how auth fits into the platform

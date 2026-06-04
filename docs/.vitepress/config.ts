@@ -73,24 +73,6 @@ function buildReferenceSidebar(tree: SidebarItem[]): SidebarItem[] {
 
   const primitive = byName.get('primitive-app')
   const wss = byName.get('js-bao-wss-client')
-  const bao = byName.get('js-bao')
-
-  function pickTypedocApiSections(
-    projectNode: SidebarItem | undefined,
-    sectionTitles: string[]
-  ): SidebarItem[] {
-    const api = projectNode?.items?.find((i) => normalizeTitle(i.text).toLowerCase() === 'api')
-    if (!api) return []
-
-    const out: SidebarItem[] = []
-    for (const title of sectionTitles) {
-      const section = api.items?.find(
-        (i) => normalizeTitle(i.text).toLowerCase() === title.toLowerCase()
-      )
-      if (section) out.push({ text: title, items: section.items ?? [], collapsed: true })
-    }
-    return out
-  }
 
   function pickWssClientSections(projectNode: SidebarItem | undefined): SidebarItem[] {
     const api = projectNode?.items?.find((i) => normalizeTitle(i.text).toLowerCase() === 'api')
@@ -351,12 +333,6 @@ function buildReferenceSidebar(tree: SidebarItem[]): SidebarItem[] {
       items: pickWssClientSections(wss),
       collapsed: true,
     })
-  if (bao)
-    items.push({
-      text: 'js-bao',
-      items: pickTypedocApiSections(bao, ['Classes', 'Functions', 'Interfaces', 'Type Aliases']),
-      collapsed: true,
-    })
 
   return items
 }
@@ -385,6 +361,7 @@ export default defineConfig({
         items: [
           { text: 'Overview', link: '/' },
           { text: 'Quick Start', link: '/getting-started/template-app' },
+          { text: 'Configuring Your Backend', link: '/getting-started/configuring-your-backend' },
           { text: 'Deploying to Production', link: '/getting-started/deploying-to-production' },
           { text: 'Example Apps', link: '/getting-started/example-apps' },
         ],
@@ -395,6 +372,8 @@ export default defineConfig({
         items: [
           { text: 'Authentication', link: '/getting-started/authentication' },
           { text: 'Users and Groups', link: '/getting-started/users-and-groups' },
+          { text: 'Access Control', link: '/getting-started/access-control' },
+          { text: 'Invitations', link: '/getting-started/invitations' },
         ],
         collapsed: false,
       },
@@ -405,13 +384,15 @@ export default defineConfig({
           { text: 'Working with Documents', link: '/getting-started/working-with-documents' },
           { text: 'Working with Databases', link: '/getting-started/working-with-databases' },
           { text: 'Blobs and Files', link: '/getting-started/blobs-and-files' },
+          { text: 'Blob Buckets', link: '/getting-started/blob-buckets' },
         ],
         collapsed: false,
       },
       {
         text: 'Platform Services',
         items: [
-          { text: 'Workflows and Prompts', link: '/getting-started/workflows-and-prompts' },
+          { text: 'Workflows', link: '/getting-started/workflows' },
+          { text: 'Prompts', link: '/getting-started/prompts' },
           { text: 'API Integrations', link: '/getting-started/api-integrations' },
           { text: 'Analytics', link: '/getting-started/analytics' },
         ],

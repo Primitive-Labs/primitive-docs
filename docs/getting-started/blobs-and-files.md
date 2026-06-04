@@ -16,7 +16,7 @@ This page covers **document-scoped blobs** — files attached to a specific docu
 
 :::
 
-The blob context comes from the document: `client.document(documentId).blobs()` in JavaScript, `client.documents.blobs(documentId:)` in Swift.
+The blob context comes from the document, as shown above — uploads, downloads, and listing all hang off it.
 
 ## Displaying Images
 
@@ -50,7 +50,7 @@ The URL includes authentication, so it only works for signed-in users with docum
 
 :::
 
-`downloadUrl` is synchronous and authenticated. In JavaScript, `read(blobId, { as })` returns `text` / `arrayBuffer` / `blob`; Swift's `read(blobId:)` returns `Data`.
+`downloadUrl` is synchronous and authenticated.
 
 ## Listing and Managing Blobs
 
@@ -62,13 +62,13 @@ The URL includes authentication, so it only works for signed-in users with docum
 
 :::
 
-## Offline Support
+## Caching and Upload Queuing
 
-Blob storage works offline:
+Blob storage tolerates flaky connections:
 
-- **Uploads queue** when offline and complete automatically when back online
-- **Downloaded files cache** locally for offline access
-- **Prefetch files** proactively for offline use (JavaScript-only — the Swift document-blob context doesn't expose `prefetch` yet):
+- **Uploads queue** when the network drops and complete automatically when it returns
+- **Downloaded files cache** locally, so repeat reads are instant
+- **Prefetch files** proactively to warm the cache:
 
 ```typescript
 await blobs.prefetch([blobId1, blobId2], { concurrency: 4 });

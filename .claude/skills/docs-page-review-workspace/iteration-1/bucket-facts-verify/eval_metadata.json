@@ -1,0 +1,13 @@
+{
+  "eval_id": 1,
+  "eval_name": "bucket-facts-verify",
+  "prompt": "Review the pre-audit blob-buckets.md snapshot; verify factual claims against library_repos/js-bao-wss and the installed CLI.",
+  "assertions": [
+    {"text": "Identifies that the documented access policies (public/authenticated/owner/cel) don't match the real enum (public-read/authenticated/owner-only)"},
+    {"text": "Identifies that the documented TTL tiers (1-hour/1-day/30-days/persistent) don't match the real tiers (1d/3d/14d/28d/180d/365d/permanent)"},
+    {"text": "Identifies that the [blobBucket] TOML table name and/or the inline [blobBucket.rules] CEL block don't match the real sync format ([bucket]; CEL rules not a released bucket surface)"},
+    {"text": "Identifies the metadata-vs-tags mismatch (uploads accept tags: string[]; there is no arbitrary metadata field for CEL rules to reference)"},
+    {"text": "Flags the shipped 'Content review needed' warning box as something that must not be published"},
+    {"text": "Does not invent additional false facts (no claims contradicting the source it cites)"}
+  ]
+}

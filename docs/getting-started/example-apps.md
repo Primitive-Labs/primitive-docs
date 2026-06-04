@@ -31,4 +31,4 @@ This example shows how to structure an app where users create multiple independe
 
 ## Source Code
 
-Both live example apps are **web** apps built on the [primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template) (Vue). For iOS, the equivalent starting point is the Swift template in [swift-primitive-app-dev](https://github.com/Primitive-Labs/swift-primitive-app-dev) — see the [Quick Start](./template-app.md). Use them as reference when building your own applications.
+Both live example apps are **web** apps built on the [primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template) (Vue) — use it as a reference when building your own application. For iOS, scaffold the Swift template with `npx create-primitive-app my-app --platform ios` (see the [Quick Start](./template-app.md)); it's the equivalent starting point.

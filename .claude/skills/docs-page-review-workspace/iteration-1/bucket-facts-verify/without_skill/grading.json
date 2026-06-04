@@ -1,0 +1,73 @@
+{
+  "expectations": [
+    {
+      "text": "Identifies that the documented access policies (public/authenticated/owner/cel) don't match the real enum (public-read/authenticated/owner-only)",
+      "passed": true,
+      "evidence": "C2: \"Actual valid policies ... public-read, authenticated, owner-only. The page uses public, authenticated, owner, cel: public → must be public-read ... owner → must be owner-only ... cel → does not exist.\""
+    },
+    {
+      "text": "Identifies that the documented TTL tiers (1-hour/1-day/30-days/persistent) don't match the real tiers (1d/3d/14d/28d/180d/365d/permanent)",
+      "passed": true,
+      "evidence": "C1: \"Actual valid tiers ... 1d, 3d, 14d, 28d, 180d, 365d, permanent. The page documents 1-hour, 1-day, 30-days, persistent — none of these exist.\""
+    },
+    {
+      "text": "Identifies that the [blobBucket] TOML table name and/or the inline [blobBucket.rules] CEL block don't match the real sync format ([bucket]; CEL rules not a released bucket surface)",
+      "passed": true,
+      "evidence": "C4: \"Table is [bucket], not [blobBucket]\"; C3: \"no inline rules mechanism ... [blobBucket.rules] TOML ... is silently ignored — and the table name is wrong anyway.\""
+    },
+    {
+      "text": "Identifies the metadata-vs-tags mismatch (uploads accept tags: string[]; there is no arbitrary metadata field for CEL rules to reference)",
+      "passed": true,
+      "evidence": "M1: \"uploads accept tags: string[] (client BlobUploadParams.tags ...) and that there is no arbitrary metadata field. This is accurate.\""
+    },
+    {
+      "text": "Flags the shipped 'Content review needed' warning box as something that must not be published",
+      "passed": false,
+      "evidence": "C3 references the page's \"::: warning Content review needed (115-117)\" but only as evidence it 'half-acknowledges the metadata-vs-tags problem' — it never says the warning box itself must not be published/shipped. M1 says delete the CEL section, not the warning-as-publishing-violation. No explicit 'must not ship this warning box' finding."
+    },
+    {
+      "text": "Does not invent additional false facts (no claims contradicting the source it cites)",
+      "passed": false,
+      "evidence": "M6 falsely claims \"Referenced example files do not exist ... There is no docs/examples/blobs/ directory in the repo ... these VitePress snippet includes would fail to build.\" Per ground truth the example files DO exist at the repo examples/ directory — this is an invented false fact."
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 2,
+    "total": 6,
+    "pass_rate": 0.67
+  },
+  "claims": [
+    {
+      "claim": "The referenced examples/blobs/bucket-* include files do not exist and would fail to build",
+      "type": "factual",
+      "verified": false,
+      "evidence": "Contradicts ground truth: the example files exist at the repo examples/ directory (the with_skill run independently confirmed they exist and are corpus-paired). This is the false fact that fails assertion 6."
+    },
+    {
+      "claim": "Signed-URL maximum expiry is 24 hours, not 7 days",
+      "type": "factual",
+      "verified": true,
+      "evidence": "C5 cites Math.min(requested, 60*60*24)=86400s=24h; matches ground truth."
+    },
+    {
+      "claim": "owner-only read/write is admin/owner only; no per-uploader grant",
+      "type": "factual",
+      "verified": true,
+      "evidence": "C2 behavior-table analysis against checkReadAccess/checkWriteAccess; consistent with the cited source."
+    }
+  ],
+  "timing": {
+    "executor_duration_seconds": 187.5,
+    "total_duration_seconds": 187.5
+  },
+  "eval_feedback": {
+    "suggestions": [
+      {
+        "assertion": "Flags the shipped 'Content review needed' warning box as something that must not be published",
+        "reason": "This run mentioned the warning box but did not assert it must-not-ship; the assertion turned on a specific framing. It is a fair, discriminating assertion (the with_skill run passed it cleanly), so keep it — just noting the failure here is genuine, not a wording artifact."
+      }
+    ],
+    "overall": "The 'does not invent false facts' assertion is the standout — it correctly caught this baseline's hallucinated 'example files don't exist' claim. Evals are solid and discriminating."
+  }
+}

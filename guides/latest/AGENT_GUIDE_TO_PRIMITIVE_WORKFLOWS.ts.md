@@ -759,6 +759,26 @@ Behavior:
 
 Set `accessRule` once in the `[workflow]` TOML block and it sticks: `primitive sync push` and `primitive workflows create --from-file` both apply it (an absent/empty rule is sent as "no rule" rather than dropped). To change it later without re-pushing the file, `primitive workflows update <id> --access-rule "<CEL>"` sets it (pass `--access-rule ""` to clear; omitting the flag leaves the existing rule untouched).
 
+## Inbound webhooks
+
+External services trigger workflows via inbound webhooks. Define them as `webhooks/*.toml` in the sync directory and push with `primitive sync push`:
+
+```toml
+# config/webhooks/stripe-payments.toml
+[webhook]
+key = "stripe-payments"
+displayName = "Stripe Payments"
+workflowKey = "process-stripe"
+verificationScheme = "stripe"     # stripe | github | slack | custom | none
+status = "active"
+# Optional: toleranceSeconds, deduplicationEnabled, deduplicationWindowMs,
+# secretGracePeriodMs, [webhook.allowedIps] cidrs, [webhook.inputMapping]
+```
+
+Receive endpoint: `POST /app/{appId}/webhook/{webhookKey}`. The platform verifies the signature per `verificationScheme`, then starts `workflowKey` with the event payload as input; `inputMapping` (e.g. `"data.object"`) extracts a nested path first. Always pair a webhook-triggered workflow with `accessRule = "hasRole('owner')"` (see Access control above) so clients can't start it directly with a crafted payload.
+
+CLI: `primitive webhooks list | get | create | update | delete | rotate-secret | test | events <webhook-key>` — `events` lists recent deliveries (accepted / rejected / duplicate).
+
 ## Client apply (footgun)
 
 By default, `requiresClientApply = true`. After the workflow completes, status becomes `apply_pending` and a connected client must call `claimApply` → run `onApply` → `confirmApply` to finalize. If no client is listening, the run sits in `apply_pending` indefinitely.

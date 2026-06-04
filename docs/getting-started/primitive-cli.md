@@ -228,7 +228,7 @@ primitive guides get workflows
 primitive guides get authentication
 ```
 
-Guides are cached locally at `~/.primitive/guides/` for offline access.
+Guides are cached locally at `~/.primitive/guides/`.
 
 :::tip For AI Agents
 When working with an AI coding assistant, point it to these guides before asking it to implement features. For example: "Read `primitive guides get workflows` and then create a workflow that sends a welcome email when a user signs up." The agent will fetch the guide, learn the patterns, and implement your request correctly.
@@ -238,7 +238,7 @@ When working with an AI coding assistant, point it to these guides before asking
 
 The CLI supports exporting and importing app configuration as TOML files, enabling version control for your app settings.
 
-When using **project-scoped environments** (set up via `primitive env create`), the sync directory is resolved automatically as `.primitive/sync/<env>/<appId>/` — each environment gets its own isolated slot so a `pull --env staging` never touches production state:
+When using **project-scoped environments** (set up via `primitive env add`), the sync directory is resolved automatically as `.primitive/sync/<env>/<appId>/` — each environment gets its own isolated slot so a `pull --env staging` never touches production state:
 
 ```bash
 # Initialize (auto-resolves .primitive/sync/<env>/<appId>/)
@@ -312,6 +312,16 @@ When you run `primitive init`, you'll be prompted to install the skill as part o
 
 ## Advanced Features
 
+### App Secrets
+
+Store app-level secrets server-side and reference them from workflows and integrations as <span v-pre>`{{ secrets.KEY_NAME }}`</span> — your client code and repo never see the values:
+
+```bash
+primitive secrets set OPENAI_API_KEY --value sk-...
+primitive secrets list
+primitive secrets delete OPENAI_API_KEY
+```
+
 ### Integrations
 
 Configure external API connections:
@@ -342,6 +352,20 @@ primitive workflows publish my-workflow
 primitive workflows runs list
 ```
 
+### Webhooks
+
+Manage inbound webhooks that trigger workflows when external services (Stripe, GitHub, Slack, …) send events. Define them as `webhooks/*.toml` in your sync directory, then inspect from the terminal:
+
+```bash
+primitive webhooks list
+primitive webhooks get <webhook-key>
+primitive webhooks events <webhook-key>     # recent deliveries (accepted/rejected/duplicate)
+primitive webhooks rotate-secret <webhook-key>
+primitive webhooks test <webhook-key>
+```
+
+See [Inbound Webhooks](./workflows.md#via-inbound-webhooks).
+
 ### Cron Triggers
 
 Schedule workflows to run on a cron expression:
@@ -359,7 +383,7 @@ primitive cron-triggers resume nightly-digest
 primitive cron-triggers delete nightly-digest
 ```
 
-See [Scheduled and Real-Time Automation](./scheduled-and-realtime-automation.md).
+See [Invoking Workflows: On a Schedule](./workflows.md#on-a-schedule-cron-triggers).
 
 ### Database Codegen
 
@@ -455,16 +479,16 @@ await client.otpVerify("alice+primitivetest-teacher@example.com", "000000");
 // client is now authenticated; the access token expires in 30 minutes
 ```
 
-The derived account must already exist as an `AppUser` in this app — invite it ahead of time or seed it as part of test setup. The bypass never auto-provisions.
+The derived account must already exist as a user in this app — invite it ahead of time or seed it as part of test setup. The bypass never auto-provisions, which keeps a public-mode app from being signed up as `attacker+primitivetest@<whitelisted>`.
 
 Guardrails:
 
 - **Per-app whitelist.** Apps without a whitelist have no bypass at all.
-- **30-minute tokens** with a `primitiveBypass: true` claim, re-checked per request against the whitelist.
+- **30-minute tokens** with a `primitiveBypass: true` claim, re-checked per request against the whitelist — removing a base immediately revokes its derived sessions.
 - **Member scope only.** `+primitivetest*` cannot hold admin/owner privileges or receive invitations to those roles — boundary calls return `RESERVED_EMAIL_FOR_ADMIN`.
-- **AppUser must exist.** The derived account has to be an existing member of the app.
+- **Suffix shape.** Derived addresses match `<base-local>+primitivetest<suffix>@<base-domain>` where the suffix is `[A-Za-z0-9._-]*`; only single-`+` shapes are accepted.
 
-Use this for automated tests and local development. See [Authentication](./authentication.md#test-user-sign-in-for-automated-testing) for the security model in detail.
+Use this for automated tests and local development — not for staging or production flows.
 
 ## Scripting
 
@@ -483,6 +507,18 @@ primitive token
 
 `primitive token` automatically refreshes the active access token if it's expired or about to expire, so scripts that pipe it into another tool ( `curl -H "Authorization: Bearer $(primitive token)" ...`) keep working past the access-token lifetime without a manual `primitive login`.
 
+### API Tokens for CI and Servers
+
+For headless environments where an interactive `primitive login` isn't possible — CI pipelines, deploy scripts, server-side jobs — create a long-lived API token instead:
+
+```bash
+primitive tokens create --name "CI deploys" --ttl 90d
+primitive tokens list
+primitive tokens revoke <token-id>
+```
+
+TTL accepts `m`/`h`/`d`/`w`/`mo`/`y` units; omit `--ttl` for a non-expiring token. Treat these like passwords — store them in your CI's secret store and revoke any token you no longer need.
+
 ## Getting Help
 
 Every command has built-in help:
@@ -497,5 +533,5 @@ primitive users invite --help
 
 - **[Quick Start](./template-app.md)** — Create your first app
 - **[Working with Databases](./working-with-databases.md)** — Server-side storage managed via CLI
-- **[Workflows and Prompts](./workflows-and-prompts.md)** — Automation configured via CLI
+- **[Workflows](./workflows.md)** — Automation configured via CLI
 - **[Deploying to Production](./deploying-to-production.md)** — Deploy your app

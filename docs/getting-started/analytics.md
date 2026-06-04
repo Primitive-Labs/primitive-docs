@@ -4,10 +4,6 @@ Primitive includes a built-in analytics pipeline. Events are buffered on the cli
 
 This page covers what's tracked out of the box, how to emit your own events, and how to read analytics back from the client, the CLI, and from workflows.
 
-::: warning JavaScript-only
-The custom-event client API (`client.analytics.*`) is currently **JavaScript-only** — the Swift client doesn't yet expose a public analytics API. Swift apps still get server-side auto-tracking (DAU/WAU/MAU, document/permission/workflow lifecycle), but can't emit custom events from the client today. Read analytics back via the CLI, REST, or workflow steps from any platform.
-:::
-
 ## What's Tracked Automatically
 
 You get a working analytics pipeline by initializing `JsBaoClient` with default options. No `logEvent` calls required.
@@ -148,7 +144,7 @@ const client = new JsBaoClient({
 
 ## Querying Analytics
 
-There are four ways to read analytics back: the CLI (terminal-friendly, scriptable), REST (admin-only), workflows (server-side, scheduled), and the Admin Console (visual).
+There are four ways to read analytics back: the CLI (terminal-friendly, scriptable), the REST API (admin-only), workflows (server-side, scheduled), and the Admin Console (visual).
 
 ### From the CLI
 
@@ -188,34 +184,11 @@ primitive analytics integrations
 
 ### From the REST API
 
-All endpoints require `admin` permission on the app.
-
-```text
-GET /app/{appId}/api/analytics/overview/dau?windowDays=28
-GET /app/{appId}/api/analytics/overview/wau?windowDays=28
-GET /app/{appId}/api/analytics/overview/mau?windowDays=28
-GET /app/{appId}/api/analytics/overview/growth?windowDays=28
-
-GET /app/{appId}/api/analytics/daily-active?windowDays=28
-GET /app/{appId}/api/analytics/rolling-active?windowDays=7
-GET /app/{appId}/api/analytics/cohort-retention
-
-GET /app/{appId}/api/analytics/users/top?windowDays=30&limit=10
-GET /app/{appId}/api/analytics/users/search?q=...&limit=25
-GET /app/{appId}/api/analytics/users/{userUlid}/detail
-GET /app/{appId}/api/analytics/users/{userUlid}/snapshot
-
-GET /app/{appId}/api/analytics/events?windowDays=7&page=0
-GET /app/{appId}/api/analytics/events/grouped?windowDays=7&groupBy=action
-
-GET /app/{appId}/api/analytics/integrations?windowDays=30
-GET /app/{appId}/api/analytics/workflows/top?windowDays=30&limit=10
-GET /app/{appId}/api/analytics/prompts/top?windowDays=30&limit=10
-```
+Every CLI query above is backed by an admin-only REST endpoint under `/app/{appId}/api/analytics/...` — use the CLI's `--json` output to discover the shapes, or call the endpoints directly from your own tooling.
 
 ### From a Workflow
 
-Workflows can run analytics queries as a step. This is the simplest way to ship a recurring digest, an admin email, or a Slack post that summarizes activity. See [Workflows and Prompts](./workflows-and-prompts.md#analytics-query-step) for the full step reference.
+Workflows can run analytics queries as a step. This is the simplest way to ship a recurring digest, an admin email, or a Slack post that summarizes activity. See [Workflows](./workflows.md#analytics-query-step) for the full step reference.
 
 ```toml
 [[steps]]
@@ -243,6 +216,6 @@ The **Analytics** section of the [Admin Console](./admin-console.md) shows usage
 
 ## Next Steps
 
-- **[Workflows and Prompts](./workflows-and-prompts.md#analytics-query-step)** — Wire analytics into recurring workflows
+- **[Workflows](./workflows.md#analytics-query-step)** — Wire analytics into recurring workflows
 - **[Admin Console](./admin-console.md)** — Visual analytics dashboards
 - **[Primitive CLI](./primitive-cli.md)** — Full `primitive analytics` reference

@@ -2,7 +2,7 @@
 
 Guidelines for AI agents implementing invitations, document sharing, group and collection membership, and access requests.
 
-> **Swift parity:** the sharing operations below exist in both clients. Exception: `client.invitations.getAcceptToken(...)` is **JavaScript-only**. Note `documents.requestAccess` **requires** a `permission` (`"read-write"`|`"reader"`).
+> **Swift parity:** the sharing operations below exist in both clients. Exception: `client.invitations.get(invitationId)` (full invitation envelope including `inviteToken` — use it for "resend invite" flows) is **JavaScript-only**. Note `documents.requestAccess` **requires** a `permission` (`"read-write"`|`"reader"`).
 
 ## Core operations (JavaScript + Swift)
 

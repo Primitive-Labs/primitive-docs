@@ -139,7 +139,7 @@ method = "GET"
 path = "/forecast/{{ input.city }}"
 ```
 
-See [Workflows and Prompts](./workflows-and-prompts.md) for more on workflow steps.
+See [Workflows](./workflows.md) for more on workflow steps.
 
 ## CLI Reference
 
@@ -155,5 +155,5 @@ primitive integrations logs my-api       # View recent call logs
 
 ## Next Steps
 
-- **[Workflows and Prompts](./workflows-and-prompts.md)** — Use integrations in automated workflows
+- **[Workflows](./workflows.md)** — Use integrations in automated workflows
 - **[Primitive CLI](./primitive-cli.md)** — Full CLI command reference

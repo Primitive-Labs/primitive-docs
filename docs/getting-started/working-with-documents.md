@@ -249,26 +249,14 @@ todo.completed = true;     // write
 await todo.save();
 ```
 
-But a JavaScript model instance is **not** a plain object, and this trips people up: you cannot spread or clone it. Under the hood, each field is a getter/setter on the model's prototype rather than a value sitting directly on the instance, so the spread (`...`) and rest operators — which only copy a value's own properties — skip every field and quietly give you back an empty object.
+But a JavaScript model instance is **not** a plain object: its fields are prototype getters, so the spread (`...`) and rest operators — which only copy own properties — quietly give you back an empty object:
 
 ```typescript
 const copy = { ...todo };            // ❌ has none of todo's fields
 const { id, ...rest } = todo;        // ❌ `rest` is empty
-const next = { ...todo, done: true } // ❌ todo's other fields are lost
 ```
 
-None of these throw — they just hand back partial data, which usually surfaces later as a confusing "missing field" bug. When you genuinely need a plain object — to serialize a record, send it to an integration, or copy it into a new record — read the fields you want explicitly:
-
-```typescript
-// Snapshot a record as a plain object
-const snapshot = { id: todo.id, title: todo.title, completed: todo.completed };
-
-// Duplicate into a new record — list the fields you want to carry over
-const dup = new Todo({ title: todo.title, priority: todo.priority });
-await dup.save({ targetDocument: documentId });
-```
-
-The reverse direction is fine: constructors, `save()`, and `query()` filters all take plain objects, so spreading a plain object *into* them works as expected. The pitfall is only when the model instance is the thing being spread.
+Nothing throws — you just get partial data that surfaces later as a confusing "missing field" bug. When you need a plain object (to serialize, send to an integration, or duplicate a record), read the fields explicitly: `{ id: todo.id, title: todo.title }`. The reverse direction is fine — constructors, `save()`, and `query()` filters all accept plain objects.
 
 ### Iterating on the Schema
 
@@ -281,16 +269,6 @@ You're free to evolve the schema as the app grows. A few rules of thumb:
 - **Adding a `unique = true` constraint to an existing field** can fail at save time if existing records collide. Inspect the data before tightening uniqueness.
 
 The `index.ts` barrel will throw at startup if `models.toml` and the generated classes drift apart. If you see that error, run `pnpm codegen` and commit the regenerated files.
-
-### Migrating an Existing Project
-
-If you have an older project that defines models with `defineModelSchema()` directly in TypeScript, the codegen CLI ships with a migration tool:
-
-```bash
-npx js-bao-codegen-v2 migrate
-```
-
-This scans your existing model files, generates `src/models/models.toml`, and produces a migration report classifying each model as `safe-to-delete` (fully captured in TOML) or `needs-manual-migration` (custom methods, function-valued defaults, etc. — these need manual review). After running migrate, run `pnpm codegen` and delete the original hand-authored files marked safe.
 
 ## CRUD Operations
 
@@ -306,7 +284,7 @@ A record is created and saved locally first, then synced in the background.
 
 :::
 
-In JavaScript a model is a class with instance `.save()`; in Swift a `TypedModel<Task>` (bound to one document) does the writes. In single-document mode the JS save targets the active document; otherwise pass `{ targetDocument }`.
+In single-document mode a JavaScript `save()` targets the active document; otherwise pass `{ targetDocument }`.
 
 ### Read
 
@@ -320,7 +298,6 @@ Find by id, query with filters, get the first match, or count.
 
 :::
 
-`query()` returns a `PaginatedResult` in JavaScript — rows are on `.data`. In Swift, `query()` returns the rows directly and `count` lives on the `.dynamic` layer.
 
 ### Update
 
@@ -332,7 +309,7 @@ Find by id, query with filters, get the first match, or count.
 
 :::
 
-Both look the record up first. JavaScript mutates the loaded object and saves it; Swift applies a partial update keyed by id.
+Both look the record up first, then apply the change.
 
 ### Delete
 
@@ -486,7 +463,7 @@ One `TypedModel` per record type per document. Prefer `makeTypedModel(doc:docume
 
 ## Sharing Documents
 
-Share by user id, by email (the grant resolves at signup if they aren't a member yet), or with an entire group.
+Documents are private until you grant a permission level (`reader` | `read-write` | `owner`, see [the table above](#private-by-default)) to a user, an email, or a group:
 
 ::: code-group
 
@@ -496,7 +473,82 @@ Share by user id, by email (the grant resolves at signup if they aren't a member
 
 :::
 
-For the full sharing story — member invitations with quotas, email-based grants, and access requests — see [Sharing and Invitations](./sharing-and-invitations.md).
+### Share by Email
+
+The most common case — you have a colleague's email but don't know (or care) whether they've signed up yet. If the email belongs to an existing user, access is granted immediately. If not, the share waits and applies automatically when they sign up — see [Invitations](./invitations.md#how-invitations-resolve) for how that resolution works. Repeated shares to the same recipient are idempotent — the latest `permission` wins.
+
+Batch shares can mix user IDs and emails:
+
+```typescript
+await client.documents.updatePermissions(documentId, {
+  permissions: [
+    { userId: "user-abc", permission: "read-write" },
+    { email: "alice@example.com", permission: "reader" },
+    { email: "bob@example.com", permission: "read-write" },
+  ],
+});
+```
+
+To have the platform email the recipient, pass `sendEmail: true` along with a `documentUrl`, and make sure your app's base URL is configured — the server uses them to compose the share and accept links.
+
+### Share with a Group
+
+Grant document access to everyone in a group (the `grantGroupPermission` call in the example above). When group membership changes, document access updates automatically.
+
+### Who Has Access? (Members + Pending)
+
+Sharing UIs typically show two sections: people who currently have access, and people who've been invited but haven't signed up yet:
+
+::: code-group
+
+<<< ../../examples/sharing/document-members.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/document-members.swift#example{swift} [Swift]
+
+:::
+
+### Removing Someone
+
+One call handles both "currently has access" and "invited but hasn't signed up yet" — pass an email and the server removes the matching member *or* cancels the pending grant, whichever exists:
+
+```typescript
+await client.documents.removePermission(documentId, userId);
+await client.documents.removePermission(documentId, { email: "alice@example.com" });
+```
+
+Use the email form whenever you don't want to think about whether the target has signed up yet.
+
+## Collections
+
+Sharing one document at a time stops scaling as soon as access maps to a *set* of documents — a project's files, a course's materials, a client folder. A **collection** bundles documents so they can be shared as a unit: adding a member to a collection grants them access to every document currently in it *and* to any document added later. Remove a document from the collection (or a member from the collection) and the access goes with it.
+
+```typescript
+// Create a collection and put documents in it
+const collection = await client.collections.create({ name: "Project Phoenix" });
+await client.collections.addDocument(collection.collectionId, designDocId);
+await client.collections.addDocument(collection.collectionId, specDocId);
+
+// One grant covers the whole set — including documents added later
+await client.collections.addMember(collection.collectionId, {
+  email: "alice@example.com",
+  permission: "read-write",
+});
+```
+
+Collections sit between single-document shares and groups: share a *document* when access is about that one thing, share a *collection* when access is about a set of documents, and use a *group* when access is about who someone is (a team, a role). Membership works like document sharing — add by user ID or by email (email adds to non-users resolve at signup, like any [deferred grant](./invitations.md#sharing-with-people-who-arent-users-yet)), and list current members and pending invitations:
+
+::: code-group
+
+<<< ../../examples/sharing/collection-access.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/collection-access.swift#example{swift} [Swift]
+
+:::
+
+```typescript
+const pending = await client.collections.listPendingInvitations(collectionId);
+// [{ email, permission, invitationId, ... }]
+```
 
 ## Finding Documents a User Can Access
 
@@ -550,7 +602,7 @@ Listed through a collection the user is a member of.
 
 :::
 
-`ownedDocuments` and `sharedDocuments` both return the `{ items, cursor }` envelope and accept `tag` / `limit` / `cursor`. (In JavaScript, `ownedDocuments()` returns a flat array by default and the `{ items, cursor }` page when you pass `returnPage: true`; Swift always returns the envelope.)
+`ownedDocuments` and `sharedDocuments` accept `tag` / `limit` / `cursor` for filtering and pagination.
 
 ## Document Thumbnails and Metadata
 
@@ -568,10 +620,48 @@ Documents carry presentation fields you can update at any time.
 
 ## Document Access Requests
 
-A `403` from getting a document can include a `canRequestAccess` hint. Users with a document link can submit a request, and document owners can approve or deny it. See [Sharing and Invitations](./sharing-and-invitations.md#document-access-requests).
+When a user has a document link (or ID) but no permission, they can request access — the Google-Docs-style "Request access" flow. A `403` from `client.documents.get(documentId)` includes a `canRequestAccess` hint when the document accepts requests:
+
+```typescript
+try {
+  await client.documents.get(documentId);
+} catch (err) {
+  if (err.code === "DOC_ACCESS_DENIED" && err.details?.canRequestAccess) {
+    // Show a "Request access" button
+  }
+}
+```
+
+The full flow — submit a request (`permission` is required), then an owner lists and approves:
+
+::: code-group
+
+<<< ../../examples/sharing/request-access.ts#example{ts} [JavaScript]
+
+<<< ../../examples/sharing/request-access.swift#example{swift} [Swift]
+
+:::
+
+Owners can also deny with a reason:
+
+```typescript
+await client.documents.denyAccessRequest(documentId, requestId, {
+  reason: "Please email sales instead",
+});
+```
+
+Both sides stay informed without polling: owners and admins receive a `document:access-request-created` WebSocket event (badge the UI immediately), and the requester receives a `document:access-request-resolved` event plus an email with the outcome.
+
+```typescript
+client.on("document:access-request-created", (event) => {
+  showAccessRequestBadge(event.documentId);
+});
+```
+
+Behavior worth knowing: requests expire after 30 days, a requester can't re-submit while a request for the same document is pending, and a resolved request can't be re-resolved.
 
 ## Next Steps
 
 - **[Choosing Your Data Model](./choosing-your-data-model.md)** — When to use documents vs. databases
-- **[Sharing and Invitations](./sharing-and-invitations.md)** — Full sharing, invitations, and access requests
+- **[Invitations](./invitations.md)** — App membership, and how shares to not-yet-users resolve
 - **[Working with Databases](./working-with-databases.md)** — Server-side structured storage

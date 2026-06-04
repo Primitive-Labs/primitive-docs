@@ -6,7 +6,7 @@ Primitive offers two storage systems — **Documents** and **Databases** — eac
 
 | | Documents | Databases |
 |---|---|---|
-| **Where data lives** | Local-first, in the browser | Server-side |
+| **Where data lives** | Local-first, on the device | Server-side |
 | **Connectivity** | Offline access, instant local reads | Requires network connectivity |
 | **Collaboration** | Real-time sync across collaborators | N/A |
 | **Access model** | All-or-nothing sharing per document | Per-operation CEL access rules |
@@ -18,7 +18,7 @@ Primitive offers two storage systems — **Documents** and **Databases** — eac
 
 ## When to Use Documents
 
-Documents are local-first collaborative containers. Data lives in the browser, syncs automatically, and works offline. Choose documents when:
+Documents are local-first collaborative containers. Data lives on the device, syncs automatically, and works offline. Choose documents when:
 
 - **Users own the data** — Tasks, notes, projects, personal records
 - **Real-time collaboration matters** — Multiple users editing shared data simultaneously with conflict-free merging

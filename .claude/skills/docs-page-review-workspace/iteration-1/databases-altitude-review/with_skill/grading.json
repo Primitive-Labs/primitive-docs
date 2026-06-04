@@ -1,0 +1,57 @@
+{
+  "expectations": [
+    {
+      "text": "Identifies that reference-depth/advanced material (e.g. conditional-filter boolean gates, optional-filter substitution semantics, schema-gate error codes, operation timing) exceeds getting-started altitude or needs moving/condensing",
+      "passed": true,
+      "evidence": "Findings #5 (schema-gate error codes OPERATION_REFERENCES_UNDEFINED etc. \"reference-table depth\"), #6 (Operation Timing _timing breakdown \"debugging-internals reference\"), #7 (Conditional Filters/Boolean Gates truth tables \"exceeds the concept-page ceiling\")."
+    },
+    {
+      "text": "Makes an ordering/structure point: advanced material should sit below (not between/above) introductory and common-path content, or the page should be restructured along those lines",
+      "passed": true,
+      "evidence": "Verdict: \"the second half drifts to agent-guide altitude.\" Findings note placement (e.g. #6 \"Sits below 'Common Patterns' so it isn't a ramp violation\"; #7 \"correctly placed *low* on the page (good ramp)\") and the disposition is to relocate deep material to the agent guide/reference, keeping the ramp ordering."
+    },
+    {
+      "text": "Flags the '(SQLite-backed)' implementation-internal mention in the intro",
+      "passed": false,
+      "evidence": "No finding mentions 'SQLite-backed' or the storage engine. The standards findings (#1 JavaScript-only, #2 legacy alias, #3 truncation loop) and altitude findings do not include the SQLite intro leak that the without_skill run caught (its defect #3)."
+    },
+    {
+      "text": "Proposes concrete dispositions (condense, move to reference/agent docs, reorder) rather than only describing problems",
+      "passed": true,
+      "evidence": "Every finding has a Fix proposing concrete disposition, e.g. #4 \"Collapse to a short reference to access-control.md plus only the database-specific surface\"; #6 \"Reduce to one sentence ... or remove; let the guide carry the phase names.\""
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 1,
+    "total": 4,
+    "pass_rate": 0.75
+  },
+  "claims": [
+    {
+      "claim": "The truncation-loop 're-run until truncated:false' instruction is a footgun (only safe when the write removes records from the match set)",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Finding #3 cites DATABASES.template.md:675; a substantive correctness catch beyond pure altitude. Plausible and well-sourced."
+    },
+    {
+      "claim": "Swift databases.subscribe is missing (real gap behind the JS-only callout)",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Bugs-to-file section cites DatabasesAPI.swift exposing executeOperation/executeBatch but no subscribe; consistent with repo's JS↔Swift drift convention."
+    }
+  ],
+  "timing": {
+    "executor_duration_seconds": 154.4,
+    "total_duration_seconds": 154.4
+  },
+  "eval_feedback": {
+    "suggestions": [
+      {
+        "assertion": "Flags the '(SQLite-backed)' implementation-internal mention in the intro",
+        "reason": "This is a discriminating assertion — the without_skill run caught it, this run missed it. It's a single low-prominence phrase, so it's a good test of thoroughness. Worth keeping; the miss here is a genuine gap, not an unsatisfiable assertion."
+      }
+    ],
+    "overall": "Assertions are well-targeted and discriminating. The SQLite-backed assertion specifically separated the two runs on thoroughness, which is exactly what a good eval should do."
+  }
+}
