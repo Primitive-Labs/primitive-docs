@@ -42,19 +42,16 @@ Every event — auto or custom — gets these fields populated automatically: `t
 
 ### Offline Persistence
 
-Events are persisted to IndexedDB while offline (1 MiB cap, oldest dropped when full) and flushed on reconnect. A rate limiter caps emission at 300 events/minute with a 60-token burst. No code required.
+Events are persisted on the device while offline and flushed on reconnect. A rate limiter caps emission at 300 events/minute with a 60-token burst. No code required.
 
 ## Emitting Custom Events
 
-Use `client.analytics.logEvent()` for app-specific events:
+Log app-specific events from the client:
 
-```typescript
-client.analytics.logEvent({
-  action: "photo_uploaded",
-  feature: "gallery",
-  user_ulid: currentUserUlid,
-});
-```
+::: code-group
+<<< ../../examples/analytics/log-event.ts#example{ts} [JavaScript]
+<<< ../../examples/analytics/log-event.swift#example{swift} [Swift]
+:::
 
 `action` and `user_ulid` are required. Use the verb_noun convention for action names (`photo_uploaded`, `report_generated`, `settings_changed`) and group related events under a `feature` so per-feature dashboards work.
 
@@ -62,31 +59,19 @@ client.analytics.logEvent({
 
 Pass a `context_json` object for per-event debug data. It's serialized and **truncated to 1 KiB**, so keep it small — don't dump request bodies or full reports.
 
-```typescript
-client.analytics.logEvent({
-  action: "search_executed",
-  feature: "search",
-  user_ulid: currentUserUlid,
-  context_json: {
-    query: "quarterly report",
-    resultCount: 42,
-  },
-});
-```
+::: code-group
+<<< ../../examples/analytics/log-event-context.ts#example{ts} [JavaScript]
+<<< ../../examples/analytics/log-event-context.swift#example{swift} [Swift]
+:::
 
 ### Pre-Auth Events
 
-Events without an authenticated user are dropped silently. To track activity on landing pages and sign-up flows, use the `ANALYTICS_UNAUTHENTICATED_USER` constant:
+Events without an authenticated user are dropped silently. To track activity on landing pages and sign-up flows, pass the unauthenticated-user constant as the `user_ulid`:
 
-```typescript
-import { ANALYTICS_UNAUTHENTICATED_USER } from "js-bao-wss-client";
-
-client.analytics.logEvent({
-  action: "landing_page_view",
-  feature: "onboarding",
-  user_ulid: ANALYTICS_UNAUTHENTICATED_USER,
-});
-```
+::: code-group
+<<< ../../examples/analytics/log-event-preauth.ts#example{ts} [JavaScript]
+<<< ../../examples/analytics/log-event-preauth.swift#example{swift} [Swift]
+:::
 
 Use sparingly — most analytics should be tied to real users.
 
@@ -104,19 +89,16 @@ This emits an event with `action: "_snapshot"`, `feature: "_state"`, and your pa
 
 If your app reports plan/version dynamically (e.g. after an in-app upgrade), set them once on the client and they flow into every subsequent event:
 
-```typescript
-client.analytics.setPlanOverride("pro");
-client.analytics.setAppVersionOverride("2.1.4");
-
-// Pass null/undefined to clear an override
-client.analytics.setPlanOverride(null);
-```
+::: code-group
+<<< ../../examples/analytics/analytics-overrides.ts#example{ts} [JavaScript]
+<<< ../../examples/analytics/analytics-overrides.swift#example{swift} [Swift]
+:::
 
 ### What to Avoid
 
-- **Don't log without `user_ulid`** — TypeScript will catch it, and the runtime drops the event silently.
+- **Don't log without `user_ulid`** — the runtime drops the event silently.
 - **Don't log high-frequency telemetry** (mouse moves, scroll, keystrokes) — the rate limiter caps at 300 events/min and will drop the rest.
-- **Don't add your own `beforeunload` flush** — the client already does this and emits `session_end` for you.
+- **Don't add your own teardown flush** — the client flushes pending events and emits `session_end` for you.
 
 ## Configuring Auto Events
 

@@ -14,6 +14,10 @@ Read aggregated analytics (DAU/WAU/MAU, retention, top users, event feeds) throu
 
 Standing up an app gets you DAU/WAU/MAU tracking, session analytics, document/permission audit trails, and full workflow/prompt/integration observability with no instrumentation.
 
+**Key constraints for custom events:**
+- Every analytics event requires an authenticated user. Events without a `user_ulid` are dropped silently. Use the unauthenticated-user constant for pre-auth screens.
+- A tenant ID (resolved automatically from the client's `appId`) must also be present, or the event is dropped.
+
 
 ### Server-Side Events
 
@@ -50,6 +54,91 @@ The platform emits these from the server. No client code at all.
 | `revoked` | `token` | API token revoked |
 
 Workflow and prompt events also record `duration_ms` and LLM token counts (`input_tokens`, `output_tokens`, `total_tokens`) when available.
+
+
+### Offline Persistence and Rate Limiting
+
+Events are buffered on the device and persisted locally while offline; persisted events are flushed automatically when the WebSocket reconnects. A rate limiter caps emission at **300 events/minute with a 60-token burst** — events over the cap are dropped silently. No special code needed.
+
+
+---
+
+## Logging Custom Events
+
+### Basic Event
+
+`action` and `user_ulid` are required; `feature` (defaults to `"unspecified"`) groups related events.
+
+```swift
+  client.logAnalyticsEvent([
+    "action": "photo_uploaded",
+    "feature": "gallery",
+    "user_ulid": currentUserUlid,
+  ])
+```
+
+`logAnalyticsEvent` takes a `[String: Any]` dictionary. If `user_ulid` is omitted it is back-filled from the client's current user, or set to the unauthenticated-user constant when no user is signed in.
+
+### Event with Context
+
+Pass a `context_json` object for per-event debug data. The serialized payload is bounded at **1 KiB**, so keep it small — don't dump request bodies or full reports.
+
+```swift
+  client.logAnalyticsEvent([
+    "action": "search_executed",
+    "feature": "search",
+    "user_ulid": currentUserUlid,
+    "context_json": [
+      "query": "quarterly report",
+      "resultCount": 42,
+    ],
+  ])
+```
+
+`context_json` accepts a `[String: Any]` dictionary. If its serialized size exceeds 1 KiB, the field is dropped from the event before sending.
+
+
+---
+
+## Pre-Auth Events
+
+Events with no authenticated user are dropped. To log on pre-auth screens (landing pages, sign-up flow), pass the unauthenticated-user constant as the `user_ulid`. Its value is `"UNAUTHENTICATED"`. Use sparingly — most analytics should be tied to real users.
+
+```swift
+  client.logAnalyticsEvent([
+    "action": "landing_page_view",
+    "feature": "onboarding",
+    "user_ulid": AnalyticsQueue.unauthenticatedUser,
+  ])
+```
+
+---
+
+## Manual Flush
+
+Events are buffered and flushed automatically — including when the WebSocket reconnects — so you rarely need to flush manually. Call `flush` to force a send (e.g. before an explicit teardown).
+
+The queue auto-flushes every **100ms** (or earlier when batched). `client.destroy()` cancels the flush timer and triggers a final flush before storage closes, so you don't need a manual flush on teardown.
+
+```swift
+client.flushAnalytics()
+```
+
+---
+
+## Plan and App Version Overrides
+
+If your app reports its plan/version dynamically (e.g. after an in-app upgrade), set them on the client. They flow into every subsequent event automatically. Pass `null`/`nil` to clear an override.
+
+```swift
+  client.setAnalyticsPlanOverride("pro")
+  client.setAnalyticsAppVersionOverride("2.1.4")
+
+  // Pass nil to clear an override
+  client.setAnalyticsPlanOverride(nil)
+```
+
+---
 
 
 ---
@@ -163,4 +252,12 @@ Each row from `/analytics/events` includes geographic and per-event metric field
 These fields are absent (or zero) when the event type doesn't produce them.
 
 ---
+
+## Best Practices
+
+1. **Use verb_noun action names** — `"photo_uploaded"`, `"report_generated"`, `"settings_changed"`.
+2. **Group with `feature`** — set consistently to enable per-feature dashboards (`"gallery"`, `"settings"`, `"billing"`).
+3. **Keep `context_json` small** — bounded at 1 KiB. Don't dump request bodies or full reports.
+4. **Don't log high-frequency events** — rate limiter caps at 300/min with burst 60. Design around meaningful actions, not continuous telemetry.
+5. **Use the override setters** instead of passing `plan` / `app_version` on every event.
 
