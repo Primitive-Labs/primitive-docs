@@ -20,7 +20,7 @@ without cluttering the main docs.
 
 The two clients aren't at full parity. Where they differ, the page says so explicitly:
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 The method exists in the JavaScript client but **not** the Swift client (or vice-versa). The
 available language is shown; the gap links to the tracking issue.
 :::

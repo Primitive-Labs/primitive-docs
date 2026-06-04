@@ -21,7 +21,7 @@ analog — prefer the options-struct form for cross-client parity.
 
 Fetch a single prompt definition by key.
 
-::: warning Swift-only — broken at runtime
+::: danger Swift-only — broken at runtime
 Swift exposes `prompts.get`, but it calls an app-api route (`GET /prompts/{key}`)
 that doesn't exist, so it returns a 404 at runtime
 ([#993](https://github.com/Primitive-Labs/js-bao-wss/issues/993)). JS exposes no
@@ -35,7 +35,7 @@ its return is now typed (`PromptInfo?`) for source parity, but do not rely on it
 
 List the prompts available to the current app/user.
 
-::: warning Swift-only — broken at runtime
+::: danger Swift-only — broken at runtime
 Swift exposes `prompts.list`, but it calls an app-api route (`GET /prompts`) that
 doesn't exist, so it returns a 404 at runtime
 ([#993](https://github.com/Primitive-Labs/js-bao-wss/issues/993)). JS exposes no

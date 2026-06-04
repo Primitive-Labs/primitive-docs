@@ -2,7 +2,7 @@
 
 Generate content with Google Gemini models: structured prompts, raw passthrough, model discovery, and token counting.
 
-::: warning Swift parity gap — no analytics, no error normalization
+::: danger Swift parity gap — no analytics, no error normalization
 Across **all** `gemini.*` methods, the Swift `GeminiAPI` emits **no analytics events** — JS fires `prompt_started` / `prompt_succeeded` / `prompt_failed` for every generate call, but the Swift auto-events engine isn't wired (the context getter hardcodes `isEnabled = true` yet nothing fires). Swift also does **not** normalize provider failures to the `GEMINI_ERROR` code the way JS does. Until both are aligned, treat gemini analytics as JS-only and don't rely on a uniform error code on iOS ([#963](https://github.com/Primitive-Labs/js-bao-wss/issues/963), sweep gemini D2).
 :::
 

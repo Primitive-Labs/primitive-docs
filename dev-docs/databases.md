@@ -211,7 +211,7 @@ Get the field schema for a model in a database.
 
 Connect to a database and get a `DoDb` for ad-hoc record query/find/save/count/aggregate.
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — the Swift client has no `connect()` and no `DoDb` record
 surface, so the entire ad-hoc `query` / `find` / `save` / `patch` / `count` /
 `aggregate` API is absent on Swift (sweep databases D2). On Swift, read and
@@ -226,7 +226,7 @@ instead ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954),
 
 Subscribe to real-time database changes for a server-registered subscription.
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — the Swift client has no `subscribe()`; poll via
 `executeOperation` instead
 ([#952](https://github.com/Primitive-Labs/js-bao-wss/issues/952)). Swift also

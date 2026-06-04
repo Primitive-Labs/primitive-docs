@@ -186,7 +186,7 @@ JS delivers **deltas** — `added` / `updated` / `removed` arrays of client IDs.
 
 Fires when an internal KV cache entry (e.g. the `me` record) refreshes from the server.
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — the Swift client emits no `cacheUpdated` event and has no `JsBaoEvent` case for it
 (sweep cache D7). It's also absent from the typed
 `JsBaoEvents` map, so subscribe through an untyped `on` cast.
@@ -198,7 +198,7 @@ JavaScript-only — the Swift client emits no `cacheUpdated` event and has no `J
 
 Fires when an internal KV cache entry fails to refresh from the server.
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — no Swift `JsBaoEvent` case (sweep cache D7). Like `cacheUpdated`, it's not in
 the typed `JsBaoEvents` map; subscribe via an untyped `on` cast.
 :::

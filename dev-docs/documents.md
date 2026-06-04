@@ -4,10 +4,21 @@ Create, open, share, and sync collaborative Yjs documents. Blob attachments are 
 
 ## create(options)
 
-Create a new document. Pass `localOnly: true` to defer the server commit.
+Create a new document. **Local-first** on both clients: the document is written
+locally and is immediately usable, the server commit races in the background,
+and `localOnly: true` keeps it on-device (commit it later with the top-level
+`client.commitOfflineCreate`). A create issued while offline queues rather than
+failing. The response carries the document's `metadata` blob — use
+`createWithAlias` when you need the id back.
 
-::: danger SKIPPED — superseded
-JS `documents.create` is local-first (writes locally, commits in the background, honors `localOnly`); Swift's `documents.create` POSTs synchronously. We are **not** routing the sub-API through a local-first path — the capability already exists on Swift via the top-level `client.createDocument(options:)`, and the tracking issue ([#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852)) is closed. A create issued via `documents.create` while offline therefore fails rather than queueing; use `client.createDocument` when you need offline-first creates.
+::: tip Divergent shape
+Like js-bao, Swift's `documents.create` forwards to the authoritative
+`client.createDocument(options:)` — same local-first flow, including the
+create-time `metadata` blob being replayed into the server commit
+([#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852),
+[#673](https://github.com/Primitive-Labs/js-bao-wss/issues/673)). The only
+difference: `documents.create` returns just `{ metadata }`, whereas
+`client.createDocument` also hands back the writable document handle.
 :::
 
 ::: code-group
@@ -37,7 +48,7 @@ Resolve an alias to a document, creating one if it doesn't exist yet (singleton 
 
 List documents accessible to the current user. Deprecated in favor of `client.me.ownedDocuments()` / `client.me.sharedDocuments()` ([#628](https://github.com/Primitive-Labs/js-bao-wss/issues/628)).
 
-::: danger SKIPPED — deprecated
+::: warning SKIPPED — deprecated
 Swift returns a typed `[DocumentInfo]` but only supports `limit`/`cursor` pagination; JS adds `tag`, `forward`, `waitForLoad`, `refreshFromServer`, `localOnly`, and a `returnPage` array-vs-page duality ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)). We are **not** expanding `list`'s options — `documents.list` is deprecated in both clients; the pagination-parity work belongs on the `me.ownedDocuments()` / `me.sharedDocuments()` surface instead.
 :::
 
@@ -441,11 +452,18 @@ JS is async and returns `{ documentId, title?, createdAt }` objects; Swift is sy
 
 Commit a locally-created (`localOnly`) document to the server.
 
-::: danger SKIPPED — superseded
-JavaScript-only — `documents.commitOfflineCreate` isn't exposed on Swift, and we are not adding it: it's paired with the [skipped local-first `documents.create`](#create-options) work. The underlying flow already exists via `client.createDocument`, and the tracking issue ([#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852)) is closed.
+::: tip Divergent shape
+JS namespaces this under `documents.commitOfflineCreate`; Swift exposes it as a
+top-level `client.commitOfflineCreate(documentId:onExists:)`. Same flow — it
+replays the pending create's stashed `title`/`tags`/`metadata` into the server
+POST. Pair it with a `localOnly: true` create (or any create made while
+offline) to push the doc up once you're back online.
 :::
 
+::: code-group
 <<< ./snippets/documents/commit-offline-create.ts#example{ts} [JavaScript]
+<<< ./snippets/documents/commit-offline-create.swift#example{swift} [Swift]
+:::
 
 ## cancelPendingCreate(documentId, opts?)
 

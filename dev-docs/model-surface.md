@@ -10,7 +10,7 @@ JavaScript exposes the whole surface as **static/instance methods on the generat
 
 Construct a record and persist it. JS `save` accepts `SaveOptions` (`targetDocument`, `forceWrite`, `upsertOn`); in Swift a `TypedModel` is bound to one document, so the write targets that document.
 
-::: warning Swift parity gap
+::: danger Swift parity gap
 JS targets the active document by default (or `{ targetDocument }`); Swift's `TypedModel.create(_:)` writes to the document the model was constructed against, with no active-document defaulting. None of JS's `SaveOptions` are exposed on the Swift facade — `targetDocument` and `forceWrite` have no equivalent at all, and `upsertOn` is reachable only via the internal `.dynamic.upsert` (see below) (sweep D3/D4, [#947](https://github.com/Primitive-Labs/js-bao-wss/issues/947)).
 :::
 
@@ -128,7 +128,7 @@ Swift `count` lives on `.dynamic`.
 
 Group-by aggregation with count/avg/sum, an optional filter, sort, and limit.
 
-::: warning Swift parity gap
+::: danger Swift parity gap
 Swift `aggregate` lives on `.dynamic` and returns untyped `[[String: Any]]` rows (vs JS's typed result). Its `groupBy` is `[String]` only, so two JS grouping shapes have no Swift form: StringSet-membership grouping (`{ field, contains }`) and the single-facet map (sweep D2, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
 :::
 

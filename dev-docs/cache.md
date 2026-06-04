@@ -6,7 +6,7 @@ General-purpose key-value cache with in-memory + persistent storage, request ded
 
 Build a deterministic cache key from a base string and optional params.
 
-::: warning Swift parity gap — keys are not portable
+::: danger Swift parity gap — keys are not portable
 The two clients produce **different keys** for the same inputs: JS serializes params as
 `base:<stable-JSON>` and accepts any value (scalar, array, object), while Swift accepts only
 `[String: Any]` and joins them as `base?k=v&…`. Keys are therefore **not portable across
@@ -76,7 +76,7 @@ Remove every entry from the cache.
 The JS cache emits `cacheUpdated` (`{ key, updatedAt, source, value }`) on every successful network
 refresh and `cacheUpdateFailed` (`{ key, error }`) on failure.
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — the Swift `KvCache` has no emitter and fires no cache events (sweep cache D7; no
 issue number filed yet). These events are also not part of the typed public event map, so they are
 not surfaced through `client.on(...)`.

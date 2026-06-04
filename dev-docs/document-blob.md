@@ -9,7 +9,7 @@ with `client.document(id).blobs()` (JS) or `client.documents.blobs(documentId:)`
 
 Upload a blob attached to the document, hashing and deduplicating automatically.
 
-::: warning Swift parity gap
+::: danger Swift parity gap
 JS accepts `File | Blob | Uint8Array | ArrayBuffer` and the `retainLocal` option;
 Swift's `upload(data:options:)` takes only `Data` (filename/contentType must be
 passed explicitly) and has no `retainLocal` (sweep blob D12). The `Data`-only source
@@ -44,7 +44,7 @@ Retrieve metadata for a single blob.
 
 Build a direct, authenticated download URL for a blob (synchronous).
 
-::: warning Swift parity gap
+::: danger Swift parity gap
 JS accepts both `disposition` and `attachmentFilename`. Swift's
 `downloadUrl(blobId:disposition:)` supports `disposition` only — there is no way to
 override the download filename from the Swift client (sweep blob D-downloadUrl; not
@@ -76,7 +76,7 @@ JS's `read` takes an `options` object (`as: "uint8array" | "arrayBuffer" | "blob
 
 Delete a blob from the document.
 
-::: warning Swift parity gap
+::: danger Swift parity gap
 Beyond the result shape, JS `delete` also evicts the blob's local cache, cancels any
 queued upload for it, and emits `queue-drained`. Swift's `delete` does none of this —
 a deleted blob can be served stale from the local cache, and a delete issued mid-upload
@@ -92,7 +92,7 @@ won't cancel the in-flight transfer (sweep blob D10; not tracked by an issue).
 
 Upload a file and queue it for background transfer when the upload queue is active.
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — the Swift document-blob context exposes only `upload(data:)`, with
 no separate queued-upload entry point. Part of the upload-queue facade that is absent
 on Swift (sweep blob D13; not tracked by an issue).
@@ -104,7 +104,7 @@ on Swift (sweep blob D13; not tracked by an issue).
 
 Build a service-worker-proxied URL for a blob (useful for inline display).
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — relies on a browser service worker, which has no Swift counterpart
 (web-only by platform constraint).
 :::
@@ -115,7 +115,7 @@ JavaScript-only — relies on a browser service worker, which has no Swift count
 
 Report whether a service worker is registered and controlling blob proxy requests.
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — service-worker-specific (web-only by platform constraint).
 :::
 
@@ -125,7 +125,7 @@ JavaScript-only — service-worker-specific (web-only by platform constraint).
 
 Pre-download multiple blobs into the local cache for offline access.
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — the Swift document-blob context doesn't expose `prefetch` yet,
 though the underlying `BlobManager.prefetch` already exists internally ([#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957)).
 :::
@@ -136,7 +136,7 @@ though the underlying `BlobManager.prefetch` already exists internally ([#957](h
 
 Return the current status of all tracked uploads for this document.
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — the upload-queue facade is not re-exported on the Swift
 document-blob context (sweep blob D13; not tracked by an issue).
 :::
@@ -147,7 +147,7 @@ document-blob context (sweep blob D13; not tracked by an issue).
 
 Pause an in-progress upload by blob ID.
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — upload-queue control, part of the queue facade absent on Swift
 (sweep blob D13; not tracked by an issue).
 :::
@@ -158,7 +158,7 @@ JavaScript-only — upload-queue control, part of the queue facade absent on Swi
 
 Resume a paused upload by blob ID.
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — upload-queue control, part of the queue facade absent on Swift
 (sweep blob D13; not tracked by an issue).
 :::
@@ -169,7 +169,7 @@ JavaScript-only — upload-queue control, part of the queue facade absent on Swi
 
 Pause all in-progress uploads for this document.
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — upload-queue control, part of the queue facade absent on Swift
 (sweep blob D13; not tracked by an issue).
 :::
@@ -180,7 +180,7 @@ JavaScript-only — upload-queue control, part of the queue facade absent on Swi
 
 Resume all paused uploads for this document.
 
-::: warning No Swift equivalent
+::: danger No Swift equivalent
 JavaScript-only — upload-queue control, part of the queue facade absent on Swift
 (sweep blob D13; not tracked by an issue).
 :::

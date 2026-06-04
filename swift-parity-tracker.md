@@ -19,7 +19,7 @@ Last updated 2026-06-04 (all ❓ needs-decision items resolved: analytics built,
 - **✅ Just built — `client.analytics` namespace + auto-engine:** typed `client.analytics.{logEvent,logSnapshot,flush,setPlanOverride,setAppVersionOverride}` (#951 done), session-lifecycle auto-events + flush-on-connect/background (#963 engine+session done; per-feature catalog still deferred).
 - **🔵 Deferred (I'll build these later — say go):** doc-blob `prefetch`/`read(as:)` (#957) · doc-blob delete-eviction (#965) · `databases.subscribe` (#952) · `me` offline-first (#938 rest) · codegen filenames (#944) · codegen `--check`/relationship-accessors/barrel (#995 rest) · per-feature analytics auto-events (#963 rest) · **auth parity (#964 — your call: defer all)** · **model-surface (#854/#946/#947/#955/#992 — deferred until PR #923 merges)** · native auth/notifications (#928–931, separate native track).
 - **❓ Needs your decision before I build:** _(none — all resolved 2026-06-04)_.
-- **🔴 Skipped (not doing, with reason):** #852 (issue CLOSED — `client.createDocument` already provides local-first) · #859 (a deprecation-*removal* task, not a parity fix) · #949 (a JS-side public-type fix — nothing to change in Swift).
+- **🔴 Skipped (not doing, with reason):** #859 (a deprecation-*removal* task, not a parity fix) · #949 (a JS-side public-type fix — nothing to change in Swift).
 
 ## Master chart
 
@@ -27,7 +27,7 @@ Last updated 2026-06-04 (all ❓ needs-decision items resolved: analytics built,
 |---|---|---|---|
 | [#846](https://github.com/Primitive-Labs/js-bao-wss/issues/846) | ⚪ stale → close | — | `getOrCreateWithAlias` already exists (typed `c3cb4c4f`); GH comment posted |
 | [#847](https://github.com/Primitive-Labs/js-bao-wss/issues/847) | ⚪ stale → close | — | `me.owned/sharedDocuments` exist; real gap is #938; GH comment posted |
-| [#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852) | 🔴 skipped | — | issue CLOSED; `client.createDocument` already provides local-first. Routing the sub-API is low-value — not doing |
+| [#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852) | ✅ done | `21220b8b` | `documents.create` now delegates to the local-first `client.createDocument` (offline queues instead of failing; `localOnly` honored), matching js-bao's forward. Also threads the create-time `metadata` blob through commit (#673) |
 | [#854](https://github.com/Primitive-Labs/js-bao-wss/issues/854) | 🔵 deferred | — | model-level subscription events — **deferred until PR #923 merges** (model-surface) |
 | [#859](https://github.com/Primitive-Labs/js-bao-wss/issues/859) | 🔴 skipped | — | a deprecation-*removal* task (remove `documents.list`), not a parity fix — not ours |
 | [#928](https://github.com/Primitive-Labs/js-bao-wss/issues/928) | 🔵 deferred (scope) | — | native Google sign-in — separate native track |
@@ -76,4 +76,4 @@ Last updated 2026-06-04 (all ❓ needs-decision items resolved: analytics built,
 - User-facing **`docs/getting-started/` + `guides/latest/`** migration to the typed API.
 
 ## Commit reference (`js-parity-jun-3`)
-`c3cb4c4f` documents typed · `b5e31ff2` documents behavioral (#961/#506) · `0b7b4bc5` bounded (#959/#960/#962) · `5c0333f3` wave-1 · `13f0c031` wave-2 · `f0576fa1` wave-3 · `5e0b76e2` wave-4 · `e4591a3f` cache query/body · `60db2ecd` cache serverTimeoutMs + runSync · `ea7c67ca` wave-5 (prompts/doc-blob/importCsv/cache-options/codegen) · `90ca6dad` analytics namespace + session auto-events (#951/#963)
+`c3cb4c4f` documents typed · `b5e31ff2` documents behavioral (#961/#506) · `0b7b4bc5` bounded (#959/#960/#962) · `5c0333f3` wave-1 · `13f0c031` wave-2 · `f0576fa1` wave-3 · `5e0b76e2` wave-4 · `e4591a3f` cache query/body · `60db2ecd` cache serverTimeoutMs + runSync · `ea7c67ca` wave-5 (prompts/doc-blob/importCsv/cache-options/codegen) · `90ca6dad` analytics namespace + session auto-events (#951/#963) · `21220b8b` documents.create local-first delegation (#852/#673)
