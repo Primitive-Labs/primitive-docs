@@ -1,9 +1,9 @@
 # auth — `client` (authentication)
 
-Sign users in (OAuth, magic link, OTP, passkeys), enable offline access, read auth config, and log out. These methods live directly on the client, not under a sub-API.
+Sign users in (OAuth, magic link, OTP, passkeys), enable offline access, read auth config, and log out.
 
-::: danger Swift parity gap
-Most of the auth surface is **dual** but the Swift client is largely untyped: `getAuthConfig`/`getAppConfig`/`magicLinkVerify`/`otpVerify`/`enableOfflineAccess` return `[String: Any]` where JS returns named objects, and the OAuth/magic-link/OTP methods lack the JS `inviteToken`/`waitlist` options. `logout` and `enableOfflineAccess` options also diverge — and there are two **behavioral** gaps beyond shape: Swift's `logout` skips the server `/auth/logout` cookie clear, and Swift's offline-access biometric default is inverted vs JS. Both clients compile; the Swift examples use dict access and the narrower Swift signatures. Tracked under [#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964) (option/behavioral gaps) and [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954) (untyped dicts). Per-method divergences are noted inline.
+::: tip Typed `client.auth` namespace (Swift)
+The non-native auth surface — magic-link, OTP, `getAuthConfig`, `logout`, the offline-grant suite, and the identity/token accessors (`getUserId`/`getToken`/`isAuthenticated`/`waitForUserId`) — now lives on a **typed `client.auth.*` namespace** in Swift ([#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)). These methods return named result types (`MagicLinkVerifyResult`, `OtpVerifyResult`, `AuthConfigInfo`, `EnableOfflineAccessResult`, …) rather than `[String: Any]`. The JS client keeps the same calls **top-level** on `client.*`, so the call shapes differ slightly per language. A handful of **behavioral**/option gaps remain and are flagged inline below: `logout` still skips the server `/auth/logout` cookie clear and honors only `wipeLocal`; `enableOfflineAccess` is missing JS options and inverts the biometric default; `getAppConfig` is still untyped; and OAuth + passkeys are native-deferred ([#928](https://github.com/Primitive-Labs/js-bao-wss/issues/928) / [#929](https://github.com/Primitive-Labs/js-bao-wss/issues/929)).
 :::
 
 ## OAuth
@@ -59,7 +59,7 @@ JS takes a single params object (with optional `refreshProxyBaseUrl`/`refreshPro
 Email a magic sign-in link to the user.
 
 ::: tip Divergent shape
-JS returns `{ success }` and `redirectUri` is optional; Swift requires `redirectUri:` and returns a bare `Bool` ([#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)).
+Both clients return a typed `{ success }` result (Swift `MagicLinkRequestResult`). JS makes `redirectUri` optional and lives top-level on `client.*`; Swift requires `redirectUri:` and lives on `client.auth.*` ([#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)).
 :::
 
 ::: code-group
@@ -72,7 +72,7 @@ JS returns `{ success }` and `redirectUri` is optional; Swift requires `redirect
 Verify a magic-link token and sign the user in.
 
 ::: tip Divergent shape
-JS returns a typed `{ user, isNewUser, promptAddPasskey }` and accepts `{ inviteToken }`; Swift returns an untyped `[String: Any]` and has no `inviteToken` option ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)).
+Both clients return a typed result with `{ user, isNewUser?, promptAddPasskey? }` (Swift `MagicLinkVerifyResult` via `client.auth.magicLinkVerify`). JS additionally accepts an `{ inviteToken }` option for invite-only signups; Swift has no `inviteToken` option yet ([#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)).
 :::
 
 ::: code-group
@@ -87,7 +87,7 @@ JS returns a typed `{ user, isNewUser, promptAddPasskey }` and accepts `{ invite
 Email a one-time password (OTP) code to the user.
 
 ::: tip Divergent shape
-JS returns `{ success }`; Swift returns a bare `Bool` ([#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)).
+Both clients return a typed `{ success }` result (Swift `OtpRequestResult` via `client.auth.otpRequest`); JS keeps it top-level on `client.*` ([#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)).
 :::
 
 ::: code-group
@@ -100,7 +100,7 @@ JS returns `{ success }`; Swift returns a bare `Bool` ([#964](https://github.com
 Verify an OTP code and sign the user in.
 
 ::: tip Divergent shape
-JS returns a typed `{ user, isNewUser }` and accepts `{ inviteToken }`; Swift returns an untyped `[String: Any]` and has no `inviteToken` option ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)).
+Both clients return a typed result with `{ user, isNewUser? }` (Swift `OtpVerifyResult` via `client.auth.otpVerify`). JS additionally accepts an `{ inviteToken }` option; Swift has no `inviteToken` option yet ([#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)).
 :::
 
 ::: code-group
@@ -162,8 +162,10 @@ Update a passkey's metadata (e.g. rename its device).
 
 Enable offline access using a passkey (largeBlob) or PIN-based grant. Requires online connectivity.
 
+The result is now a typed `EnableOfflineAccessResult` (`{ enabled, method?, reason? }`) via `client.auth.enableOfflineAccess`.
+
 ::: danger Swift parity gap
-JS's `EnableOfflineAccessOptions` accepts `{ preferBiometric, allowPinFallback, ttlDays, retention, pinProvider }`; Swift exposes only `ttlDays` plus a **Swift-only `requireBiometric` flag** — the `preferBiometric`/`allowPinFallback`/`retention`/`pinProvider` options are all missing (sweep auth D1). The defaults also diverge: Swift's `requireBiometric` **defaults to `true`** (→ a `"biometric"` grant), whereas JS defaults to the non-biometric `"signed"` grant method (sweep auth D2). Finally, Swift returns an untyped `[String: Any]` instead of JS's typed `{ enabled, method?, reason? }` (sweep auth D6). All three are undocumented offline-access gaps ([#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964), [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+JS's `EnableOfflineAccessOptions` accepts `{ preferBiometric, allowPinFallback, ttlDays, retention, pinProvider }`; Swift exposes only `ttlDays` plus a **Swift-only `requireBiometric` flag** — the `preferBiometric`/`allowPinFallback`/`retention`/`pinProvider` options are all missing (sweep auth D1). The defaults also diverge: Swift's `requireBiometric` **defaults to `true`** (→ a `"biometric"` grant), whereas JS defaults to the non-biometric `"signed"` grant method (sweep auth D2). Both option/default gaps remain open ([#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)).
 :::
 
 ::: code-group
@@ -184,11 +186,7 @@ Check whether the client currently holds a valid auth token (synchronous, local)
 
 ### getAuthConfig()
 
-Fetch the full auth configuration (providers, passkey/OTP/magic-link flags, redirect URIs).
-
-::: danger Swift parity gap
-JS returns a typed `AuthConfig` object with 14 named fields; Swift returns the raw `[String: Any]` envelope, so callers must reach in by string key with no compile-time field names (sweep auth D4, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
+Fetch the full auth configuration (providers, passkey/OTP/magic-link flags, redirect URIs). Both clients return a typed object — Swift `AuthConfigInfo` via `client.auth.getAuthConfig()`.
 
 ::: code-group
 <<< ./snippets/auth/get-auth-config.ts#example{ts} [JavaScript]

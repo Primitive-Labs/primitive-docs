@@ -1,7 +1,7 @@
 import type { JsBaoClient } from "js-bao-wss-client";
 
 // Subscribe to real-time database changes for a server-registered subscription.
-// JS-only — the Swift client has no equivalent.
+// Returns an unsubscribe handle — call it to stop receiving changes.
 export function subscribe(
   client: JsBaoClient,
   databaseId: string,

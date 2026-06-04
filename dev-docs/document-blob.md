@@ -58,13 +58,14 @@ tracked by an issue).
 
 ## read(blobId, options?)
 
-Read blob content from the cache or server.
+Read blob content from the cache or server. Pass `force: true` (Swift) /
+`forceRedownload: true` (JS) to bypass the local cache and re-download.
 
 ::: tip Divergent shape
 JS's `read` takes an `options` object (`as: "uint8array" | "arrayBuffer" | "blob"
-| "text"`, plus `forceRedownload`) and returns the requested format. Swift's
-`read(blobId:)` always returns raw `Data` — no format options
-([#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957)).
+| "text"`) and returns the requested format. Swift's base `read(blobId:)` returns
+raw `Data`; typed overloads cover the common cases — see
+[`read(as:)`](#read-blobid-as-force) below.
 :::
 
 ::: code-group
@@ -72,15 +73,27 @@ JS's `read` takes an `options` object (`as: "uint8array" | "arrayBuffer" | "blob
 <<< ./snippets/document-blob/read.swift#example{swift} [Swift]
 :::
 
+## read(blobId, as:, force?)
+
+Read a blob and decode it in one call (#957). Swift offers two typed overloads:
+`read(blobId:as: String.self)` decodes UTF-8 text, and
+`read(blobId:as: T.self)` JSON-decodes into any `Decodable`. JS expresses the
+text form via `read(blobId, { as: "text" })` and JSON-parses for typed shapes.
+
+::: code-group
+<<< ./snippets/document-blob/read-as.ts#example{ts} [JavaScript]
+<<< ./snippets/document-blob/read-as.swift#example{swift} [Swift]
+:::
+
 ## delete(blobId)
 
-Delete a blob from the document.
+Delete a blob from the document. Swift's `delete` now **evicts the blob from the
+local cache** (#965), so a subsequent `read` won't serve the deleted blob stale.
 
-::: danger Swift parity gap
-Beyond the result shape, JS `delete` also evicts the blob's local cache, cancels any
-queued upload for it, and emits `queue-drained`. Swift's `delete` does none of this —
-a deleted blob can be served stale from the local cache, and a delete issued mid-upload
-won't cancel the in-flight transfer (sweep blob D10; not tracked by an issue).
+::: warning Upload-queue side effects are JS-only
+JS `delete` additionally cancels any queued upload for the blob and emits
+`queue-drained`. Swift has no upload-queue facade, so those queue-specific side
+effects don't apply (part of the by-design upload-queue exclusion, sweep blob D13).
 :::
 
 ::: code-group
@@ -123,14 +136,13 @@ JavaScript-only — service-worker-specific (web-only by platform constraint).
 
 ## prefetch(blobIds, options?)
 
-Pre-download multiple blobs into the local cache for offline access.
+Pre-download multiple blobs into the local cache for offline access (#957).
+Best-effort: per-blob failures are swallowed. `concurrency` defaults to 2.
 
-::: danger No Swift equivalent
-JavaScript-only — the Swift document-blob context doesn't expose `prefetch` yet,
-though the underlying `BlobManager.prefetch` already exists internally ([#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957)).
-:::
-
+::: code-group
 <<< ./snippets/document-blob/prefetch.ts#example{ts} [JavaScript]
+<<< ./snippets/document-blob/prefetch.swift#example{swift} [Swift]
+:::
 
 ## uploads()
 

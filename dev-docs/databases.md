@@ -224,20 +224,22 @@ instead ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954),
 
 ## subscribe(databaseId, subscriptionKey, options)
 
-Subscribe to real-time database changes for a server-registered subscription.
+Subscribe to real-time database changes for a server-registered subscription
+(created via the `/databases/:id/subscriptions` admin endpoint). The server
+filters events by the subscription's CEL `filter` and access rule, so `onChange`
+only fires for rows the subscriber may see. `subscribe(...)` returns an
+**unsubscribe handle** — call it to remove the callback and send `db.unsubscribe`
+(#952). On WebSocket reconnect the client automatically re-issues `db.subscribe`
+for every active subscription.
 
-::: danger No Swift equivalent
-JavaScript-only — the Swift client has no `subscribe()`; poll via
-`executeOperation` instead
-([#952](https://github.com/Primitive-Labs/js-bao-wss/issues/952)). Swift also
-ships no typed `DatabaseChangeEvent` / `DatabaseChangePayload` payloads, and the
-`change.changeType` (`"enter"` / `"update"` / `"leave"`) field the JS `onChange`
-callback exposes is missing from the public JS type as well (sweep databases D1
-/ [#949](https://github.com/Primitive-Labs/js-bao-wss/issues/949),
-[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
+Each `onChange` event carries typed `changes` (`DatabaseChangeEvent`): `op`,
+`modelName`, `id`, `data`/`previousData`, and the `changeType` filter transition
+(`"enter"` / `"update"` / `"leave"`).
 
+::: code-group
 <<< ./snippets/databases/subscribe.ts#example{ts} [JavaScript]
+<<< ./snippets/databases/subscribe.swift#example{swift} [Swift]
+:::
 
 ## importCsv(databaseId, options)
 

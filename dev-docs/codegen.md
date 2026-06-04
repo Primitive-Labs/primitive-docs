@@ -25,7 +25,7 @@ The same TOML produces structurally different output in each language:
 | Generated type | a `class` extending `BaseModelImpl` (nearly empty body) | a `struct` conforming to `PrimitiveModel` |
 | CRUD path | inherited from the base class — `new Task({...})`, `task.save()`, `Task.find(...)` | through a `TypedModel<Task>(doc:)` wrapper that holds the doc handle |
 | Generated body | empty (`class Task extends BaseModelImpl {}`) | full struct: stored properties + designated `init`, `init?(record:)`, `init?(row:)`, `primitiveValues()`, and a `primitiveSchema` literal |
-| Registration | a self-registering `index.ts` barrel — importing it registers every model | none — a struct is available as soon as it conforms to `PrimitiveModel` |
+| Registration | a self-registering `index.ts` barrel — importing it registers every model | a `GeneratedModels.swift` barrel exposing `GeneratedModels.all` + `register(on:)` (Swift has no import-time side effects, so registration is one explicit call) |
 | How it runs | `npx js-bao-codegen-v2` (CLI) | the `JsBaoCodegenPlugin` SPM build plugin, run automatically during `swift build` |
 
 The struct-vs-class shape is intentional and documented at length (Swift structs can't inherit and protocols can't carry stored state, so each record needs real stored properties plus the four bridge methods). For the full rationale — and why CRUD goes through `TypedModel<T>` rather than statics on the type — see [`swift-client/docs/codegen.md`](https://github.com/Primitive-Labs/js-bao-wss/blob/main/swift-client/docs/codegen.md) in the js-bao-wss repo.
@@ -47,10 +47,10 @@ From the [codegen-conventions parity sweep](https://github.com/Primitive-Labs/js
 |---|---|---|---|
 | D1 | ~~Swift drops the `enum` field key~~ — now parsed + emitted (see below) | resolved | [filed](https://github.com/Primitive-Labs/js-bao-wss/issues?q=codegen+enum) |
 | D2 | ~~Swift ignores `auto_stamp`~~ — now parsed + round-tripped (see below) | resolved | [filed](https://github.com/Primitive-Labs/js-bao-wss/issues?q=codegen+auto_stamp) |
-| D3 | Name derivation differs | naming · P1 | [filed](https://github.com/Primitive-Labs/js-bao-wss/issues?q=codegen+name) |
-| D4 | Swift codegen has no `--check` / strict mode | param/options · P2 | [filed](https://github.com/Primitive-Labs/js-bao-wss/issues?q=codegen+check) |
-| D5 | Swift emits no relationship accessor methods | missing-in-swift · P1 | [filed](https://github.com/Primitive-Labs/js-bao-wss/issues?q=codegen+relationship) |
-| D6 | JS has a self-registering barrel; Swift has no registration step | behavioral · P2 | [filed](https://github.com/Primitive-Labs/js-bao-wss/issues?q=codegen+registration) |
+| D3 | Default name derivation differs (JS singularizes; Swift suffixes). `class_name` override now works on both | naming · P2 | [#944](https://github.com/Primitive-Labs/js-bao-wss/issues/944) |
+| D4 | ~~Swift codegen has no `--check`~~ — `--check` now shipped (see below); strict unknown-key mode still JS-only | partly resolved | [#995](https://github.com/Primitive-Labs/js-bao-wss/issues/995) |
+| D5 | ~~Swift emits no relationship accessors~~ — now emitted as typed static accessors (see below) | resolved | [#995](https://github.com/Primitive-Labs/js-bao-wss/issues/995) |
+| D6 | ~~Swift has no registration step~~ — now emits a `GeneratedModels` barrel (see below) | resolved | [#995](https://github.com/Primitive-Labs/js-bao-wss/issues/995) |
 
 ### D1 — `enum` field key {#d1-enum}
 
@@ -58,24 +58,53 @@ From the [codegen-conventions parity sweep](https://github.com/Primitive-Labs/js
 
 ### D3 — name derivation {#d3-name-derivation}
 
-::: warning D3 · The two codegens derive different class names
-From the *same* TOML, the codegens derive **different** type names unless every model carries an explicit `class_name`. JS singularizes to PascalCase (`[models.tasks]` → `Task`); Swift PascalCases without singularizing and appends a `Record` suffix (`[models.tasks]` → `TasksRecord`). A non-pluralizable name like `everything` **hard-fails JS codegen** (no plural rule) while Swift happily emits `EverythingRecord`. This is why the fixture above sets `class_name` on every model — it forces cross-client identity.
+::: warning D3 · Default name derivation differs (but `class_name` reconciles it)
+With **no** `class_name`, the codegens derive **different** default type names: JS singularizes to PascalCase (`[models.tasks]` → `Task`); Swift PascalCases without singularizing and appends a `--name-suffix` (default `Record`), so `[models.tasks]` → `TasksRecord`. A non-pluralizable name like `everything` **hard-fails JS codegen** (no plural rule) while Swift happily emits `EverythingRecord`.
+
+The language-agnostic `[models.<name>] class_name = "..."` override is parsed by **both** codegens (same TOML key js-bao reads via `tomlLoader.ts`), so setting it forces a single cross-client type name — which is why the fixture above sets `class_name` on every model. Swift validates the value up front: it must be a legal Swift identifier and not a reserved keyword, and the error names the offending TOML model rather than the generated file. The Swift output filename is derived from the resolved class name (`TaskRecord` → `TaskRecord.swift`); the driver fail-loud-rejects two models that would resolve to the same filename (or to the reserved `GeneratedModels.swift` barrel name).
 :::
 
-### D4 — no `--check` / strict mode {#d4-check-strict}
+### D4 — `--check` strict mode {#d4-check-strict}
 
-::: tip D4 · Swift codegen has no `--check` and no strict unknown-key mode
-`js-bao-codegen-v2` ships two CI-relevant behaviors the Swift tool lacks: a `--check` mode that exits non-zero if generated output is stale (a "did you regenerate?" gate), and strict unknown-key rejection (default-on, with a `--no-strict` escape hatch). Swift codegen has neither — a typo'd field key (`requird = true`) is silently dropped at build time and only surfaces, if at all, when the runtime loader sees it.
+Swift codegen now ships `--check` (#995), mirroring `js-bao-codegen-v2 --check`. It regenerates every file in memory and compares against what's on disk — without writing — then exits non-zero listing any file that is **missing, changed, or a stale leftover**. Drop it into CI as a "did you regenerate?" gate:
+
+```sh
+swift-bao-codegen --input schema.toml --output Sources/Generated --check
+```
+
+::: tip D4 · Strict unknown-key rejection is still JS-only
+`--check` reaches parity, but the other CI behavior — strict unknown-key rejection (`js-bao-codegen-v2` default-on, with a `--no-strict` escape hatch) — has no Swift equivalent yet. A typo'd field key (`requird = true`) is silently dropped at build time rather than failing the codegen.
 :::
 
-### D5 — no relationship accessors {#d5-relationships}
+### D5 — relationship accessors {#d5-relationships}
 
-::: warning D5 · Swift codegen emits no relationship accessor methods
-The JS codegen bakes typed relationship accessors into the generated model: `author(): Promise<User | null>` for `refersTo`, `posts(options?): Promise<PaginatedResult<Post>>` for `hasMany`, plus `addTag()`/`removeTag()` for `hasManyThrough`. The Swift codegen emits relationships **only** as data inside the `primitiveSchema` literal — zero accessor methods on the struct or its statics facade. So `await post.author()` / `await user.posts()` in JS has no generated equivalent in Swift; the app must drop to the runtime relationship-resolution layer manually.
-:::
+The Swift codegen now bakes typed relationship accessors into the generated struct (#995), mirroring the JS codegen's `author()` / `posts(...)` methods. Because a Swift struct is a doc-decoupled value type (it can't carry the doc binding the way the JS instance does), the accessors are emitted as **static** methods that take the source `PrimitiveRecord` plus the target `DynamicModel`(s) explicitly:
 
-### D6 — registration model {#d6-registration}
+- `refersTo` → `static func author(of: PrimitiveRecord, in: DynamicModel) throws -> UserRecord?`
+- `hasMany` → `static func posts(of: PrimitiveRecord, in: DynamicModel) throws -> [PostRecord]`
+- `hasManyThrough` → `static func tags(of: PrimitiveRecord, through: DynamicModel, in: DynamicModel) throws -> [TagRecord]`
 
-::: tip D6 · JS emits a self-registering barrel; Swift has no registration step
-JS emits an `index.ts` barrel whose import has the side effect of registering every model (`attachAndRegisterModel`) and which fail-loud-checks that the TOML model set and the generated class set match. Swift emits independent per-model files and relies on each struct's `PrimitiveModel` conformance at the use site — there's no generated registration entrypoint and no generated TOML-vs-emitted consistency check. The practical difference: importing the JS barrel guarantees registration ran once and that codegen is in sync with the TOML; Swift's "did codegen run / is it in sync?" guarantees are weaker.
+Each accessor delegates to the runtime resolvers (`record.refersTo` / `hasMany` / `hasManyThrough`) and maps the result back through the generated `init?(record:)`, so callers get typed records instead of raw `PrimitiveRecord`s. The return type names the target's resolved Swift type via the cross-model name map.
+
+### D6 — registration barrel {#d6-registration}
+
+The Swift codegen now emits a `GeneratedModels.swift` registration barrel (#995) alongside the per-model files, mirroring the JS codegen's `index.ts`. JS has import-time side effects, so its barrel self-registers on import; Swift has none, so the barrel instead exposes an aggregate plus a one-call register:
+
+```swift
+// Generated GeneratedModels.swift
+enum GeneratedModels {
+    static let all: [any PrimitiveModel.Type] = [TaskRecord.self, /* … */]
+    static func register(on client: JsBaoClient) {
+        client.registerModels(all)
+    }
+}
+
+// App side — register every generated model in one call:
+GeneratedModels.register(on: client)
+```
+
+The `all` array preserves TOML declaration order, so the file is byte-stable across runs (and clean under `--check`). The barrel filename `GeneratedModels.swift` is reserved — a model that would resolve to it is rejected with a "disambiguate with `class_name`" error.
+
+::: tip D6 · One residual difference
+JS's barrel also fail-loud-checks that the TOML model set and the generated class set match on import. Swift's `--check` covers the "is generated code in sync with the TOML?" guarantee at build/CI time instead, but there's no equivalent *runtime* import-time consistency assertion.
 :::

@@ -8,7 +8,7 @@ func read(
 ) async throws {
   // #region example
   let blobs = client.documents.blobs(documentId: documentId)
-  // Swift returns raw `Data` (no `as` format options).
+  // Base read returns raw `Data`. Pass `force: true` to bypass the cache.
   let bytes: Data = try await blobs.read(blobId: blobId)
   let text = String(data: bytes, encoding: .utf8)
   // #endregion example

@@ -1,13 +1,13 @@
 import JsBaoClient
 
-// Verify a magic-link token and sign the user in. Swift returns an untyped
-// `[String: Any]` (no typed `user` / `isNewUser` / `promptAddPasskey`) and
-// has no `inviteToken` option.
+// Verify a magic-link token and sign the user in via the typed `client.auth`
+// namespace. Returns a typed `MagicLinkVerifyResult` (`user`, `isNewUser?`,
+// `promptAddPasskey?`). On success the SDK has already applied the access token.
 func magicLinkVerify(client: JsBaoClient, token: String) async throws {
   // #region example
-  let result = try await client.magicLinkVerify(token: token)
-  let user = result["user"] as? [String: Any]
-  let isNewUser = result["isNewUser"] as? Bool ?? false
+  let result = try await client.auth.magicLinkVerify(token: token)
+  let user = result.user           // AuthUser: userId, email, name?
+  let isNewUser = result.isNewUser ?? false
   // #endregion example
   _ = (user, isNewUser)
 }

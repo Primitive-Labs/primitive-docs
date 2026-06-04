@@ -182,9 +182,26 @@ on background/terminate; flush-on-connect). Follow-ups:
   the `analyticsAutoEvents` config option are **deferred** — each needs a call-site
   hook across `JsBaoClient.swift`, a much larger pass than the engine itself.
 
-### Deferred — the rest of the "feature tier"
-`auth` and `model-surface` are tied to feature-sized issues and were **deferred by
-decision (2026-06-04)**: #964 auth scope = defer all (native passkeys/OAuth are
-#928/#929); #854/#946/#947/#955/#992 model-surface = defer until PR #923 (the
-one-model `Model.*` API) merges. They live in `JsBaoClient.swift` / `Internal/` /
-`Schema/`, not simple `[String:Any]` API files. (cache behavior is done; #994.)
+### Wave 7 (done) — completion pass (2026-06-04)
+Built every remaining buildable partial/deferred item; clone builds, dev gate
+green. Commits on `js-parity-jun-3`:
+- **me offline-first** (#938) `458988bc` — `ownedDocuments`/`sharedDocuments` merge
+  local cache + server. Follow-up: `me.md` user-facing examples (prose only; signatures unchanged).
+- **doc-blob prefetch/read(as:)/delete-eviction** (#957/#965) `458988bc` — follow-up:
+  `guides/latest/AGENT_GUIDE_TO_PRIMITIVE_BLOBS.swift.md` (add `prefetch`/typed `read`).
+- **codegen --check/barrel/accessors/class-name** (#995/#944) `458988bc` — follow-up:
+  `docs/getting-started/` codegen page + guide (document `--check`, `GeneratedModels.register(on:)`).
+- **typed `client.auth` namespace** (#964/#954/#991) `b2d3de2d` — follow-up: any
+  user-facing auth examples → `client.auth.<method>(...)` typed calls. Remaining
+  behavioral nits (logout server cookie clear, offline-access biometric default,
+  `inviteToken`/`revokeOffline` options) are small and still open — see `dev-docs/auth.md` red callouts.
+- **databases.subscribe** (#952) `b2d3de2d` — follow-up: `docs/getting-started/working-with-databases.md` + `guides/latest/...DATABASES.swift.md` (realtime section).
+- **per-feature analytics auto-events** (#963) `a1120091` — no user-facing change.
+- **WorkflowStartedEvent payload** (#996) `d5837c84` — no user-facing change (event shape only).
+
+### Deferred — genuinely out of scope only
+- **model-surface** (#854/#946/#947/#955/#992, + #962 model-class field-filtering) —
+  edits the exact files **open PR #923** (the one-model `Model.*` API) is rewriting;
+  building now would conflict with in-flight work. Revisit post-merge.
+- **native** auth/notifications/deep-links (#928–931) — need native iOS frameworks
+  (`AuthenticationServices`, APNS); separate native track.

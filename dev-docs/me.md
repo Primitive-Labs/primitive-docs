@@ -49,14 +49,18 @@ flat `DocumentInfo[]` by default (or a `{ items, cursor }` page with
 `returnPage: true`) and accepts the full `documents.list` option set. Swift
 returns a typed `[DocumentInfo]`.
 
-::: warning Swift behavioral gap (deferred)
-Swift's `ownedDocuments` accepts only `cursor`/`limit`/`tag` and is a **bare
-network GET**. The 7 offline-first knobs (`includeRoot`, `refreshFromServer`,
-`localOnly`, `serverTimeoutMs`, `waitForLoad`, `forward`, `returnPage`) and the
-local-cache merge / stale-refresh JS performs are absent, so the Swift path
-returns nothing offline. This is a feature gap, deferred — tracked at
-[#938](https://github.com/Primitive-Labs/js-bao-wss/issues/938). (The return type
-itself is now typed, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).)
+Swift's `ownedDocuments` is now **offline-first** (#938): when online it fetches
+the server list AND merges in owner rows from the local metadata cache (deduped
+by `documentId`, server rows winning on conflict), so freshly-created
+`pendingCreate` docs and other locally-known owned docs the server list didn't
+return still appear; when offline it returns the owner subset of the local cache
+only.
+
+::: tip Narrower option set (Swift)
+Swift accepts `cursor`/`limit`/`tag` only — the JS-side `includeRoot`,
+`refreshFromServer`, `localOnly`, `serverTimeoutMs`, `waitForLoad`, `forward`,
+and `returnPage` knobs are not surfaced. The offline-first merge itself is
+on by default.
 :::
 
 ::: code-group
@@ -70,13 +74,10 @@ List documents shared with the current user (non-owner permissions plus pending
 legacy invitations). Returns the unified `{ items, cursor? }` envelope — a typed
 `SharedDocumentListResult` in Swift; pass `tag` to filter and `cursor` to paginate.
 
-::: warning Swift behavioral gap (deferred)
-Like `ownedDocuments`, Swift's `sharedDocuments` is a **bare network GET** — JS
-does an offline-first cache-merge with stale-refresh, so the Swift path returns
-nothing offline. This is a feature gap, deferred — tracked at
-[#938](https://github.com/Primitive-Labs/js-bao-wss/issues/938). (The envelope is
-now typed, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).)
-:::
+Like `ownedDocuments`, Swift's `sharedDocuments` is now **offline-first** (#938):
+online it merges the server page with non-owner rows from the local metadata
+cache (deduped by `documentId`, server winning); offline it returns the
+non-owner subset of the local cache only.
 
 ::: code-group
 <<< ./snippets/me/shared-documents.ts#example{ts} [JavaScript]

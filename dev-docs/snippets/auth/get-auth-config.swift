@@ -1,11 +1,13 @@
 import JsBaoClient
 
-// Fetch the full auth configuration. Swift returns an untyped `[String: Any]`
-// where JS exposes a typed object — read the 14 fields by key.
+// Fetch the full auth configuration via the typed `client.auth` namespace.
+// Returns a typed `AuthConfigInfo` with named fields (no string-key lookups).
 func getAuthConfig(client: JsBaoClient) async throws {
   // #region example
-  let config = try await client.getAuthConfig()
-  let googleOAuthEnabled = config["googleOAuthEnabled"] as? Bool ?? false
+  let config = try await client.auth.getAuthConfig()
+  if config.googleOAuthEnabled {
+    // show the Google sign-in button
+  }
   // #endregion example
-  _ = googleOAuthEnabled
+  _ = config
 }
