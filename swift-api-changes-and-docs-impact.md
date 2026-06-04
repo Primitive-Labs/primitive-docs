@@ -1,7 +1,7 @@
 # Swift API changes → docs to update
 
-Swift client on `js-bao-wss` @ `js-parity-jun-3`. The **#918 model-surface** row
-is still being built by an agent — expect it to shift.
+Swift client parity work (`js-bao-wss` `js-parity-jun-3`) — **complete and merged
+to `main`**. Everything below has landed.
 
 | Changed (Swift client) | Issue | Docs to update |
 |---|---|---|
@@ -16,6 +16,6 @@ is still being built by an agent — expect it to shift.
 | `workflows.runSync` + `WorkflowStartedEvent` payload aligned to JS | #956/#996 | `docs/getting-started/workflows.md`, `…_WORKFLOWS.swift.md` |
 | `databases.importCsv` (typed) | #962 | `docs/getting-started/working-with-databases.md` CSV section |
 | Codegen `--check`, `GeneratedModels` barrel (`.all`/`register(on:)`), relationship accessors | #995/#944 | `docs/getting-started/choosing-your-data-model.md`, `…_DATA_MODELING.swift.md` |
-| **Model-surface: `Model.save()` (replaces create/update), `Model.query/find/count/delete/aggregate/subscribe`; `BaoModel`+`TypedModel` deleted** _(agent building now)_ | #918 | `docs/reference/**` (regenerate — `BaseModel` reference is stale), `docs/getting-started/choosing-your-data-model.md`, `…_DATA_MODELING.swift.md` |
+| **Model-surface: `Model.save()` (replaces create/update), `Model.query/find/count/delete/aggregate/subscribe`; `BaoModel`+`TypedModel` deleted** | #918 | `docs/reference/**` (regenerate — `BaseModel` reference is stale), `docs/getting-started/choosing-your-data-model.md`, `…_DATA_MODELING.swift.md` |
 
 Also: `examples/workflows/workflow-start.swift` still uses untyped `started["runKey"]` against the now-typed `StartWorkflowResult` — `compile:examples` fails there until migrated (part of #954).
