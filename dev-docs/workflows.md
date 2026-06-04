@@ -10,20 +10,17 @@ its apply handler, and confirm. The low-level lease methods (`claimApply` /
 `confirmApply` / `releaseApply` / `getPendingApplies`) are shared across both
 SDKs; `define` registers an auto-apply handler that runs that sequence for you.
 
-::: tip Untyped Swift returns
-The Swift `workflows` methods return `[String: Any]` (or `[[String: Any]]`)
-where JS returns typed result structs (`StartWorkflowResult`,
-`WorkflowStatusResult`, `ListWorkflowRunsResult`, …). The wire shapes match;
-read Swift fields by key. Tracked in [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).
-:::
-
-::: warning Swift parity gap
-Every Swift `workflows` method coerces a non-dictionary / undecodable response
-body to an empty `[:]` (the `result as? [String: Any] ?? [:]` pattern, applied
-across `start` / `getStatus` / `terminate` / `listRuns` / `listStepRuns` /
-`claimApply` / `confirmApply` / `releaseApply`). A malformed body therefore
-surfaces as a silent empty success rather than a thrown error — JS rejects
-instead. Don't treat an empty result as "no data"; it can mean a decode failure.
+::: tip Now typed
+The Swift `workflows` methods now return typed result structs that mirror the JS
+ones field-for-field — `StartWorkflowResult`, `WorkflowStatusResult`,
+`ListWorkflowRunsResult`, `ListWorkflowStepRunsResult`, `ClaimApplyResult`,
+`ConfirmApplyResult`, `ReleaseApplyResult`, and `[PendingApplyInfo]` — instead of
+`[String: Any]`. Read fields with dot access (`result.runId`,
+`status.normalizedStatus`). Opaque blobs (`output`, `meta`, step `config` /
+`input`, …) are `JSONValue?`. A malformed response body now **throws** on decode
+rather than coercing to an empty `[:]`
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954),
+[#991](https://github.com/Primitive-Labs/js-bao-wss/issues/991)).
 :::
 
 ## start(options)
@@ -75,7 +72,7 @@ that reconciles the Cloudflare-workflow and DB status shapes.
 
 ::: tip Divergent shape
 `normalizedStatus` is Swift-only — JS `getStatus` returns `WorkflowStatusResult`
-with no such field, so code that reads `status["normalizedStatus"]` won't port
+with no such field, so code that reads `status.normalizedStatus` won't port
 across clients. It's a Swift-side convenience (reconciles the CF-workflow and DB
 status shapes), not a JS gap.
 :::

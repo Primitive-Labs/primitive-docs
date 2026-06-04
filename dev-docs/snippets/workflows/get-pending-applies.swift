@@ -5,7 +5,8 @@ import JsBaoClient
 func getPendingApplies(client: JsBaoClient, contextDocId: String) async throws {
   // #region example
   let pending = try await client.workflows.getPendingApplies(contextDocId: contextDocId)
-  // pending: [[String: Any]] — one entry per run still in apply_pending
+  // pending: [PendingApplyInfo] — one entry per run still in apply_pending
+  // (read pending[i].runKey / .workflowKey / .contextDocId / .meta)
   // #endregion example
   _ = pending
 }

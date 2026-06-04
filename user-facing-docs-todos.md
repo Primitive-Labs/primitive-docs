@@ -153,3 +153,9 @@ Client typed + cookbook updated; clone builds, dev gate green. Follow-ups:
 - **integrations** → `docs/getting-started/api-integrations.md` + `…_INTEGRATIONS.swift.md`.
 
 **Client test target** now needs migration before `swift test`: `CollectionsTests`, `DatabaseTests`, `ApiParityTests` (cron/blobBuckets), plus the documents tests flagged earlier — all call old untyped signatures (the library target itself builds clean).
+
+### Wave 4 (done) — workflows
+Client typed (+ workflows slice of #991) + cookbook updated; clone builds, dev gate green. Follow-up: `docs/getting-started/workflows-and-prompts.md` + `guides/latest/AGENT_GUIDE_TO_PRIMITIVE_{WORKFLOWS,SCHEDULING_AND_REALTIME}.swift.md` (keyed → typed dot-access).
+
+### Not yet done — the "feature tier" (entangled with the client core)
+`analytics`, `auth`, `cache`, and `model-surface` are **not** simple `[String:Any]` API files — they live in `JsBaoClient.swift` / `Internal/` / `Schema/` and are tied to feature-sized issues (#951/#963, #964, #994, #946/#947/#955/#992). They need focused individual work, not parallel typing.

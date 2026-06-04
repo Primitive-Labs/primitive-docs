@@ -10,7 +10,7 @@ func listRuns(client: JsBaoClient, workflowKey: String) async throws {
       limit: 20
     )
   )
-  // page["items"] / page["cursor"]
+  // page.items: [WorkflowRunInfo]  /  page.cursor for the next page
   // #endregion example
   _ = page
 }

@@ -8,7 +8,7 @@ func getStatus(client: JsBaoClient, workflowKey: String, runKey: String) async t
     workflowKey: workflowKey,
     runKey: runKey
   )
-  // status["normalizedStatus"] / status["status"] / status["run"]
+  // status.normalizedStatus / status.status / status.output / status.run
   // #endregion example
   _ = status
 }

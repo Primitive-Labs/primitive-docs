@@ -9,7 +9,7 @@ func start(client: JsBaoClient, workflowKey: String, contextDocId: String) async
     input: ["topic": "spring planting"],
     options: StartWorkflowOptions(runKey: "run-001", contextDocId: contextDocId)
   )
-  // run["runId"] / run["runKey"] / run["status"] / run["existing"]
+  // run.runId / run.runKey / run.status / run.existing
   // #endregion example
   _ = run
 }

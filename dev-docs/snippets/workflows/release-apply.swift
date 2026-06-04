@@ -15,7 +15,7 @@ func releaseApply(
     runKey: runKey,
     contextDocId: contextDocId
   )
-  // result["released"]
+  // result.released
   // #endregion example
   _ = result
 }

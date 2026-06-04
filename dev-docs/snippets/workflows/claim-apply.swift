@@ -15,7 +15,7 @@ func claimApply(
     runKey: runKey,
     contextDocId: contextDocId
   )
-  if claim["claimed"] as? Bool == true {
+  if claim.claimed {
     // safe to read the output via getStatus and apply it, then confirmApply
   }
   // #endregion example

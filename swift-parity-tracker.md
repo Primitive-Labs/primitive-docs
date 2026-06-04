@@ -29,7 +29,14 @@ Deferred features noted by agents: gemini/llm analytics events (#963).
 
 **Wave 3 ✅ (clone builds, dev gate green):** typed `groups`, `collections`, `databases`, `blob-buckets`, `integrations` → **#954** for those surfaces; also **#453** (groups addMember union), **#671** (collections addMember union), **#958** (integrations call request shape). Deferred features: databases `importCsv` (#962a) + `subscribe` (#952), blob-buckets missing surface (#965).
 
-**Remaining:** workflows · analytics · auth · cache · model-surface — plus the feature-sized issues (#963 auto-events, #964 auth, #952 subscribe, #956 runSync, #962a importCsv, #946/#947 model paging) and the 6 new bug issues (#991–#996; cron's slice of #991 done).
+**Wave 4 ✅ (clone builds, dev gate green):** typed `workflows` → **#954** + the workflows slice of **#991** (decode throws instead of `?? [:]`). `runSync` (#956) deferred.
+
+**Remaining — NOT simple typing (entangled with the client core + feature-sized):**
+- `analytics` (methods on `JsBaoClient.swift` + `AnalyticsQueue`) — #951 namespace + #963 auto-event engine + typed `AnalyticsEventInput`.
+- `auth` (`JsBaoClient.swift` + `Internal/AuthController.swift`) — #964 option surfaces / `AUTH_CODES`; passkeys are native (proposals #928–931).
+- `cache` (`Internal/KvCache.swift` CacheFacade) — #994 `fetchHttp` wrong-results + no-op options.
+- `model-surface` (`Schema/DynamicModel.swift`, `MultiDocModel.swift`) — #946/#947/#955/#992, architectural (paged query, active-doc defaulting, sync find/findAll).
+These touch shared core files (can't be parallel-typed) and are the feature tier; do them as focused, individual efforts.
 
 ## ⚪ Stale / invalid → comment recommending close
 | Issue | State | Why |

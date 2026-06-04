@@ -14,7 +14,7 @@ func confirmApply(
     runKey: runKey,
     contextDocId: contextDocId
   )
-  // result["confirmed"]
+  // result.confirmed
   // #endregion example
   _ = result
 }
