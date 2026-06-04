@@ -249,8 +249,6 @@ Accepted shapes:
 - `blobUploads`: `{ start?: boolean; success?: boolean; failure?: boolean }`
 - `llm`, `gemini`: `boolean | { start?: boolean; success?: boolean; failure?: boolean }`
 
-Options accepted but currently no-ops (do not rely on): `boot`, `firstDocOpen`, `firstDocEdit`, `offlineRecovery`, `serviceWorker`.
-
 ---
 
 ## Querying Analytics (CLI)
@@ -370,8 +368,7 @@ These fields are absent (or zero) when the event type doesn't produce them.
 3. **Keep `context_json` small** — truncated to 1 KiB. Don't dump request bodies or full reports.
 4. **Don't log high-frequency events** — rate limiter caps at 300/min with burst 60. Design around meaningful actions, not continuous telemetry.
 5. **Don't add your own `beforeunload` flush** — the client already does this.
-6. **Don't toggle no-op options** (`boot`, `firstDocOpen`, `firstDocEdit`, `offlineRecovery`, `serviceWorker`) and assume something happens.
-7. **Use `setPlanOverride` / `setAppVersionOverride`** instead of passing `plan` / `app_version` on every `logEvent` call.
+6. **Use `setPlanOverride` / `setAppVersionOverride`** instead of passing `plan` / `app_version` on every `logEvent` call.
 
 ---
 

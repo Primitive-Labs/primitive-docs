@@ -665,7 +665,7 @@ Collections (see the [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#col
 | `member.add` / `remove` | `user.userId == collection.createdBy` | Creator only |
 | `member.list` | `user.userId == collection.createdBy \|\| hasCollectionAccess(collection.collectionId)` | Creator or collection member |
 
-Per-op fallback applies — configured ops always win, missing ops resolve against this table. A `CollectionTypeConfig` row whose `ruleSetId` is null is an explicit opt-out and denies everything except admin/owner. Self-leave on `member.remove` is currently NOT short-circuited and returns 403 for non-creator readers/writers.
+Per-op fallback applies — configured ops always win, missing ops resolve against this table. A `CollectionTypeConfig` row whose `ruleSetId` is null is an explicit opt-out and denies everything except admin/owner. A non-creator reader/writer removing their own membership via `member.remove` is denied (403) unless the rule set grants it.
 
 ### CEL context for collection rule sets
 

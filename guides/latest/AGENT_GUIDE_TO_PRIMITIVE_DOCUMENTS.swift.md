@@ -910,7 +910,7 @@ The owner lists pending requests with `listAccessRequests`, then resolves each w
 
 #### Real-time delivery
 
-The server pushes WS frames `document:access-request-created` (to owners/admins) and `document:access-request-resolved` (to the requester). **These are not currently surfaced as typed `client.on(...)` events.** For now, poll `listAccessRequests()` on the owner side, and check `documents.get` again on the requester side after a sensible interval, or wire your own WS frame handler if you need lower latency.
+The server pushes WS frames `document:access-request-created` (to owners/admins) and `document:access-request-resolved` (to the requester). **These are not surfaced as typed `client.on(...)` events.** Poll `listAccessRequests()` on the owner side, and check `documents.get` again on the requester side after a sensible interval, or wire your own WS frame handler if you need lower latency.
 
 ### Collections
 

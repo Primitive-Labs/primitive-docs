@@ -15,15 +15,10 @@ This guide is verified against `js-bao-wss` source. Anything not described here 
 - Clients call `client.integrations.call({ integrationKey, method, path, ... })`. The platform routes through `POST /app/{appId}/api/integrations/{integrationKey}/proxy`.
 - Workflows can call integrations via the `integration.call` step.
 
-### Important: integration-scoped secrets are deprecated
-
-`primitive integrations secrets add` is disabled. Existing rows are still read for backward compatibility, but **always use App Secrets + `{{secrets.KEY}}` templates** for new work.
+Credentials always go through App Secrets:
 
 ```bash
-# WRONG - this command now exits with an error
-primitive integrations secrets add <id> --data '{"apiKey":"..."}'
-
-# RIGHT - store as an app secret, reference it from the integration's defaultHeaders
+# Store as an app secret, reference it from the integration's defaultHeaders
 primitive secrets set OPENAI_API_KEY --value sk-... --summary "OpenAI prod key"
 ```
 
@@ -52,7 +47,7 @@ forwardHeaders = ["x-trace-id"]      # Optional. Lowercased allowlist of CLIENT 
 forwardQueryParams = ["q", "limit"]  # Optional. Lowercased allowlist of CLIENT query params to forward.
                                      #   Default [] = none. ["*"] = all.
 bodyMode = "json"                    # Optional. "json" (default) | "raw" | "multipart".
-responsePassthrough = true           # Optional. Currently parsed but not enforced; the proxy always
+responsePassthrough = true           # Optional. Parsed but not enforced; the proxy always
                                      #   returns { status, headers, body } from upstream.
 
 [requestConfig.defaultHeaders]       # Optional. Always-sent headers. {{secrets.KEY}} resolved here.
@@ -100,7 +95,7 @@ value = "fine-tune"
 | `requestConfig.forwardQueryParams` | string[] | No | `[]` | **Lowercased.** `[]`=none, `["*"]`=all. |
 | `requestConfig.bodyMode` | string | No | `"json"` | `"json"` \| `"raw"` \| `"multipart"`. |
 | `requestConfig.multipartFieldMapping` | array | No | `[]` | Required for sane multipart behavior. |
-| `requestConfig.responsePassthrough` | bool | No | `true` | Parsed but currently inert. |
+| `requestConfig.responsePassthrough` | bool | No | `true` | Parsed but not enforced. |
 
 ### Per-integration limits (set via API/admin UI, not TOML)
 
@@ -136,11 +131,11 @@ api_key = "{{secrets.GOOGLE_API_KEY}}"
 
 Behavior:
 
-- Resolution happens server-side at proxy time. The plaintext value never leaves the worker.
+- Resolution happens server-side at proxy time. The plaintext value is never returned to the client.
 - Any header/query whose value was substituted from a secret is automatically marked sensitive — its value is replaced with `[redacted]` in admin logs and the test-mode request preview.
 - An unresolved `{{secrets.MISSING}}` is left as-is in the outgoing request (it is **not** an error). Test the integration to catch this.
 - Secret-key constraint: `^[A-Z][A-Z0-9_]{0,63}$` (uppercase letters, digits, underscores; starts with a letter; ≤64 chars).
-- Cache: app-secret reads use a 30s-fresh / 60s-stale SWR cache per worker isolate. Updates invalidate it for that app.
+- Cache: app-secret reads are cached server-side (30s fresh / 60s stale). Updates invalidate the cache for that app.
 
 ### Rotation
 
@@ -283,7 +278,7 @@ Newly-pushed integrations land in `status = "draft"`. Drafts can be exercised vi
 primitive integrations update <integration-id> --status active
 ```
 
-### 6. `responsePassthrough` is currently a no-op
+### 6. `responsePassthrough` has no effect
 
 The proxy always returns `{ status, headers, body }` from upstream regardless of this flag. Don't rely on toggling it.
 
@@ -356,14 +351,6 @@ primitive secrets delete OPENAI_API_KEY
 ```
 
 Values are AES-encrypted at rest using `APP_SECRETS_ENCRYPTION_KEY`. Max 100 secrets per app, max 2 KB per value.
-
-### Integration Secrets (DEPRECATED — read-only)
-
-```bash
-primitive integrations secrets list <id>     # still works for legacy data
-primitive integrations secrets archive <id> <secret-id>
-# `add` is disabled and exits with an error.
-```
 
 ### Test Cases (regression suite for an integration)
 
@@ -447,7 +434,7 @@ If `sync push` reports a conflict, someone modified the server since your last `
 | Code | HTTP | Meaning |
 |------|------|---------|
 | `INTEGRATION_INACTIVE` | 404 | `status != "active"`. |
-| `MISSING_SECRET` | 409 | Legacy integration secret required but missing. App-secret–only integrations don't trigger this. |
+| `MISSING_SECRET` | 409 | A stored integration-scoped secret row is required but missing. Integrations using `{{secrets.KEY}}` app-secret templates don't trigger this. |
 | `DISALLOWED_METHOD` | 422 | Method not in `allowedMethods`. |
 | `DISALLOWED_PATH` | 422 | Path doesn't match `allowedPaths`. |
 | `REQUEST_BODY_TOO_LARGE` | 413 | Body exceeds `maxRequestBodyBytes`. |

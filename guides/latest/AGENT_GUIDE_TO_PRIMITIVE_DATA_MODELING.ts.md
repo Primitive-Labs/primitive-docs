@@ -181,7 +181,7 @@ Documents only. One document per workspace. Owner shares with teammates via grou
 ### Multi-tenant SaaS / project management
 
 - **Document** per user for personal preferences, dashboard layout.
-- **Database** per organization (`type: "org"`) and **per project** (`type: "project"`). Per-project DOs scale and isolate independently. Group membership (`team`, `admin`) gates operations.
+- **Database** per organization (`type: "org"`) and **per project** (`type: "project"`). Each database is an isolated instance, so per-project databases scale and fail independently. Group membership (`team`, `admin`) gates operations.
 
 ### E-commerce
 

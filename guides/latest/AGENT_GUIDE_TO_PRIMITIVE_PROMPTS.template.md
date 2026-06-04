@@ -462,7 +462,7 @@ expectedOutputContains = '["Bob","teacher"]'                # JSON array string
 expectedJsonSubset = '{"status":"ok"}'                      # JSON string
 ```
 
-Key-based refs (`configName`, `evaluatorPromptKey`, `evaluatorConfigName`) are portable across apps. Legacy ID-based refs (`configId`, `evaluatorPromptId`, `evaluatorConfigId`) are still accepted but tied to a specific app.
+Key-based refs (`configName`, `evaluatorPromptKey`, `evaluatorConfigName`) are portable across apps. ID-based refs (`configId`, `evaluatorPromptId`, `evaluatorConfigId`) are also accepted but tied to a specific app — prefer the key-based forms.
 
 ### What `sync pull` actually writes
 

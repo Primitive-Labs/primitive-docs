@@ -261,7 +261,7 @@ try {
 
 The exported `AUTH_CODES` constant covers: `ADDED_TO_WAITLIST`, `INVITATION_REQUIRED`, `DOMAIN_NOT_ALLOWED`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `PASSKEY_NOT_ENABLED`, `MAGIC_LINK_NOT_ENABLED`, `WAITLIST_ENTRY_UPDATED`, `INVITE_TOKEN_INVALID`, `INVITE_TOKEN_EXPIRED`, `INVITE_ALREADY_ACCEPTED`. The server may also return `RATE_LIMITED`, `OTP_MAX_ATTEMPTS`, and `RESERVED_EMAIL_FOR_ADMIN` — compare those as string literals.
 
-> **Caveat on `OTP_NOT_ENABLED`.** The constant is defined and exported, but the OTP request endpoint currently returns a plain 400 with the message `"OTP authentication is not enabled for this app"` and **no `code` field** when OTP is disabled. Don't rely on switching on `OTP_NOT_ENABLED` to detect that case — gate the OTP UI on `getAuthConfig().otpEnabled` up front instead.
+> **Caveat on `OTP_NOT_ENABLED`.** The constant is defined and exported, but the OTP request endpoint returns a plain 400 with the message `"OTP authentication is not enabled for this app"` and **no `code` field** when OTP is disabled. Don't rely on switching on `OTP_NOT_ENABLED` to detect that case — gate the OTP UI on `getAuthConfig().otpEnabled` up front instead.
 
 The same `AuthError` codes apply to `magicLinkRequest`/`magicLinkVerify` and `passkey*` methods.
 

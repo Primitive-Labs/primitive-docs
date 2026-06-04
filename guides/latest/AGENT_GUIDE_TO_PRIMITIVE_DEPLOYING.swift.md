@@ -132,7 +132,7 @@ team_id "2J4V27W63D"                    # same Team ID as DEVELOPMENT_TEAM
 
 ### 4. App Store Connect API Key
 
-`upload_to_testflight` and `upload_to_app_store` authenticate with an App Store Connect API key — username/password no longer works for upload.
+`upload_to_testflight` and `upload_to_app_store` authenticate with an App Store Connect API key.
 
 1. [App Store Connect → Users and Access → Integrations → API Keys](https://appstoreconnect.apple.com/access/integrations/api) → create a key with role **App Manager**.
 2. Download the `.p8` (one-time download) to `fastlane/api_key.p8`. **Gitignore it** — it's a private key; leaking it lets anyone upload builds as your team.

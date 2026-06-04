@@ -630,7 +630,7 @@ htmlBody = "<p>Hi {{ member.name }}</p>"
 
 When `concurrency = 1` (the default), iterations are sequential. When `concurrency > 1`, the engine fans them out in parallel batches — in durable mode each batch runs as a child workflow so restarts don't re-run completed items. For very large fan-outs, `workflow.start` + `workflow.await` gives finer control.
 
-When a parallel `forEach` batch's combined output exceeds the inline size limit (~1 MB), the engine automatically offloads the batch result to managed object storage and rehydrates it transparently for the next step. You don't need to handle this — large per-iteration outputs no longer fail the step — but it does add a storage round-trip, so keep per-iteration outputs lean when you can.
+When a parallel `forEach` batch's combined output exceeds the inline size limit (~1 MB), the engine automatically offloads the batch result to managed object storage and rehydrates it transparently for the next step. Large per-iteration outputs are handled for you, but the offload adds a storage round-trip — keep per-iteration outputs lean when you can.
 
 ### Batch database updates
 
@@ -1033,7 +1033,7 @@ Setting `status = "active"` without an active config or revision returns: `Canno
 ### Configurations vs revisions
 
 - **Configurations** (recommended): named, mutable groupings of steps. One is `activeConfigId`. Created automatically on first sync push.
-- **Revisions** (legacy): immutable snapshots created via `primitive workflows publish`.
+- **Revisions**: immutable snapshots created via `primitive workflows publish`. Prefer configurations.
 
 ## CLI
 
@@ -1066,7 +1066,7 @@ primitive workflows preview <workflow-id> --draft --wait
 #   3. active configuration (default)
 #   4. draft (fallback if no active config)
 
-# Draft / publish (legacy revision flow)
+# Draft / publish (revision flow)
 primitive workflows draft update <workflow-id> --from-file workflow.toml
 primitive workflows publish <workflow-id>
 

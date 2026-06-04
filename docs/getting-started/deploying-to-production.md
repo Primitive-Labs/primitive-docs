@@ -137,7 +137,7 @@ team_id "2J4V27W63D"                    # same Team ID as DEVELOPMENT_TEAM
 
 ### 4. App Store Connect API Key
 
-The lanes below authenticate with App Store Connect using an API key (not a username / password — the username path no longer works for upload).
+The lanes below authenticate with App Store Connect using an API key.
 
 1. Go to [App Store Connect → Users and Access → Integrations → App Store Connect API](https://appstoreconnect.apple.com/access/integrations/api).
 2. Create a new key with role **App Manager**.
