@@ -21,14 +21,22 @@ Both doc products draw code examples from one corpus so JS/Swift parity is mecha
    - `{{#lang ts}} … {{/lang}}` / `{{#lang swift}} … {{/lang}}` — language-scoped prose (implementation notes, gotchas) rendered ONLY into that language's build. An iOS agent must never fetch JavaScript gotchas: language-specific prose goes in a lang block or doesn't exist. Shared concept prose stays neutral and unscoped. Platform gaps are never documented in either build — scope a one-language capability's section to that language's block and file the parity bug (see STYLE.md).
 4. **Guide structure mirrors page structure** — each concept page in `docs/getting-started/` has a same-boundary guide template (e.g. `workflows.md` ↔ `AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.template.md`), which is what makes the sync rule below checkable.
 
+## Branches and Channels
+
+Two long-lived branches, two validation surfaces (`docs-sources.json` `channel`, read via `scripts/channel.mjs`):
+
+- **`main` = production channel = published.** Merging to main publishes the site (gh-pages). Docs describe the released platform: submodules pinned at the last production-release SHA, gates run against the *published* npm packages (pinned devDependencies). publish-docs.yml refuses a non-production stamp.
+- **`next` = next channel.** Docs are trued continuously against the library `main` tips (`docs-next-sync` skill). The TS-compile and CLI gates run against the **submodule source** instead of published packages (`pnpm build:source-packages` builds js-bao, js-bao-wss-client, and primitive-admin from `library_repos/`), so merged-but-unreleased work is documentable immediately.
+- **Publishing = merging `next → main` at a production release SHA** (`docs-publish-release` skill): never past the release, restamped onto the production channel, verified against the release summary. Hotfixes to published docs go straight to main and flow back into next via merge.
+
 Validation gates (run before declaring doc work done):
 
-- `pnpm check:examples` — example parity + compilation, TOML validity, guide render/registry checks, validation of every documented CLI invocation against the *published* `primitive-admin`, and the source-stamp gate (`docs-sources.json` must match submodule HEADs + installed package versions)
+- `pnpm check:examples` — example parity + compilation, TOML validity, guide render/registry checks, validation of every documented CLI invocation against the channel's `primitive-admin`, and the source-stamp gate (`docs-sources.json` must match submodule HEADs + the channel's package versions)
 - `node scripts/stamp-sources.mjs --changes` — per-library commits since the last doc-truing pass (the doc-impact scan); `pnpm stamp:sources` resets the baseline once docs reflect those sources (also mirrors versions into `guides.json` `builtAgainst` and the site footer)
 - `npx vitepress build docs` — dead links fail the build
 - `node scripts/check-example-parity.mjs` — inventory of inline code fences and their language-parity classification
 
-Project skills under `.claude/skills/` automate the editorial loop: `docs-editorial` (writing standards), `docs-page-review` (per-page review), `docs-sync-check` (docs↔guides sync), `docs-set-audit` (whole-set audit), `docs-release-sync` (update docs from a release summary).
+Project skills under `.claude/skills/` automate the editorial loop: `docs-editorial` (writing standards), `docs-page-review` (per-page review), `docs-sync-check` (docs↔guides sync), `docs-set-audit` (whole-set audit), `docs-next-sync` (true the next branch against library main), `docs-publish-release` (merge next→main at a production release).
 
 ## Guide Sync Rule
 

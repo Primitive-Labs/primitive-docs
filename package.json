@@ -32,6 +32,7 @@
     "gen:reference-index": "node scripts/gen-reference-index.mjs",
     "check:examples": "node scripts/examples.mjs --check && node scripts/compile-examples.mjs && node scripts/render-guides.mjs --check && node scripts/sync-guides-json.mjs --check && node scripts/check-toml.mjs && node scripts/check-cli.mjs && node scripts/stamp-sources.mjs --check",
     "stamp:sources": "node scripts/stamp-sources.mjs",
+    "build:source-packages": "node scripts/build-source-packages.mjs",
     "compile:examples": "node scripts/compile-examples.mjs",
     "gen:example-models": "js-bao-codegen-v2 generate -i examples/_harness/schema.toml -o examples/_harness/generated/ts",
     "sync:examples": "node scripts/examples.mjs",

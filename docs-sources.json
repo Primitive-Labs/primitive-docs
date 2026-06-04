@@ -1,4 +1,5 @@
 {
+  "channel": "production",
   "stampedAt": "2026-06-04",
   "libraries": {
     "js-bao-wss": {

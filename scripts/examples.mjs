@@ -47,8 +47,9 @@ function walk(dir) {
   const out = [];
   for (const name of readdirSync(dir)) {
     // `_harness/` holds the compile scaffolding (fixture schema, generated
-    // models, build dirs) — it is not part of the example corpus.
-    if (name === "_harness" || name.startsWith(".")) continue;
+    // models, build dirs); `node_modules/` is the next channel's symlink
+    // shadow (compile-examples.mjs) — neither is part of the example corpus.
+    if (name === "_harness" || name === "node_modules" || name.startsWith(".")) continue;
     const full = join(dir, name);
     if (statSync(full).isDirectory()) out.push(...walk(full));
     else out.push(full);
