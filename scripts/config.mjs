@@ -1,12 +1,5 @@
 export const PROJECTS = [
   {
-    id: 'js-bao',
-    type: 'typedoc',
-    repoPath: 'packages/js-bao',
-    entryPoints: ['packages/js-bao/src/index.ts'],
-    outDir: 'docs/reference/js-bao/api',
-  },
-  {
     id: 'js-bao-wss-client',
     type: 'typedoc',
     repoPath: 'packages/js-bao-wss-client',

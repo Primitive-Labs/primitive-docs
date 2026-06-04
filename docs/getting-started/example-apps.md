@@ -31,4 +31,4 @@ This example shows how to structure an app where users create multiple independe
 
 ## Source Code
 
-Both example apps are built on the [primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template). You can use them as reference when building your own applications.
+Both live example apps are built on the [primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template) (Vue). Use it — or the iOS Swift template (see the [Quick Start](./template-app.md)) — as a reference when building your own application.

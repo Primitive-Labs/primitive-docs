@@ -83,6 +83,6 @@ In practice, many developers use the console for exploring and testing, and the 
 ## Next Steps
 
 - **[Primitive CLI](./primitive-cli.md)** — Command-line alternative for all admin tasks
-- **[Workflows and Prompts](./workflows-and-prompts.md)** — Define the workflows you'll test in the console
+- **[Workflows](./workflows.md)** — Define the workflows you'll test in the console
 - **[API Integrations](./api-integrations.md)** — Configure the integrations you'll manage in the console
 - **[Analytics](./analytics.md)** — Emit and query the events that show up under Analytics

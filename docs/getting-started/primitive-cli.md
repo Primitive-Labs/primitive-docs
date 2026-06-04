@@ -20,10 +20,10 @@ If you're working with an AI coding assistant, it can run `primitive guides list
 
 ## Installation
 
-Install the CLI globally via npm:
+Install the CLI globally:
 
 ```bash
-npm install -g primitive-admin
+pnpm add -g primitive-admin
 ```
 
 This installs the `primitive` command globally on your system.
@@ -172,7 +172,7 @@ primitive users list
 primitive users invite user@example.com
 
 # Remove a user
-primitive users remove user@example.com
+primitive users remove <user-id>
 
 # List pending invitations
 primitive users invitations
@@ -204,15 +204,14 @@ primitive users admin-invitations delete <invitation-id>
 
 ### OAuth Configuration
 
-Configure OAuth providers for your app:
+Configure OAuth providers for your app (client credentials are entered in the [Admin Console](https://admin.primitiveapi.com/login) under the app's Google OAuth settings):
 
 ```bash
-# Set up Google OAuth
-primitive apps oauth set-google --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
+# Enable Google OAuth as a sign-in method
+primitive apps update --google-oauth true
 
-# Add allowed origins (for CORS)
-primitive apps origins add http://localhost:5173
-primitive apps origins add https://myapp.com
+# Set allowed origins (for CORS; comma-separated list)
+primitive apps update --cors-origins "http://localhost:5173,https://myapp.com"
 ```
 
 ### Accessing Guides
@@ -229,7 +228,7 @@ primitive guides get workflows
 primitive guides get authentication
 ```
 
-Guides are cached locally at `~/.primitive/guides/` for offline access.
+Guides are cached locally at `~/.primitive/guides/`.
 
 :::tip For AI Agents
 When working with an AI coding assistant, point it to these guides before asking it to implement features. For example: "Read `primitive guides get workflows` and then create a workflow that sends a welcome email when a user signs up." The agent will fetch the guide, learn the patterns, and implement your request correctly.
@@ -239,7 +238,7 @@ When working with an AI coding assistant, point it to these guides before asking
 
 The CLI supports exporting and importing app configuration as TOML files, enabling version control for your app settings.
 
-When using **project-scoped environments** (set up via `primitive env create`), the sync directory is resolved automatically as `.primitive/sync/<env>/<appId>/` — each environment gets its own isolated slot so a `pull --env staging` never touches production state:
+When using **project-scoped environments** (set up via `primitive env add`), the sync directory is resolved automatically as `.primitive/sync/<env>/<appId>/` — each environment gets its own isolated slot so a `pull --env staging` never touches production state:
 
 ```bash
 # Initialize (auto-resolves .primitive/sync/<env>/<appId>/)
@@ -313,6 +312,16 @@ When you run `primitive init`, you'll be prompted to install the skill as part o
 
 ## Advanced Features
 
+### App Secrets
+
+Store app-level secrets server-side and reference them from workflows and integrations as <span v-pre>`{{ secrets.KEY_NAME }}`</span> — your client code and repo never see the values:
+
+```bash
+primitive secrets set OPENAI_API_KEY --value sk-...
+primitive secrets list
+primitive secrets delete OPENAI_API_KEY
+```
+
 ### Integrations
 
 Configure external API connections:
@@ -330,7 +339,7 @@ Manage LLM prompts:
 ```bash
 primitive prompts list
 primitive prompts create my-prompt
-primitive prompts test my-prompt
+primitive prompts execute my-prompt
 ```
 
 ### Workflows
@@ -343,6 +352,20 @@ primitive workflows publish my-workflow
 primitive workflows runs list
 ```
 
+### Webhooks
+
+Manage inbound webhooks that trigger workflows when external services (Stripe, GitHub, Slack, …) send events. Define them as `webhooks/*.toml` in your sync directory, then inspect from the terminal:
+
+```bash
+primitive webhooks list                    # shows each webhook's ID
+primitive webhooks get <webhook-id>
+primitive webhooks events <webhook-id>      # recent deliveries (accepted/rejected/duplicate)
+primitive webhooks rotate-secret <webhook-id>
+primitive webhooks test <webhook-id>
+```
+
+See [Inbound Webhooks](./workflows.md#via-inbound-webhooks).
+
 ### Cron Triggers
 
 Schedule workflows to run on a cron expression:
@@ -351,16 +374,16 @@ Schedule workflows to run on a cron expression:
 primitive cron-triggers list
 primitive cron-triggers create \
   --key nightly-digest \
-  --workflow send-digest \
-  --schedule "0 9 * * *" \
+  --workflow-key send-digest \
+  --cron "0 9 * * *" \
   --timezone "America/Los_Angeles"
-primitive cron-triggers run nightly-digest       # fire manually
-primitive cron-triggers disable nightly-digest
-primitive cron-triggers enable nightly-digest
-primitive cron-triggers delete nightly-digest
+primitive cron-triggers test <trigger-id>        # fire manually (ID from cron-triggers list)
+primitive cron-triggers pause <trigger-id>
+primitive cron-triggers resume <trigger-id>
+primitive cron-triggers delete <trigger-id>
 ```
 
-See [Scheduled and Real-Time Automation](./scheduled-and-realtime-automation.md).
+See [Invoking Workflows: On a Schedule](./workflows.md#on-a-schedule-cron-triggers).
 
 ### Database Codegen
 
@@ -378,14 +401,14 @@ Manage general-purpose blob storage:
 
 ```bash
 primitive blob-buckets list
-primitive blob-buckets create --key avatars --access-policy authenticated --ttl-tier persistent
-primitive blob-buckets blobs avatars
+primitive blob-buckets create --key avatars --access authenticated --ttl permanent
+primitive blob-buckets list-blobs avatars
 primitive blob-buckets upload avatars ./file.png --content-type image/png
 primitive blob-buckets signed-url avatars <blobId> --expires 3600
-primitive blob-buckets delete avatars --force
+primitive blob-buckets delete avatars -y
 ```
 
-See [Blob Buckets](./blob-buckets.md).
+See [Blobs and Files](./blobs-and-files.md).
 
 ### Email Templates
 
@@ -439,7 +462,7 @@ For integration tests and local dev, Primitive supports a `+primitivetest` OTP b
 primitive apps update --test-account-bases alice@example.com,bob@example.com
 
 # Inspect the current whitelist (along with other app settings)
-primitive apps show
+primitive apps get
 
 # Clear the whitelist — pass an empty string
 primitive apps update --test-account-bases ''
@@ -449,23 +472,24 @@ The list is capped at 50 base emails per app, and a base cannot itself be a `+pr
 
 Each whitelisted base authorizes unlimited derived addresses of the form `<base-local>+primitivetest<suffix>@<base-domain>`. From the test side, sign in via the normal OTP flow using the magic code `000000`:
 
-```typescript
-// In an integration test
-await client.otpRequest("alice+primitivetest-teacher@example.com");
-await client.otpVerify("alice+primitivetest-teacher@example.com", "000000");
-// client is now authenticated; the access token expires in 30 minutes
-```
+::: code-group
 
-The derived account must already exist as an `AppUser` in this app — invite it ahead of time or seed it as part of test setup. The bypass never auto-provisions.
+<<< ../../examples/auth/test-user-otp.ts#example{ts} [JavaScript]
+
+<<< ../../examples/auth/test-user-otp.swift#example{swift} [Swift]
+
+:::
+
+The derived account must already exist as a user in this app — invite it ahead of time or seed it as part of test setup. The bypass never auto-provisions, which keeps a public-mode app from being signed up as `attacker+primitivetest@<whitelisted>`.
 
 Guardrails:
 
 - **Per-app whitelist.** Apps without a whitelist have no bypass at all.
-- **30-minute tokens** with a `primitiveBypass: true` claim, re-checked per request against the whitelist.
+- **30-minute tokens** with a `primitiveBypass: true` claim, re-checked per request against the whitelist — removing a base immediately revokes its derived sessions.
 - **Member scope only.** `+primitivetest*` cannot hold admin/owner privileges or receive invitations to those roles — boundary calls return `RESERVED_EMAIL_FOR_ADMIN`.
-- **AppUser must exist.** The derived account has to be an existing member of the app.
+- **Suffix shape.** Derived addresses match `<base-local>+primitivetest<suffix>@<base-domain>` where the suffix is `[A-Za-z0-9._-]*`; only single-`+` shapes are accepted.
 
-Use this for automated tests and local development. See [Authentication](./authentication.md#test-user-sign-in-for-automated-testing) for the security model in detail.
+Use this for automated tests and local development — not for staging or production flows.
 
 ## Scripting
 
@@ -484,6 +508,18 @@ primitive token
 
 `primitive token` automatically refreshes the active access token if it's expired or about to expire, so scripts that pipe it into another tool ( `curl -H "Authorization: Bearer $(primitive token)" ...`) keep working past the access-token lifetime without a manual `primitive login`.
 
+### API Tokens for CI and Servers
+
+For headless environments where an interactive `primitive login` isn't possible — CI pipelines, deploy scripts, server-side jobs — create a long-lived API token instead:
+
+```bash
+primitive tokens create --name "CI deploys" --ttl 90d
+primitive tokens list
+primitive tokens revoke <token-id>
+```
+
+TTL accepts `m`/`h`/`d`/`w`/`mo`/`y` units; omit `--ttl` for a non-expiring token. Treat these like passwords — store them in your CI's secret store and revoke any token you no longer need.
+
 ## Getting Help
 
 Every command has built-in help:
@@ -496,7 +532,7 @@ primitive users invite --help
 
 ## Next Steps
 
-- **[Template App Setup](./template-app.md)** — Create your first app
+- **[Quick Start](./template-app.md)** — Create your first app
 - **[Working with Databases](./working-with-databases.md)** — Server-side storage managed via CLI
-- **[Workflows and Prompts](./workflows-and-prompts.md)** — Automation configured via CLI
+- **[Workflows](./workflows.md)** — Automation configured via CLI
 - **[Deploying to Production](./deploying-to-production.md)** — Deploy your app

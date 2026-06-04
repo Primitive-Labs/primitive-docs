@@ -6,3 +6,7 @@
 	path = library_repos/js-bao-wss
 	url = https://github.com/Primitive-Labs/js-bao-wss
 	branch = main
+[submodule "library_repos/swift-primitive-app-dev"]
+	path = library_repos/swift-primitive-app-dev
+	url = https://github.com/Primitive-Labs/swift-primitive-app-dev
+	branch = main

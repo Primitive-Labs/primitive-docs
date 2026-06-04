@@ -1,0 +1,65 @@
+{
+  "expectations": [
+    {
+      "text": "Identifies the template-variable namespace error: prompt templates read {{ input.* }}, not {{ variables.* }} as the page documents",
+      "passed": true,
+      "evidence": "Finding 1 (high/facts): templates documented under variables.* but engine places execution-time variables under input; fix replaces variables. with input. throughout"
+    },
+    {
+      "text": "Identifies that the documented prompt TOML shape is wrong (template text belongs on a [[configs]] entry as userPromptTemplate; [prompt] uses displayName, and has no body field)",
+      "passed": false,
+      "evidence": "Review does not identify the TOML shape problem \u2014 the [prompt] name/body example is not flagged; only the namespace error is found"
+    },
+    {
+      "text": "Verifies claims against actual source rather than asserting from intuition (cites files/paths as evidence)",
+      "passed": true,
+      "evidence": "Cites the template engine behavior and traced the render context (\"The template engine places execution-time variables under the context key input\"); agent verified against block-executor.ts/templates.ts"
+    },
+    {
+      "text": "Does not pad the review with manufactured findings beyond the real ones (at most ~5 minor/low suggestions)",
+      "passed": true,
+      "evidence": "Single high finding plus clean-lens statements; no padded minor findings (0 low-severity rows)"
+    },
+    {
+      "text": "States explicitly that the rest of the page conforms / is clean",
+      "passed": true,
+      "evidence": "Verdict: \"Well-structured and on-altitude \u2014 the ramp is monotonic... the platform/standards lenses are clean, and example parity is satisfied\"; lens-by-lens clean passes listed"
+    }
+  ],
+  "summary": {
+    "passed": 2,
+    "failed": 1,
+    "total": 3,
+    "pass_rate": 0.67
+  },
+  "claims": [
+    {
+      "claim": "Template bodies should use input.* not variables.* (the only real defect)",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Matches ground truth (templates read {{ input.* }}, supplied as variables at execute time). The review correctly distinguishes the supply side ([steps.variables], correct) from the read side (input.*), which is exactly the ground-truth asymmetry."
+    },
+    {
+      "claim": "The prompt TOML name/body fields are correct as written",
+      "type": "factual",
+      "verified": false,
+      "evidence": "The review did NOT flag the prompt TOML using name= and body= on [prompt]. Per ground truth the real schema uses displayName on [prompt] and userPromptTemplate on [[configs]] (no body field). The with_skill run missed this second real error \u2014 the without_skill run caught it (its findings #2)."
+    }
+  ],
+  "timing": {
+    "executor_duration_seconds": 166.3,
+    "total_duration_seconds": 166.3
+  },
+  "eval_feedback": {
+    "suggestions": [
+      {
+        "assertion": "Reports no high-severity findings (no claimed factual errors or policy violations)",
+        "reason": "This eval is mislabeled: the 'clean' fixture prompts.md actually contains real high-severity factual errors (variables.* instead of input.*, and name/body instead of displayName/[[configs]].userPromptTemplate per ground truth). An ideal review SHOULD report high-severity findings here, so this assertion penalizes correct behavior and rewards a reviewer that misses real bugs. Either swap in a genuinely clean fixture, or invert the assertion to 'correctly reports the real high-severity factual errors and does not invent additional ones.'"
+      },
+      {
+        "reason": "No assertion checks whether the review caught the name/body TOML-schema error. The with_skill run missed it while the without_skill run caught it \u2014 a discriminating outcome that currently goes unmeasured. Add an assertion for the displayName/userPromptTemplate schema error."
+      }
+    ],
+    "overall": "The false-positive-avoidance intent is good, but the chosen fixture is not actually clean \u2014 it has two real factual errors. As written, assertion #1 rewards under-reporting. Recommend a truly clean fixture for this eval and a separate assertion for catching the real schema error."
+  }
+}

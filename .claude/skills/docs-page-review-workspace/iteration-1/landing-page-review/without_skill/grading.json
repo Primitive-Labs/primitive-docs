@@ -1,0 +1,62 @@
+{
+  "expectations": [
+    {
+      "text": "Flags the web/browser-only framing (architecture diagram says 'Your App (Browser)', 'local in-browser database', JS-only stack) as a platform-neutrality violation given iOS is a first-class platform",
+      "passed": true,
+      "evidence": "Blocking issue #2: \"Prose is browser-centric, not platform-neutral \u2014 and the page is effectively web/Vue-only\"; cites \"Your App (Browser)\" header, \"runs in the browser\", JS-only Stack, and contradiction with \"web AND iOS both first-class\"."
+    },
+    {
+      "text": "Flags mechanism-level detail as wrong altitude for an overview page (the defineModelSchema/JsBaoClient code samples and package-by-package stack detail)",
+      "passed": true,
+      "evidence": "Blocking issue #1: \"Code blocks exceed the landing-tier ceiling \u2014 name mechanisms and API shapes\" \u2014 calls out the defineModelSchema block and new JsBaoClient({...}) block as schema syntax / specific API shapes."
+    },
+    {
+      "text": "Flags the 'runs on edge infrastructure' line (or equivalent) as an infrastructure-internals leak",
+      "passed": true,
+      "evidence": "Section \"3. Infrastructure-internals leak\" flags the \"runs on edge infrastructure\" line with the STYLE.md rule and a fix"
+    },
+    {
+      "text": "Findings cite which standard/rule is violated and propose concrete fixes (not just observations)",
+      "passed": true,
+      "evidence": "Each issue cites a rule and gives a **Fix**, e.g. #3 cites feedback_no_cloudflare_internals_in_docs / STYLE.md 'No infrastructure internals' and fixes by dropping 'that runs on edge infrastructure'."
+    },
+    {
+      "text": "Review classifies the page as a landing/overview-tier page and judges it against that tier",
+      "passed": true,
+      "evidence": "\"**Tier:** Landing / overview. Per the repo style guide, the entry altitude for this tier is *capabilities and value \u2014 what you get*, and its **ceiling** is: 'Never name mechanisms...'\" \u2014 and judges overshoot against that ceiling."
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 1,
+    "total": 5,
+    "pass_rate": 0.8
+  },
+  "claims": [
+    {
+      "claim": "The 'edge infrastructure' phrase is an infrastructure-internals leak",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Fixture line 77: \"The Primitive backend is a managed service that runs on edge infrastructure\" \u2014 matches the cited text and the repo's no-infra-internals rule."
+    },
+    {
+      "claim": "The ASCII architecture diagram box borders are misaligned/broken",
+      "type": "factual",
+      "verified": false,
+      "evidence": "Finding #5 asserts the diagram art is broken; could not independently confirm box-border misalignment from the available outputs. Plausible but unverified."
+    }
+  ],
+  "timing": {
+    "executor_duration_seconds": 90.6,
+    "total_duration_seconds": 90.6
+  },
+  "eval_feedback": {
+    "suggestions": [
+      {
+        "assertion": "Flags the 'console-only settings (like OAuth client credentials)' aside as an inconsistency aside that shouldn't be documented",
+        "reason": "The fixture index.md contains no 'console-only settings (like OAuth client credentials)' aside (confirmed by grep \u2014 only a normal OAuth capability bullet and an admin-console mention). This assertion is unsatisfiable against the current fixture and should be removed or rewritten to target content the fixture actually contains."
+      }
+    ],
+    "overall": "Strong, discriminating assertions overall. One assertion (#3) targets content that does not exist in the fixture and fails on both runs for that reason \u2014 it does not measure skill quality and should be fixed."
+  }
+}

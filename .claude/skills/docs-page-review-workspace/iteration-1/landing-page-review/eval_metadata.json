@@ -1,0 +1,22 @@
+{
+  "eval_id": 0,
+  "eval_name": "landing-page-review",
+  "prompt": "Review the Primitive docs landing page (snapshot of pre-audit docs/index.md) for quality and adherence to the repo's documentation standards.",
+  "assertions": [
+    {
+      "text": "Flags the web/browser-only framing (architecture diagram says 'Your App (Browser)', 'local in-browser database', JS-only stack) as a platform-neutrality violation given iOS is a first-class platform"
+    },
+    {
+      "text": "Flags mechanism-level detail as wrong altitude for an overview page (the defineModelSchema/JsBaoClient code samples and package-by-package stack detail)"
+    },
+    {
+      "text": "Flags the 'runs on edge infrastructure' line (or equivalent) as an infrastructure-internals leak"
+    },
+    {
+      "text": "Findings cite which standard/rule is violated and propose concrete fixes (not just observations)"
+    },
+    {
+      "text": "Review classifies the page as a landing/overview-tier page and judges it against that tier"
+    }
+  ]
+}
