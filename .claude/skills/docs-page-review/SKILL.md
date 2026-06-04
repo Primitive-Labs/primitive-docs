@@ -5,7 +5,7 @@ description: Review a Primitive documentation page (or diff) against the repo's 
 
 # Reviewing a Primitive Docs Page
 
-Produce a findings-based review of one or more documentation pages against `STYLE.md` (repo root) — read it first; it is the standard you are checking against, and every finding must cite which of its rules is violated. If a recalled memory or older convention conflicts with STYLE.md, **STYLE.md wins** — it is kept current; memories may lag policy changes. This skill exists because these violations arrive one plausible sentence at a time and survive authoring even when the author knows the rules — the value is a *fresh-eyes pass with focused lenses*, not general impressions.
+Produce a findings-based review of one or more documentation pages against `STYLE.md` (repo root) — read it first; it is the standard you are checking against, and every finding must cite which of its rules is violated. If a recalled memory or older convention conflicts with STYLE.md, **STYLE.md wins** — it is kept current; memories may lag policy changes. (Notably: neither human docs nor agent guides document platform gaps or differences — guides scope one-language content via `{{#lang}}` blocks, and gaps become filed bugs.) This skill exists because these violations arrive one plausible sentence at a time and survive authoring even when the author knows the rules — the value is a *fresh-eyes pass with focused lenses*, not general impressions.
 
 ## Scope and setup
 
@@ -27,7 +27,7 @@ Run each lens as its own deliberate pass over the page. A combined pass reliably
 ### 2. Tone and audience
 
 - Human docs: does anything talk down (explaining general programming concepts) or over-explain (reference-depth coverage of every option)? Is each concept introduced clearly with an example of putting it into practice?
-- Agent guides: any narrative warm-up, feature-selling, or rhetorical filler an LLM doesn't need? Are patterns and examples concrete?
+- Agent guides: any narrative warm-up, feature-selling, or rhetorical filler an LLM doesn't need? Are patterns and examples concrete? And is the guide **generic-first**: concepts and contracts introduced platform-neutrally, with per-language examples and clearly-scoped platform notes/gotchas carrying the specifics? A guide structured as "web by default, iOS as a delta" is a structural finding, not a tone nit.
 
 ### 3. Standards (the never-say list + concept boundaries)
 
