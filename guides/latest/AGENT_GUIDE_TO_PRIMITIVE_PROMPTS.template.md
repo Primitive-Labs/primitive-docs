@@ -632,6 +632,7 @@ The first arg is the `promptKey`, NOT the `promptId`. The endpoint is `POST /pro
 
 ### Don't do this
 
+{{#lang ts}}
 ```typescript
 // WRONG — passing promptId instead of promptKey
 await client.prompts.execute("01HXY...PROMPT_ID", { variables: {} });
@@ -642,6 +643,19 @@ await client.prompts.execute("p", { variables: { name: "Alice" } });
 // template: "Hi {{ name }}"   ← won't resolve, renders as "Hi "
 // Fix: template: "Hi {{ input.name }}"
 ```
+{{/lang}}
+{{#lang swift}}
+```swift
+// WRONG — passing the prompt id instead of the prompt key
+try await client.prompts.execute("01HXY...PROMPT_ID", variables: [:])
+// → 404. Use the key from the TOML.
+
+// WRONG — expecting a top-level variable
+try await client.prompts.execute("p", variables: ["name": "Alice"])
+// template: "Hi {{ name }}"   ← won't resolve, renders as "Hi "
+// Fix: template: "Hi {{ input.name }}"
+```
+{{/lang}}
 
 ---
 

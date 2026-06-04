@@ -1,4 +1,4 @@
-# Working with Documents in the Primitive platform. (js-bao and js-bao-wss-client)
+# Working with Documents in the Primitive platform.
 
 Guidelines for building apps with Primitive's document-based architecture.
 
@@ -34,19 +34,21 @@ See the [Data Modeling guide](AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.md) for a f
 
 ## Critical Rules
 
-1. **JS-Bao query operates over ALL open documents.** NEVER iterate over documents to query. Filter results by documentId or other fields in the query itself.
+1. **Queries operate over ALL open documents.** NEVER iterate over documents to query. Filter results by documentId or other fields in the query itself.
 
 2. **Use model IDs, not document IDs.** Model data references entirely in objects using model IDs. Use documentIds ONLY when required for APIs (sharing, save location). In routes and queries, prefer model IDs.
 
 3. **NEVER remove fields from models.** Add a deprecation comment instead.
 
-4. **ALWAYS add new models to `models.toml`.** Run `npx js-bao-codegen-v2` after editing `models.toml`.
+4. **ALWAYS declare new models in the schema and regenerate.**
+   Add the model to `models.toml`, then run `npx js-bao-codegen-v2`.
 
-5. **Load data in pages, not sub-components.** Pass data into sub-components as props.
+5. **Prefer query filtering over in-memory filtering.** Push filter conditions into the query itself rather than fetching everything and filtering on the client.
 
-6. **Prefer `.query()` filtering over JavaScript filtering.** If filter params change based on app state, pass them via `queryParams` to the data loader.
+6. **Load data at the screen level, not in leaf components.** Pass data and readiness into sub-components as props.
 
-7. **Understand the root document's role and limitations.** The root document is a special per-user document that is automatically created and opened. It can never be shared or deleted, and there is exactly one per user. The primitive template uses it to store user preferences via `userStore`—a great place for settings that should be available whenever the user signs in. While the root document can hold any js-bao model, we recommend storing most application data in regular documents for greater flexibility (sharing, collaboration, multiple documents). Use the "single document" pattern with aliases for personal apps, or the "one document at a time" pattern for multi-workspace apps.
+7. **Understand the root document's role and limitations.** The root document is a special per-user document that is automatically created and opened. It can never be shared or deleted, and there is exactly one per user. It's a natural home for user preferences and settings that should be available whenever the user signs in. The root document can hold any model, but store most application data in regular documents for greater flexibility (sharing, collaboration, multiple documents). Use the "single document" pattern with aliases for personal apps, or the "one document at a time" pattern for multi-workspace apps.
+   The template stores user preferences in the root document via `userStore`.
 
 ## Document Lifecycle
 
@@ -59,7 +61,9 @@ Documents must be opened before querying or modifying data within them.
   const result = await Task.query({}, { documents: documentId });
 ```
 
-Documents are ready to be queried once the `.open()` call finishes. Applications should wait for all required documents to be opened and show a loading state until all needed documents have been opened. Often it's handy to track this with an `isReady` ref.
+Documents are ready to be queried once the `.open()` call finishes. Applications should wait for all required documents to be opened and show a loading state until then, then track document-specific readiness explicitly. `open()` is idempotent — calling it on an already-open document is a no-op. Handle open failures explicitly: surface an error or redirect; don't silently continue.
+
+Track readiness with an `isReady` ref.
 
 **Wrong** — querying or saving before the document is open throws (or returns nothing for queries on no-document models):
 
@@ -70,7 +74,7 @@ const result = await TodoItem.query({});         // throws DocumentClosedError o
                                                  // returns empty data for query
 ```
 
-**Note on `jsBaoDocumentsStore.isReady`:** The demo app provides `jsBaoDocumentsStore` with an `isReady` property. This indicates that the **store itself** has finished initializing (the document list and invitation list have loaded) — it does NOT indicate that any particular document has been opened. You still need to track document-specific readiness separately (e.g., after calling `documents.open()`) before querying data in those documents.
+**Note on `jsBaoDocumentsStore.isReady`:** The template provides `jsBaoDocumentsStore` with an `isReady` property. This indicates that the **store itself** has finished initializing (the document list and invitation list have loaded) — it does NOT indicate that any particular document has been opened. You still need to track document-specific readiness separately (e.g., after calling `documents.open()`) before querying data in those documents.
 
 **Where in the Vue tree to open documents:**
 
@@ -78,8 +82,7 @@ const result = await TodoItem.query({});         // throws DocumentClosedError o
 - **Open after authentication, not before.** Gate on `userStore.isAuthenticated` (not `isInitialized`). The template's `AppLayout` already gates rendering on `isAuthenticated`, so components mounted inside it can call `open()` safely.
 - **Session-scoped documents** (small bounded set, < ~20): open once at app/layout level for the session.
 - **Route-scoped documents** (per-page, unbounded count, or transient): open on route entry, close on route leave. Render a loading state until `documents.open()` resolves and (with `useJsBaoDataLoader`) `initialDataLoaded` is true.
-- **Handle open failures explicitly** — surface an error or redirect. Don't silently continue.
-- **`open()` is idempotent** — calling it on an already-open document is a no-op.
+
 
 ### 2. Finding documents a user can access
 
@@ -135,7 +138,9 @@ There is **no single "my documents" list**. A user reaches documents through **f
   });
 ```
 
-`ownedDocuments` and `sharedDocuments` return the unified `{ items, cursor }` envelope (raw-JSON `cursor`, NOT base64url). Each `SharedDocument` in `items` extends `DocumentInfo`: base document fields (`title`, `createdBy`, `createdAt`, `lastModified`, plus `tags`/`metadata`/`thumbnailBlobId` when set) plus the share-only extras `permission` (never `"owner"`), `source` (`"permission"` | `"invitation"`), `grantedBy`, `invitationId` (invitation rows only). In JS, `ownedDocuments()` returns a flat `DocumentInfo[]` by default and the envelope with `returnPage: true`; Swift always returns the envelope as `[String: Any]`.
+Each shared document in the result extends the base `DocumentInfo` (`title`, `createdBy`, `createdAt`, `lastModified`, plus `tags`/`metadata`/`thumbnailBlobId` when set) with the share-only extras `permission` (never `"owner"`), `source` (`"permission"` | `"invitation"`), `grantedBy`, `invitationId` (invitation rows only).
+
+`ownedDocuments` and `sharedDocuments` return the unified `{ items, cursor }` envelope (raw-JSON `cursor`, NOT base64url). `ownedDocuments()` returns a flat `DocumentInfo[]` by default, or the envelope with `returnPage: true`.
 
 For an "everything I can access" surface, combine these two calls with group and collection memberships:
 
@@ -151,13 +156,13 @@ const collections = await jsBaoClient.collections.list();
 
 #### Do not use
 
-- **`client.documents.list()`** — deprecated. Returns the union of owner + reader + read-write rows and logs a console warning on every call. Use `me.ownedDocuments` and `me.sharedDocuments`; they have the same option set (`tag`, `limit`, `cursor`, `returnPage`).
+- **`client.documents.list()`** — returns the union of owner + reader + read-write rows and logs a console warning on every call. Use `me.ownedDocuments` and `me.sharedDocuments`; they have the same option set (`tag`, `limit`, `cursor`, `returnPage`).
 - **`client.documents.createInvitation(...)`, `documents.acceptInvitation(...)`, `documents.declineInvitation(...)`, `documents.listPendingInvitationsForUser(...)`** — the per-document `DocumentInvitation` flow. Use `documents.updatePermissions(documentId, { email, ... })` for the share path; the platform creates an `AppInvitation` + `DeferredDocumentPermission` and the recipient redeems it via `client.invitations.accept(inviteToken)`. `client.me.pendingDocumentInvitations()` is the current "invitations I can accept" lookup.
-- **`client.me.bookmarks.*`** — removed. There is no bookmarks API; render "my documents" from `me.ownedDocuments()` + `me.sharedDocuments()` (and `collections.list()` / `groups.listUserMemberships(...)` if you also want group/collection access).
+- **`client.me.bookmarks.*`** — render "my documents" from `me.ownedDocuments()` + `me.sharedDocuments()` (and `collections.list()` / `groups.listUserMemberships(...)` if you also want group/collection access).
 
-## Core data operations (JavaScript + Swift)
+## Core data operations
 
-Every example below is compiled against the real clients as part of the docs build. JavaScript uses generated model classes (`new Task(...)`, `Task.query(...)`); Swift uses a `TypedModel<Task>` bound to a document, with paged/aggregate/subscribe on its `.dynamic` layer. The deeper [Querying Data](#querying-data) and [Saving Data](#saving-data) sections below add JS-specific nuance (projections, includes, save options).
+Every example below is compiled against the real client as part of the docs build. The [Querying Data](#querying-data) and [Saving Data](#saving-data) sections below go deeper on projections, includes, and save options.
 
 ### Create
 
@@ -314,7 +319,7 @@ Every example below is compiled against the real clients as part of the docs bui
 
 ## Common Document Usage Patterns
 
-**Helper Stores:** The demo app includes `jsBaoDocumentsStore` (the underlying tracked-documents store) and `singleDocumentStore` (a higher-level wrapper for Pattern 1 / Pattern 2) in `/src/stores/`. These stores handle document opening, closing, readiness tracking, and state management. They can be used as-is, customized to fit your needs, or ignored in favor of application-specific approaches.
+**Helper Stores:** The template includes `jsBaoDocumentsStore` (the underlying tracked-documents store) and `singleDocumentStore` (a higher-level wrapper for Pattern 1 / Pattern 2) in `/src/stores/`. These stores handle document opening, closing, readiness tracking, and state management. They can be used as-is, customized to fit your needs, or ignored in favor of application-specific approaches.
 
 ### Pattern 1: Single Document (Personal Apps)
 
@@ -332,7 +337,7 @@ Each user gets exactly one document that holds all their data. The document is o
 
 **Best for:** Apps where users create discrete projects/workspaces they might share independently — accounting (per company), project management (per project), shared shopping lists (per household).
 
-Users have multiple documents but work in one at a time, switching between them. Track a `currentDocument` ref and call `open()` on the chosen document.
+Users have multiple documents but work in one at a time, switching between them. Track the current document and call `open()` on the chosen one.
 
 **UI components** in `src/components/documents/`: `PrimitiveDocumentSwitcher` (sidebar dropdown) and `PrimitiveDocumentList` (full management page with rename/share/delete).
 
@@ -350,7 +355,7 @@ List with `me.ownedDocuments()` and `open()` the selected document; create a new
 
 **Best for:** Apps that query across many documents, each with its own sharing context — chat (per channel), multi-tenant dashboards, collaborative workspaces with distinct collections.
 
-All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `me.ownedDocuments({ tag })` (and `me.sharedDocuments({ tag })` if the user can also be a non-owner).
+All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `me.ownedDocuments({ tag })` (and `me.sharedDocuments({ tag })` if the user can also be a non-owner), open each, and track per-document readiness yourself. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over local tracking.
 
 ```typescript
 // Open every document with a given tag
@@ -363,9 +368,7 @@ await Promise.all(
 const messages = await Message.query({});
 ```
 
-**Implementation tips for Pattern 3:** The demo app does not ship a built-in "multi-document" Pinia store. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over a local store. For per-tag in-memory tracking, build directly on `jsBaoClient.me.ownedDocuments({ tag })` and `jsBaoClient.documents.open()`, and track per-document readiness yourself.
-
-A minimal store for "all documents tagged `channel`" (Vue/Pinia framework glue — web-specific, left inline):
+The template does not ship a built-in "multi-document" Pinia store. A minimal store for "all documents tagged `channel`":
 
 ```typescript
 // stores/channelDocsStore.ts
@@ -421,6 +424,7 @@ const { data: messages } = useJsBaoDataLoader({
 
 The same pattern adapts to "the K most recent" or "channels the user belongs to" — change the `me.ownedDocuments` / `me.sharedDocuments` calls and the readiness condition; everything else stays.
 
+
 ## Data Modeling Decisions
 
 ### Separate Documents When:
@@ -465,6 +469,8 @@ const todoListsLocal = owned.filter((doc) => doc.tags?.includes("todolist"));
 
 ## Defining Models
 
+Models are declared in a TOML schema and the client model types are generated from it by codegen. The field types and options are the same across platforms; the schema file, codegen command, and generated artifacts differ.
+
 ### Creating New Model Files
 
 Models are defined in `src/models/models.toml` and TypeScript classes are generated from that file. Follow this workflow:
@@ -497,6 +503,7 @@ import { Todo } from "@/models";
 **Step 4: Make additional edits** to the schema in `models.toml` and run `npx js-bao-codegen-v2` again.
 
 **CRITICAL: NEVER edit `*.generated.ts` files or `src/models/index.ts`.** Both are overwritten on every codegen run.
+
 
 ### Field Types
 
@@ -602,14 +609,12 @@ name = "name_parent_unique"
 fields = ["name", "parentId"]
 ```
 
-After `npx js-bao-codegen-v2`, single-field constraints get an auto-generated runtime name of `<modelName>_<fieldName>_unique` (e.g. `users_email_unique`); composite constraints use the `name` you declared (e.g. `name_parent_unique`).
+After codegen, single-field constraints get an auto-generated runtime name of `<modelName>_<fieldName>_unique` (e.g. `users_email_unique`); composite constraints use the `name` you declared (e.g. `name_parent_unique`).
 
 **Wrong** — these TOML shapes are silently rejected or fail at codegen:
 
 ```toml novalidate
-# DON'T: nesting under `options` — that's the programmatic
-# defineModelSchema({ options: { uniqueConstraints } }) shape, not the
-# TOML dialect. In TOML the array lives directly on the model.
+# DON'T: nesting under `options`. The array lives directly on the model.
 [[models.categories.options.unique_constraints]]
 name = "name_parent_unique"
 fields = ["name", "parentId"]
@@ -821,9 +826,7 @@ Only one stringset facet field is allowed per aggregation. To check membership o
 
 ### useJsBaoDataLoader Pattern
 
-`useJsBaoDataLoader` is the **web template's** Vue composable for centralized component data loading. The iOS counterpart is `PrimitiveApp`'s `BaoDataLoader<T>` — an `ObservableObject` bound in a SwiftUI `.task` via `.bind(client:subscribeTo:load:)` with triggers like `.onModelChange(model)` (see the Swift client guide); the Vue-specific caveats below don't apply to it.
-
-`useJsBaoDataLoader` is a composable provided by the primitive library that centralizes data loading for a component. **It is component-only**: it registers its model subscriptions and document-event listeners inside `onMounted`, which fires only for mounted Vue components. Calling it from a Pinia store's `setup()`, a router guard, or any other non-component context will load data once but **never react to subsequent changes** — the `onMounted` callback never runs there, so no subscriptions are registered. For those contexts, subscribe directly (see [Subscribing Outside a Component](#subscribing-outside-a-component) below).
+`useJsBaoDataLoader` is the Vue composable for centralized component data loading, provided by the primitive library. **It is component-only**: it registers its model subscriptions and document-event listeners inside `onMounted`, which fires only for mounted Vue components. Calling it from a Pinia store's `setup()`, a router guard, or any other non-component context will load data once but **never react to subsequent changes** — the `onMounted` callback never runs there, so no subscriptions are registered. For those contexts, subscribe directly (see [Subscribing Outside a Component](#subscribing-outside-a-component) below).
 
 It handles four key concerns:
 
@@ -876,7 +879,7 @@ const {
 
 `useJsBaoDataLoader` is the right tool inside a component. Outside one — a **Pinia store**, a singleton service, a router guard — do not reach for it: its `onMounted`-based subscriptions never register there, so reactive updates silently never fire.
 
-`Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle (see [Subscribe to changes](#subscribe-to-changes) above for the compiled call). It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). Wire it up directly in the store's `setup()` and keep the unsubscribe handle so you can tear it down (Vue/Pinia framework glue — web-specific, left inline):
+`Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle (see [Subscribe to changes](#subscribe-to-changes) above for the compiled call). It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). Wire it up directly in the store's `setup()` and keep the unsubscribe handle so you can tear it down:
 
 ```typescript
 // stores/tasksStore.ts
@@ -919,7 +922,9 @@ Rules:
 
 This is the same `Model.subscribe()` that `useJsBaoDataLoader` calls internally — you are just registering it in a place that doesn't depend on `onMounted`.
 
+
 ## Saving Data
+
 
 ### Save to a Specific Document (when creating new objects)
 
@@ -1064,7 +1069,7 @@ This applies both to new saves and updates, and is consistent across single save
 
 ### Singleton Model per Document (Avoiding ID Confusion)
 
-Create a singleton model per document for metadata. Child models reference by model ID, not document ID — declared in `models.toml`:
+Create a singleton model per document for metadata. Child models reference by model ID, not document ID. Declare both models in the schema:
 
 ```toml
 # TodoList — one per document
@@ -1126,9 +1131,30 @@ For documents that should exist exactly once (default document, settings), use `
 - `documents.aliases.delete(params)` - Remove an alias
 - `documents.aliases.listForDocument(documentId)` - List all aliases for a document
 
+
 ## Sharing Documents
 
-Documents can be shared with individual users (by userId or email), with groups, with collections, or exposed to a request-access flow for users with a link. For the full picture — member invitations with quotas, deferred grants, and access requests — see the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md).
+Documents can be shared with individual users (by userId or email), with groups, with collections, or exposed to a request-access flow for users with a link. Sharing **by email** to someone who isn't a user yet creates a *deferred grant* that resolves automatically at signup — that resolution lifecycle, app membership, invitation quotas, and the invite-accept wiring live in the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md).
+
+### Sharing mental model
+
+**Document permission levels:** `"owner"` > `"read-write"` > `"reader"`. (`"admin"` is an app-role projection, not a grantable document permission.) Effective permission = MAX(direct, group-derived, collection-derived). Granting a *lower* group permission to someone who already has a higher direct grant is a no-op for them.
+
+| Primitive | Grants | Scope |
+|-----------|--------|-------|
+| `DocumentPermission` | Direct access to one document | Document |
+| `DocumentGroupPermission` | Access via group membership | Document |
+| `Collection` membership | Access to every document in a collection | Collection |
+| `CollectionGroupPermission` | Collection access via group membership | Collection |
+| `DocumentAccessRequest` | Request the owner notice you | Document |
+
+**Decision rules:**
+
+1. If you have a `userId` → write the direct permission record. If you only have an email → write the same record by email; the platform resolves it or defers it. No manual "accept" call is needed for the standard email-match path.
+2. **Share at the highest level that fits — `collection` > `group` > `doc`.** A collection grant propagates to every document inside it (current and future); a group add propagates to every doc that group can see. Don't add per-document grants for something already shared at the collection or group level.
+3. Use groups for team-scoped access; use direct permissions for individual access.
+4. If a user hits a 403 → parse the response's `canRequestAccess` hint and either show "Request access" or a hard-deny screen.
+5. Read "documents I own" from `client.me.ownedDocuments()` and "documents shared directly with me" from `client.me.sharedDocuments()`. Group- and collection-scoped access is read through `groups.listDocuments` / `collections.listDocuments`.
 
 ### Quick Reference
 
@@ -1184,7 +1210,7 @@ Render the user's documents from two calls: `client.me.ownedDocuments()` for doc
 
 ### Using PrimitiveShareDocumentDialog
 
-When allowing users to share documents, use `PrimitiveShareDocumentDialog` (Vue framework glue — web-specific, left inline):
+When allowing users to share documents, use `PrimitiveShareDocumentDialog`:
 
 ```vue
 <PrimitiveShareDocumentDialog
@@ -1204,9 +1230,7 @@ When allowing users to share documents, use `PrimitiveShareDocumentDialog` (Vue 
 - `autoAcceptInvites: true` - Invitations are automatically accepted when the document tag matches a registered collection. Documents appear immediately in the user's list.
 - `autoAcceptInvites: false` - Users must manually accept invitations on a management page. Provides more control but requires UI for viewing/accepting invitations.
 
-**Navigating after accepting an invitation:**
-
-When a user accepts an invitation, you typically want to navigate them to the content. Since routes use model IDs (not document IDs), query for the model first:
+When a user accepts an invitation, you typically want to navigate them to the content. Since routes use model IDs (not document IDs), query for the model in the newly accessible document first, then route to it.
 
 ```typescript
 async function handleInvitationAccepted(documentId: string): Promise<void> {
@@ -1255,16 +1279,13 @@ Use these methods to confirm the server has received your writes before taking i
   await client.documents.waitForInSync(documentId);
 ```
 
-The point-in-time checks return `false` if the client is disconnected or the check times out (JS accepts an optional `timeoutMs`; Swift's `includesWrites` / `inSync` are synchronous local reads). The `waitFor*` polling helpers exist on both `documents.*` and the client root: `waitForWriteConfirmation` returns true on success / false on timeout, and `waitForInSync` throws on timeout.
+The point-in-time checks return `false` if the client is disconnected or the check times out. The `waitFor*` polling helpers exist on both `documents.*` and the client root: `waitForWriteConfirmation` returns true on success / false on timeout, and `waitForInSync` throws on timeout.
+
+The point-in-time checks accept an optional `timeoutMs`.
 
 ### Updating Document Metadata
 
-Update a document's title, thumbnail, and presentation metadata — see [Update thumbnail / metadata](#update-thumbnail--metadata) above for the compiled call. Each field is optional; pass `null` to clear `thumbnailBlobId` or `metadata`.
-
-```typescript
-// Check if a document is currently open
-const open = jsBaoClient.documents.isOpen(documentId);
-```
+Update a document's title, thumbnail, and presentation metadata — see [Update thumbnail / metadata](#update-thumbnail--metadata) above for the compiled call. Each field is optional; pass `null` to clear `thumbnailBlobId` or `metadata`. `documents.isOpen(documentId)` reports whether a document is currently open.
 
 `thumbnailBlobId` points at a blob you've already uploaded; the platform marks the referenced blob readable to anyone with access to the document. `metadata` is a JSON-serializable object with a 4KB cap on its serialized UTF-8 form — keep it to the kind of presentation hints that need to travel with the document (cover image references, badge colors, list layout). Failures return:
 
@@ -1298,50 +1319,125 @@ Beyond the Quick Reference and the `PrimitiveShareDocumentDialog` UI, the full p
   const pending = await client.documents.listPendingInvitations(documentId);
 ```
 
+#### Direct shares: `updatePermissions`
+
+The method is **`updatePermissions`** (no `setPermissions`). Two forms — single user (by id or email) and batch (any mix of userId and email):
+
 ```typescript
-await jsBaoClient.documents.listGroupPermissions(documentId);
-
-// Mutate access — by user id
-await jsBaoClient.documents.updatePermissions(documentId, {
-  userId, permission: "read-write",
-});
-await jsBaoClient.documents.updatePermissions(documentId, {
-  permissions: [{ userId, permission: "reader" }, ...],
-});
-
-// Mutate access — by email (single canonical entry point for sharing).
-// Resolves to a direct grant if the user exists, or a deferred grant
-// (carrying invitationId + inviteToken) if not. With `sendEmail: true`:
-// `documentUrl` is REQUIRED AND `app.baseUrl` must be configured (the
-// deferred branch uses it to compose the accept URL). Both preconditions
-// return HTTP 400 if missing. Repeated calls with the same email are
-// idempotent — an existing pending DeferredDocumentPermission for the
-// same (documentId, email) is updated in place, not duplicated.
-await jsBaoClient.documents.updatePermissions(documentId, {
-  email: "user@example.com",
+// Single user (by id or email)
+await client.documents.updatePermissions(documentId, {
+  email: "alice@example.com",
   permission: "read-write",
-  sendEmail: true,
-  documentUrl: `${origin}/lists`,
-  note: "...",
 });
 
-// Remove access — by user id or email
-await jsBaoClient.documents.removePermission(documentId, userId);
-await jsBaoClient.documents.removePermission(documentId, { email }); // also cancels a pending deferred grant
-await jsBaoClient.documents.transferOwnership(documentId, newOwnerId);
-
-// Group access
-await jsBaoClient.documents.grantGroupPermission(documentId, {
-  groupType, groupId, permission: "read-write",
+// Batch (any mix of userId and email)
+await client.documents.updatePermissions(documentId, {
+  permissions: [
+    { userId: "user-abc", permission: "read-write" },
+    { email: "alice@example.com", permission: "reader" },
+    { email: "bob@example.com",   permission: "read-write" },
+  ],
 });
-await jsBaoClient.documents.revokeGroupPermission(documentId, groupType, groupId);
-
-// Recipient redeems a deferred grant (after signup or in a different session)
-// using the inviteToken returned from updatePermissions.
-await client.invitations.accept(inviteToken);
 ```
 
-The access-request flow (a user with a link requests access; an owner lists and approves) is compiled here:
+Optional fields on either form: `sendEmail`, `documentUrl`, `note`.
+
+When `sendEmail: true`, the server delivers per-recipient emails:
+
+- **Existing app members** receive the `document-share` template, populated with the caller-supplied `documentUrl`.
+- **Non-members (deferred grants)** receive the `document-share-deferred` template, populated with an accept URL composed from `app.baseUrl` + the new `inviteToken` (shape `${app.baseUrl}/invite/accept?inviteToken=...`).
+
+Both branches share two preconditions when `sendEmail: true`: `documentUrl` must be supplied in the request, and the app must have `baseUrl` configured (so the deferred branch can compose its accept URL). Either missing returns HTTP 400 (`"documentUrl is required when sendEmail is true"` or `"Cannot send share email: app baseUrl is not configured"`). Customize either email type with `primitive email-templates set document-share ...` or `primitive email-templates set document-share-deferred ...`.
+
+Repeated email-based calls are idempotent: a second `updatePermissions(documentId, { email })` with the same email updates the existing pending `DeferredDocumentPermission` in place rather than creating a duplicate row, so the latest `permission` value wins at signup-time resolution and `client.documents.listPendingInvitations(documentId)` shows one entry per pending recipient.
+
+**There is no `permission: null` to remove.** Removal is a separate call (`removePermission` by userId or by email; `transferOwnership` to hand a document to a new owner):
+
+```typescript
+// Remove a current member by userId:
+await client.documents.removePermission(documentId, "user-abc");
+await client.documents.removePermission(documentId, { userId: "user-abc" });
+
+// Cancel a pending email-based invite, OR remove a current member matched by email:
+await client.documents.removePermission(documentId, { email: "alice@example.com" });
+
+await client.documents.transferOwnership(documentId, newOwnerId);
+```
+
+**Don't do this** (silent no-op for someone with a higher group permission, and there is no `null` form):
+
+```typescript
+// WRONG — there is no setPermissions
+await client.documents.setPermissions(documentId, [
+  { userId, permission: null },
+]);
+
+// WRONG — downgrades direct grant to "reader" but does NOT lower a higher
+// group-derived permission. The user keeps read-write via the group.
+await client.documents.updatePermissions(documentId, {
+  userId, permission: "reader",
+});
+// Correct: also lower or revoke the group permission.
+```
+
+Lowering a user's direct permission while they still have a higher one via a group is a no-op — the group wins (effective = MAX). To actually lower it, also lower or revoke the group permission.
+
+#### Response shape
+
+```typescript
+// {
+//   success: true,
+//   message: "...",
+//   results?: [
+//     // Direct (existing user):
+//     { status: "granted" | "updated", userId: "user-abc", permission: "read-write" },
+//
+//     // Deferred (email not yet an app user):
+//     { status: "pending_signup",
+//       email: "bob@example.com",
+//       permission: "read-write",
+//       appInvitationCreated: true,
+//       invitationId: "inv-123",
+//       inviteToken: "..." | null }   // combine with your accept URL
+//   ]
+// }
+```
+
+`results` is only present when at least one entry was deferred (i.e. the batch contained an email that didn't yet map to an app user). For all-direct grants — single-user or batch — the response is just `{ success: true, message }` with no `results` array. Branch on `status` per row when `results` is present.
+
+#### Group sharing
+
+The method is **`grantGroupPermission`** (no `setGroupPermission`). Member changes inside the group propagate automatically — no per-membership permission calls.
+
+```typescript
+await client.documents.grantGroupPermission(documentId, {
+  groupType: "team",
+  groupId: "engineering",
+  permission: "read-write",       // owner | read-write | reader
+});
+
+// Listing / revoking
+await client.documents.listGroupPermissions(documentId);
+await client.documents.revokeGroupPermission(documentId, "team", "engineering");
+```
+
+#### Looking up users
+
+`client.users.lookup(email)` reports whether an email maps to an existing app user — use it to decide whether to share by `userId` (definitive) or `email` (will defer if no app user yet). The argument is a plain string, not `{ email }`.
+
+```typescript
+const result = await client.users.lookup("alice@example.com");
+// { exists: true, user: { userId, name, email } }
+// or { exists: false }
+```
+
+#### Redeeming a deferred grant
+
+The recipient redeems a deferred grant (after signup or in a different session) with `client.invitations.accept(inviteToken)`, using the `inviteToken` returned from the share call. Only needed for the cross-identity path — email-matched signup resolves automatically. See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-grants) for when the explicit accept call is required versus automatic resolution.
+
+### Document Access Requests
+
+The owner UI when a non-member hits a 403 they're allowed to escalate. The end-to-end flow (a user with a link requests access; an owner lists and approves) is compiled here:
 
 ```typescript
   // A user with the link requests access
@@ -1354,6 +1450,89 @@ The access-request flow (a user with a link requests access; an owner lists and 
   const requests = await client.documents.listAccessRequests(documentId);
   await client.documents.approveAccessRequest(documentId, requestId);
 ```
+
+#### Detect on `documents.get` failure
+
+The 403 body is JSON shaped `{ error, status, timestamp, code: "DOC_ACCESS_DENIED", details: { code: "DOC_ACCESS_DENIED", canRequestAccess: boolean } }`. The thrown error is a plain error whose message embeds the body — parse it and branch on `canRequestAccess`:
+
+```typescript
+try {
+  const doc = await client.documents.get(documentId);
+} catch (err) {
+  const body = parseHttpErrorBody(err); // your helper — JSON.parse the bit after "HTTP 403: "
+  if (body?.code === "DOC_ACCESS_DENIED" && body.details?.canRequestAccess) {
+    await client.documents.requestAccess(documentId, {
+      permission: "read-write",                  // REQUIRED
+      message: "Working on the Q2 planning deck",
+    });
+    showPendingUI();
+  } else {
+    showHardDeniedUI();
+  }
+}
+
+function parseHttpErrorBody(err: unknown): any | null {
+  const m = String((err as Error)?.message || "").match(/^HTTP \d+:\s*(.*)$/s);
+  if (!m) return null;
+  try { return JSON.parse(m[1]); } catch { return null; }
+}
+```
+
+`canRequestAccess` returns `true` only when:
+- Caller is an `AppUser` (regular member, not anonymous).
+- Caller is **not** an admin/owner (they already have access).
+- Document exists, is not the root document.
+- Caller has no existing direct or group permission.
+
+#### `requestAccess` requires `permission`
+
+```typescript
+await client.documents.requestAccess(documentId, {
+  permission: "read-write",          // REQUIRED — "read-write" or "reader"
+  message: "...",                    // optional, max 500 chars
+  documentUrl: "https://...",        // optional, embedded in owner email
+  reviewUrl: "https://...",          // optional, owner's review CTA
+  sendEmail: false,                  // optional, default true
+});
+```
+
+Calling with no `permission` will 400. Re-requesting from the same user updates the existing pending request silently — there is no `ACCESS_REQUEST_ALREADY_PENDING` error. Real codes:
+
+| Body code | When |
+|-----------|------|
+| `ALREADY_HAS_ACCESS` | Caller already has any permission |
+| `RATE_LIMITED` | Too many requests; body has `retryAfter` |
+| `ACCESS_REQUEST_ALREADY_RESOLVED` | Approve/deny called on a non-pending request |
+
+#### Owner / admin flow
+
+The owner lists pending requests with `listAccessRequests`, then resolves each with `approveAccessRequest` (optional `permission` override) or `denyAccessRequest`.
+
+```typescript
+const requests = await client.documents.listAccessRequests(documentId);
+// DocumentAccessRequest[]: { requestId, requesterId, status, requestedPermission, message?, ... }
+
+await client.documents.approveAccessRequest(documentId, requestId, {
+  permission: "read-write",          // optional override
+  documentUrl: "https://...",        // optional, embedded in approval email
+});
+
+await client.documents.denyAccessRequest(documentId, requestId, {
+  documentUrl: "https://...",        // optional
+});
+```
+
+> **Note:** `denyAccessRequest` does not accept a `reason` field — only `documentUrl`. Don't try to pass one.
+
+#### Constraints
+
+- 30-day TTL on unresolved requests.
+- One pending request per `(document, requester)` — re-requesting updates it in place.
+- Resolved requests are immutable.
+
+#### Real-time delivery
+
+The server pushes WS frames `document:access-request-created` (to owners/admins) and `document:access-request-resolved` (to the requester). **These are not currently surfaced as typed `client.on(...)` events.** For now, poll `listAccessRequests()` on the owner side, and check `documents.get` again on the requester side after a sensible interval, or wire your own WS frame handler if you need lower latency.
 
 ### Collections
 
@@ -1420,9 +1599,47 @@ await client.collections.removeMember(collection.collectionId, targetUserId);
 // Change a user's permission: call addMember again with the new level.
 ```
 
-> **Gap (#671):** `collections.addMember` accepts `userId` only — no email-based deferred grant, and there's no `collections.listPendingInvitations` to power a "Members + Pending" UI on a collection. To share a collection with someone who hasn't signed up, either get them into the app first (`client.invitations.create({ email })`, or share an individual document by email so the deferred-grant flow runs) and add them to the collection after signup, or share the collection with a group they'll be a member of.
+Collections accept email-based members exactly like documents and groups — a deferred grant that resolves on signup:
+
+```typescript
+// Add an individual member by userId
+await client.collections.addMember(collectionId, {
+  userId: "user-abc",
+  permission: "read-write",              // "reader" or "read-write"
+});
+
+// Or by email — deferred grant resolves on signup, mirroring documents/groups
+const result = await client.collections.addMember(collectionId, {
+  email: "newhire@example.com",
+  permission: "reader",
+  sendEmail: true,                       // optional: platform sends an invite email
+  collectionUrl: "https://...",          // required when sendEmail is true
+  note: "Sharing the onboarding docs",
+});
+// result.status: "added" | "already_member" | "pending_signup"
+// Pending case carries { invitationId, inviteToken, expiresAt }.
+
+// Share with a group (fans out to every document in the collection)
+await client.collections.grantGroupPermission(collectionId, {
+  groupType: "team",
+  groupId: "engineering",
+  permission: "reader",
+});
+
+// Inspect / undo
+const access = await client.collections.getAccess(collectionId);
+// → { members: [...], groups: [...] }
+const pending = await client.collections.listPendingInvitations(collectionId);
+// → [{ email, permission, invitationId, expiresAt, ... }]
+await client.collections.removeMember(collectionId, "user-abc");
+await client.collections.revokeGroupPermission(collectionId, "team", "engineering");
+// Change a user's permission: call addMember again with the new level.
+```
+
+The deferred-grant flow on `collections.addMember({ email })` mirrors the document share path: `app.baseUrl` must be configured, `sendEmail: true` requires `collectionUrl`, and `client.invitations.delete(invitationId)` cancels every pending collection add (plus any pending document shares and group adds) attached to the invitation. See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-grants) for the resolution lifecycle.
 
 For per-context CEL rules using `collectionType` + `contextId` (and the `hasCollectionAccess` helper), see [Rule Sets for Collection Management](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md#rule-sets-for-collection-management) in the Users and Groups guide.
+
 
 **CLI:**
 
@@ -1437,9 +1654,104 @@ primitive collections members remove <collection-id> <user-id>
 primitive collections access <collection-id>
 ```
 
+### Building a "Members + Pending" UI
+
+The canonical sharing panel: people with access + people invited but not yet signed up. Use the per-resource `listPendingInvitations` endpoints — each shareable resource exposes a denormalized list so callers don't have to filter the app-level invitation list. Don't reach into `client.invitations.listDeferredGrants(...)` (admin-debug) or `client.invitations.list(...)` (app-level, admin/owner only) for product UI — the per-resource endpoints are the source. Removing yourself from a document also evicts the local copy.
+
+```typescript
+// Current members
+const members = await client.documents.getPermissions(documentId);
+// [{ userId, email, name, permission, grantedAt }, ...]   (getPermissions, not listPermissions)
+
+// Pending email shares for one document
+const docPending = await client.documents.listPendingInvitations(documentId);
+// [{ email, permission, invitationId, createdAt, expiresAt, grantedBy? }]
+
+// Pending group adds for one group
+const groupPending = await client.groups.listPendingInvitations(groupType, groupId);
+// [{ email, role, invitationId, createdAt, expiresAt, addedBy? }]
+
+// Pending collection adds for one collection
+const colPending = await client.collections.listPendingInvitations(collectionId);
+```
+
+**Canonical "share + render" flow:**
+
+```typescript
+async function shareAndReload(documentId: string, email: string) {
+  const result = await client.documents.updatePermissions(documentId, {
+    email,
+    permission: "read-write",
+  });
+  // result.results is present only when at least one row was deferred
+  // (email didn't yet map to an app user). All-direct grants return just
+  // { success, message } — that's success; refetch the panel.
+  const [members, pending] = await Promise.all([
+    client.documents.getPermissions(documentId),
+    client.documents.listPendingInvitations(documentId),
+  ]);
+  return { members, pending };
+}
+```
+
+**Cancelling:**
+
+```typescript
+// Cancel one pending document share / group add (by email):
+await client.documents.removePermission(documentId, { email });
+await client.groups.removeMember(groupType, groupId, { email });
+
+// Remove someone who already has access (by userId):
+await client.documents.removePermission(documentId, userId);
+await client.groups.removeMember(groupType, groupId, userId);
+
+// Nuclear: cancel the whole AppInvitation, cascading every pending document
+// share and group add linked to it. Use only for "uninvite from the app
+// entirely" — NOT to cancel a single share.
+await client.invitations.delete(invitationId);
+```
+
+
+### Sharing Discovery Cheat Sheet
+
+Pick the call that answers the question you're actually asking:
+
+| Question | Call |
+|----------|------|
+| Documents the user owns | `client.me.ownedDocuments({ tag?, limit?, cursor?, returnPage? })` |
+| Documents directly shared with the user (`DocumentPermission` + pending `DocumentInvitation`) | `client.me.sharedDocuments({ tag?, cursor?, limit? })` → `{ items, cursor }` |
+| Pending document invitations the user can accept | `client.me.pendingDocumentInvitations()` |
+| Documents inside a collection | `client.collections.listDocuments(collectionId, { limit?, cursor? })` |
+| Documents shared with a group | `client.groups.listDocuments(groupType, groupId)` |
+| Collections the user is a direct member of | `client.collections.list({ limit?, cursor? })` |
+| Members + groups on a collection | `client.collections.getAccess(collectionId)` |
+| Group permissions on a document | `client.documents.listGroupPermissions(documentId)` |
+| Pending email invites on a document / group / collection | `client.{documents\|groups\|collections}.listPendingInvitations(...)` |
+
+**Anti-patterns:**
+
+- Calling a method that doesn't exist: `setPermissions`, `setGroupPermission`, `client.users.lookup({ email })`. The correct names are `updatePermissions`, `grantGroupPermission`, `client.users.lookup(email)`.
+- Passing `permission: null` to remove a grant — there is no null form. Use `removePermission`.
+- Lowering a user's direct permission while they still have a higher one via group — the group wins (effective = MAX).
+- Assuming `me.sharedDocuments()` includes group- or collection-shared docs — it only carries direct `DocumentPermission` rows and pending `DocumentInvitation`s. Combine with `collections.list()` / `groups.listUserMemberships(...)` for a complete picture.
+- Showing a "request access" button without parsing the 403 body for `details.canRequestAccess`.
+- Calling `client.invitations.delete()` to cancel a single pending document share — it cascades to every share and group add linked to that invitation.
+- Polling `client.invitations.list` / `listDeferredGrants` to populate "Members + Pending" rows — those are app-level / admin surfaces; per-resource `listPendingInvitations` is the product UI source.
+
+**Sharing error codes** (server-emitted body codes; the client throws `Error("HTTP <status>: <body>")` — parse the body):
+
+| Code | Endpoint | Meaning |
+|------|----------|---------|
+| `DOC_ACCESS_DENIED` (with `details.canRequestAccess`) | `documents.get` | 403; check the hint to decide between request-access UI and hard deny |
+| `ALREADY_HAS_ACCESS` | `requestAccess` | Caller already has a direct or group permission |
+| `RATE_LIMITED` | `requestAccess` | Body has `retryAfter` (seconds) |
+| `ACCESS_REQUEST_ALREADY_RESOLVED` | `approveAccessRequest`, `denyAccessRequest` | Request is no longer pending |
+
+App-membership and invitation error codes live in the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#error-codes-quick-reference).
+
 ### Read-Only Permission Handling
 
-When a user has "reader" permission, disable all edit functionality (Vue computed — web-specific, left inline):
+When a user has "reader" permission, disable all edit functionality: hide create/add buttons, delete buttons and drag handles, and share buttons (only owners can share); disable inputs and checkboxes; and prevent inline editing. Derive a read-only flag from the document's `permission` field (`"reader"`) and thread it down to child views.
 
 ```typescript
 const isReadOnly = computed(() => {
@@ -1451,12 +1763,7 @@ const isReadOnly = computed(() => {
 });
 ```
 
-Pass `isReadOnly` to child components and use it to:
-- Hide create/add buttons (`v-if="!isReadOnly"`)
-- Hide delete buttons and drag handles
-- Disable checkboxes and inputs (`:disabled="isReadOnly"`)
-- Hide share buttons (only owners can share)
-- Prevent inline editing
+Pass `isReadOnly` to child components and use it to gate UI: `v-if="!isReadOnly"` on create/delete controls, `:disabled="isReadOnly"` on inputs.
 
 ## Admin CLI: Export / Import
 

@@ -4,7 +4,7 @@ Guidelines for modeling user relationships and managing access control with Prim
 
 ## Core operations
 
-The key client calls, compiled against the real clients as part of the docs build. The dense reference below adds the result shapes, discriminated-union branching, and CEL access-control detail.
+The key client calls, compiled against the real clients as part of the docs build. The dense reference below adds the result shapes, result-status branching, and CEL access-control detail.
 
 ### Look up users
 
@@ -85,29 +85,29 @@ For app-specific user data (preferences, settings, profile fields beyond name/em
 
 **Do this:**
 
-```typescript
+```swift
 // Store additional user data in a document, keyed by the platform userId
-const userProfile = new UserProfile();
-userProfile.userId = platformUserId; // reference the platform user
-userProfile.bio = "Software engineer";
-userProfile.theme = "dark";
-await userProfile.save({ targetDocument: userDocumentId });
+var userProfile = UserProfile()
+userProfile.userId = platformUserId  // reference the platform user
+userProfile.bio = "Software engineer"
+userProfile.theme = "dark"
+try await userProfile.save(targetDocument: userDocumentId)
 
 // Or in a database via registered operation
-await client.databases.executeOperation(dbId, "updateProfile", {
-  params: { bio: "Software engineer", theme: "dark" },
+try await client.databases.executeOperation(dbId, "updateProfile", params: [
+  "bio": "Software engineer", "theme": "dark"
   // The operation uses $user.userId server-side — no need to pass userId
-});
+])
 ```
 
 **Don't do this:**
 
-```typescript
+```swift
 // DON'T create a separate user model that duplicates platform fields
-const user = new AppUser();
-user.email = "alice@example.com"; // Already managed by platform
-user.name = "Alice";              // Already managed by platform
-user.id = generateNewId();        // Use platform userId instead
+var user = AppUser()
+user.email = "alice@example.com"  // Already managed by platform
+user.name = "Alice"               // Already managed by platform
+user.id = generateNewId()         // Use platform userId instead
 ```
 
 ### When to store additional user data
@@ -137,15 +137,14 @@ primitive users list
 primitive users list --search "ali"
 ```
 
-```typescript
-// Direct API call for in-app pickers
-const res = await fetch(`/app/${appId}/api/users?name=${encodeURIComponent("ali")}&limit=20`, {
-  headers: { Authorization: `Bearer ${token}` },
-});
-const { items, nextCursor } = await res.json();
+For in-app user pickers, call the REST endpoint directly:
+
+```
+GET /app/{appId}/api/users?name=ali&limit=20
+Authorization: Bearer <token>
 ```
 
-User search returns rows of `{ userId, email, name, avatarUrl, role, addedAt }` filtered to members of the current app.
+It returns `{ items, nextCursor }`, where each row is `{ userId, email, name, avatarUrl, role, addedAt }` filtered to members of the current app.
 
 ### App roles
 
@@ -276,19 +275,9 @@ If the group type has `autoAddCreator: true` (default), the creator is automatic
 
 ### Add members
 
-```typescript
-// By user ID — always direct
-await client.groups.addMember("team", "engineering", { userId: "user-456" });
+Add a member by `userId` (always direct) or by `email` (direct if the email maps to an app user, deferred otherwise). Pass **either** `userId` or `email`, never both — the server rejects requests carrying both.
 
-// By email — direct if the email maps to an app user, deferred otherwise
-const result = await client.groups.addMember("team", "engineering", {
-  email: "alice@example.com",
-});
-```
-
-`AddGroupMemberParams` is a discriminated union — pass **either** `userId` or `email`, never both. The TS types enforce this.
-
-`addMember` returns `DirectGroupAdd | DeferredGroupAdd` — branch on `status`:
+`addMember` returns a result you branch on by `status` (`DirectGroupAdd | DeferredGroupAdd`):
 
 ```swift
   let result = try await client.groups.addMember(
@@ -318,27 +307,17 @@ const result = await client.groups.addMember("team", "engineering", {
 
 Status meanings:
 - `"added"` — new membership created. `{ userId, userName?, userEmail?, addedAt, addedBy }`.
-- `"already_member"` — idempotent no-op. `addedAt`/`addedBy` reflect the pre-existing row. Replaces the old HTTP 409 response.
+- `"already_member"` — idempotent no-op. `addedAt`/`addedBy` reflect the pre-existing row.
 - `"pending_signup"` — email not yet an app user. Server created an `AppInvitation` + `DeferredGroupAdd`: `{ email, appInvitationCreated, deferredId, expiresAt, groupType, groupId, invitationId, inviteToken }`. Use `inviteToken` to build your own accept URL; the platform's default email is sent unless the underlying invitation was created with `sendEmail: false`.
 
 Until a deferred add resolves, `isMemberOf` returns false for that email's user — do not assume membership before sign-up/accept.
 
 **Don't do this:**
 
-```typescript
-// BAD — mixing userId and email is rejected by the type system AND the server
-await client.groups.addMember("team", "engineering", {
-  userId: "user-456",
-  email: "alice@example.com",
-});
+- **Don't pass both `userId` and `email`** in one call — it's rejected.
+- **Don't assume the result is always direct.** When the email isn't an app user yet, `status` is `"pending_signup"` and there is no `userId` on the result — always branch on `status` before reading direct-add fields.
 
-// BAD — assuming the result is always direct. If the email isn't an app user
-// yet, result.userId is undefined.
-const r = await client.groups.addMember("team", "engineering", { email });
-console.log(r.userId); // TypeError when r.status === "pending_signup"
-```
-
-See the [Sharing and Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.md) for the full deferred-grant lifecycle and the token-based acceptance path.
+See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-grants) for the full deferred-grant lifecycle and the token-based acceptance path.
 
 ### List members
 
@@ -388,7 +367,8 @@ Use this to render the "pending members" section of a group sharing UI without h
   // [["groupType", "groupId", "name", "description"?, "addedAt", "addedBy"]]
 ```
 
-`name` is joined from `AppGroup` at call time; orphan rows (membership pointing at a deleted group) are skipped. In TypeScript, pass `{ groupType }` to filter to a single type — a server-side SK-range push-down, not a post-query JS filter. (The Swift client returns all memberships; filter client-side.)
+`name` is joined from `AppGroup` at call time; orphan rows (membership pointing at a deleted group) are skipped.
+The call returns every membership for the user; filter by `groupType` on the returned list.
 
 ## Group Type Configuration
 
@@ -537,7 +517,7 @@ access: "has(database.metadata.teamId) && isMemberOf('team', database.metadata.t
 Rule sets control who can manage groups (`category: "group"`) and group members (`category: "member"`). Each `(category, operation)` pair holds a CEL expression evaluated against the requesting user and the target group.
 
 **Valid operations:**
-- `category: "group"` — `create`, `edit`, `delete`, `get` (the read op was renamed from `list` to `get` to match the single-resource controller method; rule sets persisted before the rename keep working via a `get` → `list` alias, but new TOML configs must use `get`).
+- `category: "group"` — `create`, `edit`, `delete`, `get` (the read op; use `get` in TOML configs).
 - `category: "member"` — `create`, `edit`, `delete`, `list`.
 
 There is no `read` or `update` — use `edit`. There is no `add` — use `create` (for `member.create` = "add member").
@@ -686,7 +666,7 @@ Collections (see the [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#col
 
 **Resource type:** `collection`. **Categories and operations:**
 
-- `category: "collection"` — `create`, `edit`, `delete`, `get` (the read op was renamed from `list` to `get` for parity with `group.get`; rule sets persisted before the rename keep working via a `get` → `list` alias, but new TOML configs must use `get`).
+- `category: "collection"` — `create`, `edit`, `delete`, `get` (the read op, parallel to `group.get`; use `get` in TOML configs).
 - `category: "document"` — `add`, `remove`, `list` (controls which documents the collection can hold).
 - `category: "member"` — `add`, `remove`, `list`.
 
@@ -773,20 +753,21 @@ autoAddCreator = true
 
 **Runtime** (in app code):
 
-```typescript
+```swift
 // User creates a team
-await client.groups.create({
+try await client.groups.create(
   groupType: "team",
   groupId: "alpha-team",
-  name: "Alpha Team",
-});
+  name: "Alpha Team"
+)
 
 // Share a document with the team
-await client.documents.grantGroupPermission(docId, {
+try await client.documents.grantGroupPermission(
+  docId,
   groupType: "team",
   groupId: "alpha-team",
-  permission: "read-write",
-});
+  permission: "read-write"
+)
 
 // Database operations gated by team membership
 // access: "isMemberOf('team', database.metadata.teamId)"
@@ -796,18 +777,16 @@ await client.documents.grantGroupPermission(docId, {
 
 Use group types as roles within a context.
 
-```typescript
+```swift
 // Create role groups for a project
-await client.groups.create({ groupType: "editor", groupId: "project-1", name: "Project 1 Editors" });
-await client.groups.create({ groupType: "viewer", groupId: "project-1", name: "Project 1 Viewers" });
+try await client.groups.create(groupType: "editor", groupId: "project-1", name: "Project 1 Editors")
+try await client.groups.create(groupType: "viewer", groupId: "project-1", name: "Project 1 Viewers")
 
 // Grant different document permissions
-await client.documents.grantGroupPermission(docId, {
-  groupType: "editor", groupId: "project-1", permission: "read-write",
-});
-await client.documents.grantGroupPermission(docId, {
-  groupType: "viewer", groupId: "project-1", permission: "reader",
-});
+try await client.documents.grantGroupPermission(
+  docId, groupType: "editor", groupId: "project-1", permission: "read-write")
+try await client.documents.grantGroupPermission(
+  docId, groupType: "viewer", groupId: "project-1", permission: "reader")
 
 // Database operations with role checks
 // Editors can modify:
@@ -838,40 +817,39 @@ The per-parameter `access` expression ensures parents can only view their own ch
 
 **Runtime** (in app code):
 
-```typescript
+```swift
 // A "parent-of" group per student
-await client.groups.create({
+try await client.groups.create(
   groupType: "parent-of",
   groupId: "student-123",
-  name: "Parents of Student 123",
-});
-await client.groups.addMember("parent-of", "student-123", { userId: parentUserId });
+  name: "Parents of Student 123"
+)
+try await client.groups.addMember("parent-of", "student-123", userId: parentUserId)
 
 // Parent queries their child's grades — server enforces access
-const grades = await client.databases.executeOperation(dbId, "viewGrades", {
-  params: { studentId: "student-123" },
-});
+let grades = try await client.databases.executeOperation(
+  dbId, "viewGrades", params: ["studentId": "student-123"])
 ```
 
 ### Organization hierarchy
 
 Model nested organizational structure with multiple group types.
 
-```typescript
+```swift
 // Organization-level groups
-await client.groups.create({ groupType: "org", groupId: "acme-corp", name: "Acme Corp" });
+try await client.groups.create(groupType: "org", groupId: "acme-corp", name: "Acme Corp")
 
 // Department-level groups
-await client.groups.create({ groupType: "dept", groupId: "engineering", name: "Engineering" });
-await client.groups.create({ groupType: "dept", groupId: "marketing", name: "Marketing" });
+try await client.groups.create(groupType: "dept", groupId: "engineering", name: "Engineering")
+try await client.groups.create(groupType: "dept", groupId: "marketing", name: "Marketing")
 
 // Team-level groups
-await client.groups.create({ groupType: "team", groupId: "backend", name: "Backend Team" });
+try await client.groups.create(groupType: "team", groupId: "backend", name: "Backend Team")
 
 // A user can be in multiple groups at different levels
-await client.groups.addMember("org", "acme-corp", { userId });
-await client.groups.addMember("dept", "engineering", { userId });
-await client.groups.addMember("team", "backend", { userId });
+try await client.groups.addMember("org", "acme-corp", userId: userId)
+try await client.groups.addMember("dept", "engineering", userId: userId)
+try await client.groups.addMember("team", "backend", userId: userId)
 
 // CEL can check any level:
 // "isMemberOf('org', database.metadata.orgId)"
@@ -908,7 +886,7 @@ await client.groups.addMember("team", "backend", { userId });
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `addMember` returns `status: "pending_signup"` | Email isn't an app user yet | Expected. Membership resolves when they sign up or accept via `inviteToken`. Render a pending-members UI; cancel via `removeMember({ email })` or `invitations.revokeDeferredGrant(deferredId, "group")`. |
-| `addMember` returns `status: "already_member"` | User already in the group | Idempotent — no error. Replaces the previous HTTP 409 response. |
+| `addMember` returns `status: "already_member"` | User already in the group | Idempotent — no error. |
 | 409 on `groups.create` | A group with that `(groupType, groupId)` already exists | Use a different `groupId` or call `groups.get` first. |
 | 403 on `groups.create` (member role) | The group type has a `GroupTypeConfig` row with no rule set attached (explicit opt-out), OR a configured `group.create` rule denied the caller | Either delete the `GroupTypeConfig` row to fall back to the permissive default (`group.create = "true"`), attach a rule set with a permissive `group.create`, or call as an owner/admin. |
 | 403 on `groups.create` with `groupType` starting with `_` | Reserved system group type | Pick a different prefix. |

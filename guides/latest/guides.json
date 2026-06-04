@@ -58,7 +58,7 @@
     {
       "topic": "blobs",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_BLOBS.ts.md",
-      "description": "Storing and managing binary files — document-scoped blobs and general-purpose blob buckets",
+      "description": "Document-scoped blob storage — uploads, downloads, offline queue, caching, and permissions for files attached to documents",
       "keywords": [
         "blobs",
         "files",
@@ -70,12 +70,6 @@
         "offline",
         "cache",
         "prefetch",
-        "bucket",
-        "buckets",
-        "blob bucket",
-        "signed url",
-        "ttl",
-        "access policy",
         "avatars"
       ],
       "useCases": [
@@ -236,134 +230,6 @@
       ]
     },
     {
-      "topic": "sharing-and-invitations",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.ts.md",
-      "description": "Invitations, document and database sharing, collections, member invitation quotas, and access requests",
-      "keywords": [
-        "sharing",
-        "share",
-        "invitation",
-        "invitations",
-        "invite",
-        "email invite",
-        "access request",
-        "request access",
-        "collection",
-        "collections",
-        "member invitation",
-        "quota",
-        "sharing by email",
-        "updatePermissions",
-        "grantGroupPermission"
-      ],
-      "useCases": [
-        "Sharing a document by userId, email, or group",
-        "Sharing a database with a group",
-        "Sharing documents in bulk via a collection",
-        "Inviting users to an app (admin or member-initiated)",
-        "Enforcing member-invitation quotas",
-        "Responding to a document access denial with a request-access flow",
-        "Approving or denying document access requests",
-        "Rendering a 'people with access + pending invitations' panel",
-        "Listing the documents a user owns or has been shared into"
-      ],
-      "concepts": [
-        "client.documents.updatePermissions",
-        "client.documents.grantGroupPermission",
-        "client.collections.addMember",
-        "client.invitations.create",
-        "client.invitations.quota",
-        "client.invitations.delete",
-        "client.documents.requestAccess",
-        "client.documents.approveAccessRequest",
-        "client.documents.denyAccessRequest",
-        "client.me.ownedDocuments",
-        "client.me.sharedDocuments",
-        "canRequestAccess",
-        "AppInvitation",
-        "memberInvitationsEnabled",
-        "memberInvitationLimit"
-      ],
-      "prerequisites": [],
-      "relatedGuides": [
-        "documents",
-        "users-and-groups",
-        "authentication"
-      ],
-      "variants": [
-        {
-          "language": "ts",
-          "file": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.ts.md"
-        },
-        {
-          "language": "swift",
-          "file": "AGENT_GUIDE_TO_PRIMITIVE_SHARING_AND_INVITATIONS.swift.md"
-        }
-      ]
-    },
-    {
-      "topic": "scheduling-and-realtime",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.ts.md",
-      "description": "Cron-scheduled workflows and real-time database subscriptions over WebSocket",
-      "keywords": [
-        "cron",
-        "schedule",
-        "scheduled workflow",
-        "CronTrigger",
-        "timezone",
-        "overlap",
-        "subscription",
-        "subscriptions",
-        "db.subscribe",
-        "real-time",
-        "WebSocket",
-        "live data",
-        "DatabaseTypeSubscription",
-        "originConnectionId",
-        "isOrigin"
-      ],
-      "useCases": [
-        "Scheduling a workflow to run on a cron expression",
-        "Handling timezones and overlap policies for scheduled jobs",
-        "Pausing, resuming, or manually firing a cron trigger",
-        "Subscribing to real-time database changes from the client",
-        "Registering parameterized subscriptions with CEL access and filter rules",
-        "Building load+subscribe UIs for live views",
-        "Driving workflow-progress UIs by subscribing to workflow-written records"
-      ],
-      "concepts": [
-        "CronTrigger",
-        "client.cronTriggers.create",
-        "client.cronTriggers.test",
-        "overlapPolicy",
-        "IANA timezone",
-        "DatabaseTypeSubscription",
-        "client.databases.subscribe",
-        "originConnectionId",
-        "originUserId",
-        "isOrigin",
-        "select projection",
-        "emit filter",
-        "access rule",
-        "filter rule"
-      ],
-      "prerequisites": [],
-      "relatedGuides": [
-        "workflows",
-        "databases"
-      ],
-      "variants": [
-        {
-          "language": "ts",
-          "file": "AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.ts.md"
-        },
-        {
-          "language": "swift",
-          "file": "AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.swift.md"
-        }
-      ]
-    },
-    {
       "topic": "databases",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.ts.md",
       "description": "Server-side database storage with CEL-based access control, registered operations, triggers, real-time subscriptions, and group permissions",
@@ -388,7 +254,10 @@
         "real-time",
         "applyToQuery",
         "DatabaseTypeSubscription",
-        "DatabaseGroupPermission"
+        "DatabaseGroupPermission",
+        "subscribe",
+        "db.change",
+        "live updates"
       ],
       "useCases": [
         "Creating and managing server-side databases",
@@ -403,7 +272,9 @@
         "Subscribing to real-time database changes over WebSocket",
         "Granting database access to a group via DatabaseGroupPermission",
         "Importing CSV data into databases",
-        "Managing database permissions"
+        "Managing database permissions",
+        "Subscribing to real-time database changes",
+        "Building live dashboards and notification badges"
       ],
       "concepts": [
         "databases.create",
@@ -452,7 +323,7 @@
     {
       "topic": "documents",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.ts.md",
-      "description": "Working with documents - the core local-first data architecture in Primitive apps",
+      "description": "Local-first collaborative documents — models and CRUD, opening/finding documents, sharing and permissions, collections, and access requests",
       "keywords": [
         "documents",
         "models",
@@ -465,7 +336,12 @@
         "js-bao",
         "data modeling",
         "local-first",
-        "collaboration"
+        "collaboration",
+        "share",
+        "collections",
+        "access request",
+        "members",
+        "pending invitations"
       ],
       "useCases": [
         "Creating and defining data models",
@@ -473,7 +349,11 @@
         "Saving and updating records",
         "Sharing documents with other users",
         "Understanding document permissions",
-        "Using useJsBaoDataLoader for reactive data"
+        "Using useJsBaoDataLoader for reactive data",
+        "Sharing a document with a user, email, or group",
+        "Building a members + pending sharing UI",
+        "Handling document access requests",
+        "Bundling documents into collections"
       ],
       "concepts": [
         "BaseModel",
@@ -535,7 +415,11 @@
         "cron",
         "scheduled",
         "include fragments",
-        "$params validator"
+        "$params validator",
+        "cron-triggers",
+        "overlap policy",
+        "timezone",
+        "schedule"
       ],
       "useCases": [
         "Building multi-step automation pipelines",
@@ -872,86 +756,6 @@
       ]
     },
     {
-      "topic": "swift-client",
-      "file": "AGENT_GUIDE_TO_PRIMITIVE_SWIFT_CLIENT.md",
-      "description": "Building Primitive apps in Swift (iOS) — PrimitiveApp, JsBaoClient, codegen + TypedModel, Fastlane",
-      "keywords": [
-        "swift",
-        "apple",
-        "ios",
-        "macos",
-        "iphone",
-        "ipad",
-        "mac",
-        "swiftui",
-        "xcode",
-        "fastlane",
-        "testflight",
-        "app store",
-        "PrimitiveApp",
-        "PrimitiveAppState",
-        "TypedModel",
-        "swift-bao-codegen",
-        "JsBaoCodegenPlugin",
-        "schema.toml",
-        "xcodegen",
-        "AuthGateView",
-        "BaoModel",
-        "primitive init --platform apple"
-      ],
-      "useCases": [
-        "Scaffolding a new iOS or macOS app with `primitive init --platform apple`",
-        "Running on iOS Simulator, paired iPhone/iPad, or macOS",
-        "Defining data models in schema.toml and wiring swift-bao-codegen on both SwiftPM and Xcode build paths",
-        "Binding generated PrimitiveModel records to documents via TypedModel<T>",
-        "Reading and writing through TypedModel — synchronous reads, local-first writes",
-        "Subscribing to events (.sync / .remoteUpdate / .workflowStatus) with proper subscription lifetime",
-        "Implementing workflow apply handlers with CheckedContinuation + runKey guards",
-        "Using AuthGateView and PrimitiveAuthManager for sign-in",
-        "Code signing setup (DEVELOPMENT_TEAM in project.yml + xcodegen regen)",
-        "Shipping to TestFlight and the App Store with Fastlane lanes (beta / release / add_testers / bump)",
-        "Migrating from the legacy BaoModel<T> / BaoModelRecord path to TypedModel<T> + codegen"
-      ],
-      "concepts": [
-        "PrimitiveAppState",
-        "AuthGateView",
-        "JsBaoClient",
-        "TypedModel",
-        "PrimitiveModel",
-        "PrimitiveSchema",
-        "swift-bao-codegen",
-        "JsBaoCodegenPlugin",
-        "makeTypedModel",
-        "BaoDataLoader",
-        "EventSubscription",
-        "OpenDocumentOptions",
-        "StartWorkflowOptions",
-        "WorkflowStatusEvent",
-        "primitive init --platform apple",
-        "xcodegen",
-        "project.yml",
-        "primitive.json",
-        "Fastfile",
-        "upload_to_testflight",
-        "upload_to_app_store"
-      ],
-      "prerequisites": [],
-      "relatedGuides": [
-        "documents",
-        "data-modeling",
-        "workflows",
-        "blobs",
-        "authentication",
-        "sharing-and-invitations"
-      ],
-      "variants": [
-        {
-          "language": "swift",
-          "file": "AGENT_GUIDE_TO_PRIMITIVE_SWIFT_CLIENT.md"
-        }
-      ]
-    },
-    {
       "topic": "configuration",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_CONFIGURATION.ts.md",
       "description": "Managing backend configuration as code — the TOML sync loop, directory map, environments, secrets, and headless CI auth",
@@ -1022,6 +826,116 @@
         {
           "language": "swift",
           "file": "AGENT_GUIDE_TO_PRIMITIVE_ACCESS_CONTROL.swift.md"
+        }
+      ]
+    },
+    {
+      "topic": "invitations",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.ts.md",
+      "description": "App membership — access modes (public/invite-only/domain), the waitlist, invitations and quotas, custom invitation emails, and deferred grants that resolve when someone becomes a user",
+      "keywords": [
+        "invitations",
+        "invite",
+        "app membership",
+        "access mode",
+        "invite-only",
+        "domain",
+        "waitlist",
+        "inviteToken",
+        "deferred grant",
+        "pending signup",
+        "quota",
+        "accept"
+      ],
+      "useCases": [
+        "Inviting users to an app",
+        "Letting members invite teammates with quotas",
+        "Sending custom invitation emails",
+        "Handling invite-accept landing pages and tokens",
+        "Sharing with people who haven't signed up yet",
+        "Managing a waitlist for an invite-only app"
+      ],
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.swift.md"
+        }
+      ]
+    },
+    {
+      "topic": "blob-buckets",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_BLOB_BUCKETS.ts.md",
+      "description": "General-purpose blob bucket storage — bucket configuration, access policies, TTL tiers, signed URLs, and workflow integration",
+      "keywords": [
+        "blob bucket",
+        "buckets",
+        "bucket",
+        "signed url",
+        "ttl",
+        "access policy",
+        "public-read",
+        "owner-only",
+        "avatars",
+        "workflow outputs"
+      ],
+      "useCases": [
+        "Storing files outside any document (avatars, generated assets)",
+        "Serving public assets via signed URLs",
+        "Time-boxed download links",
+        "Writing workflow outputs to storage"
+      ],
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_BLOB_BUCKETS.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_BLOB_BUCKETS.swift.md"
+        }
+      ]
+    },
+    {
+      "topic": "deploying",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_DEPLOYING.ts.md",
+      "description": "Shipping Primitive apps to production — web deploys (cf-deploy, environments) and iOS distribution (signing, devices, TestFlight, App Store via Fastlane)",
+      "keywords": [
+        "deploy",
+        "deploying",
+        "production",
+        "ship",
+        "release",
+        "cf-deploy",
+        "wrangler",
+        "environments",
+        "ios",
+        "signing",
+        "provisioning",
+        "TestFlight",
+        "App Store",
+        "Fastlane",
+        "xcodegen",
+        "run-ios.sh"
+      ],
+      "useCases": [
+        "Deploying the web template to production",
+        "Adding staging/test environments",
+        "Running on a physical iPhone",
+        "Shipping a TestFlight build",
+        "Submitting to the App Store"
+      ],
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_DEPLOYING.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_DEPLOYING.swift.md"
         }
       ]
     }

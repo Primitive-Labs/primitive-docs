@@ -33,8 +33,36 @@ function regionFor(id, variant) {
   return lines.slice(s + 1, e).join("\n");
 }
 
-function render(template, variant) {
-  return template.replace(/\{\{\s*example:\s*([\w.-]+\/[\w.-]+)\s*\}\}/g, (_, id) => {
+// Language-scoped blocks: content between `{{#lang ts}}` / `{{/lang}}` (or
+// `{{#lang swift}}`) renders ONLY into builds of that language. This is how a
+// template carries language-specific notes and gotchas without shipping them
+// to the other language's build — an iOS agent fetching the swift guide should
+// never receive JavaScript gotchas. Blocks may span multiple lines; they do
+// not nest. The marker lines themselves are removed from the output, and a
+// dropped block collapses (no blank-line residue).
+function applyLangBlocks(template, variant, problems, templateName) {
+  const open = /\{\{#lang\s+([\w-]+)\s*\}\}/g;
+  // Validate balance + known languages once per template (caller dedupes).
+  const langs = new Set(VARIANTS.map((v) => v.language));
+  for (const m of template.matchAll(open)) {
+    if (!langs.has(m[1]) && problems) {
+      problems.push(`✘ ${templateName}: {{#lang ${m[1]}}} is not a declared language (${[...langs].join(", ")})`);
+    }
+  }
+  const opens = (template.match(open) || []).length;
+  const closes = (template.match(/\{\{\/lang\s*\}\}/g) || []).length;
+  if (opens !== closes && problems) {
+    problems.push(`✘ ${templateName}: unbalanced {{#lang}}/{{/lang}} blocks (${opens} open, ${closes} close)`);
+  }
+  return template.replace(
+    /[ \t]*\{\{#lang\s+([\w-]+)\s*\}\}[ \t]*\r?\n?([\s\S]*?)[ \t]*\{\{\/lang\s*\}\}[ \t]*\r?\n?/g,
+    (_, lang, body) => (lang === variant.language ? body : "")
+  );
+}
+
+function render(template, variant, problems, templateName) {
+  const scoped = applyLangBlocks(template, variant, variant.id === VARIANTS[0].id ? problems : null, templateName);
+  return scoped.replace(/\{\{\s*example:\s*([\w.-]+\/[\w.-]+)\s*\}\}/g, (_, id) => {
     return "```" + variant.fence + "\n" + regionFor(id, variant) + "\n```";
   });
 }
@@ -55,7 +83,7 @@ for (const t of templates) {
   }
   for (const variant of VARIANTS) {
     const out = join(GUIDES_DIR, `${base}.${variant.id}.md`);
-    const rendered = render(src, variant);
+    const rendered = render(src, variant, problems, t);
     if (CHECK) {
       let current = "";
       try { current = readFileSync(out, "utf-8"); } catch { /* missing */ }

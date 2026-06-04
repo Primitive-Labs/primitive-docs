@@ -15,7 +15,7 @@ export async function uploadDocumentBlobWithOptions(
     contentType: "text/plain",
     disposition: "attachment", // or "inline"
     // retainLocal defaults to true; set false to drop local bytes once the
-    // server confirms the upload (JS-only option).
+    // server confirms the upload.
   });
   // #endregion example
   return { blobId, numBytes, contentType };

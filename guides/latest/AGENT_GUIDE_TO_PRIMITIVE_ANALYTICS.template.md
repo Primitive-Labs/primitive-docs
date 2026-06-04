@@ -2,21 +2,22 @@
 
 Guidelines for AI agents implementing analytics tracking in Primitive apps.
 
-> **JavaScript-only client API.** The custom-event client surface (`client.analytics.logEvent/logSnapshot/setPlanOverride/setAppVersionOverride`) exists **only in the JavaScript client**. The Swift client has internal analytics plumbing (auto-events, an `AnalyticsQueue`) but exposes **no public `client.analytics` API** — do not write Swift snippets that call `client.analytics.*`. Server-side auto-tracking applies to all platforms; read analytics via CLI/REST/workflow steps.
-
 ## Overview
 
-Primitive provides built-in analytics via `client.analytics`. Events are buffered client-side, batched over WebSocket, and stored server-side for querying. The system handles offline persistence, rate limiting, and automatic lifecycle events out of the box.
+Primitive provides built-in analytics. The platform tracks user activity and resource lifecycle automatically and stores events server-side for querying. The system handles offline persistence, rate limiting, and automatic lifecycle events out of the box.
 
-**Key constraints:**
-- Every analytics event requires an authenticated user. Events without a `user_ulid` are dropped silently. Use `ANALYTICS_UNAUTHENTICATED_USER` for pre-auth screens.
-- A tenant ID (resolved automatically from `client.appId`) must also be present, or the event is dropped.
+Read aggregated analytics (DAU/WAU/MAU, retention, top users, event feeds) through the `primitive` CLI, the REST API, or workflow steps — covered below.
 
 ---
 
 ## What's Tracked Automatically (Zero Developer Work)
 
-Initializing `JsBaoClient` with default options gets you DAU/WAU/MAU tracking, session analytics, document/permission audit trails, and full workflow/prompt/integration observability with no `logEvent` calls.
+Standing up an app gets you DAU/WAU/MAU tracking, session analytics, document/permission audit trails, and full workflow/prompt/integration observability with no instrumentation.
+
+{{#lang ts}}
+**Key constraints for custom events:**
+- Every analytics event requires an authenticated user. Events without a `user_ulid` are dropped silently. Use `ANALYTICS_UNAUTHENTICATED_USER` for pre-auth screens.
+- A tenant ID (resolved automatically from `client.appId`) must also be present, or the event is dropped.
 
 ### Client-Side Auto Events
 
@@ -37,6 +38,7 @@ All enabled by default. The client automatically emits these lifecycle events:
 | `prompt_started` | `gemini` | on | Gemini `generate` / `countTokens` / `generateRaw` begins |
 | `prompt_succeeded` | `gemini` | on | Gemini `generate` / `countTokens` / `generateRaw` succeeds |
 | `prompt_failed` | `gemini` | on | Gemini `generate` / `countTokens` / `generateRaw` fails |
+{{/lang}}
 
 ### Server-Side Events
 
@@ -74,6 +76,7 @@ The platform emits these from the server. No client code at all.
 
 Workflow and prompt events also record `duration_ms` and LLM token counts (`input_tokens`, `output_tokens`, `total_tokens`) when available.
 
+{{#lang ts}}
 ### Auto-Populated Fields
 
 Every event (auto or custom) gets these populated automatically:
@@ -250,6 +253,7 @@ Accepted shapes:
 - `llm`, `gemini`: `boolean | { start?: boolean; success?: boolean; failure?: boolean }`
 
 Options accepted but currently no-ops (do not rely on): `boot`, `firstDocOpen`, `firstDocEdit`, `offlineRecovery`, `serviceWorker`.
+{{/lang}}
 
 ---
 
@@ -363,6 +367,7 @@ These fields are absent (or zero) when the event type doesn't produce them.
 
 ---
 
+{{#lang ts}}
 ## Best Practices
 
 1. **Use verb_noun action names** — `"photo_uploaded"`, `"report_generated"`, `"settings_changed"`.
@@ -423,3 +428,4 @@ client.analytics.logEvent({
 
 // No need for a beforeunload flush — the client adds one automatically.
 ```
+{{/lang}}

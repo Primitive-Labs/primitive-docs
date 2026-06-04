@@ -1,30 +1,32 @@
-# Agent Guide to DevTools: Document Explorer and Test Harness
+# Agent Guide to DevTools: Inspecting State and Running Tests
 
-How AI agents use Primitive's browser-based DevTools to validate state and run tests.
+How AI agents use Primitive's built-in developer tools to validate live app state,
+run tests, and inspect blobs during development.
 
 ## Overview
 
-Primitive apps include three browser-based tools, accessible via a floating
-DevTools button:
+Every Primitive app ships a dev-only inspection surface for working against a
+running, authenticated client. Across platforms it gives you the same three core
+capabilities:
 
-1. **Document Explorer** — inspect/manipulate js-bao documents, models, records
-2. **Test Harness** — run browser-based tests with isolated ephemeral documents
-3. **Blob Explorer** — browse, upload, download, delete blobs in documents
+1. **Data inspection** — browse and mutate the documents, models, and records the
+   client holds, plus server-side databases.
+2. **Test running** — run tests in the same authenticated session as the app and
+   read their pass/fail output.
+3. **Blob inspection** — list, preview, upload, download, and delete blobs in a
+   document.
 
-Provided by the `primitiveDevTools` Vite plugin. Active only when:
+The tools are active only in development builds and never ship to production.
+
+The tools are a single browser overlay (the **DevTools** overlay) provided by the
+`primitiveDevTools` Vite plugin, opened from a floating button in the running app.
+It is active only when:
 
 - `vite` is running in dev mode (`command === "serve"`), AND
 - `enabled !== false`, AND
-- The user is authenticated (button only shows after auth)
+- the user is authenticated (the button only shows after auth).
 
-Excluded from production builds.
-
-> **web/Vite-only.** These DevTools (the floating overlay, Document/Blob
-> Explorers, and the in-browser Test Harness — including
-> `createTestDocument` / `destroyTestDocument` and the `primitiveDevTools`
-> Vite plugin) ship only with the web/Vite client. The Swift client has no
-> equivalent — use the client's built-in **Debug Inspector** instead. Every
-> code block in this guide is therefore web/Vite-specific.
+It is excluded from production builds.
 
 ## Setup
 
@@ -533,3 +535,4 @@ Not exposed in production builds or non-debug hostnames.
 - Escape behavior is layered: nested `[role=dialog][data-state=open]`,
   `[data-devtools-modal]`, `[data-devtools-dropdown]`, and focused
   inputs/textareas/selects all consume Escape before the overlay does.
+

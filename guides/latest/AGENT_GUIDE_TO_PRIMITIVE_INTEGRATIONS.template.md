@@ -254,7 +254,7 @@ allowedPaths = ["/users", "/users/me", "/users/me/avatar"]
 ### 3. `forwardHeaders = ["*"]` leaks every client header upstream
 
 ```toml novalidate
-# WRONG - forwards Cookie, Authorization, X-Internal-* everything from the browser
+# WRONG - forwards Cookie, Authorization, X-Internal-* everything from the client
 forwardHeaders = ["*"]
 
 # RIGHT - explicit allowlist

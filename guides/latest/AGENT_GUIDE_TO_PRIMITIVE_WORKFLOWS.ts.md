@@ -1,7 +1,5 @@
 # Workflow Agent Guide
 
-> **Swift parity:** workflow *definitions* are TOML (language-neutral). On the client, `workflows.start` exists in both languages, but **`client.workflows.runSync(...)` is JavaScript-only** — Swift has `start` + `runAndApply`. Prompt/integration calls used from app code are dual-language (see the Prompts and Integrations guides).
-
 Workflows are multi-step server-side automations defined in TOML. Each step is one of a fixed set of `kind`s (LLM call, integration call, prompt execute, database op, email, blob, etc.). Steps run sequentially with template-rendered inputs and a shared output context.
 
 This guide is the source of truth for what's actually in `src/workflows/`. Examples are kept short and load-bearing.
@@ -779,6 +777,217 @@ Receive endpoint: `POST /app/{appId}/webhook/{webhookKey}`. The platform verifie
 
 CLI: `primitive webhooks list | get | create | update | delete | rotate-secret | test | events <webhook-key>` — `events` lists recent deliveries (accepted / rejected / duplicate).
 
+## Cron triggers
+
+A cron trigger fires a workflow on a clock schedule. It is one of the ways to invoke a workflow — a clock instead of a `workflows.start()` call or an inbound webhook. The trigger points at a workflow by `workflowKey`; the trigger itself runs no code.
+
+**Decision rule:** trigger is a clock → cron trigger. Trigger is a user action or external webhook → `workflows.start()` or an inbound webhook, NOT cron.
+
+### Critical rules
+
+1. **Cron triggers fire workflows, not arbitrary code.** Create the workflow first (`status = "active"` with an active config/revision), then point the trigger at it via `workflowKey`.
+2. **Set `requiresClientApply = false` on the target workflow.** Cron-triggered workflows almost always want this — otherwise the run sits in `apply_pending` forever because no client is listening.
+3. **Set an IANA `timezone` whenever the schedule has a user-visible hour.** `0 9 * * *` in UTC is 2am in Los Angeles.
+4. **`overlapPolicy` is `"skip"` (default) or `"allow"`.** There is no `"queue"`. `"skip"` checks whether the previous run is still active and increments `skippedCount`; `"allow"` always fires. Use `"allow"` only when each firing is independent and idempotent.
+5. **Per-app cap is 50 cron triggers.**
+
+### Creating (TOML / `primitive sync`)
+
+```toml
+# config/cron-triggers/nightly-digest.toml
+[cronTrigger]
+key = "nightly-digest"
+displayName = "Nightly digest email"
+cron = "0 9 * * *"
+timezone = "America/Los_Angeles"
+workflowKey = "send-digest"
+overlapPolicy = "skip"
+state = "active"
+
+# Optional: static input passed to the workflow on every fire
+[rootInput]
+digestType = "daily"
+environment = "production"
+
+# Optional: dynamic input. `{{now}}` is replaced with the fire-time ISO string.
+[inputMapping]
+firedAt = "{{now}}"
+```
+
+```bash
+primitive sync push --dir ./config
+```
+
+The TOML key `key` maps to the API field `triggerKey`. The field name is `cron` (not `schedule`).
+
+### Creating (client / CLI)
+
+```typescript
+  const trigger = await client.cronTriggers.create({
+    triggerKey: "nightly-digest",
+    displayName: "Nightly digest email",
+    cron: "0 9 * * *",                  // NOT `schedule`
+    timezone: "America/Los_Angeles",    // set whenever the hour is user-visible
+    workflowKey: "send-digest",
+    overlapPolicy: "skip",              // "skip" (default) | "allow" — no "queue"
+    rootInput: { digestType: "daily" }, // NOT `input`
+    inputMapping: { firedAt: "{{now}}" }, // merged over rootInput; {{now}} = fire time
+  });
+  // trigger.triggerId is a ULID — use it for get/update/pause/test/delete.
+```
+
+Via the CLI:
+
+```bash
+primitive cron-triggers create \
+  --key nightly-digest \
+  --name "Nightly Digest" \
+  --cron "0 9 * * *" \
+  --workflow-key send-digest \
+  --timezone "America/Los_Angeles" \
+  --overlap-policy skip       # skip (default) | allow
+
+# With per-firing input passed to the workflow:
+primitive cron-triggers create \
+  --key nightly-digest --name "Nightly Digest" --cron "0 9 * * *" \
+  --workflow-key send-digest \
+  --input '{"reportType":"daily","priority":"high"}'
+
+# Or map fields from the trigger firing context into the workflow input:
+primitive cron-triggers create \
+  --key nightly-digest --name "Nightly Digest" --cron "0 9 * * *" \
+  --workflow-key send-digest \
+  --input-mapping '{"runId":"$triggerId","at":"$firedAt"}'
+```
+
+The CLI flags are `--key`, `--name`, `--cron`, `--workflow-key`, `--overlap-policy`, `--timezone`, `--input`, `--input-mapping` — NOT `--schedule` or `--workflow`. `--input` is a literal payload; `--input-mapping` projects fields from the firing context into the workflow input. Both are also accepted by `cron-triggers update`.
+
+#### Wrong
+
+```typescript
+// WRONG — these field names don't exist
+await client.cronTriggers.create({
+  key: "nightly-digest",         // should be triggerKey
+  schedule: "0 9 * * *",          // should be cron
+  input: { ... },                 // should be rootInput
+  overlapPolicy: "queue",         // not a valid value
+  enabled: true,                  // no such field; use `state`
+});
+```
+
+### Field reference
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `triggerKey` | Yes | Per-app unique. Alphanumerics, `-`, `_`. Must start alphanumeric. |
+| `displayName` | Yes | Human label. |
+| `cron` | Yes | 5-field cron (see Syntax below). |
+| `workflowKey` | Yes | Must refer to an existing workflow definition. |
+| `timezone` | No | IANA name (validated via `Intl.DateTimeFormat`). Default `"UTC"`. |
+| `overlapPolicy` | No | `"skip"` (default) or `"allow"`. |
+| `rootInput` | No | JSON object, merged into workflow input. |
+| `inputMapping` | No | JSON object, merged AFTER `rootInput`. Supports `{{now}}` substitution. |
+| `description` | No | Free text. |
+| `state` | Update only | `"active"` / `"paused"` / `"archived"`. Set on update; create always starts `"active"`. |
+
+### Cron expression syntax
+
+Standard 5-field POSIX: `minute hour day-of-month month day-of-week`.
+
+Supported per field: `*`, exact (`5`), range (`5-10`), step on wildcard (`*/5`), step on range (`9-17/2`), comma list (`1,2,3`).
+
+**Not supported:** month/day names, `?`, `L`, `W`, `#`, last-day modifiers, 6/7-field crons.
+
+**Day-of-week:** `0` and `7` both mean Sunday, but `7` is only allowed as a bare value (NOT in ranges). Use `0` in ranges.
+
+**Vixie semantics:** when both day-of-month and day-of-week are restricted, fires when EITHER matches.
+
+| Need | Schedule |
+|------|----------|
+| Every 5 minutes | `*/5 * * * *` |
+| Every hour on the hour | `0 * * * *` |
+| Every day at 9am (local) | `0 9 * * *` + `timezone` |
+| Every Monday at 9am | `0 9 * * 1` |
+| First of every month | `0 0 1 * *` |
+| Every 15 min, business hours, Mon–Fri | `*/15 9-17 * * 1-5` |
+
+Invalid expressions are rejected at create time. If the cron later becomes unparseable (rare), the trigger transitions to `state: "error_paused"` with `lastError` set; alarms stop until you call `resume`.
+
+### Workflow input shape
+
+The workflow receives `rootInput` merged with `inputMapping` (latter wins on key collision), plus the `meta` object on the run record:
+
+```typescript
+// Inside the workflow:
+input.digestType    // "daily"          (from rootInput)
+input.firedAt       // "2026-04-27T..." (from inputMapping with {{now}})
+
+// And on the run record:
+run.contextDocId    // "cron:<triggerId>"
+run.meta.source     // "cron"
+run.meta.triggerId  // <triggerId>
+run.meta.triggerKey // "nightly-digest"
+run.meta.manual     // true if started via cronTriggers.test()
+```
+
+### Lifecycle methods
+
+```typescript
+  await client.cronTriggers.list();                       // excludes archived
+  await client.cronTriggers.get(triggerId);               // includes runtime.scheduledAlarmAt
+  await client.cronTriggers.update(triggerId, {           // change cron/timezone/state etc.
+    cron: "0 8 * * *",
+    timezone: "America/New_York",
+  });
+  await client.cronTriggers.pause(triggerId);             // cancels the pending alarm
+  await client.cronTriggers.resume(triggerId);            // clears lastError, reschedules
+  await client.cronTriggers.test(triggerId);              // fire NOW; does not touch schedule
+  await client.cronTriggers.delete(triggerId);            // soft delete (archive)
+```
+
+`.test()`, `.pause()`, `.resume()`, `.delete()`, `.update()`, `.get()` all take the `triggerId` (ULID returned from `.create()`), NOT the `triggerKey`. Use `.list()` to look up `triggerId` by key. The same operations are available on the CLI:
+
+```bash
+primitive cron-triggers list
+primitive cron-triggers get <trigger-id>          # includes runtime.scheduledAlarmAt
+primitive cron-triggers test <trigger-id>         # fire now; does NOT affect schedule
+primitive cron-triggers pause <trigger-id>
+primitive cron-triggers resume <trigger-id>
+primitive cron-triggers delete <trigger-id>
+```
+
+### Querying cron-triggered runs
+
+There is no `triggerSource` filter on `workflows.listRuns()`. Cron runs are identifiable by their `contextDocId` starting with `cron:` and `meta.source === "cron"`:
+
+```typescript
+  const { items } = await client.workflows.listRuns({ workflowKey: "send-digest" });
+  const cronRuns = items.filter((r) => r.contextDocId?.startsWith("cron:"));
+```
+
+### Managing triggers (client)
+
+```typescript
+  const { items } = await client.cronTriggers.list();
+  const trigger = await client.cronTriggers.get(triggerId);
+  await client.cronTriggers.test(triggerId); // fire once, now
+```
+
+### Debugging cron triggers
+
+Trigger states:
+
+- `active` — scheduled, alarm armed.
+- `paused` — manual pause; alarm cancelled until `resume`.
+- `error_paused` — set automatically when the workflow start fails or the cron expression becomes unparseable. `lastError` is populated. Call `resume` to clear and reschedule.
+- `archived` — soft-deleted; never returns from list.
+
+`skippedCount` increments when `overlapPolicy: "skip"` blocks a fire because the prior run is still active.
+
+### Driving subscriptions from cron
+
+A cron-spawned workflow that writes to a database wakes up every matching database subscription — cron writes → subscription broadcasts → UI renders, with no cron-awareness in the subscriber. The subscription side lives with databases; see the [Databases agent guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md#real-time-subscriptions). Cron/workflow writes arrive on the subscription with `originConnectionId: null` / `originUserId: null` and both `isOrigin` flags `false`.
+
 ## Client apply (footgun)
 
 By default, `requiresClientApply = true`. After the workflow completes, status becomes `apply_pending` and a connected client must call `claimApply` → run `onApply` → `confirmApply` to finalize. If no client is listening, the run sits in `apply_pending` indefinitely.
@@ -798,17 +1007,31 @@ primitive workflows create --from-file workflow.toml --requires-client-apply fal
 primitive workflows update <workflow-id> --requires-client-apply false
 ```
 
-## Synchronous invocation (`runSync`)
+## Synchronous invocation
 
-Opt a workflow into synchronous invocation by setting `syncCallable = true` in the TOML (pushed by `primitive sync push`) or via `primitive workflows update --sync-callable true`. Once set, clients can call `client.workflows.runSync()` and `await` the final envelope in a single round-trip — useful for short, latency-sensitive tasks like input validation, enrichment lookups, or webhook handlers that must reply with a result.
+Opt a workflow into synchronous invocation by setting `syncCallable = true` in the TOML (pushed by `primitive sync push`) or via `primitive workflows update --sync-callable true`. Once set, a caller can invoke the workflow and receive the final envelope in a single round-trip — useful for short, latency-sensitive tasks like input validation, enrichment lookups, or webhook handlers that must reply with a result.
 
-Constraints:
+Server-side constraints on a `syncCallable` workflow:
 
 - **Step kinds are restricted.** The server validates step kinds against a sync-compatible list when the flag is set (or when steps are pushed against a sync-callable workflow). Long-running or suspending kinds (`event.wait`, `workflow.await`, `delay` over the timeout) reject at save time with `Workflow contains sync-incompatible steps`.
-- **Timeout.** `timeoutMs` defaults to 5s and is capped server-side at 30s (the server CPU budget per request). Exceeding it resolves with `status: "timeout"`.
-- **Apply still applies.** A sync-callable workflow may still have `requiresClientApply = true`, in which case `runSync` resolves with `status: "apply_pending"` and the normal `claimApply`/`confirmApply` flow takes over. Most sync-callable workflows want `requiresClientApply = false`.
+- **Timeout.** The invocation timeout defaults to 5s and is capped server-side at 30s (the server CPU budget per request). Exceeding it resolves with `status: "timeout"`.
+- **Apply still applies.** A sync-callable workflow may still have `requiresClientApply = true`, in which case the synchronous call resolves with `status: "apply_pending"` and the normal `claimApply`/`confirmApply` flow takes over. Most sync-callable workflows want `requiresClientApply = false`.
 
 Long-running workflows should keep using `start()` plus the WebSocket / polling lifecycle.
+
+Call `client.workflows.runSync()` and `await` the final envelope:
+
+```typescript
+const sync = await client.workflows.runSync({
+  workflowKey: "validate-token",
+  input: { token },
+  timeoutMs: 5000,                 // default 5000; server caps at 30000
+  // signal: abortSignal,            // optional AbortSignal
+});
+// → { runId, runKey, status, output?, error?, run?, existing? }
+// status: "completed" | "failed" | "terminated" | "timeout" | "apply_pending"
+// Promise resolves for every terminal outcome — only transport errors reject.
+```
 
 ## Workflow lifecycle
 
@@ -919,47 +1142,6 @@ Fragments live at `<workflowDir>/../workflow-fragments/<name>.toml` and contain 
 
 When a workflow references a registered database operation via `database.query`/`mutate`/etc., the CLI checks that every `$params.X` substitution in the operation's TOML maps to a declared `[[operations.params]]` entry at `sync push` time. A typo like `$params.proectId` is reported with the file path and line number of the offending `[[operations]]` block instead of silently no-opping at runtime.
 
-### Cron triggers
-
-```bash
-primitive cron-triggers create \
-  --key nightly-digest \
-  --name "Nightly Digest" \
-  --cron "0 9 * * *" \
-  --workflow-key send-digest \
-  --timezone "America/Los_Angeles" \
-  --overlap-policy skip       # skip (default) | allow
-
-# With per-firing input passed to the workflow:
-primitive cron-triggers create \
-  --key nightly-digest --name "Nightly Digest" --cron "0 9 * * *" \
-  --workflow-key send-digest \
-  --input '{"reportType":"daily","priority":"high"}'
-
-# Or map fields from the trigger context into the workflow input:
-primitive cron-triggers create \
-  --key nightly-digest --name "Nightly Digest" --cron "0 9 * * *" \
-  --workflow-key send-digest \
-  --input-mapping '{"runId":"$triggerId","at":"$firedAt"}'
-
-primitive cron-triggers list
-primitive cron-triggers get <trigger-id>
-primitive cron-triggers test <trigger-id>     # fire manually
-primitive cron-triggers pause <trigger-id>
-primitive cron-triggers resume <trigger-id>
-primitive cron-triggers delete <trigger-id>
-```
-
-Notes:
-- The CLI flags are `--key`, `--name`, `--cron`, `--workflow-key`, `--overlap-policy`, `--timezone`, `--input`, `--input-mapping` — NOT `--schedule` or `--workflow`.
-- `--input` and `--input-mapping` accept JSON strings; `--input` is a literal payload and `--input-mapping` projects fields from the trigger firing context into the workflow input. Both are also accepted by `cron-triggers update`.
-- `overlapPolicy` is exactly `skip` or `allow` (no `queue` value exists).
-- Per-app cap of 50 cron triggers.
-- Always set an IANA `--timezone` for user-visible schedules.
-- The referenced workflow must be `status = "active"` with an active config/revision and (for server-only triggers) `requiresClientApply = false`.
-
-See `AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md` for full details.
-
 ## Client SDK
 
 Start a workflow, check its status, and list recent runs:
@@ -1004,21 +1186,6 @@ await client.workflows.terminate({ workflowKey, runKey, contextDocId });
 const { items, cursor } = await client.workflows.listRuns({ workflowKey, status, limit: 50 });
 ```
 
-In Swift, `start`/`getStatus`/`listRuns` return untyped `[String: Any]` dictionaries — read fields by key (e.g. `started["runKey"] as? String`).
-
-**Synchronous invocation is JavaScript-only.** `client.workflows.runSync(...)` has no Swift equivalent (#956); Swift callers use `start()` plus `getStatus`/`runAndApply`. It is only available on workflows with `syncCallable = true`:
-
-```typescript
-const sync = await client.workflows.runSync({
-  workflowKey: "validate-token",
-  input: { token },
-  timeoutMs: 5000,                 // default 5000; server caps at 30000
-  // signal: abortSignal,            // optional AbortSignal
-});
-// → { runId, runKey, status, output?, error?, run?, existing? }
-// status: "completed" | "failed" | "terminated" | "timeout" | "apply_pending"
-// Promise resolves for every terminal outcome — only transport errors reject.
-```
 
 Inspect the per-step debug records of a run:
 
@@ -1049,7 +1216,8 @@ client.on("workflowStatus", (e) => {
 });
 ```
 
-The `workflowStatus` event uses `"completed"`. The `getStatus` method returns `"complete"`. Yes, this is inconsistent in the SDK — handle both if your code shares logic.
+The `workflowStatus` event uses `"completed"`. The `getStatus` method returns `"complete"`. These differ in the SDK — handle both if your code shares logic.
+
 
 ## Apply pattern
 
@@ -1066,6 +1234,7 @@ client.workflows.define("my-workflow-key", {
 ```
 
 Manual flow if you need it: `claimApply` → run logic → `confirmApply` (success) or `releaseApply` (failure). 30s lease timeout for crashed clients.
+
 
 ## Footguns and don't-do-this
 

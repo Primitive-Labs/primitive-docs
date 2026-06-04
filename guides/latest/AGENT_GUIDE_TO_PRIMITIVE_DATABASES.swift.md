@@ -1,10 +1,8 @@
-# Working with Databases in the Primitive platform (js-bao-wss-client)
+# Working with Databases in the Primitive platform
 
 Guidelines for building apps with Primitive's server-side database storage.
 
-> **Swift parity:** the database **client** calls below exist in both languages (Swift takes `name:` + an `options:` dict, e.g. `executeOperation(databaseId:name:options:)`). **`client.databases.subscribe(...)` is JavaScript-only** — Swift has no DB subscriptions; poll via `executeOperation`. Operation/model definitions are TOML (language-neutral).
-
-## Client operations (JavaScript + Swift)
+## Client operations
 
 ### Run a registered operation
 
@@ -113,10 +111,6 @@ primitive sync push --dir ./config
 
 Construct the client, then create a database and call its registered operations:
 
-```typescript
-import { JsBaoClient } from "js-bao-wss-client";
-const client = new JsBaoClient({ apiUrl, wsUrl, appId, token });
-```
 
 ```swift
   // Create a database instance of the configured type
@@ -150,7 +144,7 @@ primitive sync pull            # Pull current config from server
 primitive sync diff            # Preview changes
 primitive sync push            # Push local config to server
 primitive sync push --dry-run  # See what would change without applying
-# Override with a fixed path (legacy):
+# Override with a fixed path:
 primitive sync init --dir ./config
 primitive sync push --dir ./config
 ```
@@ -287,9 +281,6 @@ primitive databases records models <id>
 primitive databases records describe <id> <model>
 primitive databases records query <id> <model> --filter '{"status":"open"}'
 
-# TypeScript codegen from database-type TOML (record interfaces + op param/result types)
-primitive databases codegen --sync-dir ./config --output ./src/generated/db
-
 # Data migration (records + indexes + constraints; type config excluded — run sync push on target first)
 primitive databases export <id> --output ./out
 primitive databases import ./out --overwrite [--dry-run]
@@ -301,7 +292,6 @@ primitive databases import-csv <database-id> <file.csv> --model <name> \
   [--delimiter ,] [--dry-run] [--stop-on-error] [--json]
 ```
 
-**Codegen enum / union / required typing.** When a field or an operation param restricts a string to a fixed set of values, codegen emits a TypeScript string-literal union (e.g. `status: "open" | "in-progress" | "closed"`) instead of `string`, and enum params are validated server-side as well. Fields that operation params mark `required` are emitted as non-optional on the generated record interface. This keeps generated types aligned with the server's validation instead of widening everything to `string`.
 
 ## Database Types
 
@@ -313,10 +303,8 @@ A **database type** is a named configuration shared across many databases. It pr
 - **`autoPopulatedFields`** — declarative server-side field stamping on writes (see below)
 - **`defaultAccess`** — fallback CEL access rule applied to operations that omit their own `access`
 - **`[models.*]` schema** — optional server-enforced model declaration. When present, every op edit (and the schema edit itself) is checked against it; see [Schema gate](#schema-gate)
-- **Subscriptions** — type-scoped real-time subscription definitions (managed via `[[subscriptions]]` blocks in the TOML)
 - **Rule set attachment** — controls who can edit the type config and its operations
 
-Real-time subscriptions are also part of the type config — see [Real-Time Subscriptions](#real-time-subscriptions). One subscription definition serves every database of that type. Define them as `[[subscriptions]]` blocks in the same TOML file; `primitive sync push` manages them alongside operations.
 
 ### Triggers
 
@@ -536,7 +524,7 @@ Used **as string values inside operation definitions** (filter values, data fiel
 | `$user.userId` | Current user's ID |
 | `$now` | Current ISO 8601 timestamp |
 | `$database.id` | The database instance ID |
-| `$database.celContext.key` | Value from database CEL context (`null` if key missing) — `$database.metadata.key` is a legacy alias |
+| `$database.celContext.key` | Value from database CEL context (`null` if key missing) — `$database.metadata.key` resolves to the same value |
 | `$params.fieldName` | Caller-provided parameter (`undefined` if not passed) |
 | `$steps.stepName.<accessor>` | Pipeline cross-step reference (see Pipelines) |
 
@@ -561,6 +549,32 @@ params = '{"authorId":{"type":"string","required":false}}'
 | `{"authorId":""}` | `{"status":"approved","authorId":""}` (matches empty string — only `undefined` drops) |
 
 > **Gotcha:** If a filter or data field references `$params.X` but `X` isn't declared in `params`, the substitution always resolves to `undefined` and the key silently drops — your operation becomes a match-all for that field, or your save omits the field entirely. The validator catches obvious cases at registration time, but always double-check the params schema covers every `$params.*` reference.
+
+### Boolean gate conditions
+
+Substitution variables (`$database.metadata.*`, `$params.*`, `$steps.*`) can appear **directly as elements** in `$and`/`$or` arrays (not as key-value pairs). The resolved boolean value gates that branch:
+
+| Value | In `$and` | In `$or` |
+|-------|-----------|----------|
+| `true` | No-op — remaining conditions apply | Short-circuits to match-all |
+| `false` / `null` / missing | Short-circuits to no-match (empty result, no DB hit) | Removed — other branches still apply |
+
+**Common use case — per-database feature flag:**
+
+```json
+{
+  "filter": {
+    "$or": [
+      { "authorId": "$user.userId" },
+      { "$and": ["$database.metadata.peerVisibility", { "status": "approved" }] }
+    ]
+  }
+}
+```
+
+When `$database.metadata.peerVisibility` is `true`, the `$and` branch includes approved posts. When it's `false` or missing, the branch short-circuits to no-match — users only see their own records. A missing key evaluates to `null`, so the gate is safely closed before the flag is set.
+
+This also works with `$steps.*` references in pipelines (see [Settings record pattern](#settings-record-pattern)).
 
 ### Operation types
 
@@ -730,7 +744,7 @@ The client library is used at runtime to create database instances, execute oper
   // db: ["databaseId": ..., "title": ..., "databaseType": ..., "permission": ...]
 ```
 
-`db.databaseType` is the configured type; `db.celContext` holds the per-database CEL context dict (`db.metadata` is the legacy alias for the same field).
+`db.databaseType` is the configured type; `db.celContext` holds the per-database CEL context dict (`db.metadata` resolves to the same field).
 
 ### Listing and fetching databases
 
@@ -823,7 +837,7 @@ Callers can override `limit`, `cursor`, and `direction` at call time:
 
 ### Managing database CEL context
 
-The CEL context (formerly called "metadata") stores per-database values that operations and triggers can reference via `$database.celContext.*` (or the legacy alias `$database.metadata.*`):
+The CEL context stores per-database values that operations and triggers can reference via `$database.celContext.*` (`$database.metadata.*` resolves to the same values):
 
 ```swift
   _ = try await client.databases.updateCelContext(
@@ -832,7 +846,6 @@ The CEL context (formerly called "metadata") stores per-database values that ope
   )
 ```
 
-`client.databases.updateMetadata(databaseId, {...})` is the legacy alias for the same call (JavaScript).
 
 Via CLI:
 
@@ -841,343 +854,6 @@ primitive databases cel-context update <database-id> --data '{"teamId":"team-alp
 primitive databases cel-context get <database-id>
 ```
 
-## Direct Record Operations
-
-Direct record operations require owner or manager permission. For most apps, use registered operations instead.
-
-Connect to a database to get a `DoDb` handle:
-
-```typescript
-const db = client.databases.connect(databaseId);
-```
-
-The handle supports string-based or model-class-based access:
-
-```typescript
-// String-based
-await db.save("tasks", { id: "task-1", title: "Ship v1" });
-
-// Model-class-based (with js-bao models)
-import { Task } from "./models";
-await db.save(Task, { id: "task-1", title: "Ship v1" });
-```
-
-### Save (upsert)
-
-```typescript
-await db.save("products", { id: "prod-1", name: "Widget", price: 9.99 });
-
-// Insert only — fails if record exists
-await db.save("products", data, { ifNotExists: true });
-
-// Conditional write
-await db.save("products", data, { condition: { status: "draft" } });
-
-// With StringSet fields
-await db.save("products", data, { stringSets: { tags: ["featured", "sale"] } });
-```
-
-### Patch (partial update)
-
-```typescript
-await db.patch("products", "prod-1", { price: 7.99 });
-
-// Conditional patch
-await db.patch("products", "prod-1", { price: 7.99 }, { condition: { status: "draft" } });
-```
-
-### Find
-
-```typescript
-const product = await db.find("products", "prod-1"); // or null
-```
-
-### Delete
-
-```typescript
-const deleted = await db.delete("products", "prod-1"); // true if existed
-```
-
-### Count
-
-```typescript
-const total = await db.count("products");
-const saleCount = await db.count("products", { onSale: true });
-```
-
-### Query
-
-```typescript
-const result = await db.query("tasks", filter, options);
-// result: { data: T[], hasMore: boolean, nextCursor?: string, prevCursor?: string }
-```
-
-### Filter operators
-
-| Operator | Description | Example |
-|----------|-------------|---------|
-| *(exact match)* | Equals a value (shorthand for `$eq`) | `{ status: "active" }` |
-| `$eq` | Explicit equality | `{ status: { $eq: "active" } }` |
-| `$ne` | Not equal | `{ status: { $ne: "archived" } }` |
-| `$gt` | Greater than | `{ price: { $gt: 10 } }` |
-| `$gte` | Greater than or equal | `{ price: { $gte: 10 } }` |
-| `$lt` | Less than | `{ price: { $lt: 50 } }` |
-| `$lte` | Less than or equal | `{ price: { $lte: 50 } }` |
-| `$in` | Matches any value in array | `{ category: { $in: ["books", "music"] } }` |
-| `$nin` | Matches none of the values in array | `{ status: { $nin: ["archived", "deleted"] } }` |
-| `$startsWith` | String prefix match | `{ name: { $startsWith: "Pro" } }` |
-| `$endsWith` | String suffix match | `{ filename: { $endsWith: ".pdf" } }` |
-| `$containsText` | Full-text search | `{ name: { $containsText: "deluxe" } }` |
-| `$exists` | Field exists (true) or is null/missing (false) | `{ avatar: { $exists: true } }` |
-| `$contains` | StringSet contains a value | `{ tags: { $contains: "featured" } }` |
-| `$all` | StringSet contains all values | `{ tags: { $all: ["featured", "sale"] } }` |
-| `$size` | StringSet element count (number or comparison) | `{ tags: { $size: 3 } }` or `{ tags: { $size: { $gte: 1 } } }` |
-| `$or` | Matches any of the conditions | `{ $or: [{ status: "active" }, { priority: { $gte: 5 } }] }` |
-| `$and` | Matches all conditions (useful when multiple conditions target the same field) | `{ $and: [{ price: { $gte: 10 } }, { price: { $lte: 50 } }] }` |
-
-`$startsWith`, `$endsWith`, and `$containsText` are mutually exclusive on the same field — only one substring operator per field per query.
-
-Multiple filters on different fields are implicitly combined with AND:
-
-```typescript
-// These two are equivalent:
-{ status: "active", priority: { $gte: 5 } }
-{ $and: [{ status: "active" }, { priority: { $gte: 5 } }] }
-
-// Use explicit $and when you need multiple conditions on the same field:
-{ $and: [{ price: { $gte: 10 } }, { price: { $lte: 50 } }] }
-
-// Combine $or with other filters:
-{ category: "electronics", $or: [{ onSale: true }, { price: { $lt: 20 } }] }
-```
-
-### Boolean gate conditions
-
-Substitution variables (`$database.metadata.*`, `$params.*`, `$steps.*`) can appear **directly as elements** in `$and`/`$or` arrays (not as key-value pairs). The resolved boolean value gates that branch:
-
-| Value | In `$and` | In `$or` |
-|-------|-----------|----------|
-| `true` | No-op — remaining conditions apply | Short-circuits to match-all |
-| `false` / `null` / missing | Short-circuits to no-match (empty result, no DB hit) | Removed — other branches still apply |
-
-**Common use case — per-database feature flag:**
-
-```json
-{
-  "filter": {
-    "$or": [
-      { "authorId": "$user.userId" },
-      { "$and": ["$database.metadata.peerVisibility", { "status": "approved" }] }
-    ]
-  }
-}
-```
-
-When `$database.metadata.peerVisibility` is `true`, the `$and` branch includes approved posts. When it's `false` or missing, the branch short-circuits to no-match — users only see their own records. A missing key evaluates to `null`, so the gate is safely closed before the flag is set.
-
-This also works with `$steps.*` references in pipelines (see [Settings record pattern](#settings-record-pattern)).
-
-### Sort, limit, pagination
-
-```typescript
-const page1 = await db.query("tasks", {}, {
-  sort: { createdAt: -1 },
-  limit: 20,
-});
-
-if (page1.hasMore) {
-  const page2 = await db.query("tasks", {}, {
-    sort: { createdAt: -1 },
-    limit: 20,
-    uniqueStartKey: page1.nextCursor,
-  });
-}
-```
-
-### Projection
-
-```typescript
-const result = await db.query("tasks", {}, {
-  projection: { title: 1, status: 1 },
-});
-```
-
-### Includes (related data)
-
-```typescript
-const result = await db.query("orders", {}, {
-  include: [{
-    model: "customers",
-    type: "refersTo",
-    sourceField: "customerId",
-    as: "customer",
-  }],
-});
-// result.data[0]._related.customer = { id, name, ... }
-```
-
-Include types: `refersTo` (FK to one record), `hasMany` (target FK to this record), `refersToMany` (StringSet to multiple records).
-
-## Atomic Operations
-
-### Increment
-
-```typescript
-const newValues = await db.increment("products", "prod-1", {
-  viewCount: 1,
-  stock: -1,
-});
-// { viewCount: 43, stock: 11 }
-```
-
-### StringSet add/remove
-
-```typescript
-await db.addToSet("products", "prod-1", { tags: ["featured"] });
-await db.removeFromSet("products", "prod-1", { tags: ["sale"] });
-```
-
-## Batch Writes (direct)
-
-`db.batch` executes multiple writes atomically at the storage layer. Returns one `BatchOperationResult` per input op (`{success, id, error?, values?}` — `values` for increment ops); a per-item failure does NOT throw, so check `.success` on each result.
-
-```typescript
-const results = await db.batch([
-  { op: "save",      modelName: "tasks", id: "t-1", data: { title: "A" } },
-  { op: "patch",     modelName: "tasks", id: "t-2", data: { done: true } },
-  { op: "delete",    modelName: "tasks", id: "t-3" },
-  { op: "increment", modelName: "tasks", id: "t-4", fields: { priority: 1 } },
-  { op: "addToSet",  modelName: "tasks", id: "t-5", stringSets: { tags: ["urgent"] } },
-]);
-
-for (const r of results) {
-  if (!r.success) console.warn("op failed:", r.id, r.error);
-}
-```
-
-### Aggregation (direct)
-
-```typescript
-const result = await db.aggregate("orders", {
-  groupBy: ["status"],
-  operations: [
-    { type: "count" },
-    { type: "sum", field: "total" },
-    { type: "avg", field: "total" },
-    { type: "min", field: "total" },
-    { type: "max", field: "total" },
-  ],
-  filter: { createdAt: { $gte: "2025-01-01" } },
-  sort: { field: "count", direction: -1 },
-  limit: 10,
-});
-```
-
-## Client-Side Models (Direct Record Access Only)
-
-**Registered operations are the primary client interface for databases and need no client-side models** — the operation layer is typed by `primitive databases codegen` (see TypeScript codegen above). The models below apply only to the **direct record access** path (owner/manager `DoDb` handles): there, defining js-bao models gives you type safety, autoregistration, and automatic index syncing on connect. The database itself stays schemaless — `modelName` is a collection label and the server accepts any JSON for it.
-
-The TOML dialect is the same one documents use. Declare each model in `src/models/models.toml`, run `npx js-bao-codegen-v2`, and import the generated class from `@/models`:
-
-```toml
-# src/models/models.toml
-[models.tasks.fields.id]
-type = "id"
-auto_assign = true
-indexed = true
-
-[models.tasks.fields.title]
-type = "string"
-indexed = true
-
-[models.tasks.fields.status]
-type = "string"
-indexed = true
-
-[models.tasks.fields.priority]
-type = "number"
-indexed = true
-
-[models.tasks.fields.assignee]
-type = "string"
-```
-
-```typescript
-import { Task } from "@/models";
-const db = client.databases.connect(databaseId);
-await db.syncIndexes(Task);
-```
-
-The same TOML powers documents and client-side database models. See the [Documents agent guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#defining-models) for the full TOML reference: field types, options, relationships, unique constraints, and schema iteration.
-
-If you want the server to enforce that registered operations only reference fields you've declared, declare those same models *inside the database type config* (`config/database-types/<type>.toml`) using `[models.<Name>.fields.<field>]` blocks. The CLI sync push extracts that subtree and stores it as the type's `schema`, which the op-edit and schema-edit gates check against — see [Schema gate](#schema-gate).
-
-If you're not using the project template (no `models.toml`, no codegen), the lower-level primitives are still exported for programmatic use:
-
-```typescript
-import {
-  defineModelSchema,
-  createModelClass,
-  InferAttrs,
-  TypedModelConstructor,
-} from "js-bao-wss-client";
-import type { BaseModel } from "js-bao";
-
-const taskSchema = defineModelSchema({
-  name: "tasks",
-  fields: {
-    id: { type: "id", autoAssign: true, indexed: true },
-    title: { type: "string", indexed: true },
-    status: { type: "string", indexed: true },
-    priority: { type: "number", indexed: true },
-    assignee: { type: "string" },
-  },
-});
-
-type TaskAttrs = InferAttrs<typeof taskSchema>;
-interface Task extends TaskAttrs, BaseModel {}
-
-const Task: TypedModelConstructor<Task> = createModelClass({ schema: taskSchema });
-
-export { Task };
-```
-
-This produces the same runtime artifact as codegen output, but you lose the auto-registered barrel and the boot-time TOML/code consistency check. Reach for it only if TOML+codegen genuinely doesn't fit your build setup; the migration path back to TOML is `npx js-bao-codegen-v2 migrate`.
-
-Database field types: `id` (primary key, use `auto_assign = true` for ULIDs), `string`, `number`, `boolean`, `date`, `stringset` (set-of-strings field — use with `addToSet`/`removeFromSet`). There is no object/JSON field type — store structured payloads as JSON strings and parse on read.
-
-### Indexes
-
-Add `indexed: true` to fields you filter or sort on. Sync indexes after connecting:
-
-```typescript
-const db = client.databases.connect(databaseId);
-await db.syncIndexes(Task);
-```
-
-Or register indexes manually:
-
-```typescript
-await db.registerIndex("tasks", "status", "string");
-await db.registerIndex("tasks", "priority", "number");
-
-// Unique index
-await db.registerIndex("users", "email", "string", true);
-
-// Composite unique constraint
-await db.registerUniqueConstraint("tasks", "unique_title_per_project", ["projectId", "title"]);
-
-// List and drop indexes
-const indexes = await db.listIndexes("tasks"); // or listIndexes() for all models
-await db.dropIndex("tasks", "status");
-
-// List and drop unique constraints
-const constraints = await db.listUniqueConstraints("tasks");
-await db.dropUniqueConstraint("tasks", "unique_title_per_project");
-
-// Sync indexes for all models passed in the models array at init
-await db.syncAllIndexes();
-```
 
 ## Permissions
 
@@ -1246,143 +922,13 @@ For a unified "all DBs I can access" view, combine `databases.list()` with `grou
 
 **Group permissions are still admin-level access — they don't replace operation-level CEL.** Only the database owner (or an app admin) can grant/revoke group permissions.
 
-## Real-Time Subscriptions
-
-Databases push changes to connected clients over WebSocket. Subscriptions are **type-scoped** — defined once on the database type config and applied to every database of that type. The model key is `(appId, databaseType, subscriptionKey)`.
-
-### Registering a subscription
-
-Subscriptions can be managed via TOML config files with `primitive sync push` (recommended) or via the admin HTTP API at `/databases/types/<databaseType>/subscriptions`.
-
-**Via TOML (recommended)** — add `[[subscriptions]]` blocks to your database type config file:
-
-```toml
-# config/database-types/support-desk.toml
-[type]
-databaseType = "support-desk"
-
-[[subscriptions]]
-subscriptionKey = "my-open-tickets"
-displayName = "My open tickets"
-modelName = "ticket"
-accessRule = "user.userId != ''"
-filter = "record.data.assigneeId == user.userId && record.data.status == 'open'"
-select = ["id", "title", "priority", "updatedAt"]
-emit = ["enter", "leave"]
-
-[[subscriptions]]
-subscriptionKey = "tickets-by-team"
-displayName = "Tickets by team"
-modelName = "ticket"
-accessRule = "isMemberOf('team', params.teamId)"
-filter = "record.data.teamId == params.teamId"
-[subscriptions.params]
-teamId = { type = "string", required = true }
-```
-
-`primitive sync push` creates new subscriptions, updates changed ones, and deletes keys present on the server but missing from the TOML. `primitive sync pull` round-trips subscriptions back into `[[subscriptions]]` blocks.
-
-**Via admin HTTP API** — POST/PUT/DELETE directly from a server-side client:
-
-```typescript
-await adminClient.fetch(
-  `/databases/types/support-desk/subscriptions`,
-  {
-    method: "POST",
-    body: JSON.stringify({
-      subscriptionKey: "my-open-tickets",
-      displayName: "My open tickets",
-      modelName: "ticket",
-      access: "user.userId != ''",
-      filter: "record.data.assigneeId == user.userId && record.data.status == 'open'",
-      // Optional: only send these fields in each change frame
-      select: ["id", "title", "priority", "updatedAt"],
-      // Optional: only deliver these change types ("enter" | "update" | "leave")
-      emit: ["enter", "leave"],
-      // Optional: declared params bound to the subscriber
-      params: { teamId: { type: "string", required: false } },
-    }),
-  },
-);
-```
-
-Field semantics:
-
-- `subscriptionKey` — unique within the type. Clients reference it when subscribing. Must not contain `#`. Re-creating a subscription with the same key after deletion returns HTTP 409 if an archived row still holds the key — use a different key or hard-delete first.
-- `displayName` — required human label.
-- `modelName` — the model whose changes drive the subscription.
-- `access` / `accessRule` (CEL, required) — evaluated at subscribe time; false → subscribe is rejected. Must be a non-empty string. The TOML field is `accessRule`; the HTTP API field is `access`.
-- `filter` (CEL, required) — evaluated per-change, per-subscriber against `record.*` (with payload nested under `record.data.*`) and `record.previousData.*`. Only matches are delivered. Cannot grant access `access` denies. Must be a non-empty string — use `"true"` for "match every change `access` allowed". **Cannot reference `database.*`** — a `filter` that references `database.celContext.*` or `database.metadata.*` is rejected with HTTP 400 at save time.
-- `select` (string array) — narrows `data` (and `previousData`) to the listed fields **server-side**. Omit to send full records. Use `select` to keep sensitive fields off the wire entirely.
-- `emit` (string array) — one or more of `"enter"`, `"update"`, `"leave"`. Restricts which `changeType` values are delivered (see frame shape below). Omit for all.
-- `params` — declared params bound to the subscriber, exposed as `params.*` in `access` and `filter`. Supported types: `string`, `number`, `boolean`. Type checks are strict — no coercion. Max 5 entries.
-
-CEL context differs between the two phases:
-
-- `access` (subscribe time): `user.userId`, `user.role`, `database.id`, `database.celContext.*` (also `database.metadata.*`), `params.*`, plus `isMemberOf`, `memberGroups`, `hasRole`.
-- `filter` (per-change broadcast): `user.userId` (the subscriber), `record.modelName`, `record.op`, `record.id`, `record.data.<fieldName>` (post-write payload), `record.previousData.<fieldName>` (pre-write payload, when present), and `params.*`. Memberships and `database.*` are **not** bound at filter time — put group-based and database-context-based authorization in `access`, not `filter`.
-
-### Subscribing from the client
-
-> **JavaScript only.** `client.databases.subscribe(...)` has no Swift equivalent — the Swift `DatabasesAPI` exposes no `subscribe`. Swift apps poll via `executeOperation` instead.
-
-```typescript
-const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
-  params: { teamId: "team-1" },
-  onChange: (event) => {
-    // event.changes: Array of { op, changeType, modelName, id, data?, previousData? }
-    if (event.isOrigin) return;     // this tab already applied the change optimistically
-    for (const change of event.changes) {
-      // change.op:         "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet"
-      // change.changeType: "enter" | "update" | "leave"
-      applyChange(change);
-    }
-  },
-});
-
-// Later:
-unsub();
-```
-
-`subscribe` returns synchronously; the unsubscribe callback returns immediately. The client auto-reissues `db.subscribe` on WebSocket reconnect.
-
-### Change-frame origin attribution
-
-Every `db.change` frame carries who produced the write so subscribers can suppress their own optimistic echoes:
-
-| Field | Meaning |
-|---|---|
-| `originConnectionId` | The writer's WebSocket connection id, or `null` for server-side writes (cron, workflow steps, admin imports, HTTP writes without `X-JB-Connection-Id`) |
-| `originUserId` | The writer's user id, or `null` for server-side writes |
-| `isOrigin` | Synthesized per-recipient: `true` iff `originConnectionId` matches this client's current WS connection id |
-| `isOriginUser` | Synthesized per-recipient: `true` iff any tab/process signed in as the receiver wrote it. Differs from `isOrigin` across tabs of the same user — useful for cache invalidation that only cares about user identity. |
-
-On WS reconnect the local connection id rotates, so a frame for the writer's own pre-reconnect write may arrive with `isOrigin: false`. That's expected and harmless because the writer-exclusion server-side fanout still drops the frame from the writing connection itself.
-
-### Critical Rules
-
-1. **Always pair initial load with subscription.** Subscriptions deliver deltas only — fetch initial state with a regular `executeOperation` call and keep the query's filter semantically equivalent to the subscription's `filter`.
-2. **Writer's connection is excluded server-side.** The connection that triggered the mutation does not receive the change event back.
-3. **No replay on reconnect.** Re-query on reconnect; the server does not buffer missed changes.
-4. **Workflow mutations fan out too.** A `database.mutate` step in a workflow wakes up every matching subscription. Workflow writes arrive with `originConnectionId: null` / `originUserId: null` and both `isOrigin` flags `false`.
-5. **`select` is privacy-affecting.** Fields not listed never leave the worker. Use it instead of trying to scrub fields client-side.
-
-See the [Scheduling and Real-Time guide](AGENT_GUIDE_TO_PRIMITIVE_SCHEDULING_AND_REALTIME.md) for the full walkthrough.
 
 ## Schema Introspection
 
 Databases are schemaless — the system tracks fields and inferred types as records are written.
 
-List the models (collections) in a database via the raw records endpoint:
+List the models (collections) in a database via the raw records endpoint `GET /app/<appId>/api/databases/<databaseId>/records/models` (returns `{ models: ["contacts", "orders", "products"] }`).
 
-```typescript
-const response = await fetch(
-  `${apiUrl}/app/${appId}/api/databases/${databaseId}/records/models`,
-  { headers: { Authorization: `Bearer ${token}` } }
-);
-const { models } = await response.json();
-// ["contacts", "orders", "products"]
-```
 
 Describe a model's observed fields:
 
@@ -1395,38 +941,7 @@ Inferred types: `string`, `number`, `boolean`, `array`, `object`.
 
 ## CSV Import
 
-> **JavaScript only.** The rich `importCsv` API below (raw-CSV parsing, `columnMap`, per-row `transform`, `onProgress`) is JavaScript-only. The Swift client exposes `databases.importRows(databaseId:operationName:rows:batchSize:)`, which takes **pre-parsed** row dicts and batches them through `executeBatch` — parse the CSV with a third-party parser first, and do any column mapping / coercion yourself before calling.
-
-```typescript
-import { Product } from "./models";
-
-// With model class
-const result = await client.databases.importCsv(databaseId, {
-  csv: csvString,
-  model: Product,
-  columnMap: { "Product Name": "name", "Unit Price": "price" },
-});
-
-// Without model class (csv string or pre-parsed data array)
-const result = await client.databases.importCsv(databaseId, {
-  csv: csvString,       // provide csv or data, not both
-  // data: parsedRows,  // alternative: pre-parsed array of objects
-  modelName: "products",
-  types: { price: "number", stock: "number" },
-  idColumn: "sku",
-  transform: (row, index) => {
-    if (!row.name) return null; // skip
-    return { ...row, importedAt: new Date().toISOString() };
-  },
-  batchSize: 10000,
-  onProgress: ({ processed, total, imported, failed }) => {
-    console.log(`${processed}/${total} processed`);
-  },
-});
-// result: { imported: number, failed: number, errors: [...], indexesCreated: number, durationMs: number }
-```
-
-For one-off, non-programmatic bulk loads there's also a CLI path:
+For one-off, non-programmatic bulk loads, use the CLI path:
 
 ```bash
 primitive databases import-csv <database-id> <file.csv> --model products \
@@ -1434,7 +949,8 @@ primitive databases import-csv <database-id> <file.csv> --model products \
   --types '{"price":"number"}' --id-column SKU
 ```
 
-The CLI imports through a registered batch (bulk) save operation — `--operation` defaults to `seed_save`, so the database type needs a save-like op (`{ modelName, id, data }`) by that name (or pass your own). `--batch-size` defaults to 5000, `--delimiter` to `,`; use `--dry-run` to report row/batch counts without writing and `--stop-on-error` to abort on the first failing chunk (default is best-effort continue). Use `importCsv()` from app code when you need per-row `transform` or progress callbacks; use the CLI for ad-hoc imports from a terminal.
+The CLI imports through a registered batch (bulk) save operation — `--operation` defaults to `seed_save`, so the database type needs a save-like op (`{ modelName, id, data }`) by that name (or pass your own). `--batch-size` defaults to 5000, `--delimiter` to `,`; use `--dry-run` to report row/batch counts without writing and `--stop-on-error` to abort on the first failing chunk (default is best-effort continue).
+
 
 ### Database design
 
