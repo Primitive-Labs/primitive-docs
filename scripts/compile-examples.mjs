@@ -7,9 +7,15 @@
 //
 // Files are grouped by their variant's `harness` (scripts/variants.mjs):
 //
-//   "ts"          — type-checks against `js-bao-wss-client` + `js-bao` from
-//                   the docs project's node_modules
-//   "swift-macos" — `swift build` in examples/_harness/swift
+//   "ts"          — type-checks against `js-bao-wss-client` + `js-bao`. On the
+//                   production channel these resolve from the docs project's
+//                   node_modules (the published pinned packages); on the next
+//                   channel an `examples/node_modules/` symlink shadow points
+//                   them at the built submodule packages instead (see
+//                   scripts/channel.mjs; build with `pnpm build:source-packages`)
+//   "swift-macos" — `swift build` in examples/_harness/swift (always the
+//                   vendored submodule swift-client — source-based on both
+//                   channels; the pinned submodule commit selects the surface)
 //   null          — no compile gate declared yet; loudly enumerated as
 //                   uncompiled (never silently skipped)
 //
@@ -19,19 +25,21 @@
 //
 // Usage:  node scripts/compile-examples.mjs
 
-import { readdirSync, readFileSync, writeFileSync, statSync, mkdirSync, rmSync, cpSync } from "node:fs";
-import { join, dirname, relative } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readdirSync, readFileSync, writeFileSync, statSync, mkdirSync, rmSync, cpSync, symlinkSync } from "node:fs";
+import { join, relative } from "node:path";
 import { execFileSync } from "node:child_process";
 import { parseExampleFile } from "./variants.mjs";
+import { ROOT, docsChannel, assertSourcePackagesBuilt, sourcePackageDir } from "./channel.mjs";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EXAMPLES_DIR = join(ROOT, "examples");
+const CHANNEL = docsChannel();
 
 function walk(dir) {
   const out = [];
   for (const name of readdirSync(dir)) {
-    if (name === "_harness" || name.startsWith(".")) continue;
+    // `_harness/` holds the compile scaffolding; `node_modules/` is the
+    // next channel's symlink shadow — neither is corpus.
+    if (name === "_harness" || name === "node_modules" || name.startsWith(".")) continue;
     const full = join(dir, name);
     if (statSync(full).isDirectory()) out.push(...walk(full));
     else out.push(full);
@@ -65,12 +73,31 @@ const tsCompile = tsAll.filter((f) => !isSkipped(f));
 console.log(`TypeScript: ${tsCompile.length} file(s) to compile, ${tsAll.length - tsCompile.length} skipped (// nocompile)`);
 
 if (tsCompile.length > 0) {
+  // Channel routing: examples import `js-bao` / `js-bao-wss-client` bare.
+  // Module resolution walks up from examples/<subject>/, so a symlink shadow
+  // at examples/node_modules/ overrides the root install for example files
+  // only. Next channel: create it (pointing at the built submodule packages);
+  // production: remove it so a stale shadow can't mask the published surface.
+  const shadowDir = join(EXAMPLES_DIR, "node_modules");
+  rmSync(shadowDir, { recursive: true, force: true });
+  if (CHANNEL === "next") {
+    assertSourcePackagesBuilt(["js-bao", "js-bao-wss-client"]);
+    mkdirSync(shadowDir, { recursive: true });
+    for (const pkg of ["js-bao", "js-bao-wss-client"]) {
+      symlinkSync(sourcePackageDir(pkg), join(shadowDir, pkg), "dir");
+    }
+  }
+
   // (Re)generate the fixture model classes the TS examples import — the
   // generated output is gitignored, so the gate must produce it itself
-  // (locally and on CI).
+  // (locally and on CI). The codegen CLI must match the channel's js-bao.
+  const codegen =
+    CHANNEL === "next"
+      ? ["node", join(sourcePackageDir("js-bao"), "dist", "codegen-v2.cjs")]
+      : ["npx", "js-bao-codegen-v2"];
   execFileSync(
-    "npx",
-    ["js-bao-codegen-v2", "generate", "-i", join(EXAMPLES_DIR, "_harness", "schema.toml"), "-o", join(EXAMPLES_DIR, "_harness", "generated", "ts")],
+    codegen[0],
+    [...codegen.slice(1), "generate", "-i", join(EXAMPLES_DIR, "_harness", "schema.toml"), "-o", join(EXAMPLES_DIR, "_harness", "generated", "ts")],
     { cwd: ROOT, stdio: "inherit" },
   );
   const buildDir = join(EXAMPLES_DIR, "_harness", "ts", ".build");
@@ -87,9 +114,10 @@ if (tsCompile.length > 0) {
           module: "esnext",
           target: "es2022",
           moduleResolution: "bundler",
-          // `js-bao-wss-client` and `js-bao` resolve from the docs project's own
-          // node_modules — the exact published versions the docs target
-          // (js-bao-wss-client@2.0.0, js-bao@0.5.1). No path hacks.
+          // `js-bao-wss-client` and `js-bao` resolve by normal node_modules
+          // walking: the published pinned packages from the root install on
+          // the production channel, or the built submodule packages via the
+          // examples/node_modules shadow on the next channel. No path hacks.
           types: [],
         },
         files: tsCompile,
@@ -100,7 +128,9 @@ if (tsCompile.length > 0) {
   );
   try {
     execFileSync("npx", ["tsc", "-p", tsconfigPath], { cwd: ROOT, stdio: "inherit" });
-    console.log("✓ TypeScript examples compile against js-bao-wss-client + js-bao.\n");
+    console.log(
+      `✓ TypeScript examples compile against js-bao-wss-client + js-bao (${CHANNEL === "next" ? "submodule source" : "published packages"}).\n`,
+    );
   } catch {
     failures.push("TypeScript");
     console.error("✘ TypeScript example compilation failed (see errors above).\n");

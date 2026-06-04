@@ -64,6 +64,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      # On the next channel the TS-compile and CLI gates read the submodule
+      # source (scripts/channel.mjs) — build it first. Production reads the
+      # installed pinned packages and skips this.
+      - name: Build source packages (next channel)
+        run: |
+          channel=$(node -p "JSON.parse(require('fs').readFileSync('docs-sources.json','utf8')).channel ?? 'production'")
+          echo "docs channel: $channel"
+          if [ "$channel" = "next" ]; then pnpm build:source-packages; fi
+
       - name: Check examples, TOML, and CLI invocations
         run: pnpm check:examples
 
@@ -127,6 +136,13 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
+
+      # See the check job — the TS half of this gate is channel-aware too.
+      - name: Build source packages (next channel)
+        run: |
+          channel=$(node -p "JSON.parse(require('fs').readFileSync('docs-sources.json','utf8')).channel ?? 'production'")
+          echo "docs channel: $channel"
+          if [ "$channel" = "next" ]; then pnpm build:source-packages; fi
 
       - name: Compile examples (TS + Swift)
         run: pnpm compile:examples

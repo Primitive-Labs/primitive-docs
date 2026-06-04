@@ -62,6 +62,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      # main is the published channel: it must always describe the released
+      # platform. A "next" stamp reaching main means a bad publish merge
+      # (docs-publish-release restamps with --channel production).
+      - name: Verify production channel
+        run: |
+          channel=$(node -p "JSON.parse(require('fs').readFileSync('docs-sources.json','utf8')).channel ?? 'production'")
+          if [ "$channel" != "production" ]; then
+            echo "::error::docs-sources.json declares channel '$channel' — main must be on the production channel"
+            exit 1
+          fi
+
       # Drift gate: example parity, TS compile (the Swift compile gate needs
       # an Apple host and is skipped here — the Checks workflow's macOS job
       # covers it pre-merge), rendered guides current, guides.json current,

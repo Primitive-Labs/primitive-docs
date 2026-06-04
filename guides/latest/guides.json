@@ -5,6 +5,7 @@
   },
   "builtAgainst": {
     "stampedAt": "2026-06-04",
+    "channel": "production",
     "packages": {
       "js-bao-wss-client": "2.0.0",
       "js-bao": "0.5.1",

@@ -2,9 +2,12 @@
 // Validate every documented `primitive …` invocation against the real CLI, so
 // CLI examples can't drift from the commands users actually run.
 //
-// The CLI is the pinned `primitive-admin` devDependency — the published
-// package users install, mirroring how code examples compile against the
-// published clients.
+// Which CLI depends on the docs channel (scripts/channel.mjs): the production
+// channel spawns the pinned `primitive-admin` devDependency — the published
+// package users install — mirroring how code examples compile against the
+// published clients. The next channel spawns the CLI built from the
+// library_repos/js-bao-wss submodule (`pnpm build:source-packages`), so docs
+// trued against unreleased library work validate against that same work.
 //
 // INTERIM MECHANISM (Option A): walks the command tree by spawning
 // `primitive <path…> --help` and parsing commander's Commands/Options
@@ -21,13 +24,18 @@
 // Usage:  node scripts/check-cli.mjs
 
 import { readdirSync, readFileSync } from "node:fs";
-import { join, dirname, relative } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, relative } from "node:path";
 import { execFileSync } from "node:child_process";
 import { VARIANTS } from "./variants.mjs";
+import { ROOT, docsChannel, assertSourcePackagesBuilt, sourcePackageDir } from "./channel.mjs";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const BIN = join(ROOT, "node_modules", ".bin", "primitive");
+const CHANNEL = docsChannel();
+if (CHANNEL === "next") assertSourcePackagesBuilt(["primitive-admin"]);
+// [command, leading args] to spawn the channel's CLI.
+const CLI =
+  CHANNEL === "next"
+    ? ["node", join(sourcePackageDir("primitive-admin"), "dist", "bin", "primitive.js")]
+    : [join(ROOT, "node_modules", ".bin", "primitive")];
 
 // ── Command tree, lazily discovered via --help ──────────────────────────────
 const helpCache = new Map(); // "path tokens".join(" ") -> { commands: Map, flags: Set } | null
@@ -70,7 +78,7 @@ function helpFor(pathTokens) {
       : [...pathTokens.slice(0, -1), "help", pathTokens[pathTokens.length - 1]];
   let parsed = null;
   try {
-    const out = execFileSync(BIN, argv, {
+    const out = execFileSync(CLI[0], [...CLI.slice(1), ...argv], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -84,7 +92,11 @@ function helpFor(pathTokens) {
 
 const rootHelp = helpFor([]);
 if (!rootHelp) {
-  console.error("✘ could not run the pinned primitive-admin CLI — is it installed?");
+  console.error(
+    CHANNEL === "next"
+      ? "✘ could not run the submodule-built primitive-admin CLI — run `pnpm build:source-packages`"
+      : "✘ could not run the pinned primitive-admin CLI — is it installed?",
+  );
   process.exit(1);
 }
 
@@ -202,8 +214,8 @@ for (const file of sources) {
 
 // ── Report ──────────────────────────────────────────────────────────────────
 console.log(
-  `CLI invocations: ${checked} checked against primitive-admin ` +
-    `(${helpCache.size - 1} subcommand help pages walked)` +
+  `CLI invocations: ${checked} checked against primitive-admin (${CHANNEL === "next" ? "submodule source" : "published package"}, ` +
+    `${helpCache.size - 1} subcommand help pages walked)` +
     (skipped.length ? `, ${skipped.length} opted out (docs:nocheck)` : ""),
 );
 for (const s of skipped) console.log(`  ~ skipped ${s}`);
