@@ -8,7 +8,7 @@ You focus on your UI and business logic. Primitive provides everything behind it
 
 A Primitive app's whole lifecycle fits in a handful of commands:
 
-1. **Scaffold** — `npx create-primitive-app my-app` (add `--platform ios` for SwiftUI). You get a running app with sign-in, synced data, and dev tools already wired up.
+1. **Scaffold** — one command gives you a running app, web or iOS, with sign-in, synced data, and dev tools already wired up.
 2. **Add your data** — flexible, fast, scalable data persistence with real-time sync, sharing, and access control built in. No backend code to write.
 3. **Add backend behavior** — workflows, managed prompts, API integrations, and scheduled jobs, all configured as code that lives in your repo.
 4. **Ship** — the web template deploys with one command; the iOS template ships through TestFlight and the App Store.
@@ -21,14 +21,14 @@ The [Quick Start](./getting-started/template-app.md) walks through it, or see Pr
 
 **One backend, every platform.** Web and iOS are first-class citizens with matching client libraries, matching templates, and one shared data schema. Concepts carry over directly — learn documents, databases, and sharing once, then build for whichever platform your users are on.
 
-**Built for AI-assisted development.** Tools like Claude and Cursor excel at UI and business logic but struggle with infrastructure plumbing. Primitive's entire backend is operated through the CLI and version-controlled TOML — exactly the interface coding agents are good at. Agent guides ship with every template, `primitive guides` serves reference docs to your assistant on demand, and a Claude Code skill teaches it platform best practices. Your agent can configure auth, define workflows, and wire up integrations without you touching a dashboard.
+**Built for AI-assisted development.** Tools like Claude and Cursor excel at UI and business logic but struggle with infrastructure plumbing. Primitive's entire backend is operated through the CLI as version-controlled configuration in your repo — exactly the interface coding agents are good at. Agent guides ship with every template, the CLI serves reference docs to your assistant on demand, and a Claude Code skill teaches it platform best practices. Your agent can configure auth, define workflows, and wire up integrations without you touching a dashboard.
 
 **One platform, not ten services.** Auth, data sync, file storage, LLM workflows, integrations, analytics — integrated, consistent, and configured in one place. No dashboard hopping, no credential juggling, no glue code between providers. Every service is built for real workloads: real-time collaboration, fine-grained access control, server-side automation.
 
 ## What Primitive Provides
 
 ### Authentication
-Multiple sign-in methods out of the box — Google OAuth, Magic Link (passwordless email), OTP (email codes), and Passkeys (biometric/WebAuthn). Token management, session handling, and refresh are all handled for you.
+Multiple sign-in methods out of the box — Google OAuth, Magic Link (passwordless email), OTP (email codes), and Passkeys (biometric sign-in). Token management, session handling, and refresh are all handled for you.
 
 ### Data Storage
 
@@ -44,7 +44,7 @@ Most apps use one or both — see [Choosing Your Data Model](./getting-started/c
 Every user gets a built-in profile (name, email, avatar) managed by the platform. Groups let you organize users into teams, roles, or any relationship — with flexible, expression-based access control that works across both documents and databases.
 
 ### Workflows
-Server-side multi-step automation pipelines. Chain together LLM calls, data transformations, external API requests, delays, and conditional logic. Define them as TOML config files in your repo. Trigger them from your app, from inbound webhooks, or on a cron schedule.
+Server-side multi-step automation pipelines. Chain together LLM calls, data transformations, external API requests, delays, and conditional logic — defined as configuration in your repo. Trigger them from your app, from inbound webhooks, or on a cron schedule.
 
 ### Managed Prompts
 Version-controlled LLM prompt templates with built-in testing. Define prompt configurations, test them against expected outputs, and use them in workflows or directly from your app.
@@ -61,43 +61,11 @@ Share documents and databases with other users — by user ID, by email (resolve
 ### Analytics
 Automatic lifecycle event tracking (daily active users, session activity, feature usage) plus custom event logging. Read metrics back from the Admin Console, the CLI, or workflow steps.
 
-## Architecture at a Glance
+## How It Fits Together
 
-```
-┌──────────────────────────────────────────────┐
-│           Your App (web or iOS)              │
-│                                              │
-│   Your UI  ◄──►  Client library  ◄──►  Local │
-│                  (JS or Swift)         store │
-└──────────────────────┬───────────────────────┘
-                       │
-            background sync · API calls
-                       │
-                       ▼
-        ┌──────────────────────────────┐
-        │      Primitive Platform      │
-        │                              │
-        │  Auth · Documents · Databases│
-        │  Workflows · Prompts · Blobs │
-        │  Integrations · Analytics    │
-        └──────────────────────────────┘
-```
+Your app runs on the user's device — in the browser or on an iPhone — and talks to the platform through a client library that exposes the same features in JavaScript (any framework) and Swift. Optional starter templates for web (Vue) and iOS (SwiftUI) wrap the client with login UI, data-binding helpers, and dev tooling — the fastest start, covered in the [Quick Start](./getting-started/template-app.md).
 
-Your app runs on the user's device — in the browser or on an iPhone. The Primitive Platform is a managed service: you interact with it through the client library, the CLI, and the Admin Console, never directly with the underlying infrastructure.
-
-## The Stack
-
-### The Client
-
-Your app talks to the platform through a client library — **js-bao-wss-client** for JavaScript (any framework: Vue, React, Svelte, vanilla) and the Swift **JsBaoClient** package for iOS. Both expose the same surface: authentication, documents with a local store and background sync, database operations, blobs, workflows, and events.
-
-### Starter Templates
-
-Optional, but the fastest start: a **web template** (Vue 3 + TypeScript) and an **iOS template** (Swift + SwiftUI), each wrapping the client with login UI, data-binding helpers, and dev tooling. See the [Quick Start](./getting-started/template-app.md).
-
-### CLI and Admin Console
-
-The `primitive` CLI manages your app's backend configuration — auth settings, users, workflows, prompts, integrations — as version-controlled TOML you push with `primitive sync`. It's also the interface AI coding agents use to manage your app. The web [Admin Console](https://admin.primitiveapi.com/login) covers the same ground interactively.
+The Primitive Platform itself is a managed service. You operate your app's backend through the CLI — as version-controlled configuration that lives in your repo, and the interface AI coding agents use — or interactively through the web [Admin Console](https://admin.primitiveapi.com/login). You never touch the underlying infrastructure.
 
 ## Next Steps
 
