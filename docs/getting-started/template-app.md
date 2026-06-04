@@ -2,31 +2,17 @@
 
 The fastest way to build on Primitive is to start from an official template. Primitive supports multiple platforms as first-class citizens — there's a **web template** (Vue + TypeScript + Tailwind) and an **iOS template** (Swift + SwiftUI). Both give you a working app in minutes: authentication, local-first data storage, real-time sync, and dev tooling. (Templates are optional — the clients are plain libraries; see [Using the Client Directly](./authentication.md#using-the-client-directly).)
 
-| Platform | Create | Stack |
-|---|---|---|
-| Web (default) | `npx create-primitive-app my-app` | Vue 3 + TypeScript + Tailwind |
-| iOS | `npx create-primitive-app my-app --platform ios` | Swift + SwiftUI (`PrimitiveApp` package) |
-
 ## 1. Create Your App
 
-Run the command for your platform, replacing `my-app` with your desired app name:
+Run the installer, replacing `my-app` with your desired app name:
 
-::: code-group
-
-```bash [Web (Vue)]
+```bash
 npx create-primitive-app my-app
 ```
 
-```bash [iOS (SwiftUI)]
-# Requires macOS with Xcode 15+, plus `brew install xcodegen`.
-# (An Apple Developer account is only needed for physical devices,
-# TestFlight, and the App Store — the simulator runs unsigned.)
-npx create-primitive-app my-app --platform ios
-```
+It asks which platform you're building for — web or iOS — or pass `--platform web` / `--platform ios` to skip the prompt. (Building for iOS requires macOS with Xcode 15+ and `brew install xcodegen`; an Apple Developer account is only needed for physical devices, TestFlight, and the App Store — the simulator runs unsigned.)
 
-:::
-
-Either way, this will:
+The installer will:
 
 - Prompt you to sign in to your Primitive account (if not already authenticated)
 - Create a new app on the Primitive servers

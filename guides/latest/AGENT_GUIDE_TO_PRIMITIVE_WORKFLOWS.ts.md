@@ -260,6 +260,47 @@ now = "2026-04-27T00:00:00Z"
 
 Workflows have no batch-write step kind. To apply a set of updates, run `forEach` over a `database.mutate` step (see `forEach` below), or use `database.applyToQuery` for query-driven updates.
 
+### `document.query` / `queryOne` / `count` / `save` / `patch` / `delete`
+
+Read and write records in a document's models server-side. All take `documentId` + `modelName`. Writes are durable when the step completes and reach connected clients like any other document change — they do not use the client-apply flow (`requiresClientApply` is for results only clients write).
+
+| Kind | Additional fields | Output |
+|---|---|---|
+| `document.query` | optional `filter`, `options` | `{ data: [...], hasMore?, nextCursor? }` — `collect`-compatible |
+| `document.queryOne` | optional `filter`, `options` | `{ record }` — `null` when nothing matches (does not fail) |
+| `document.count` | optional `filter` | `{ count }` |
+| `document.save` | `recordId`, `data` | `{ record }` — creates or replaces the record at `recordId` |
+| `document.patch` | `recordId`, `data` | `{ record }` — merges `data` fields into the record |
+| `document.delete` | `recordId` | `{ deleted: true, id }` |
+
+`filter` uses the same operator syntax as client-side model queries; empty or omitted matches all records. `options` supports `sort` (`{ field = 1 }` / `-1`), `limit`, and cursor pagination (`uniqueStartKey` — feed it the previous page's `nextCursor`).
+
+```toml
+[[steps]]
+id = "overdue"
+kind = "document.query"
+documentId = "{{ input.docId }}"
+modelName = "Invoice"
+saveAs = "invoices"
+[steps.filter]
+status = "overdue"
+amount = { "$gt" = 100 }
+[steps.options]
+sort = { dueDate = 1 }
+limit = 50
+
+[[steps]]
+id = "mark-paid"
+kind = "document.patch"
+documentId = "{{ input.docId }}"
+modelName = "Invoice"
+recordId = "{{ input.invoiceId }}"
+[steps.data]
+status = "paid"
+```
+
+A missing `documentId`/`modelName` (or `recordId` on a write), or a `documentId` that doesn't resolve to a document, fails the step non-retryably.
+
 ### `group.addMember` / `removeMember` / `checkMembership` / `listMembers` / `listUserMemberships`
 
 ```toml
@@ -321,7 +362,6 @@ kind = "workflow.start"
 forEach = "steps.get-users.data"
 as = "user"
 workflowKey = "process-item"
-maxConcurrent = 25                # default 25; cap on in-flight child runs at any moment
 [steps.input]
 userId = "{{ user.id }}"
 

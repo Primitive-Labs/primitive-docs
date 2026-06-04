@@ -353,6 +353,7 @@ Every step has an `id` (unique within the workflow) and a `kind` (the step type)
 | `prompt.execute` | Run a [managed prompt](./prompts.md) |
 | `integration.call` | Call an external API via a configured integration |
 | `database.query` / `mutate` / `count` / `aggregate` / `pipeline` / `applyToQuery` | Run registered database operations |
+| `document.query` / `queryOne` / `count` / `save` / `patch` / `delete` | Read and write records in a document's models |
 | `group.addMember` / `removeMember` / `checkMembership` / `listMembers` / `listUserMemberships` | Group membership operations |
 | `collect` | Auto-paginate any step that returns `{ items, cursor }` |
 | `workflow.call` | Run a child workflow synchronously, inline |
@@ -593,6 +594,37 @@ now = "{{ now }}"
 ```
 
 There's no batch-write step: to apply a set of database updates, run `forEach` over a `database.mutate` step, or use `database.applyToQuery` to update every record matching a server-side filter.
+
+### Document Steps
+
+`document.query`, `document.queryOne`, `document.count`, `document.save`, `document.patch`, and `document.delete` read and write records in a [document's](./working-with-documents.md) models. Every document step takes a `documentId` and a `modelName`; queries take an optional `filter` (the same operator syntax as client-side model queries) and `options` (`sort`, `limit`, cursor pagination), and writes target a `recordId`:
+
+```toml
+[[steps]]
+id = "overdue"
+kind = "document.query"
+documentId = "{{ input.docId }}"
+modelName = "Invoice"
+saveAs = "invoices"
+[steps.filter]
+status = "overdue"
+[steps.options]
+sort = { dueDate = 1 }
+limit = 50
+
+[[steps]]
+id = "mark-paid"
+kind = "document.patch"
+documentId = "{{ input.docId }}"
+modelName = "Invoice"
+recordId = "{{ input.invoiceId }}"
+[steps.data]
+status = "paid"
+```
+
+`document.save` creates or replaces the record at `recordId`; `document.patch` merges its `data` fields into it. Step results: `document.query` returns `{ data, hasMore, nextCursor }` (pageable with `collect`), `document.queryOne` returns `{ record }` (`null` when nothing matches), `document.count` returns `{ count }`, the writes return `{ record }`, and `document.delete` returns `{ deleted, id }`.
+
+Writes are durable when the step completes and reach connected clients like any other document change — use document steps when the workflow owns the write. When the result should instead land in data only clients write, leave the writing to [client apply](#applying-results-to-local-data-client-apply).
 
 ### Group Steps
 

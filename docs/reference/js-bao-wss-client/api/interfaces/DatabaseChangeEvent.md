@@ -22,7 +22,7 @@ Keep this in sync with the internal copy in
 
 ### changeType?
 
-> `optional` **changeType**: `"enter"` \| `"update"` \| `"leave"`
+> `optional` **changeType**: `"update"` \| `"enter"` \| `"leave"`
 
 ***
 

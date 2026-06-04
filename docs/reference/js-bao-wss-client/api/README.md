@@ -511,7 +511,7 @@ All automatic emitters are on by default; pass `analyticsAutoEvents` when constr
 
 When `analyticsAutoEvents.llm` enables any of `start`, `success`, or `failure`, `client.getLlmAnalyticsContext()` becomes non-null so LLM helpers can emit structured events without guessing configuration. `analyticsAutoEvents.gemini` controls `client.getGeminiAnalyticsContext()`, which powers automatic logging inside the Gemini namespace.
 
-**Removed events** (no longer emitted): `client_boot`, `first_doc_open`, `first_doc_edit`, `offline_recovery`, `service_worker_control`, `service_worker_token_update`, `llm_request_*`, `gemini_request_*`.
+**Removed events** (no longer emitted, and their option flags have been removed from `analyticsAutoEvents`): `client_boot` (`boot`), `first_doc_open` (`firstDocOpen`), `first_doc_edit` (`firstDocEdit`), `offline_recovery` (`offlineRecovery`), `service_worker_control` / `service_worker_token_update` (`serviceWorker`), `llm_request_*`, `gemini_request_*`.
 
 Example configuration:
 
@@ -519,7 +519,6 @@ Example configuration:
 const client = await initializeClient({
   ...options,
   analyticsAutoEvents: {
-    firstDocEdit: false, // suppress milestone if your app logs a custom event
     blobUploads: { start: false, success: true, failure: true },
     llm: { start: true, success: true, failure: false },
   },

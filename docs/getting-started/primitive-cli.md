@@ -520,6 +520,21 @@ primitive tokens revoke <token-id>
 
 TTL accepts `m`/`h`/`d`/`w`/`mo`/`y` units; omit `--ttl` for a non-expiring token. Treat these like passwords — store them in your CI's secret store and revoke any token you no longer need.
 
+### Non-Interactive `primitive init`
+
+`primitive init` (the command behind `npx create-primitive-app`) prompts for anything it needs — app name, target platform, access mode. For scripted setups, put the answers in a `.primitive-init.toml` file in the directory where you run it, and init skips every prompt:
+
+```toml
+action = "create"            # or "use-existing" (then set app_id instead of app_name)
+app_name = "My App"
+platform = "web"             # "web" or "ios" (defaults to web)
+dir = "my-app"
+access_mode = "invite-only"  # "public", "domain", or "invite-only"
+skip_install = false
+```
+
+Run `primitive init --help` for the full key list (dev port, invite emails, allowed domains, overwrite behavior).
+
 ## Getting Help
 
 Every command has built-in help:

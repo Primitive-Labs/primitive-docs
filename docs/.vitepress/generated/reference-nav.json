@@ -48,6 +48,10 @@
                   "link": "/reference/js-bao-wss-client/api/functions/defineModelSchema"
                 },
                 {
+                  "text": "discoverSchema",
+                  "link": "/reference/js-bao-wss-client/api/functions/discoverSchema"
+                },
+                {
                   "text": "generateULID",
                   "link": "/reference/js-bao-wss-client/api/functions/generateULID"
                 },
@@ -62,6 +66,10 @@
                 {
                   "text": "isJsBaoError",
                   "link": "/reference/js-bao-wss-client/api/functions/isJsBaoError"
+                },
+                {
+                  "text": "loadSchemaFromTomlString",
+                  "link": "/reference/js-bao-wss-client/api/functions/loadSchemaFromTomlString"
                 }
               ]
             },
@@ -359,6 +367,26 @@
                 {
                   "text": "DirectPermissionGrant",
                   "link": "/reference/js-bao-wss-client/api/interfaces/DirectPermissionGrant"
+                },
+                {
+                  "text": "DiscoveredConstraint",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DiscoveredConstraint"
+                },
+                {
+                  "text": "DiscoveredField",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DiscoveredField"
+                },
+                {
+                  "text": "DiscoveredModel",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DiscoveredModel"
+                },
+                {
+                  "text": "DiscoveredRelationship",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DiscoveredRelationship"
+                },
+                {
+                  "text": "DiscoveredSchema",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/DiscoveredSchema"
                 },
                 {
                   "text": "DOClientEngine",
@@ -933,10 +961,6 @@
                 {
                   "text": "AUTH_CODES",
                   "link": "/reference/js-bao-wss-client/api/variables/AUTH_CODES"
-                },
-                {
-                  "text": "discoverSchema",
-                  "link": "/reference/js-bao-wss-client/api/variables/discoverSchema"
                 }
               ]
             },

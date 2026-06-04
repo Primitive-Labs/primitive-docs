@@ -53,7 +53,7 @@ Each of these reads as a small helpful aside and is actually a policy violation:
 - **No prior behavior or change history.** Describe how the platform works today, with current best practices. No "previously", "now supports", migration guides, version comparisons, or "legacy" labels.
 - **No infrastructure internals.** Never name Cloudflare, Workers, R2, Durable Objects, or storage engines. Describe developer-facing behavior ("isolated, server-side data store"), not implementation. The one exception: *Deploying to Production* necessarily names the deployment target (the web template deploys to Cloudflare Workers) — that page only.
 - **No links into `guides/latest/`.** Human docs are self-sufficient.
-- **No unreleased features.** Document only the *published* clients and CLI — `check:cli` validates against the installed `primitive-admin`, not the submodule source, precisely because merged ≠ released. Leave a follow-up note instead.
+- **Nothing ahead of the channel's surface.** Each branch documents its channel's platform (see CLAUDE.md): `main` describes the *published* clients and CLI; `next` describes the library `main` tips. The validation gates run against the matching surface (`scripts/channel.mjs`), so "is this documentable here?" has a mechanical answer — never describe something the channel's gates can't see.
 - **No private repo links.** Only link repos a new user can open (`primitive-app-template` is public; the `*-dev` repos are not).
 
 ## Platform treatment
@@ -78,11 +78,11 @@ The `primitive-app-demo` projects in both `*-dev` repos are **helpful reference,
 
 When stating any API name, flag, limit, enum, or behavior:
 
-- **CLI claims** → verify against the *published* `primitive-admin` (`node_modules/.bin/primitive <cmd> --help`); `pnpm check:cli` gates this in CI.
+- **CLI claims** → verify against the channel's `primitive-admin` (`node_modules/.bin/primitive <cmd> --help` on production; the submodule-built CLI — `node library_repos/js-bao-wss/cli/dist/bin/primitive.js` — on next); `pnpm check:cli` gates this in CI.
 - **Client API claims** → verify in `library_repos/js-bao-wss/src/client/api/*.ts` (and the Swift client for parity claims).
 - **Server behavior / limits** → verify in the controller source; numbers ("100 MB", "24 hours") are the most common fiction.
 - **TOML shapes and template syntax** → verify against the CLI's sync serializers/parsers and the server's template engine in `js-bao-wss`.
-- **Released vs merged**: a feature on the repo's `main` may not be in the published package. If it isn't published, it isn't documented.
+- **Released vs merged**: on the `next` branch, merged to the library's `main` is the documentation bar; the `main` branch describes only what a production release has shipped (docs reach it via `docs-publish-release`, never by writing ahead).
 
 ## Voice
 
