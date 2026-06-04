@@ -1,5 +1,5 @@
 {
-  "channel": "production",
+  "channel": "next",
   "stampedAt": "2026-06-04",
   "libraries": {
     "js-bao-wss": {
