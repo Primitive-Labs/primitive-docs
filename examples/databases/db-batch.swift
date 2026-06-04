@@ -1,7 +1,7 @@
 import JsBaoClient
 
-// Bulk-write through a registered batch operation. Each item is checked against
-// the operation's per-item CEL independently.
+// Bulk-call a registered mutation operation. Access rules are re-evaluated
+// against each item's params; any failing item rejects the whole batch.
 func importContacts(client: JsBaoClient, databaseId: String) async throws {
   // #region example
   let result = try await client.databases.executeBatch(

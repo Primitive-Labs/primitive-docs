@@ -1450,7 +1450,7 @@ On WS reconnect the local connection id rotates, so a frame for the writer's own
 ```typescript
 async function liveTickets(databaseId: string) {
   // 1. Initial load — full current state.
-  const { records: tickets } = await client.databases.executeOperation(
+  const { data: tickets } = await client.databases.executeOperation(
     databaseId,
     "list-my-open-tickets",
   );

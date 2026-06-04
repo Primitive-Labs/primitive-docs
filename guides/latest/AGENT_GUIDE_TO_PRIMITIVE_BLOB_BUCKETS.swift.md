@@ -91,7 +91,8 @@ name = "User avatars"
 description = "Profile pictures"           # optional
 ttlTier = "permanent"                       # 1d | 3d | 14d | 28d | 180d | 365d | permanent
 accessPolicy = "authenticated"              # public-read | authenticated | owner-only
-# ruleSetId is accepted in TOML/CLI but currently NOT enforced for bucket reads/writes.
+# ruleSetId = "<rule-set-id>"               # optional; when set, the rule set governs
+                                            # member-level reads/writes (see Access policies)
 ```
 
 The TOML root table is `[bucket]` (not `[blobBucket]`). The CLI's `primitive sync` reads from `config/blob-buckets/<key>.toml`.
@@ -112,7 +113,7 @@ primitive blob-buckets create \
 | `authenticated`  | Any signed-in user (or admin/owner)   | Any signed-in user (or admin/owner)   |
 | `owner-only`     | Admin/owner only                      | Admin/owner only                      |
 
-A `ruleSetId` field is accepted at bucket creation but is currently **not enforced** by the bucket blob access checks — only the three `accessPolicy` values above gate reads and writes. If you need finer-grained control today, model it at the application layer (e.g. issue signed URLs only after your own check passes).
+When a bucket has a `ruleSetId`, the attached rule set is the **authority for member-level access** and takes precedence over the `accessPolicy` matrix above: admins/owners are always allowed, unauthenticated callers get 401, and every other read/write is decided by evaluating the rule set (resource type `blob_bucket`). A missing or orphaned rule set denies closed — member access fails until the rule set exists.
 
 ### TTL tiers
 

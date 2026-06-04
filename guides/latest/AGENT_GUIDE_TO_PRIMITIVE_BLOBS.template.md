@@ -168,7 +168,7 @@ const url = blobs.downloadUrl(blobId, {
 
 {{#lang swift}}
 ```swift
-let url = blobs.downloadUrl(blobId: blobId, disposition: "attachment") // or "inline"
+let url = blobs.downloadUrl(blobId: blobId, disposition: .attachment) // or .inline
 ```
 {{/lang}}
 
@@ -221,7 +221,7 @@ const { deleted } = await blobs.delete(blobId); // { deleted: true }
 
 {{#lang swift}}
 ```swift
-let deleted = try await blobs.delete(blobId: blobId) // true
+_ = try await blobs.delete(blobId: blobId) // returns [String: Any]
 ```
 {{/lang}}
 

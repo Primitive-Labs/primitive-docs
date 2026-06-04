@@ -642,20 +642,18 @@ The full flow — submit a request (`permission` is required), then an owner lis
 
 :::
 
-Owners can also deny with a reason:
+Owners can also deny, optionally pointing the requester at the document's canonical URL:
 
 ```typescript
 await client.documents.denyAccessRequest(documentId, requestId, {
-  reason: "Please email sales instead",
+  documentUrl: "https://myapp.example/docs/sales-handbook",
 });
 ```
 
-Both sides stay informed without polling: owners and admins receive a `document:access-request-created` WebSocket event (badge the UI immediately), and the requester receives a `document:access-request-resolved` event plus an email with the outcome.
+The requester gets an email with the outcome either way. To show pending requests in an owner's UI, fetch them when the view opens:
 
 ```typescript
-client.on("document:access-request-created", (event) => {
-  showAccessRequestBadge(event.documentId);
-});
+const requests = await client.documents.listAccessRequests(documentId);
 ```
 
 Behavior worth knowing: requests expire after 30 days, a requester can't re-submit while a request for the same document is pending, and a resolved request can't be re-resolved.

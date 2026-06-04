@@ -9,41 +9,42 @@ Create a TOML config file for each external API:
 ```toml
 # config/integrations/weather-api.toml
 [integration]
-name = "weather-api"
+key = "weather-api"
 displayName = "Weather API"
+status = "active"
+
+[requestConfig]
 baseUrl = "https://api.weather.com/v1"
+allowedMethods = ["GET"]
+allowedPaths = ["/forecast/*", "/current"]
 
-[[integration.allowedPaths]]
-path = "/forecast/*"
-methods = ["GET"]
-
-[[integration.allowedPaths]]
-path = "/current"
-methods = ["GET"]
-
-[integration.headers]
-X-API-Key = "{{ secrets.WEATHER_API_KEY }}"
+[requestConfig.defaultHeaders]
+X-API-Key = "{{secrets.WEATHER_API_KEY}}"
 ```
 
 ### Key Configuration
 
-- **`baseUrl`** — The external API's base URL
-- **`allowedPaths`** — Whitelist of paths and HTTP methods your app can call (wildcards supported)
-- **`headers`** — Static headers to include on every request; use <code>&#123;&#123; secrets.KEY &#125;&#125;</code> for credentials
-- **`queryParams`** — Static query parameters to include on every request
-- **`timeout`** — Request timeout in milliseconds
+- **`integration.key`** — Unique identifier your app uses to call the integration
+- **`integration.status`** — Integrations start as `draft`; set `"active"` to make them callable from clients
+- **`integration.timeoutMs`** — Request timeout in milliseconds
+- **`requestConfig.baseUrl`** — The external API's base URL
+- **`requestConfig.allowedMethods`** / **`requestConfig.allowedPaths`** — Whitelist of HTTP methods and paths your app can call (trailing-`*` wildcards supported)
+- **`requestConfig.defaultHeaders`** — Headers sent on every request; use <code>&#123;&#123; secrets.KEY &#125;&#125;</code> for credentials
+- **`requestConfig.staticQuery`** — Query parameters appended to every request
 
 ## Managing Secrets
 
-```bash
-# Add a secret (prompts for the value)
-primitive integrations secrets add weather-api WEATHER_API_KEY
+Credentials live in your app's secrets store and are referenced from the integration config with <code>&#123;&#123; secrets.KEY &#125;&#125;</code>:
 
-# List secrets for an integration
-primitive integrations secrets list weather-api
+```bash
+# Set the secret value
+primitive secrets set WEATHER_API_KEY --value "sk-..." --summary "Weather API key"
+
+# List app secrets
+primitive secrets list
 ```
 
-Secrets are stored securely on the server and are never exposed to your client code.
+Secrets are resolved server-side when the request is proxied and are never exposed to your client code.
 
 ## Syncing Configuration
 
@@ -95,34 +96,15 @@ let response = try await client.integrations.call(IntegrationCallRequest(
 
 ### Error Handling
 
-In Swift, catch `HttpError` and switch on its typed `serverCode` (the same codes — `INTEGRATION_NOT_FOUND`, `INTEGRATION_SECRET_MISSING`, `INTEGRATION_PROXY_FAILED`); the JavaScript client uses the `isJsBaoError(error)` guard + `error.code`:
+Failed calls throw a typed error — branch on its code:
 
-```typescript
-import { isJsBaoError } from "js-bao-wss-client";
+::: code-group
 
-try {
-  const response = await client.integrations.call({
-    integrationKey: "crm-api",
-    method: "POST",
-    path: "/contacts",
-    body: { email: "user@example.com" },
-  });
-} catch (error) {
-  if (isJsBaoError(error)) {
-    switch (error.code) {
-      case "INTEGRATION_NOT_FOUND":
-        console.error("Integration not configured");
-        break;
-      case "INTEGRATION_SECRET_MISSING":
-        console.error("API credentials not set up");
-        break;
-      case "INTEGRATION_PROXY_FAILED":
-        console.error("External API error:", error.details);
-        break;
-    }
-  }
-}
-```
+<<< ../../examples/integrations/integration-call-errors.ts#example{ts} [JavaScript]
+
+<<< ../../examples/integrations/integration-call-errors.swift#example{swift} [Swift]
+
+:::
 
 ## Using Integrations in Workflows
 

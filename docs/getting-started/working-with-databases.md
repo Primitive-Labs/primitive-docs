@@ -128,23 +128,21 @@ name = "mark-overdue"
 type = "applyToQuery"
 modelName = "task"
 access = "hasRole('admin')"
-query = '{"filter":{"dueDate":{"$lt":"$params.now"},"status":"pending"}}'
-mutation = '{"op":"patch","data":{"status":"overdue"}}'
+definition = '{"source":{"filter":{"dueDate":{"$lt":"$params.now"},"status":"pending"}},"action":{"op":"patch","data":{"status":"overdue"}}}'
 params = '{"now":{"type":"string","required":true}}'
 ```
 
-**Response:** `{ matched, updated, truncated }` — if `truncated` is `true`, the query matched more records than the per-call cap; re-run until it returns `false`.
+**Response:** `{ matched, affected, failed }` — when the definition sets a `source.limit`, the response also carries `truncated` and `appliedLimit`; if `truncated` is `true`, re-run until it returns `false`.
 
 ### Batch
-Apply many individual writes in a single request, with CEL access checked per item via `itemAccess` (a failing item doesn't fail the whole batch).
+Apply many individual writes in a single request by calling a regular mutation operation in bulk with `executeBatch`. The operation's `access` rule is re-evaluated against each item's params — if any item fails authorization the whole batch is rejected before any writes happen. The response is `{ imported, failed }`.
 
 ```toml
 [[operations]]
 name = "import-contacts"
-type = "executeBatch"
+type = "mutation"
 modelName = "contact"
-access = "hasRole('admin')"
-itemAccess = "params.createdBy == user.userId"
+access = "params.createdBy == user.userId"
 ```
 
 ::: code-group

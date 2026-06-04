@@ -70,7 +70,7 @@ if (quota.unlimited || quota.remaining > 0) {
 }
 ```
 
-Inviting over the quota returns a `403 INVITATION_QUOTA_EXCEEDED` error.
+Inviting over the quota returns a `403` with `error: "INVITATION_LIMIT_REACHED"`.
 
 ### Listing and Canceling
 
@@ -152,7 +152,7 @@ Whatever URL the recipient lands on, the page handles three states:
 
 1. **Signed-in invitee** — confirm "Accept with this account?", then call `client.invitations.accept(inviteToken)` and redirect into the app.
 2. **Signed-out invitee** — stash the token (e.g. `sessionStorage`), send them through your login flow, and pass the token to whichever auth verify call the user ends up on (`magicLinkVerify`, `otpVerify`, `passkeyRegisterFinish`, `startOAuthFlow`) — the server resolves the grants atomically with signup, no second click needed.
-3. **Errors** — `INVITE_TOKEN_INVALID`, `INVITE_TOKEN_EXPIRED`, and `INVITE_ALREADY_ACCEPTED` each deserve their own message.
+3. **Errors** — any invalid, expired, or already-used token returns `401 INVITE_TOKEN_INVALID`; show one clear "this invitation is no longer valid" message with a path to request a new invite.
 
 **The web template ships all of this** — a landing page mounted at `/invite/accept` plus the token carry-over wired into every auth method. If you're using the template, just point invitation emails at `${yourApp.baseUrl}/invite/accept?inviteToken=${token}` and you're done. On iOS, handle the invite URL (universal link or custom scheme), then follow the same three states: `accept(inviteToken)` when signed in, or hold the token and pass it to the sign-in verify call.
 
@@ -168,7 +168,7 @@ Revoking an invitation also removes every pending grant attached to it — there
 
 ```typescript
 client.on("invitation", (event) => {
-  if (event.type === "accepted") refreshMembersList();
+  if (event.action === "accepted") refreshMembersList();
 });
 ```
 

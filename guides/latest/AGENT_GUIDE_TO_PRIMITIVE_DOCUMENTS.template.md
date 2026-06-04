@@ -1116,7 +1116,7 @@ await User.upsertByUnique(
 );
 ```
 
-Single-field constraints declared via `unique = true` in TOML get an auto-generated name of `<modelName>_<fieldName>_unique` (where `modelName` is the `[models.<name>]` block key). Use `[[models.X.options.unique_constraints]]` to control the name explicitly.
+Single-field constraints declared via `unique = true` in TOML get an auto-generated name of `<modelName>_<fieldName>_unique` (where `modelName` is the `[models.<name>]` block key). Use `[[models.X.unique_constraints]]` (model level — not under `options`) to control the name explicitly.
 
 For single-field upserts where the value already lives on the instance, `save({ upsertOn })` is simpler than `upsertByUnique` — see [Upsert by natural key](#upsert-by-natural-key) above for the compiled call.
 

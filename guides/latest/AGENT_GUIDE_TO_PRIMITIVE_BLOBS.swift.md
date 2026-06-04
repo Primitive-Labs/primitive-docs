@@ -117,7 +117,7 @@ The basic call is shown in **List / URL / read** above. The URL is authenticated
 
 
 ```swift
-let url = blobs.downloadUrl(blobId: blobId, disposition: "attachment") // or "inline"
+let url = blobs.downloadUrl(blobId: blobId, disposition: .attachment) // or .inline
 ```
 
 ### Read content into memory
@@ -146,7 +146,7 @@ See **List / metadata / delete** above.
 
 
 ```swift
-let deleted = try await blobs.delete(blobId: blobId) // true
+_ = try await blobs.delete(blobId: blobId) // returns [String: Any]
 ```
 
 Deleting also cancels any in-flight upload for the same `blobId` and clears local bytes.

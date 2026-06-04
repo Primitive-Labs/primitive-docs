@@ -63,8 +63,6 @@ primitive secrets list
 primitive secrets delete OPENAI_API_KEY
 ```
 
-Integration-scoped secrets: `primitive integrations secrets add <integration> <KEY>`.
-
 ## Headless auth (CI)
 
 Interactive `primitive login` doesn't work in CI. Create a long-lived API token and target an environment explicitly:

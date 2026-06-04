@@ -204,19 +204,19 @@ primitive cron-triggers create \
 ```toml [TOML (config/cron-triggers/nightly-digest.toml)]
 [cronTrigger]
 key = "nightly-digest"
-name = "Nightly digest email"
+displayName = "Nightly digest email"
 workflowKey = "send-digest"
 cron = "0 9 * * *"
 timezone = "America/Los_Angeles"
 overlapPolicy = "skip"
 
-[cronTrigger.input]
+[rootInput]
 digestType = "daily"
 ```
 
 :::
 
-`input` is a literal JSON payload sent on every firing; use `inputMapping` instead to project values from the firing context (e.g. `runId = "$triggerId"`, `at = "$firedAt"`).
+`[rootInput]` is a literal JSON payload sent on every firing (the CLI flag is `--input`); use `inputMapping` (`--input-mapping`) instead to project values from the firing context (e.g. `runId = "$triggerId"`, `at = "$firedAt"`).
 
 **Schedules** are standard 5-field cron (minute, hour, day-of-month, month, day-of-week): `0 * * * *` is hourly, `0 9 * * 1` is Mondays at 9:00, `0 0 1 * *` is the first of the month. **Timezone** accepts any IANA name and handles DST correctly — `0 9 * * *` in `America/Los_Angeles` fires at 9:00 local year-round; omitted means UTC. **Overlap policy** decides what happens if a firing arrives while the previous run is still going: `"skip"` (default — right for idempotent jobs) or `"allow"` (parallel runs).
 
@@ -274,9 +274,9 @@ The `accessRule` is evaluated on `client.workflows.start()` calls but **not** on
 Inspect webhooks and their recent deliveries (accepted, rejected, duplicate) from the CLI:
 
 ```bash
-primitive webhooks list
-primitive webhooks events <webhook-key>
-primitive webhooks rotate-secret <webhook-key>
+primitive webhooks list                  # shows each webhook's ID
+primitive webhooks events <webhook-id>
+primitive webhooks rotate-secret <webhook-id>
 ```
 
 ## Testing and Debugging Workflows

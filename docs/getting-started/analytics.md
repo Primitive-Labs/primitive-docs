@@ -30,7 +30,7 @@ The platform emits these from the server. No client code required.
 | Documents | `document.created`, `document.viewed`, `document.opened`, `document.updated`, `document.deleted`, `document.tag_added`, `document.tag_removed` |
 | Permissions | `permission.granted`, `permission.revoked`, `permission.pending.cancelled`, `ownership.transferred` |
 | Invitations | `invitation.sent`, `invitation.cancelled`, `invitation.declined` |
-| Auth & Users | `session.refreshed`, `user.removed`, `user.role_changed`, `token.created`, `token.revoked` |
+| Auth & Users | `session.refreshed`, `user.removed`, `user.role_changed`, and API-token `created` / `revoked` (feature `token`) |
 | Workflows / Prompts | `workflow.started`, `workflow.completed`, `workflow.failed`, `prompt.executed` |
 | Integrations | `integration.invoke` |
 

@@ -45,10 +45,12 @@ A prompt can have multiple configurations for different providers, models, and s
 
 ```bash
 primitive prompts configs create <prompt-id> --name "fast" \
-  --provider openrouter --model gpt-4o-mini --temperature 0.3
+  --provider openrouter --model gpt-4o-mini --temperature 0.3 \
+  --user-template "Summarize: {{ input.text }}"
 
 primitive prompts configs create <prompt-id> --name "quality" \
-  --provider gemini --model gemini-2.5-pro --temperature 0.7
+  --provider gemini --model models/gemini-2.5-pro --temperature 0.7 \
+  --user-template "Summarize: {{ input.text }}"
 
 primitive prompts configs activate <prompt-id> <config-id>
 ```

@@ -103,10 +103,6 @@ primitive groups members remove <group-type> <group-id> <user-id>
 
 The CLI takes user IDs. Email-based adds and removes (including pending-signup handling) are client-API features — see `addMember` above.
 
-### Group Roles
-
-Members have a role within each group. Default roles are `member` and `admin`, but you can define custom roles in your group type configuration.
-
 ## Groups and Documents
 
 Grant document access to an entire group instead of individual users:

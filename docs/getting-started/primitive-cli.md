@@ -172,7 +172,7 @@ primitive users list
 primitive users invite user@example.com
 
 # Remove a user
-primitive users remove user@example.com
+primitive users remove <user-id>
 
 # List pending invitations
 primitive users invitations
@@ -357,11 +357,11 @@ primitive workflows runs list
 Manage inbound webhooks that trigger workflows when external services (Stripe, GitHub, Slack, …) send events. Define them as `webhooks/*.toml` in your sync directory, then inspect from the terminal:
 
 ```bash
-primitive webhooks list
-primitive webhooks get <webhook-key>
-primitive webhooks events <webhook-key>     # recent deliveries (accepted/rejected/duplicate)
-primitive webhooks rotate-secret <webhook-key>
-primitive webhooks test <webhook-key>
+primitive webhooks list                    # shows each webhook's ID
+primitive webhooks get <webhook-id>
+primitive webhooks events <webhook-id>      # recent deliveries (accepted/rejected/duplicate)
+primitive webhooks rotate-secret <webhook-id>
+primitive webhooks test <webhook-id>
 ```
 
 See [Inbound Webhooks](./workflows.md#via-inbound-webhooks).
@@ -377,10 +377,10 @@ primitive cron-triggers create \
   --workflow-key send-digest \
   --cron "0 9 * * *" \
   --timezone "America/Los_Angeles"
-primitive cron-triggers test nightly-digest      # fire manually
-primitive cron-triggers pause nightly-digest
-primitive cron-triggers resume nightly-digest
-primitive cron-triggers delete nightly-digest
+primitive cron-triggers test <trigger-id>        # fire manually (ID from cron-triggers list)
+primitive cron-triggers pause <trigger-id>
+primitive cron-triggers resume <trigger-id>
+primitive cron-triggers delete <trigger-id>
 ```
 
 See [Invoking Workflows: On a Schedule](./workflows.md#on-a-schedule-cron-triggers).

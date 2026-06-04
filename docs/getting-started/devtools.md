@@ -168,7 +168,7 @@ The inspector has no authentication — any HTTP client on the same LAN can reac
 
 ## Server Timing
 
-Every REST response from the platform carries a `Server-Timing: handler;dur=<milliseconds>` header, so your browser's Network panel (or any HTTP tooling) can attribute slow requests to server-side handler work.
+Every REST response from the platform carries a `Server-Timing: total;dur=<milliseconds>` header, so your browser's Network panel (or any HTTP tooling) can attribute slow requests to server-side handler work.
 
 ## Production Behavior
 
