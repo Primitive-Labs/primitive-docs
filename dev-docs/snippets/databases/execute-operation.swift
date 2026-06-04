@@ -6,10 +6,10 @@ func executeOperation(client: JsBaoClient, databaseId: String, name: String) asy
   let result = try await client.databases.executeOperation(
     databaseId: databaseId,
     name: name,
-    options: [
-      "params": ["status": "active"],
-      "limit": 25,
-    ]
+    options: ExecuteOperationOptions(
+      params: ["status": "active"],
+      limit: 25
+    )
   )
   // #endregion example
   _ = result

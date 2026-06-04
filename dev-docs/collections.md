@@ -2,29 +2,28 @@
 
 Group documents into collections and manage their membership, group permissions, and pending invitations.
 
-::: warning Swift parity gap
-All 16 `CollectionsAPI` methods exist in both clients, but the Swift client takes and
-returns **untyped `[String: Any]`** where JS uses named interfaces
-(`CollectionInfo`, `CollectionAccessInfo`, `PaginatedResult<T>`,
-`{ success: boolean }`, …) — so the Swift snippets below cast out of
-dictionaries (sweep collections D1,
-[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). Specifics worth
-flagging:
+::: tip Now typed (Swift)
+All 16 `CollectionsAPI` methods are fully typed in the Swift client, matching
+the JS named interfaces field-for-field
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)):
 
-- **`addMember`** returns JS's `CollectionAddMemberResult` discriminated union
-  (`added` / `already_member` / `pending_signup`) but a flat `[String: Any]` in Swift —
-  branch on the `status` key yourself (sweep collections D2,
-  [#453](https://github.com/Primitive-Labs/js-bao-wss/issues/453),
+- Inputs take typed option structs (`CreateCollectionParams`,
+  `UpdateCollectionParams`, `GrantCollectionGroupPermissionParams`,
+  `AddCollectionMemberParams`) instead of `[String: Any]` literals.
+- Outputs decode to named models (`CollectionInfo`, `CollectionDocumentInfo`,
+  `CollectionAccessInfo`, `PendingCollectionInvitationEntry`, …); paginated
+  reads return the shared `PaginatedResult<T>` (`.items` / `.cursor`).
+- **`addMember`** returns the `CollectionAddMemberResult` discriminated union
+  — `.direct(DirectCollectionAdd)` (`status` `"added"` / `"already_member"`)
+  or `.deferred(DeferredCollectionAdd)` (`"pending_signup"`). Build params
+  with `.user(...)` / `.email(...)` (userId XOR email,
   [#671](https://github.com/Primitive-Labs/js-bao-wss/issues/671)).
 - **Mutators** (`delete` / `removeDocument` / `revokeGroupPermission` /
-  `removeMember`) return `{ success: boolean }` in JS but a bare dict in Swift,
-  and the Swift client swallows decode failures (a failed cast surfaces as an
-  empty result rather than an error) — check for an expected key rather than
-  trusting an empty dict (sweep collections D3).
-- **`listAll`** takes positional `limit` / `cursor` args in Swift, while every sibling
-  (`list`, `listDocuments`, `listCollectionsForDocument`) takes a `PaginationOptions`;
-  the Swift `cursor` is raw-interpolated into the request path (latent
-  injection/escaping bug) (sweep collections D4).
+  `removeMember`) return `SuccessResult { success }`; a malformed response now
+  throws a decode error rather than silently returning an empty dict.
+- **`listAll`** keeps its `limit` / `cursor` params and returns
+  `PaginatedResult<CollectionInfo>`; the cursor is now percent-encoded into
+  the request path.
 :::
 
 ## create(params)
@@ -74,7 +73,7 @@ Update a collection's name or description.
 
 ## delete(collectionId)
 
-Delete a collection. Returns `{ success: boolean }` (an untyped dict in Swift).
+Delete a collection. Returns `{ success: boolean }` (`SuccessResult` in Swift).
 
 ::: code-group
 <<< ./snippets/collections/delete.ts#example{ts} [JavaScript]
@@ -146,7 +145,7 @@ Revoke a group's permission from a collection. Returns `{ success: boolean }`.
 
 ## addMember(collectionId, params)
 
-Add a member by `userId` or `email` (mutually exclusive). Returns a discriminated union keyed on `status` in JS; a flat dict in Swift.
+Add a member by `userId` or `email` (mutually exclusive). Returns a discriminated union keyed on `status` — `CollectionAddMemberResult` in Swift.
 
 ::: code-group
 <<< ./snippets/collections/add-member.ts#example{ts} [JavaScript]

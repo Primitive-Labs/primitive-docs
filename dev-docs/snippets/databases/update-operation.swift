@@ -6,7 +6,7 @@ func updateOperation(client: JsBaoClient, databaseId: String, name: String) asyn
   let op = try await client.databases.updateOperation(
     databaseId: databaseId,
     name: name,
-    params: ["access": "public"]
+    params: UpdateOperationParams(access: "public")
   )
   // #endregion example
   _ = op

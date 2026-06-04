@@ -5,7 +5,7 @@ import JsBaoClient
 func getCelContext(client: JsBaoClient, databaseId: String) async throws {
   // #region example
   let payload = try await client.databases.getCelContext(databaseId: databaseId)
-  let celContext = payload["celContext"] as? [String: Any]
+  let celContext = payload.celContext
   // #endregion example
   _ = celContext
 }

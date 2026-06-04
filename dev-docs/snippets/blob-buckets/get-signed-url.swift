@@ -1,8 +1,8 @@
 import JsBaoClient
 
 // Mint a time-limited signed URL that downloads a blob without auth.
-// Swift returns an untyped `[String: Any]` rather than `BlobSignedUrlResult`,
-// so `url` / `token` / `expiresAt` are read out by key.
+// Swift returns a typed `BlobSignedUrlResult` — read `signed.url`,
+// `signed.token`, `signed.expiresAt`, `signed.expiresInSeconds`.
 func getSignedUrl(
   client: JsBaoClient,
   bucketIdOrKey: String,
@@ -14,7 +14,7 @@ func getSignedUrl(
     blobId: blobId,
     expiresInSeconds: 3600
   )
-  let url = signed["url"] as? String
+  let url = signed.url
   // #endregion example
   _ = url
 }

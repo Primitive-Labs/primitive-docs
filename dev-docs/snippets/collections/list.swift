@@ -1,13 +1,15 @@
 import JsBaoClient
 
-// List collections the caller is a direct member of. Swift returns an untyped
-// `[String: Any]` envelope; dig out `items` with a dict cast.
+// List collections the caller is a direct member of. Each item carries a
+// `permission` reflecting the caller's direct access level.
 func list(client: JsBaoClient) async throws {
   // #region example
-  let result = try await client.collections.list(
+  let page = try await client.collections.list(
     options: PaginationOptions(limit: 50)
   )
-  let items = result["items"] as? [[String: Any]] ?? []
+  for collection in page.items {
+    print(collection.name, collection.permission as Any)
+  }
   // #endregion example
-  _ = items
+  _ = page.cursor
 }

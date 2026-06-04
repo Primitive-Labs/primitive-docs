@@ -27,7 +27,9 @@ Deferred features noted by agents: gemini/llm analytics events (#963).
 
 **Wave 2 ✅ (clone builds, dev gate green):** typed `me`, `invitations`, `rule-sets`, `cron` → **#954** for those surfaces; cron typing also fixes its slice of **#991** (silent `?? [:]` coercion → typed decode that throws). Deferred: `me` offline-first `ownedDocuments`/`sharedDocuments` (#938).
 
-**Remaining waves:** groups · collections · databases · workflows · analytics · auth · blob-buckets · integrations · cache · model-surface — plus the feature-sized issues (#963 auto-events, #964 auth, #952 subscribe, #956 runSync, #962a importCsv, #946/#947 model paging) and the 6 new bug issues (#991–#996).
+**Wave 3 ✅ (clone builds, dev gate green):** typed `groups`, `collections`, `databases`, `blob-buckets`, `integrations` → **#954** for those surfaces; also **#453** (groups addMember union), **#671** (collections addMember union), **#958** (integrations call request shape). Deferred features: databases `importCsv` (#962a) + `subscribe` (#952), blob-buckets missing surface (#965).
+
+**Remaining:** workflows · analytics · auth · cache · model-surface — plus the feature-sized issues (#963 auto-events, #964 auth, #952 subscribe, #956 runSync, #962a importCsv, #946/#947 model paging) and the 6 new bug issues (#991–#996; cron's slice of #991 done).
 
 ## ⚪ Stale / invalid → comment recommending close
 | Issue | State | Why |

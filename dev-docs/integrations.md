@@ -7,18 +7,14 @@ Proxy calls to configured third-party integrations through the server.
 Call a third-party integration through the server proxy and unwrap the
 upstream response.
 
-::: warning Swift parity gap
-JS `call<T>` is generic — the response `body` is typed `T`. Swift's
-`IntegrationCallResponse.body` is `Any?`, so you cast at the call site (sweep
-integrations D2, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
-
-::: warning Swift parity gap
-Swift's request shape is narrower and over-eager: `query` is `[String: String]`
-only (JS accepts `Record<string, any>`), and `method`/`path` default to `"GET"`
-/`""` and are always sent. JS omits them when unset so the server applies the
-integration's configured `defaultMethod`/base path — so a Swift call that leaves
-them unset can hit `DISALLOWED_METHOD` where the JS call succeeds
+::: tip Now typed
+The response `body` is a `JSONValue` (JS's generic `T` defaults to `any`) —
+inspect it with `JSONValue`'s accessors/subscripts instead of casting from
+`Any?` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). The
+request `query` is `[String: JSONValue]` (mirroring JS's `Record<string, any>`),
+the request `body` is `JSONValue`, and `method`/`path` are now optional with no
+client-side default — omitting them sends no field, exactly like JS, so the
+server can apply the integration's configured defaults
 ([#958](https://github.com/Primitive-Labs/js-bao-wss/issues/958)).
 :::
 
@@ -29,22 +25,27 @@ them unset can hit `DISALLOWED_METHOD` where the JS call succeeds
 
 ## list()
 
-List the integrations configured for the current app.
+List the integrations configured for the current app. Returns
+`[IntegrationInfo]`.
 
-::: warning No JavaScript equivalent
-Swift-only — the JS `integrations` surface is `call`-only and exposes no catalog
-`list()`. Sweep integrations D1 (Swift-added surface) — no tracking issue filed.
+::: danger Swift-only and runtime-broken
+The JS `integrations` surface is `call`-only — it exposes no catalog `list()`.
+The Swift method also hits a route the server does not implement, so it returns
+`[]` in practice. Kept for source parity and now typed, but don't rely on it
+([#993](https://github.com/Primitive-Labs/js-bao-wss/issues/993)).
 :::
 
 <<< ./snippets/integrations/list.swift#example{swift} [Swift]
 
 ## get(integrationIdOrKey)
 
-Fetch a single integration by id or key.
+Fetch a single integration by id or key. Returns `IntegrationInfo?`.
 
-::: warning No JavaScript equivalent
-Swift-only — the JS `integrations` surface is `call`-only and exposes no catalog
-`get()`. Sweep integrations D1 (Swift-added surface) — no tracking issue filed.
+::: danger Swift-only and runtime-broken
+The JS `integrations` surface is `call`-only — it exposes no catalog `get()`.
+The Swift method also hits a route the server does not implement, so it returns
+`nil` in practice. Kept for source parity and now typed, but don't rely on it
+([#993](https://github.com/Primitive-Labs/js-bao-wss/issues/993)).
 :::
 
 <<< ./snippets/integrations/get.swift#example{swift} [Swift]

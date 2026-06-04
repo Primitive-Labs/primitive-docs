@@ -1,7 +1,6 @@
 import JsBaoClient
 
-// Grant a group a permission level on a collection. Swift takes an untyped
-// params dict and returns an untyped `[String: Any]`.
+// Grant a group a permission level on a collection.
 func grantGroupPermission(
   client: JsBaoClient,
   collectionId: String
@@ -9,11 +8,11 @@ func grantGroupPermission(
   // #region example
   let grant = try await client.collections.grantGroupPermission(
     collectionId: collectionId,
-    params: [
-      "groupType": "team",
-      "groupId": "eng",
-      "permission": "read-write",
-    ]
+    params: GrantCollectionGroupPermissionParams(
+      groupType: "team",
+      groupId: "eng",
+      permission: "read-write"
+    )
   )
   // #endregion example
   _ = grant

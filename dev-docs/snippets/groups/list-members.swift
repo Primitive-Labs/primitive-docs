@@ -1,7 +1,7 @@
 import JsBaoClient
 
-// List members of a group, with optional pagination. Swift takes a typed
-// `PaginationOptions` but returns an untyped `[String: Any]` envelope.
+// List members of a group, with optional pagination. Returns a typed
+// `PaginatedResult<GroupMemberInfo>`.
 func listMembers(client: JsBaoClient, groupType: String, groupId: String) async throws {
   // #region example
   let page = try await client.groups.listMembers(
@@ -9,11 +9,10 @@ func listMembers(client: JsBaoClient, groupType: String, groupId: String) async 
     groupId: groupId,
     options: PaginationOptions(limit: 50)
   )
-  let members = page["items"] as? [[String: Any]] ?? []
-  for member in members {
-    print(member["userId"] ?? "", member["userName"] ?? "")
+  for member in page.items {
+    print(member.userId, member.userName ?? "", member.userEmail ?? "")
   }
-  let nextCursor = page["cursor"] as? String
+  let nextCursor = page.cursor
   // #endregion example
   _ = nextCursor
 }

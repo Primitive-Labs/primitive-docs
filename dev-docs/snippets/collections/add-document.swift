@@ -1,6 +1,6 @@
 import JsBaoClient
 
-// Add a document to a collection. Swift returns an untyped `[String: Any]`.
+// Add a document to a collection. Returns a `CollectionDocumentInfo`.
 func addDocument(
   client: JsBaoClient,
   collectionId: String,

@@ -1,12 +1,10 @@
 import JsBaoClient
 
-// List every collection in the app (admin-only). Swift takes positional
-// `limit`/`cursor` args (not `PaginationOptions` like its siblings) and
-// returns an untyped `[String: Any]` envelope.
+// List every collection in the app (admin-only). Unlike `list()`, items do
+// NOT carry a `permission` field. Keeps positional `limit`/`cursor` params.
 func listAll(client: JsBaoClient) async throws {
   // #region example
-  let result = try await client.collections.listAll(limit: 100)
-  let items = result["items"] as? [[String: Any]] ?? []
+  let page = try await client.collections.listAll(limit: 100)
   // #endregion example
-  _ = items
+  _ = page.items
 }

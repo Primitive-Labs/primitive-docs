@@ -1,10 +1,9 @@
 import JsBaoClient
 
-// List the databases the current user can access.
-// Swift's list() takes no arguments — the JS `databaseType` filter is JS-only (#962).
-func list(client: JsBaoClient) async throws {
+// List the databases the current user can access (optionally filtered by type).
+func list(client: JsBaoClient, databaseType: String) async throws {
   // #region example
-  let databases = try await client.databases.list()
+  let databases = try await client.databases.list(databaseType: databaseType)
   // #endregion example
   _ = databases
 }

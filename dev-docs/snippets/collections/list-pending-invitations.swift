@@ -1,7 +1,6 @@
 import JsBaoClient
 
-// List pending (deferred, non-expired) invitations for a collection. Swift
-// returns an untyped `[[String: Any]]` array.
+// List pending (deferred, non-expired) invitations for a collection.
 func listPendingInvitations(
   client: JsBaoClient,
   collectionId: String
@@ -11,8 +10,7 @@ func listPendingInvitations(
     collectionId: collectionId
   )
   for invite in pending {
-    let email = invite["email"] as? String
-    _ = email
+    print(invite.email, invite.permission, invite.expiresAt)
   }
   // #endregion example
   _ = pending

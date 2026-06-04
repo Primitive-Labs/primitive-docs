@@ -6,7 +6,7 @@ func update(client: JsBaoClient, groupType: String, groupId: String) async throw
   let group = try await client.groups.update(
     groupType: groupType,
     groupId: groupId,
-    params: ["name": "Design Guild", "description": "Renamed crew"]
+    params: UpdateGroupParams(name: "Design Guild", description: "Renamed crew")
   )
   // #endregion example
   _ = group

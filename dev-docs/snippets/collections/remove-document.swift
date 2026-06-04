@@ -1,7 +1,6 @@
 import JsBaoClient
 
-// Remove a document from a collection. Swift returns an untyped `[String: Any]`
-// rather than JS's `{ success: boolean }`.
+// Remove a document from a collection. Returns `SuccessResult { success }`.
 func removeDocument(
   client: JsBaoClient,
   collectionId: String,
@@ -12,7 +11,7 @@ func removeDocument(
     collectionId: collectionId,
     documentId: documentId
   )
-  let success = result["success"] as? Bool ?? false
+  let success = result.success
   // #endregion example
   _ = success
 }

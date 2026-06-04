@@ -9,21 +9,21 @@ A bucket holds many blobs. Bucket CRUD (`createBucket`, `listBuckets`,
 (`upload`, `list`, `getMetadata`, `download`, `delete`, `getSignedUrl`) act on
 blobs inside a bucket, addressed by `bucketIdOrKey`.
 
-::: tip Divergent shape
-Both clients expose all ten methods under `client.blobBuckets`, but the Swift
-client is largely **untyped**: it takes `[String: Any]` param dictionaries and
-returns `[String: Any]` / `[[String: Any]]` where JS has named, fully-typed
-interfaces (`CreateBlobBucketParams`, `BlobBucketInfo`, `BlobInfo`,
-`BucketBlobListResult`, `BlobSignedUrlResult`) and closed enums
-(`BlobBucketTtlTier`, `BlobBucketAccessPolicy`). Mutation methods that resolve
-to `{ deleted: boolean }` in JS hand back an untyped dict in Swift, and
-`upload`/`list` flatten the JS options object into separate (labeled)
-arguments.
-`upload` also narrows the body type to `Data` (Swift) vs
-`ArrayBuffer | Uint8Array | Blob | string` (JS), and `download` returns `Data`
-vs `ArrayBuffer`. Both compile; the shapes differ
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), blobBuckets
-sweep D1–D5).
+::: tip Now typed (Swift)
+Both clients expose all ten methods under `client.blobBuckets`. The Swift client
+is now fully typed: `createBucket` takes a `CreateBlobBucketParams` with closed
+`BlobBucketTtlTier` / `BlobBucketAccessPolicy` enums, and the read methods return
+named models — `BlobBucketInfo`, `BucketBlobInfo` (the bucket-scoped blob; named
+to avoid colliding with the per-document `BlobInfo`), `BucketBlobListResult`
+(`items` + optional `cursor`), and `BlobSignedUrlResult`. `deleteBucket` and the
+blob `delete` return a typed `BlobDeletedResult` (`.deleted`).
+
+Two **by-design** binary mappings remain: `upload` takes a `Data` body (vs JS's
+`ArrayBuffer | Uint8Array | Blob | string`) and `download` returns `Data` (vs
+`ArrayBuffer`) — the idiomatic raw-bytes type on each platform. `upload` and
+`list` also take their options as labeled arguments rather than an options
+struct, but every value is typed
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ## createBucket(params)
@@ -33,13 +33,11 @@ and `accessPolicy` are required. `ttlTier` is one of `"1d"`, `"3d"`, `"14d"`,
 `"28d"`, `"180d"`, `"365d"`, `"permanent"`; `accessPolicy` is one of
 `"public-read"`, `"authenticated"`, `"owner-only"`.
 
-::: warning Swift parity gap
-Swift takes an untyped `[String: Any]` param dictionary with bare `ttlTier` /
-`accessPolicy` strings, where JS has a named `CreateBlobBucketParams` and closed
-enums (`BlobBucketTtlTier`, `BlobBucketAccessPolicy`). Nothing constrains the
-tier/policy values at compile time on iOS
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), sweep
-blobBuckets D1).
+::: tip Now typed (Swift)
+Swift takes a `CreateBlobBucketParams` struct with closed `BlobBucketTtlTier` /
+`BlobBucketAccessPolicy` enums (invalid tier/policy values won't compile) and
+returns a typed `BlobBucketInfo`
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group
@@ -51,11 +49,9 @@ blobBuckets D1).
 
 List every blob bucket for the current app (admin/owner only).
 
-::: warning Swift parity gap
-Swift returns `[[String: Any]]` instead of typed `BlobBucketInfo` values, so
-every field is accessed via dictionary casts rather than the named JS interface
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), sweep
-blobBuckets D2).
+::: tip Now typed (Swift)
+Swift returns `[BlobBucketInfo]` — each field is a typed property
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group
@@ -67,11 +63,9 @@ blobBuckets D2).
 
 Fetch a single bucket by its `bucketId` or `bucketKey`.
 
-::: warning Swift parity gap
-Swift returns an untyped `[String: Any]` rather than a typed `BlobBucketInfo`,
-so the result must be read with dictionary casts on iOS
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), sweep
-blobBuckets D2).
+::: tip Now typed (Swift)
+Swift returns a typed `BlobBucketInfo`
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group
@@ -83,11 +77,9 @@ blobBuckets D2).
 
 Delete a bucket and every blob inside it. JS resolves to `{ deleted: boolean }`.
 
-::: warning Swift parity gap
-Swift drops the `{ deleted: boolean }` result shape — callers can't read the
-typed `deleted` flag and the examples discard the return entirely
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), sweep
-blobBuckets D4).
+::: tip Now typed (Swift)
+Swift returns a typed `BlobDeletedResult` — read the flag via `result.deleted`
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group
@@ -99,13 +91,13 @@ blobBuckets D4).
 
 Upload a blob into a bucket. Returns metadata including the server-minted
 `blobId`. In JS `data` accepts `ArrayBuffer | Uint8Array | Blob | string`; the
-Swift client narrows it to `Data` and takes the options as positional args.
+Swift client narrows it to `Data` and takes the options as labeled args.
 
-::: warning Swift parity gap
-Beyond the `Data`-only body and flattened (labeled) options, Swift returns an
-untyped `[String: Any]` (`result["blobId"] as? String`) where JS resolves to a
-typed `BlobInfo` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954),
-sweep blobBuckets D5).
+::: tip Now typed (Swift)
+Swift returns a typed `BucketBlobInfo` (read `blob.blobId`, `blob.numBytes`,
+`blob.tags`, …). The `Data`-only body and labeled options are by-design platform
+mappings, not parity gaps
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group
@@ -116,15 +108,13 @@ sweep blobBuckets D5).
 ## list(bucketIdOrKey, options?)
 
 List blobs in a bucket. Uses R2 cursor pagination — pass `cursor` and `limit`.
-JS returns `{ items, cursor? }` (`BucketBlobListResult`); Swift returns an
-untyped dict with the same keys.
+JS returns `{ items, cursor? }` (`BucketBlobListResult`); Swift returns the same
+shape, typed.
 
-::: warning Swift parity gap
-Swift returns a raw dict — `page["items"] as? [[String: Any]]` — instead of the
-typed `BucketBlobListResult`, and each item is itself an untyped dict rather
-than a `BlobInfo`
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), sweep
-blobBuckets D2/D3).
+::: tip Now typed (Swift)
+Swift returns a `BucketBlobListResult` — `page.items` is `[BucketBlobInfo]` and
+`page.cursor` is `String?`. `cursor` / `limit` stay labeled arguments
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group
@@ -137,11 +127,10 @@ blobBuckets D2/D3).
 Read a blob's metadata (size, content type, tags, sha256) without downloading
 the bytes.
 
-::: warning Swift parity gap
-Swift hands back an untyped `[String: Any]` (`meta["size"]`, `meta["sha256"]`,
-…) where JS resolves to a typed `BlobInfo`
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), sweep
-blobBuckets D2).
+::: tip Now typed (Swift)
+Swift returns a typed `BucketBlobInfo` — read `meta.numBytes`, `meta.sha256`,
+`meta.tags`, … as properties
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group
@@ -159,8 +148,7 @@ Swift hands back a `Data` value where JS resolves to an `ArrayBuffer` — the
 idiomatic raw-bytes type on each platform (Swift has no `ArrayBuffer`; JS has no
 `Data`). This is a by-design binary-type mapping, the read-side mirror of the
 `Data`-only body that `upload` accepts
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), sweep
-blobBuckets D5).
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group
@@ -172,11 +160,9 @@ blobBuckets D5).
 
 Delete a single blob from a bucket. JS resolves to `{ deleted: boolean }`.
 
-::: warning Swift parity gap
-Swift drops the `{ deleted: boolean }` result shape — there's no typed
-`deleted` flag to inspect, and the examples discard the return
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), sweep
-blobBuckets D4).
+::: tip Now typed (Swift)
+Swift returns a typed `BlobDeletedResult` — read `result.deleted`
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group
@@ -188,13 +174,12 @@ blobBuckets D4).
 
 Mint a time-limited signed URL that downloads a blob without auth. JS returns
 `{ url, token, expiresAt, expiresInSeconds }` (`BlobSignedUrlResult`); Swift
-returns an untyped dict with the same keys.
+returns the same shape, typed.
 
-::: warning Swift parity gap
-Swift returns a raw dict — `signed["url"] as? String` — instead of the typed
-`BlobSignedUrlResult`, so the URL/token/expiry fields aren't statically known on
-iOS ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), sweep
-blobBuckets D3).
+::: tip Now typed (Swift)
+Swift returns a typed `BlobSignedUrlResult` — read `signed.url`, `signed.token`,
+`signed.expiresAt`, `signed.expiresInSeconds`
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group

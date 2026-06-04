@@ -1,7 +1,7 @@
 import JsBaoClient
 
-// Delete a single blob from a bucket. Swift returns an untyped
-// `[String: Any]` rather than the JS `{ deleted: boolean }` shape.
+// Delete a single blob from a bucket. Swift returns a typed
+// `BlobDeletedResult` mirroring the JS `{ deleted: boolean }` shape.
 func deleteBlob(
   client: JsBaoClient,
   bucketIdOrKey: String,
@@ -12,7 +12,7 @@ func deleteBlob(
     bucketIdOrKey: bucketIdOrKey,
     blobId: blobId
   )
-  let deleted = result["deleted"] as? Bool ?? false
+  let deleted = result.deleted
   // #endregion example
   _ = deleted
 }

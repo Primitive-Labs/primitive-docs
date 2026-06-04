@@ -4,11 +4,11 @@ Create and manage groups, their membership, pending invitations, and the
 documents and databases shared with them. The signed-in user's own memberships
 are reachable via `listUserMemberships`.
 
-::: tip Untyped Swift surface
-Every Swift `groups` method takes and returns untyped `[String: Any]` /
-`[[String: Any]]` where JS uses named interfaces (`GroupInfo`,
-`GroupMemberInfo`, `PaginatedResult<T>`, …). Both compile; the JS shapes are
-typed and the Swift shapes are hand-parsed dictionaries
+::: tip Now typed
+The Swift `groups` surface is fully typed and matches JS field-for-field:
+named models (`GroupInfo`, `GroupMemberInfo`, `GroupMembershipInfo`,
+`PaginatedResult<GroupInfo>`, …), `Encodable` option structs for inputs, and a
+`GroupAddMemberResult` discriminated union for `addMember`
 ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
@@ -26,12 +26,8 @@ Create a new group. `groupType`, `groupId`, and `name` are required;
 
 List groups, optionally filtered by `type`, with cursor pagination.
 
-::: warning Swift parity gap
-JS returns a typed `PaginatedResult<GroupInfo>` and accepts an `includeSystem`
-option (to surface platform-internal `_`-prefixed groups). Swift returns an
-untyped `[String: Any]` envelope and has no `includeSystem` parameter (groups D2,
-[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
+Swift returns a typed `PaginatedResult<GroupInfo>` and accepts the same
+`includeSystem` option as JS (to surface platform-internal `_`-prefixed groups).
 
 ::: code-group
 <<< ./snippets/groups/list.ts#example{ts} [JavaScript]
@@ -58,8 +54,7 @@ Update a group's `name` and/or `description`.
 
 ## delete(groupType, groupId)
 
-Delete a group. JS returns `{ success: boolean }`; Swift returns an untyped
-`[String: Any]`.
+Delete a group. Both JS and Swift return `{ success: boolean }`.
 
 ::: code-group
 <<< ./snippets/groups/delete.ts#example{ts} [JavaScript]
@@ -70,12 +65,8 @@ Delete a group. JS returns `{ success: boolean }`; Swift returns an untyped
 
 List the members of a group, with optional `limit` / `cursor` pagination.
 
-::: warning Swift parity gap
-Swift takes a typed `PaginationOptions` but returns an untyped `[String: Any]`
-envelope, where JS returns a typed `PaginatedResult<GroupMemberInfo>` (`{ items,
-cursor? }`) (groups D2,
-[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
+Swift takes a typed `PaginationOptions` and returns a typed
+`PaginatedResult<GroupMemberInfo>` (`{ items, cursor? }`), matching JS.
 
 ::: code-group
 <<< ./snippets/groups/list-members.ts#example{ts} [JavaScript]
@@ -86,15 +77,19 @@ cursor? }`) (groups D2,
 
 Add a user to a group by `userId` **or** `email` (mutually exclusive).
 
-::: tip Divergent shape
-JS returns a discriminated union (`GroupAddMemberResult`) keyed on `status` —
-`"added"`, `"already_member"`, or `"pending_signup"` (a deferred add for an
-email with no app user yet, carrying `deferredId` / `inviteToken` / `expiresAt`).
-The JS params type also enforces the userId-XOR-email contract at compile time.
-Swift takes an untyped `[String: Any]` (no XOR enforcement) and returns an
-untyped `[String: Any]`, so you hand-parse the `status` discriminator
+Both clients return a discriminated union (`GroupAddMemberResult`) keyed on
+`status` — `"added"`, `"already_member"`, or `"pending_signup"` (a deferred add
+for an email with no app user yet, carrying `deferredId` / `inviteToken` /
+`expiresAt`). In Swift, switch over `.direct(DirectGroupAdd)` /
+`.deferred(DeferredGroupAdd)`. Build `params` with the `.userId(_:)` /
+`.email(_:)` factories on `AddGroupMemberParams`
 ([#453](https://github.com/Primitive-Labs/js-bao-wss/issues/453),
 [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+
+::: tip Mutual exclusivity
+JS enforces the userId-XOR-email contract at compile time via a union type. In
+Swift the `.userId(_:)` / `.email(_:)` factories make the choice exclusive by
+construction.
 :::
 
 ::: code-group
@@ -127,11 +122,12 @@ instead.
 
 List every group a user belongs to.
 
-::: tip Divergent shape
-JS accepts an optional `{ groupType }` filter applied server-side. The Swift
-client has no `groupType` parameter
-([#960](https://github.com/Primitive-Labs/js-bao-wss/issues/960)) — it returns
-all memberships, so filter client-side.
+::: tip Now typed
+Both clients accept an optional server-side `groupType` filter and return typed
+`GroupMembershipInfo` rows. In JS pass `{ groupType }`; in Swift pass the
+`groupType:` parameter
+([#960](https://github.com/Primitive-Labs/js-bao-wss/issues/960),
+[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ::: code-group

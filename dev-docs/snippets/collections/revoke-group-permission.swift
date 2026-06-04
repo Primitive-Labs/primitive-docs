@@ -1,7 +1,6 @@
 import JsBaoClient
 
-// Revoke a group's permission from a collection. Swift takes positional
-// `groupType`/`groupId` and returns an untyped `[String: Any]`.
+// Revoke a group's permission from a collection. Returns `SuccessResult`.
 func revokeGroupPermission(
   client: JsBaoClient,
   collectionId: String
@@ -12,7 +11,7 @@ func revokeGroupPermission(
     groupType: "team",
     groupId: "eng"
   )
-  let success = result["success"] as? Bool ?? false
+  let success = result.success
   // #endregion example
   _ = success
 }

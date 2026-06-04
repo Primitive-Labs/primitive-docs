@@ -1,16 +1,16 @@
 import JsBaoClient
 
-// List blobs in a bucket. Swift flattens the options into positional
-// `cursor`/`limit` args and returns an untyped `[String: Any]` (no
-// `BucketBlobListResult`), so `items` / `cursor` are dug out by key.
+// List blobs in a bucket. Swift takes labeled `cursor`/`limit` args and
+// returns a typed `BucketBlobListResult` — `items` is `[BucketBlobInfo]` and
+// `cursor` is `String?`.
 func list(client: JsBaoClient, bucketIdOrKey: String) async throws {
   // #region example
   let page = try await client.blobBuckets.list(
     bucketIdOrKey: bucketIdOrKey,
     limit: 50
   )
-  let items = page["items"] as? [[String: Any]] ?? []
-  let nextCursor = page["cursor"] as? String
+  let items = page.items
+  let nextCursor = page.cursor
   // #endregion example
   _ = (items, nextCursor)
 }

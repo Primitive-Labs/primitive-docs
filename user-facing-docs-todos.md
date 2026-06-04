@@ -143,3 +143,13 @@ Client typed + cookbook updated; clone builds, dev gate green. Unlike wave 1, th
 - **`invitations`** — `…_SHARING_AND_INVITATIONS.swift.md` (primary) + USERS_AND_GROUPS / DOCUMENTS / SWIFT_CLIENT / AUTHENTICATION guides are on the untyped invitations API. **Doc bug:** `docs/getting-started/sharing-and-invitations.md` (~line 105) references `invitations.getAcceptToken(...)`, which exists in neither client → should be `invitations.get()`.
 - **`rule-sets`** — `…_USERS_AND_GROUPS.swift.md` (~lines 653/671) typed `test()`/`debug()` examples → typed structs.
 - **`cron`** — main-corpus `examples/cron-triggers/*.swift` and `Tests/JsBaoClientTests/API/ApiParityTests.swift` (cron `create`/`update` dict literals) need typed-struct updates before `swift test` passes.
+
+### Wave 3 (done) — groups, collections, databases, blob-buckets, integrations
+Client typed + cookbook updated; clone builds, dev gate green. Follow-ups:
+- **groups** → `guides/latest/AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.swift.md` (primary), `…_SHARING_AND_INVITATIONS.swift.md`.
+- **collections** → `…_DOCUMENTS.swift.md`, `…_SHARING_AND_INVITATIONS.swift.md` (remove the stale "Gap ([#671](https://github.com/Primitive-Labs/js-bao-wss/issues/671))" callout); main-corpus `examples/sharing/*` + `examples/documents/*` collections usage.
+- **databases** → `…_DATABASES.swift.md` (primary) + DATA_MODELING/PERFORMANCE guides; `docs/getting-started/{working-with-databases,choosing-your-data-model,defining-your-models}.md`. Signature changes to surface: `addManager(params:)` (was flat `userId:`), `list(databaseType:)`, `executeOperation → JSONValue`.
+- **blob-buckets** → `…_BLOBS.swift.md`.
+- **integrations** → `docs/getting-started/api-integrations.md` + `…_INTEGRATIONS.swift.md`.
+
+**Client test target** now needs migration before `swift test`: `CollectionsTests`, `DatabaseTests`, `ApiParityTests` (cron/blobBuckets), plus the documents tests flagged earlier — all call old untyped signatures (the library target itself builds clean).

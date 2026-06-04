@@ -5,12 +5,15 @@ and bulk data. Records are read and written through named **operations** —
 register them with `createOperation`, then run them via `executeOperation` /
 `executeBatch`.
 
-::: warning Untyped Swift surface
-Every Swift `databases.*` method takes and returns untyped `[String: Any]` /
-`[[String: Any]]` where JavaScript uses named interfaces (`DatabaseInfo`,
-`DatabasePermissionEntry`, `DatabaseOperationInfo`, …). The calls are
-name-for-name equivalent but Swift callers dig fields out of dictionaries
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+::: tip Now typed
+The Swift `databases.*` surface is fully typed: methods take and return named
+models (`DatabaseInfo`, `DatabasePermissionEntry`, `DatabaseOperationInfo`,
+`ModelFieldInfo`, …) and option structs (`CreateDatabaseParams`,
+`UpdateDatabaseParams`, `CreateOperationParams`, `ExecuteOperationOptions`, …)
+that mirror the JS interfaces field-for-field
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). Opaque blobs
+— a database's CEL context, an operation's `definition`/`params`, and ad-hoc
+query results from `executeOperation` — are typed as `JSONValue`.
 :::
 
 ## create(params)
@@ -26,12 +29,8 @@ Create a new database of a given type.
 
 List the databases the current user can access.
 
-::: warning Swift parity gap
-JavaScript accepts a `{ databaseType }` filter; the Swift `list()` takes no
-arguments and returns **every** accessible database, so you must filter
-client-side. This is a tracked Swift gap, not a platform constraint
-([#962](https://github.com/Primitive-Labs/js-bao-wss/issues/962)).
-:::
+The Swift `list(databaseType:)` accepts the same single-type filter as the JS
+`{ databaseType }` option and returns `[DatabaseInfo]`.
 
 ::: code-group
 <<< ./snippets/databases/list.ts#example{ts} [JavaScript]
@@ -96,13 +95,6 @@ List all permission entries for a database.
 ## addManager(databaseId, params)
 
 Add a user as a manager of a database.
-
-::: warning Swift parity gap
-JavaScript wraps the user in an `AddManagerParams` object (`{ userId }`); Swift
-flattens it to a direct `userId` argument, so the two signatures diverge. A
-tracked parity gap, not a deliberate convention
-([#962](https://github.com/Primitive-Labs/js-bao-wss/issues/962)).
-:::
 
 ::: code-group
 <<< ./snippets/databases/add-manager.ts#example{ts} [JavaScript]
@@ -264,9 +256,11 @@ Import data from a CSV string into a database, with column mapping, type
 coercion, per-row transforms, and progress callbacks.
 
 ::: warning No Swift equivalent
-JavaScript-only rich CSV pipeline. The Swift client exposes only
-`importRows(databaseId:operationName:rows:)`, which takes pre-parsed row
-dictionaries — parse the CSV yourself first
+JavaScript-only rich CSV pipeline (column mapping, type coercion, per-row
+transforms, progress callbacks). The Swift client exposes only the typed
+`importRows(databaseId:operationName:rows:)` — it takes pre-parsed
+`[[String: JSONValue]]` rows and returns a `DatabaseBatchResult`, so parse the
+CSV yourself first
 ([#962](https://github.com/Primitive-Labs/js-bao-wss/issues/962)).
 :::
 

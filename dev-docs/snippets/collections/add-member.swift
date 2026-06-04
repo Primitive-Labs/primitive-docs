@@ -1,28 +1,21 @@
 import JsBaoClient
 
-// Add a member by userId or email. Swift returns a FLAT untyped `[String: Any]`
-// rather than JS's `CollectionAddMemberResult` discriminated union — branch on
-// the `status` key yourself.
+// Add a member by userId or email (mutually exclusive). Returns the
+// `CollectionAddMemberResult` discriminated union — switch on the case.
 func addMember(client: JsBaoClient, collectionId: String) async throws {
   // #region example
   let result = try await client.collections.addMember(
     collectionId: collectionId,
-    params: [
-      "email": "teammate@example.com",
-      "permission": "read-write",
-      "sendEmail": true,
-    ]
+    params: .email("teammate@example.com", permission: .readWrite, sendEmail: true)
   )
 
-  let status = result["status"] as? String
-  if status == "pending_signup" {
+  switch result {
+  case let .deferred(add):
     // Email not yet an app user — a deferred invite was created.
-    let inviteToken = result["inviteToken"] as? String
-    _ = inviteToken
-  } else {
+    print(add.invitationId, add.inviteToken as Any)
+  case let .direct(add):
     // "added" or "already_member" — a real membership exists.
-    let userId = result["userId"] as? String
-    _ = userId
+    print(add.userId, add.permission)
   }
   // #endregion example
   _ = result
