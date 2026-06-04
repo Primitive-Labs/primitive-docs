@@ -1,11 +1,14 @@
 import JsBaoClient
 
-// List documents the current user owns. Swift accepts only `cursor`/`limit`/`tag`
-// and returns the raw `{ items, cursor? }` envelope as an untyped dictionary.
+// List documents the current user owns. Swift returns a typed `[DocumentInfo]`
+// and accepts `cursor`/`limit`/`tag` (a bare network GET — the offline-first
+// option set and cache-merge are a deferred feature gap, #938).
 func ownedDocuments(client: JsBaoClient) async throws {
   // #region example
-  let result = try await client.me.ownedDocuments(limit: 50, tag: "project")
-  let items = result["items"] as? [[String: Any]] ?? []
+  let docs = try await client.me.ownedDocuments(limit: 50, tag: "project")
+  for doc in docs {
+    print(doc.documentId, doc.title)
+  }
   // #endregion example
-  _ = items
+  _ = docs
 }

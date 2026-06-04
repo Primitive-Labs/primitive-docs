@@ -1,10 +1,9 @@
 import JsBaoClient
 
-// List rule sets. Swift takes a positional `resourceType:` filter (no
-// `ListRuleSetsOptions` object) and returns untyped `[[String: Any]]`.
+// List rule sets, optionally filtered via a typed `ListRuleSetsOptions` object.
 func list(client: JsBaoClient) async throws {
   // #region example
-  let ruleSets = try await client.ruleSets.list(resourceType: "document")
+  let ruleSets = try await client.ruleSets.list(options: ListRuleSetsOptions(resourceType: "document"))
   // #endregion example
   _ = ruleSets
 }

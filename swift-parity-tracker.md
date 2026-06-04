@@ -25,7 +25,9 @@ Also added four manager-backed `DocumentsAPI` methods: `openAlias`, `isReadOnly`
 **Wave 1 ✅ (clone builds, dev gate green):** typed `session`, `users`, `gemini`, `llm`, `databaseTypeConfigs`, `collectionTypeConfigs`, `groupTypeConfigs` → addresses **#954** for those surfaces; also resolves **#590** (groupType encoding), **#596** (collectionType encoding), and the named `GetUserOptions` (users D1). Bounded behavioral fixes landed alongside: **#959** (`WORKFLOW_APPLY_NOT_CONFIRMED`), **#960** (`listUserMemberships(groupType:)`), **#962** (`databases.list(databaseType:)`, partial — `importCsv` still pending).
 Deferred features noted by agents: gemini/llm analytics events (#963).
 
-**Remaining waves:** me · invitations · rule-sets · cron · groups · collections · databases · workflows · analytics · auth · blob-buckets · integrations · cache · model-surface — plus the feature-sized issues (#963 auto-events, #964 auth, #952 subscribe, #956 runSync, #962a importCsv, #946/#947 model paging) and the 6 new bug issues (#991–#996).
+**Wave 2 ✅ (clone builds, dev gate green):** typed `me`, `invitations`, `rule-sets`, `cron` → **#954** for those surfaces; cron typing also fixes its slice of **#991** (silent `?? [:]` coercion → typed decode that throws). Deferred: `me` offline-first `ownedDocuments`/`sharedDocuments` (#938).
+
+**Remaining waves:** groups · collections · databases · workflows · analytics · auth · blob-buckets · integrations · cache · model-surface — plus the feature-sized issues (#963 auto-events, #964 auth, #952 subscribe, #956 runSync, #962a importCsv, #946/#947 model paging) and the 6 new bug issues (#991–#996).
 
 ## ⚪ Stale / invalid → comment recommending close
 | Issue | State | Why |

@@ -2,11 +2,15 @@
 
 Define, inspect, and simulate CEL-based access rule sets for resource types.
 
-::: tip Divergent shape
-Every Swift `ruleSets` method takes and returns an **untyped `[String: Any]`** where JS
-uses named interfaces — `RuleSetInfo`, `RuleSetSchema`, `CreateRuleSetParams`, the nested CEL
-`ModelRulesInfo` / `TriggerDefInfo` rule grammar, `RuleSetTestResult`, and `RuleSetDebugResult`.
-Both compile; the shapes differ ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+::: tip Now typed
+Both surfaces use named types field-for-field — `RuleSetInfo`, `RuleSetSchema`,
+`CreateRuleSetParams` / `UpdateRuleSetParams`, the nested CEL `ModelRulesInfo` /
+`TriggerDefInfo` rule grammar, `TestRuleSetParams` / `RuleSetTestResult`, and
+`DebugRuleSetParams` / `RuleSetDebugResult`. `list` takes a typed
+`ListRuleSetsOptions`, and `delete` returns `SuccessResult`. CEL evaluation
+`context`, simulated `record` data, the schema `resourceTypes` map, and trace
+`args`/`result` stay opaque (`JSONValue`), mirroring JS's `any`
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
 :::
 
 ## create(params)
@@ -20,8 +24,8 @@ Create a new rule set for a resource type, including its CEL trigger rules.
 
 ## list(options?)
 
-List rule sets, optionally filtered by resource type. JS takes a typed
-`ListRuleSetsOptions` object; Swift takes a positional `resourceType:` filter.
+List rule sets, optionally filtered by resource type. Both surfaces take a
+typed `ListRuleSetsOptions` object.
 
 ::: code-group
 <<< ./snippets/rule-sets/list.ts#example{ts} [JavaScript]
@@ -48,8 +52,8 @@ Update a rule set's name, description, or rules.
 
 ## delete(ruleSetId)
 
-Delete a rule set by its ID. JS returns a typed `{ success: boolean }`; Swift returns
-an untyped `[String: Any]` envelope ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+Delete a rule set by its ID. Both surfaces return a typed success flag
+(`{ success: boolean }` in JS, `SuccessResult` in Swift).
 
 ::: code-group
 <<< ./snippets/rule-sets/delete.ts#example{ts} [JavaScript]

@@ -1,7 +1,7 @@
 import JsBaoClient
 
-// Retrieve the rule set schema. Swift returns an untyped `[String: Any]`
-// (no `RuleSetSchema` struct).
+// Retrieve the rule set schema. Swift returns a typed `RuleSetSchema`
+// (`resourceTypes` is an opaque `[String: JSONValue]` map).
 func schema(client: JsBaoClient) async throws {
   // #region example
   let schema = try await client.ruleSets.schema()

@@ -1,21 +1,20 @@
 import JsBaoClient
 
 // List pending deferred grants (admin/owner only) — permissions/memberships
-// created for users who haven't signed up yet. Swift takes flat args and
-// returns an untyped `[String: Any]`, dropping JS's typed `DeferredGrant`
-// union, so each grant is inspected via dictionary casts on `type`.
+// created for users who haven't signed up yet. Returns a typed
+// `{ grants, nextCursor }` page; each grant is a `DeferredGrant` union
+// discriminated on `type` (.document | .group).
 func listDeferredGrants(client: JsBaoClient) async throws {
   // #region example
   let result = try await client.invitations.listDeferredGrants(
-    type: "document", limit: 25
+    type: .document, limit: 25
   )
-  let grants = result["grants"] as? [[String: Any]] ?? []
-  for grant in grants where grant["type"] as? String == "document" {
-    let documentId = grant["documentId"] as? String ?? ""
-    let permission = grant["permission"] as? String ?? ""
-    print(documentId, permission)
+  for grant in result.grants {
+    if case let .document(doc) = grant {
+      print(doc.documentId, doc.permission)
+    }
   }
-  let nextCursor = result["nextCursor"] as? String
+  let nextCursor = result.nextCursor
   // #endregion example
   _ = nextCursor
 }

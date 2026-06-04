@@ -136,3 +136,10 @@ Client typed + cookbook updated; clone builds and the dev gate is green. **No *r
 - If a Swift tab is ever added for `users.lookup` in `docs/getting-started/sharing-and-invitations.md` / `users-and-groups.md`, use the typed `UserLookupResult`.
 
 Also landed (bounded behavioral fixes, separate from typing): `JsBaoErrorCode.workflowApplyNotConfirmed` ([#959](https://github.com/Primitive-Labs/js-bao-wss/issues/959)), `groups.listUserMemberships(groupType:)` ([#960](https://github.com/Primitive-Labs/js-bao-wss/issues/960)), `databases.list(databaseType:)` ([#962](https://github.com/Primitive-Labs/js-bao-wss/issues/962)), `collectionTypeConfigs`/`groupTypeConfigs` path-encoding ([#596](https://github.com/Primitive-Labs/js-bao-wss/issues/596)/[#590](https://github.com/Primitive-Labs/js-bao-wss/issues/590)).
+
+### Wave 2 (done) — me, invitations, rule-sets, cron
+Client typed + cookbook updated; clone builds, dev gate green. Unlike wave 1, these **do** have required user-facing follow-ups:
+- **`me`** — `guides/latest/AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.swift.md` and `…_DOCUMENTS.swift.md` carry now-incorrect claims to fix: "Swift always returns the envelope as `[String: Any]`" and "`ownedDocuments()` is cache-backed and offline-aware" (the latter is the [#938](https://github.com/Primitive-Labs/js-bao-wss/issues/938) gap — Swift is a bare GET). Move to the typed `UserProfile` / `DocumentInfo` / `SharedDocumentListResult` surface.
+- **`invitations`** — `…_SHARING_AND_INVITATIONS.swift.md` (primary) + USERS_AND_GROUPS / DOCUMENTS / SWIFT_CLIENT / AUTHENTICATION guides are on the untyped invitations API. **Doc bug:** `docs/getting-started/sharing-and-invitations.md` (~line 105) references `invitations.getAcceptToken(...)`, which exists in neither client → should be `invitations.get()`.
+- **`rule-sets`** — `…_USERS_AND_GROUPS.swift.md` (~lines 653/671) typed `test()`/`debug()` examples → typed structs.
+- **`cron`** — main-corpus `examples/cron-triggers/*.swift` and `Tests/JsBaoClientTests/API/ApiParityTests.swift` (cron `create`/`update` dict literals) need typed-struct updates before `swift test` passes.

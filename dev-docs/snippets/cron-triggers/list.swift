@@ -1,11 +1,10 @@
 import JsBaoClient
 
-// List all cron triggers. Swift returns an untyped `[String: Any]` envelope;
-// the trigger rows live under the `"items"` key.
+// List all cron triggers for the current app. Archived triggers are excluded.
 func list(client: JsBaoClient) async throws {
   // #region example
   let result = try await client.cronTriggers.list()
-  let items = result["items"] as? [[String: Any]] ?? []
+  let items = result.items
   // #endregion example
   _ = items
 }

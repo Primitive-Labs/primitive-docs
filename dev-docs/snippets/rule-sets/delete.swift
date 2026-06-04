@@ -1,11 +1,11 @@
 import JsBaoClient
 
-// Delete a rule set. Swift returns an untyped `[String: Any]` envelope rather
-// than JS's typed `{ success: boolean }`, so the success flag is hand-cast.
+// Delete a rule set by its ID. Swift returns a typed `SuccessResult`, matching
+// JS's `{ success: boolean }`.
 func deleteRuleSet(client: JsBaoClient, ruleSetId: String) async throws {
   // #region example
   let result = try await client.ruleSets.delete(ruleSetId: ruleSetId)
-  let success = result["success"] as? Bool ?? false
+  let success = result.success
   // #endregion example
   _ = success
 }

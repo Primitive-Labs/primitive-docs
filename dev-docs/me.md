@@ -4,18 +4,20 @@ The signed-in user: read and update their profile, list the documents they own
 or that are shared with them, manage pending invitations, and control the
 profile cache. To look up *other* users, see [`users`](/users).
 
-::: warning Swift parity gap
-Most of `client.me` matches by name across both clients, but the Swift surface
-is largely **untyped**: `get`/`update`/`uploadAvatar`/`pendingDocumentInvitations`
-return (and `update` accepts) `[String: Any]` where JS uses named interfaces
-(`UserProfile`, `UpdateMeParams`, …). `ownedDocuments`/`sharedDocuments` return
-the raw `{ items, cursor? }` envelope as a dictionary, and both are **bare network
-GETs** in Swift: `ownedDocuments` accepts only `cursor`/`limit`/`tag` (dropping
-the 7 offline-first option fields JS exposes) and neither does the offline-first
-cache-merge/stale-refresh JS performs — so they fail offline even though the Swift
-guide describes them as "cache-backed and offline-aware" (me D3/D4,
-[#938](https://github.com/Primitive-Labs/js-bao-wss/issues/938)). Typedness across
-the surface tracked at [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).
+::: tip Now typed (Swift)
+The `client.me` surface is now typed in Swift (issue
+[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)):
+`get`/`update` use `UserProfile` and `UpdateMeParams`, `uploadAvatar` returns
+`AvatarUploadResult`, `pendingDocumentInvitations` returns
+`[PendingDocumentInvitation]`, `ownedDocuments` returns `[DocumentInfo]`, and
+`sharedDocuments` returns `SharedDocumentListResult` (`{ items, cursor? }`).
+
+One **behavioral** divergence remains: in Swift `ownedDocuments`/`sharedDocuments`
+are **bare network GETs** (accepting only `cursor`/`limit`/`tag`), whereas JS
+layers offline-first cache-merge / stale-refresh and the full `documents.list`
+option set on top. The Swift methods therefore return nothing offline. This is a
+feature gap, deferred — tracked at
+[#938](https://github.com/Primitive-Labs/js-bao-wss/issues/938).
 :::
 
 ## get(options?)
@@ -30,9 +32,9 @@ Read the signed-in user's profile, using the cache when available. Returns
 
 ## update(params)
 
-Update the profile's `name` and/or `avatarUrl`. Pass `avatarUrl: null` (JS) to
-clear the avatar — Swift takes an untyped `[String: Any]`, so use `NSNull()` for
-the same effect ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+Update the profile's `name` and/or `avatarUrl`, returning the updated
+`UserProfile`. To clear the avatar, pass `avatarUrl: null` (JS) or
+`avatarUrl: .clear` (Swift's `UpdateMeParams`).
 
 ::: code-group
 <<< ./snippets/me/update.ts#example{ts} [JavaScript]
@@ -41,15 +43,14 @@ the same effect ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)
 
 ## uploadAvatar(imageData, contentType)
 
-Upload an avatar image and get back the new avatar URL.
+Upload an avatar image and get back the new avatar URL (a typed
+`AvatarUploadResult` in Swift, `{ avatarUrl }` in JS).
 
-::: warning Swift parity gap
+::: tip Minor divergence
 In JS `contentType` is a typed union
 (`image/png | image/jpeg | image/gif | image/webp`); Swift takes a bare `String`,
-so an invalid MIME type fails at runtime rather than compile-time. JS also returns
-a typed `{ avatarUrl }`, whereas Swift returns an untyped `[String: Any]` you must
-hand-parse (`result["avatarUrl"] as? String`)
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+so an invalid MIME type fails at runtime rather than compile-time. The return is
+now typed on both sides.
 :::
 
 ::: code-group
@@ -61,18 +62,17 @@ hand-parse (`result["avatarUrl"] as? String`)
 
 List documents the current user owns (live ownership, not creator). JS returns a
 flat `DocumentInfo[]` by default (or a `{ items, cursor }` page with
-`returnPage: true`) and accepts the full `documents.list` option set.
+`returnPage: true`) and accepts the full `documents.list` option set. Swift
+returns a typed `[DocumentInfo]`.
 
-::: warning Swift parity gap
-Swift's `ownedDocuments` accepts only `cursor`/`limit`/`tag` and returns the raw
-`{ items, cursor? }` envelope as `[String: Any]`. The 7 offline-first knobs
-(`includeRoot`, `refreshFromServer`, `localOnly`, `serverTimeoutMs`,
-`waitForLoad`, `forward`, `returnPage`) are absent (me D3). More importantly, the
-Swift call is a **bare network GET** with no local-cache merge or stale-refresh —
-despite the Swift guide describing this method as "cache-backed and offline-aware,"
-the client does the opposite and fails offline (me D4,
-[#938](https://github.com/Primitive-Labs/js-bao-wss/issues/938)). Untyped envelope
-tracked at [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).
+::: warning Swift behavioral gap (deferred)
+Swift's `ownedDocuments` accepts only `cursor`/`limit`/`tag` and is a **bare
+network GET**. The 7 offline-first knobs (`includeRoot`, `refreshFromServer`,
+`localOnly`, `serverTimeoutMs`, `waitForLoad`, `forward`, `returnPage`) and the
+local-cache merge / stale-refresh JS performs are absent, so the Swift path
+returns nothing offline. This is a feature gap, deferred — tracked at
+[#938](https://github.com/Primitive-Labs/js-bao-wss/issues/938). (The return type
+itself is now typed, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).)
 :::
 
 ::: code-group
@@ -83,15 +83,15 @@ tracked at [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).
 ## sharedDocuments(options?)
 
 List documents shared with the current user (non-owner permissions plus pending
-legacy invitations). Returns the unified `{ items, cursor? }` envelope; pass
-`tag` to filter and `cursor` to paginate.
+legacy invitations). Returns the unified `{ items, cursor? }` envelope — a typed
+`SharedDocumentListResult` in Swift; pass `tag` to filter and `cursor` to paginate.
 
-::: warning Swift parity gap
-Swift returns the envelope as an untyped `[String: Any]` and, like
-`ownedDocuments`, is a **bare network GET** — JS does an offline-first cache-merge
-with stale-refresh, so the Swift path returns nothing offline (me D4,
-[#938](https://github.com/Primitive-Labs/js-bao-wss/issues/938)). Untyped envelope
-tracked at [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).
+::: warning Swift behavioral gap (deferred)
+Like `ownedDocuments`, Swift's `sharedDocuments` is a **bare network GET** — JS
+does an offline-first cache-merge with stale-refresh, so the Swift path returns
+nothing offline. This is a feature gap, deferred — tracked at
+[#938](https://github.com/Primitive-Labs/js-bao-wss/issues/938). (The envelope is
+now typed, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).)
 :::
 
 ::: code-group
@@ -101,9 +101,9 @@ tracked at [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).
 
 ## pendingDocumentInvitations()
 
-List pending document invitations for the current user. JS returns a typed array
-(`invitationId`, `documentId`, `permission`, `accepted`, nested `document`, …);
-Swift returns `[[String: Any]]` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
+List pending document invitations for the current user. Both clients return a
+typed array (`invitationId`, `documentId`, `permission`, `accepted`, nested
+`document`, …) — `[PendingDocumentInvitation]` in Swift.
 
 ::: code-group
 <<< ./snippets/me/pending-document-invitations.ts#example{ts} [JavaScript]
