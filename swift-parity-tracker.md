@@ -1,100 +1,74 @@
-# Swift ↔ JS parity tracker (branch `docs-parity-jun-3` / `js-parity-jun-3`)
+# Swift ↔ JS parity — status chart
 
-Maps every documented JS↔Swift divergence to its GitHub issue (if any), our
-current status, and the planned GitHub action. Divergences are drawn from the
-typed/behavioral fixes plus the dev-docs cookbook marking passes (which compare
-each `.ts`↔`.swift` snippet directly, so some have no issue yet).
+Single source of truth for what's addressed vs. not. Client fixes are on
+`js-bao-wss` branch **`js-parity-jun-3`**; docs on `primitive-docs` branch
+`docs-parity-jun-3`. Commit hashes below are short SHAs on `js-parity-jun-3`.
+Last updated 2026-06-04.
 
-- **Code fixes** live on `js-bao-wss` branch `js-parity-jun-3`.
-- **Doc marking** lives on `primitive-docs` branch `docs-parity-jun-3` (`dev-docs/`).
-- Issue states verified against GitHub on 2026-06-03.
+**Status legend:** ✅ done · 🟡 partial · ⏸️ deferred · ⛔ out-of-scope/by-design · ⚪ stale/invalid → close · 🆕 filed by us (not started)
 
-Legend: ✅ fixed · 📝 documented-only (code pending) · 🟦 by-design/deferred ·
-⚪ stale→close · ➕ needs a new issue.
+## Master chart
 
-## ✅ Fixed in `js-parity-jun-3` — comment on the issue with the fix
-| Issue | State | Fix shipped on the branch |
-|---|---|---|
-| [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954) | OPEN | **`DocumentsAPI` fully typed** (untyped `[String:Any]` → named models): new `JSONValue`/`Updatable`/`JSONCoding` foundation, `DocumentTypes.swift`. Umbrella still open for the other ~13 surfaces. |
-| [#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961) | OPEN | `close` → `CloseDocumentResult { evicted }` with a sync-state guard; `delete` evicts + emits `documentMetadataChanged("deleted")` + 404/offline fallback; `removePermission(userId:)` self-eviction. Predicates **kept sync-local by design** (async = `waitFor*`). |
-| [#506](https://github.com/Primitive-Labs/js-bao-wss/issues/506) | CLOSED | `listGroupPermissions(includeSystem:)` — excludes `_`-prefixed platform groups by default. (Issue already closed; implemented to match.) |
-
-Also added four manager-backed `DocumentsAPI` methods: `openAlias`, `isReadOnly`, `listOpen`, `isSynced`.
-
-### Parity waves (typing the rest of the client via per-sub-api agents)
-**Wave 1 ✅ (clone builds, dev gate green):** typed `session`, `users`, `gemini`, `llm`, `databaseTypeConfigs`, `collectionTypeConfigs`, `groupTypeConfigs` → addresses **#954** for those surfaces; also resolves **#590** (groupType encoding), **#596** (collectionType encoding), and the named `GetUserOptions` (users D1). Bounded behavioral fixes landed alongside: **#959** (`WORKFLOW_APPLY_NOT_CONFIRMED`), **#960** (`listUserMemberships(groupType:)`), **#962** (`databases.list(databaseType:)`, partial — `importCsv` still pending).
-Deferred features noted by agents: gemini/llm analytics events (#963).
-
-**Wave 2 ✅ (clone builds, dev gate green):** typed `me`, `invitations`, `rule-sets`, `cron` → **#954** for those surfaces; cron typing also fixes its slice of **#991** (silent `?? [:]` coercion → typed decode that throws). Deferred: `me` offline-first `ownedDocuments`/`sharedDocuments` (#938).
-
-**Wave 3 ✅ (clone builds, dev gate green):** typed `groups`, `collections`, `databases`, `blob-buckets`, `integrations` → **#954** for those surfaces; also **#453** (groups addMember union), **#671** (collections addMember union), **#958** (integrations call request shape). Deferred features: databases `importCsv` (#962a) + `subscribe` (#952), blob-buckets missing surface (#965).
-
-**Wave 4 ✅ (clone builds, dev gate green):** typed `workflows` → **#954** + the workflows slice of **#991** (decode throws instead of `?? [:]`). **`runSync` ([#956](https://github.com/Primitive-Labs/js-bao-wss/issues/956)) now implemented** — typed `runSync(...) -> RunSyncWorkflowResult` posting to `/workflows/:key/run-sync` (AbortSignal omitted, by design).
-
-**Remaining — NOT simple typing (entangled with the client core + feature-sized):**
-- `analytics` (methods on `JsBaoClient.swift` + `AnalyticsQueue`) — #951 namespace + #963 auto-event engine + typed `AnalyticsEventInput`.
-- `auth` (`JsBaoClient.swift` + `Internal/AuthController.swift`) — #964 option surfaces / `AUTH_CODES`; passkeys are native (proposals #928–931).
-- `cache` (`Internal/KvCache.swift` CacheFacade) — **#994 wrong-results FIXED** (`fetchHttp` sends `query` + folds `body` into the key) + **`serverTimeoutMs` now honored**; remaining: `fetchCached` `waitForLoad`/offline still no-op, and `[String:Any]` typedness (#954).
-- `model-surface` (`Schema/DynamicModel.swift`, `MultiDocModel.swift`) — #946/#947/#955/#992, architectural (paged query, active-doc defaulting, sync find/findAll).
-These touch shared core files (can't be parallel-typed) and are the feature tier; do them as focused, individual efforts.
-
-## ⚪ Stale / invalid → comment recommending close
-| Issue | State | Why |
-|---|---|---|
-| [#846](https://github.com/Primitive-Labs/js-bao-wss/issues/846) | OPEN | `getOrCreateWithAlias` **exists** on Swift `DocumentsAPI` (now typed). |
-| [#847](https://github.com/Primitive-Labs/js-bao-wss/issues/847) | OPEN | `me.ownedDocuments()`/`sharedDocuments()` **exist**; the real gap is their shape — tracked as #938. |
-| [#953](https://github.com/Primitive-Labs/js-bao-wss/issues/953) | OPEN | `invitations.getAcceptToken` is in **neither** client; use `invitations.get`. |
-
-## 📝 Documented in the cookbook, code not yet changed — comment "verified + documented; implementation pending"
-| Issue | Surface | Gap |
-|---|---|---|
-| [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954) (rest) | analytics, databases, blob-buckets, me, groups, integrations, collections, *type-configs, rule-sets, session, … | untyped `[String:Any]` everywhere outside documents |
-| [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946) | model/query | `query()` returns `[T]`, not a paged result |
-| [#947](https://github.com/Primitive-Labs/js-bao-wss/issues/947) | model/write | writes need explicit `in: docId` |
-| [#955](https://github.com/Primitive-Labs/js-bao-wss/issues/955) | model | `TypedModel` advanced ops on `.dynamic`; `query` → `[T]` |
-| [#944](https://github.com/Primitive-Labs/js-bao-wss/issues/944) | codegen | TOML filenames diverge |
-| [#951](https://github.com/Primitive-Labs/js-bao-wss/issues/951) | analytics | no `client.analytics` namespace |
-| [#963](https://github.com/Primitive-Labs/js-bao-wss/issues/963) | analytics | no `analyticsAutoEvents`; untyped `logAnalyticsEvent` |
-| [#952](https://github.com/Primitive-Labs/js-bao-wss/issues/952) | databases | `subscribe()` is JS-only |
-| [#962](https://github.com/Primitive-Labs/js-bao-wss/issues/962) | databases | `importCsv` / `list()` options / manager shapes |
-| [#949](https://github.com/Primitive-Labs/js-bao-wss/issues/949) | databases | `changeType` missing from public `DatabaseChangeEvent` |
-| [#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957) | document-blob | `prefetch`, accessor, `read(as:)` |
-| [#965](https://github.com/Primitive-Labs/js-bao-wss/issues/965) | document-blob / buckets | missing JS surface; untyped bucket admin |
-| [#958](https://github.com/Primitive-Labs/js-bao-wss/issues/958) | integrations | `IntegrationCallRequest` query/method/path drift |
-| [#959](https://github.com/Primitive-Labs/js-bao-wss/issues/959) | errors | enum missing `WORKFLOW_APPLY_NOT_CONFIRMED` |
-| [#960](https://github.com/Primitive-Labs/js-bao-wss/issues/960) | groups | `listUserMemberships` missing `{groupType}` |
-| [#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964) | auth | passkeys; OAuth/magic-link/OTP/logout surfaces; `AUTH_CODES` |
-| [#938](https://github.com/Primitive-Labs/js-bao-wss/issues/938) | me | `owned/sharedDocuments` shape (bare GET vs offline-first) |
-| [#854](https://github.com/Primitive-Labs/js-bao-wss/issues/854) | model | model-level subscription events for `BaoDataLoader` |
-| [#590](https://github.com/Primitive-Labs/js-bao-wss/issues/590) | group-type-configs | `groupType` not percent-encoded on get/update/delete |
-| [#596](https://github.com/Primitive-Labs/js-bao-wss/issues/596) | collection-type-configs | `collectionType` percent-encoding path divergence |
-
-## 🟦 By-design / deferred (no action, or already-closed issue)
-| Item | Issue | Disposition |
-|---|---|---|
-| `inSync`/`includesWrites` sync-local (async = `waitFor*`) | [#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961) | by design |
-| `getDocumentPermission` typed enum; `getLocalMetadata` sync (SQLite vs IndexedDB) | [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954) | by design |
-| Local-first `create` + `commitOfflineCreate` | [#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852) (CLOSED) | deferred |
-| `documents.list` pagination (`list` is slated for removal) | [#859](https://github.com/Primitive-Labs/js-bao-wss/issues/859) | deferred |
-| `open` returns `YDocument` (not `{doc, metadata}`) | — (no issue) | deferred, by design |
-| Awareness/presence API not in v1 | — (no issue) | deferred |
-| Benign shape diffs: `removePermission` overloads, `waitForWriteConfirmation` throws-vs-bool, `evict`/`evictAll`/`cancelPendingCreate` no-options, `getOwner` (Swift-only), `listPendingCreates` `[String]`, `me.cacheInfo` tuple, errors enum-vs-string, blob `download` `Data` vs `ArrayBuffer`, `KvCache` (Swift-only), service-worker (web-only) | — (no issue) | by design |
-
-## ➕ New issues filed (surfaced by the direct-diff pass — had no existing issue)
-Filed 2026-06-03, all labelled `ios`:
-| Issue | Title | Surface | Why it matters |
+| Issue | Status | Fix commit | What / reason |
 |---|---|---|---|
-| [#991](https://github.com/Primitive-Labs/js-bao-wss/issues/991) | Swift client coerces malformed/undecodable responses to empty success (`result as? [String:Any] ?? [:]`) | workflows, cron, prompts, *type-configs, … | a non-dict/error body silently reads as an empty **success** instead of throwing (JS rejects) — masks real failures |
-| [#992](https://github.com/Primitive-Labs/js-bao-wss/issues/992) | Swift `Model.find`/`findAll` are synchronous and silently drop typed-decode misses | model surface | `find` returns `nil` on a decode miss (indistinguishable from not-found); `findAll` under-reports — data-loss-shaped, and sync vs JS async |
-| [#993](https://github.com/Primitive-Labs/js-bao-wss/issues/993) | Swift `prompts.get`/`prompts.list` and `integrations.list`/`get` hit non-existent app-api routes | prompts, integrations | Swift-only methods that JS doesn't have and that 404 at runtime |
-| [#994](https://github.com/Primitive-Labs/js-bao-wss/issues/994) | Swift `cache.fetchHttp` drops `query` (wrong cache hits); `fetchCached` options are silent no-ops; cache keys not portable | cache | correctness bug (P0-ish): wrong cached results; documented options silently ignored |
-| [#995](https://github.com/Primitive-Labs/js-bao-wss/issues/995) | Swift codegen parity gaps beyond filenames (#944): `enum`, `auto_stamp`, class-name derivation, `--check`, relationship accessors, registration barrel | codegen | generated Swift silently omits validated TOML features the JS codegen honors |
-| [#996](https://github.com/Primitive-Labs/js-bao-wss/issues/996) | Swift client event payloads diverge from JS (field drops/renames; `source` vocabulary+optionality; `permission` enum-vs-string; awareness snapshot-vs-delta) | events | subscribers can't rely on the same payload shape/fields across clients |
+| [#453](https://github.com/Primitive-Labs/js-bao-wss/issues/453) | ✅ done | `f0576fa1` | groups `addMember` discriminated-union result |
+| [#506](https://github.com/Primitive-Labs/js-bao-wss/issues/506) | ✅ done | `b5e31ff2` | `listGroupPermissions(includeSystem:)` (issue already CLOSED) |
+| [#590](https://github.com/Primitive-Labs/js-bao-wss/issues/590) | ✅ done | `5c0333f3` | `groupType` percent-encoding (group-type-configs) |
+| [#596](https://github.com/Primitive-Labs/js-bao-wss/issues/596) | ✅ done | `5c0333f3` | `collectionType` percent-encoding |
+| [#673](https://github.com/Primitive-Labs/js-bao-wss/issues/673) | ✅ done | `c3cb4c4f` | `DocumentInfo.lastModified` (decodes `modifiedAt`) (CLOSED) |
+| [#846](https://github.com/Primitive-Labs/js-bao-wss/issues/846) | ⚪ close | — | `getOrCreateWithAlias` already exists (typed `c3cb4c4f`); GH comment posted |
+| [#847](https://github.com/Primitive-Labs/js-bao-wss/issues/847) | ⚪ close | — | `me.owned/sharedDocuments` exist; real gap is #938; GH comment posted |
+| [#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852) | ⏸️ deferred | — | local-first `create`/`commitOfflineCreate`; flow exists via `client.createDocument` (issue CLOSED) |
+| [#854](https://github.com/Primitive-Labs/js-bao-wss/issues/854) | ⏸️ deferred | — | model-level subscription events (model-surface tier) |
+| [#859](https://github.com/Primitive-Labs/js-bao-wss/issues/859) | ⏸️ deferred | — | remove deprecated `documents.list` (a removal task; we kept it typed) |
+| [#928](https://github.com/Primitive-Labs/js-bao-wss/issues/928) | ⛔ deferred (scope) | — | native Google sign-in — native feature, separate track |
+| [#929](https://github.com/Primitive-Labs/js-bao-wss/issues/929) | ⛔ deferred (scope) | — | native passkeys — native feature, separate track |
+| [#930](https://github.com/Primitive-Labs/js-bao-wss/issues/930) | ⛔ deferred (scope) | — | notifications/APNS — native proposal |
+| [#931](https://github.com/Primitive-Labs/js-bao-wss/issues/931) | ⛔ deferred (scope) | — | deep-link routing — native proposal |
+| [#938](https://github.com/Primitive-Labs/js-bao-wss/issues/938) | 🟡 partial | `13f0c031` | `me.owned/sharedDocuments` **typed**; offline-first behavior deferred |
+| [#944](https://github.com/Primitive-Labs/js-bao-wss/issues/944) | ⏸️ deferred | — | codegen TOML filenames (codegen tooling; documented only) |
+| [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946) | ⏸️ deferred | — | `query()` should return a paged result (model-surface, architectural) |
+| [#947](https://github.com/Primitive-Labs/js-bao-wss/issues/947) | ⏸️ deferred | — | writes need explicit `in: docId` (model-surface) |
+| [#949](https://github.com/Primitive-Labs/js-bao-wss/issues/949) | ⏸️ deferred | — | `changeType` on public `DatabaseChangeEvent` (JS-side; documented) |
+| [#951](https://github.com/Primitive-Labs/js-bao-wss/issues/951) | ⏸️ deferred | — | `client.analytics` namespace — **needs design decision** |
+| [#952](https://github.com/Primitive-Labs/js-bao-wss/issues/952) | ⏸️ deferred | — | `databases.subscribe()` — WS feature to build |
+| [#953](https://github.com/Primitive-Labs/js-bao-wss/issues/953) | ⚪ invalid | — | `getAcceptToken` in neither client; GH comment to close |
+| [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954) | 🟡 mostly done | `c3cb4c4f`,`5c0333f3`,`13f0c031`,`f0576fa1`,`5e0b76e2` | **18 surfaces typed**; NOT yet: **prompts**, analytics, auth, cache, document-blob context |
+| [#955](https://github.com/Primitive-Labs/js-bao-wss/issues/955) | ⏸️ deferred | — | `TypedModel` divergence (model-surface) |
+| [#956](https://github.com/Primitive-Labs/js-bao-wss/issues/956) | ✅ done | `60db2ecd` | `workflows.runSync` |
+| [#957](https://github.com/Primitive-Labs/js-bao-wss/issues/957) | ⏸️ deferred | — | document-blob `prefetch`/`read(as:)` (DocumentBlobContext still untyped) |
+| [#958](https://github.com/Primitive-Labs/js-bao-wss/issues/958) | ✅ done | `f0576fa1` | `IntegrationCallRequest` query/method/path |
+| [#959](https://github.com/Primitive-Labs/js-bao-wss/issues/959) | ✅ done | `0b7b4bc5` | error enum `WORKFLOW_APPLY_NOT_CONFIRMED` |
+| [#960](https://github.com/Primitive-Labs/js-bao-wss/issues/960) | ✅ done | `0b7b4bc5` | `listUserMemberships(groupType:)` filter |
+| [#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961) | ✅ done | `b5e31ff2` | `close→{evicted}`, delete/removePermission eviction (sync predicates by-design) |
+| [#962](https://github.com/Primitive-Labs/js-bao-wss/issues/962) | 🟡 partial | `0b7b4bc5`,`f0576fa1` | `list(databaseType:)` + manager shapes typed; `importCsv` (#962a) deferred |
+| [#963](https://github.com/Primitive-Labs/js-bao-wss/issues/963) | ⏸️ deferred | — | analytics auto-event firing engine (feature) |
+| [#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964) | ⏸️ deferred | — | auth option surfaces / `AUTH_CODES`; passkeys native (#929, scope) |
+| [#965](https://github.com/Primitive-Labs/js-bao-wss/issues/965) | 🟡 partial | `f0576fa1` | blob-buckets typed; document-blob context surface deferred |
+| [#991](https://github.com/Primitive-Labs/js-bao-wss/issues/991) 🆕 | 🟡 partial | `13f0c031`,`5e0b76e2` | silent `?? [:]` coercion removed in cron/workflows + every typed surface; analytics/auth/cache/**prompts** remain |
+| [#992](https://github.com/Primitive-Labs/js-bao-wss/issues/992) 🆕 | ⏸️ deferred | — | `find`/`findAll` sync silent-drop (model-surface) |
+| [#993](https://github.com/Primitive-Labs/js-bao-wss/issues/993) 🆕 | 🟡 partial | `f0576fa1` | integrations `list`/`get` kept + flagged; **prompts** routes not yet addressed |
+| [#994](https://github.com/Primitive-Labs/js-bao-wss/issues/994) 🆕 | 🟡 partial | `e4591a3f`,`60db2ecd` | `fetchHttp` query+body and `serverTimeoutMs` done; `waitForLoad`/offline deferred |
+| [#995](https://github.com/Primitive-Labs/js-bao-wss/issues/995) 🆕 | 🆕 not started | — | codegen gaps beyond filenames |
+| [#996](https://github.com/Primitive-Labs/js-bao-wss/issues/996) 🆕 | 🆕 not started | — | event-payload divergences |
 
-> Blob-delete local-cleanup gap and downloadUrl `attachmentFilename` were folded into #965 rather than filed separately.
+## Surfaces typed (#954)
+**✅ Typed (18):** documents · session · users · gemini · llm · databaseTypeConfigs · collectionTypeConfigs · groupTypeConfigs · me · invitations · ruleSets · cronTriggers · groups · collections · databases · blobBuckets · integrations · workflows
 
-## GitHub actions taken (2026-06-03)
+**❌ Not yet typed:**
+- **prompts** — the one remaining dedicated API file (clean, quick follow-up).
+- **analytics · auth · cache** — not standalone API files; live in `JsBaoClient.swift` / `Internal/` and are tied to feature issues (#951/#963, #964, #994).
+- **document-blob context** (`DocumentBlobContext` inside `DocumentsAPI.swift`) — #957/#965.
+- **model-surface** (`Schema/`) — architectural, #946/#947/#955/#992.
+
+## GitHub actions taken
 - **Fix comments:** [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954#issuecomment-4616843403), [#961](https://github.com/Primitive-Labs/js-bao-wss/issues/961#issuecomment-4616843520).
-- **Close-recommendations (stale/invalid):** [#846](https://github.com/Primitive-Labs/js-bao-wss/issues/846#issuecomment-4616843626), [#847](https://github.com/Primitive-Labs/js-bao-wss/issues/847#issuecomment-4616843740), [#953](https://github.com/Primitive-Labs/js-bao-wss/issues/953#issuecomment-4616843834).
-- **New issues:** #991–#996 (above).
-- The ~20 "documented, pending" issues were intentionally left un-commented (scope kept to fixed + stale).
+- **Close-recommendations:** [#846](https://github.com/Primitive-Labs/js-bao-wss/issues/846#issuecomment-4616843626), [#847](https://github.com/Primitive-Labs/js-bao-wss/issues/847#issuecomment-4616843740), [#953](https://github.com/Primitive-Labs/js-bao-wss/issues/953#issuecomment-4616843834).
+- **New issues filed:** #991–#996.
+
+## Non-code follow-ups (tracked in `user-facing-docs-todos.md`)
+- Client **test target** migration (the library builds clean; tests still call old untyped signatures — needed before `swift test`).
+- User-facing **`docs/getting-started/` + `guides/latest/`** migration to the typed API.
+
+## Commit reference (`js-parity-jun-3`)
+`c3cb4c4f` documents typed · `b5e31ff2` documents behavioral (#961/#506) · `0b7b4bc5` bounded (#959/#960/#962) · `5c0333f3` wave-1 · `13f0c031` wave-2 · `f0576fa1` wave-3 · `5e0b76e2` wave-4 (workflows) · `e4591a3f` cache query/body · `60db2ecd` cache serverTimeoutMs + runSync
