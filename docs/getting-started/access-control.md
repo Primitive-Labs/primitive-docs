@@ -1,6 +1,6 @@
 # Access Control
 
-Every server API call in Primitive is gated by an access rule written in **[CEL](https://github.com/google/cel-spec)** — a one-line expression evaluated against the authenticated caller. Database operations, real-time subscriptions, workflow invocation, management of groups and collections: one expression language, one identity context, every surface. Learn it once and you can read and write the access rules anywhere they appear.
+Server API calls in Primitive are gated by access rules written in **[CEL](https://github.com/google/cel-spec)** — a one-line expression evaluated against the authenticated caller. Database operations, real-time subscriptions, workflow invocation, management of groups and collections: one expression language, one identity context. Learn it once and you can read and write the access rules anywhere they appear. (Documents are the exception — they use direct permission grants per user or group, covered in [Sharing Documents](./working-with-documents.md#sharing-documents).)
 
 ## CEL in Sixty Seconds
 
@@ -27,6 +27,7 @@ Every CEL evaluation sees the authenticated caller:
 | `hasRole(role)` | True if the caller's app role is `"owner"`, `"admin"`, or `"member"` as given |
 | `isMemberOf(groupType, groupId)` | True if the caller belongs to that exact group |
 | `memberGroups(groupType)` | The list of group IDs of that type the caller belongs to |
+| `fromWorkflow()` / `fromWorkflow(key)` | True when the call comes from the internal workflow runner (optionally a specific workflow) — gate an operation to server-side automation only |
 
 Group membership is the workhorse: model teams, roles, and relationships as [groups](./users-and-groups.md), then write rules against membership instead of hard-coding user IDs. `isMemberOf('team', params.teamId)` stays correct as people join and leave; `userId == '01ABC...'` doesn't.
 

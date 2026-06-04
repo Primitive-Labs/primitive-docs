@@ -97,7 +97,7 @@ That's it — the template's login component automatically shows a "Sign in with
 
 ## Passkeys (WebAuthn)
 
-Passkeys let returning users sign in with biometrics (fingerprint, face) or hardware security keys. The template's login flow supports passkeys automatically — users can register a passkey after signing in, then use it for future logins.
+Passkeys let returning users sign in with biometrics (fingerprint, face) or hardware security keys. The web template's `PrimitiveLogin` flow supports passkeys automatically — users can register a passkey after signing in, then use it for future logins.
 
 ## Email Template Customization
 

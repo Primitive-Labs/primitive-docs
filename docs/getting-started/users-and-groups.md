@@ -64,7 +64,7 @@ You can add members by **email** or by user ID. Most apps should use email — i
 
 :::
 
-Provide **either** `email` or `userId`, not both. `listUserMemberships` rows include `name` and optional `description` joined from the group (orphan rows are skipped); in JavaScript you can also pass `{ groupType }` to filter to one slice.
+Provide **either** `email` or `userId`, not both. `listUserMemberships` rows include `name` and optional `description` joined from the group (orphan rows are skipped); pass a group type to filter to one slice.
 
 The `addMember` result is a discriminated union — branch on `status`:
 

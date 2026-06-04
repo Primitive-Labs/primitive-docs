@@ -12,6 +12,8 @@ Databases work differently from documents: there are no client-side model classe
 ### Organized by Type
 A **database type** is a named configuration (operations, triggers, access rules) shared across many database instances. Think of it as a template: if you have one database per tenant, project, or team, they all share the same type — update the type once, and every instance inherits the changes. When you create a database with a type that doesn't exist yet, the type is auto-created.
 
+An individual database holds up to ~5 GB; the per-tenant/per-project pattern above is also how you scale past it, since each instance gets its own isolated storage.
+
 ### Registered Operations
 End-user data access goes through **registered operations** — named, parameterized queries and mutations with per-operation access control. You don't write raw queries in your app. Instead, you define operations as TOML config files and sync them via the CLI.
 
