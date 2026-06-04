@@ -29,12 +29,12 @@ Deferred features noted by agents: gemini/llm analytics events (#963).
 
 **Wave 3 ✅ (clone builds, dev gate green):** typed `groups`, `collections`, `databases`, `blob-buckets`, `integrations` → **#954** for those surfaces; also **#453** (groups addMember union), **#671** (collections addMember union), **#958** (integrations call request shape). Deferred features: databases `importCsv` (#962a) + `subscribe` (#952), blob-buckets missing surface (#965).
 
-**Wave 4 ✅ (clone builds, dev gate green):** typed `workflows` → **#954** + the workflows slice of **#991** (decode throws instead of `?? [:]`). `runSync` (#956) deferred.
+**Wave 4 ✅ (clone builds, dev gate green):** typed `workflows` → **#954** + the workflows slice of **#991** (decode throws instead of `?? [:]`). **`runSync` ([#956](https://github.com/Primitive-Labs/js-bao-wss/issues/956)) now implemented** — typed `runSync(...) -> RunSyncWorkflowResult` posting to `/workflows/:key/run-sync` (AbortSignal omitted, by design).
 
 **Remaining — NOT simple typing (entangled with the client core + feature-sized):**
 - `analytics` (methods on `JsBaoClient.swift` + `AnalyticsQueue`) — #951 namespace + #963 auto-event engine + typed `AnalyticsEventInput`.
 - `auth` (`JsBaoClient.swift` + `Internal/AuthController.swift`) — #964 option surfaces / `AUTH_CODES`; passkeys are native (proposals #928–931).
-- `cache` (`Internal/KvCache.swift` CacheFacade) — **#994 wrong-results FIXED** (`fetchHttp` now sends `query` + folds `body` into the key); remaining: `fetchCached` advertised options (`serverTimeoutMs`/offline) still no-op, and `[String:Any]` typedness (#954).
+- `cache` (`Internal/KvCache.swift` CacheFacade) — **#994 wrong-results FIXED** (`fetchHttp` sends `query` + folds `body` into the key) + **`serverTimeoutMs` now honored**; remaining: `fetchCached` `waitForLoad`/offline still no-op, and `[String:Any]` typedness (#954).
 - `model-surface` (`Schema/DynamicModel.swift`, `MultiDocModel.swift`) — #946/#947/#955/#992, architectural (paged query, active-doc defaulting, sync find/findAll).
 These touch shared core files (can't be parallel-typed) and are the feature tier; do them as focused, individual efforts.
 

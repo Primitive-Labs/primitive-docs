@@ -57,13 +57,14 @@ valid for workflows marked `syncCallable: true`. Every non-transport outcome
 **resolves** (failure / timeout surface as `status`, not a throw); only
 connectivity / abort-before-send errors reject.
 
-::: warning No Swift equivalent
-JavaScript-only — the Swift client has no `runSync`. Swift callers use the
-`start` + `awaitRun` (or `runAndApply`) orchestration instead
-([#956](https://github.com/Primitive-Labs/js-bao-wss/issues/956)).
+::: tip Now in Swift
+`runSync` is now available on the Swift client ([#956](https://github.com/Primitive-Labs/js-bao-wss/issues/956)) — it posts to `/workflows/:key/run-sync` and returns the typed `RunSyncWorkflowResult`. (Swift omits the JS `AbortSignal`, which the JS transport doesn't wire through either; cancel via the surrounding `Task` and read final state with `getStatus`.)
 :::
 
+::: code-group
 <<< ./snippets/workflows/run-sync.ts#example{ts} [JavaScript]
+<<< ./snippets/workflows/run-sync.swift#example{swift} [Swift]
+:::
 
 ## getStatus(options)
 
