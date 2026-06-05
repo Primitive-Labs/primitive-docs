@@ -375,28 +375,15 @@ Each subscription has:
 
 ### Subscribing from Your App
 
-`databases.subscribe(databaseId, subscriptionKey, { onChange })` returns an `unsub()` function:
+`databases.subscribe` takes the database id, the subscription key, and an `onChange` handler, and returns an unsubscribe function:
 
-```typescript
-const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
-  onChange: (event) => {
-    if (event.isOrigin) {
-      // This same tab wrote it — we already updated the UI optimistically.
-      return;
-    }
-    for (const change of event.changes) {
-      // change.op:         "save" | "patch" | "delete" | "increment" | ...
-      // change.changeType: "enter" | "update" | "leave"
-      // change.data, change.previousData (subject to the select projection)
-      if (change.op === "delete") removeTicket(change.id);
-      else upsertTicket(change.data);
-    }
-  },
-});
+::: code-group
 
-// Later
-unsub();
-```
+<<< ../../examples/databases/db-subscribe.ts#example{ts} [JavaScript]
+
+<<< ../../examples/databases/db-subscribe.swift#example{swift} [Swift]
+
+:::
 
 The usual pattern is **load + subscribe**: run a query operation once for current state, then subscribe for future changes.
 
@@ -423,12 +410,13 @@ filter = "record.data.teamId == params.teamId"
 teamId = { type = "string", required = true }
 ```
 
-```typescript
-const unsub = client.databases.subscribe(databaseId, "tickets-by-team", {
-  params: { teamId: "eng" },
-  onChange: (event) => { /* ... */ },
-});
-```
+::: code-group
+
+<<< ../../examples/databases/db-subscribe-params.ts#example{ts} [JavaScript]
+
+<<< ../../examples/databases/db-subscribe-params.swift#example{swift} [Swift]
+
+:::
 
 ### Server-Side Writes
 
