@@ -454,8 +454,10 @@ final class MyAppState: PrimitiveAppState {
     await super.connectClient()
     guard let client else { return }
     let result = try? await client.documents.getOrCreateWithAlias(
-      alias: DocumentAlias(scope: .user, aliasKey: "library"),
-      title: "Library"
+      options: GetOrCreateWithAliasOptions(
+        alias: AliasRef(scope: .user, aliasKey: "library"),
+        title: "Library"
+      )
     )
     guard let id = result?.documentId else { return }
     await selectDocumentAwaiting(id)

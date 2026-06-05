@@ -658,11 +658,11 @@ The first arg is the `promptKey`, NOT the `promptId`. The endpoint is `POST /pro
 
 ```swift
 // WRONG — passing the prompt id instead of the prompt key
-try await client.prompts.execute("01HXY...PROMPT_ID", variables: [:])
+try await client.prompts.execute(promptKey: "01HXY...PROMPT_ID", options: ExecutePromptOptions())
 // → 404. Use the key from the TOML.
 
 // WRONG — expecting a top-level variable
-try await client.prompts.execute("p", variables: ["name": "Alice"])
+try await client.prompts.execute(promptKey: "p", options: ExecutePromptOptions(variables: ["name": "Alice"]))
 // template: "Hi {{ name }}"   ← won't resolve, renders as "Hi "
 // Fix: template: "Hi {{ input.name }}"
 ```

@@ -126,29 +126,30 @@ Admins/owners can invite at any role; members can invite only at `role: "member"
 
 ```swift
 // Admins/owners: any role
-_ = try await client.invitations.create(params: [
-  "email": "alice@example.com",
-  "role": "member",  // or "admin" / "owner" (admin/owner only)
-])
+_ = try await client.invitations.create(
+  params: CreateInvitationParams(email: "alice@example.com", role: "member")  // or "admin" / "owner" (admin/owner only)
+)
 
 // Full options
-_ = try await client.invitations.create(params: [
-  "email": "alice@example.com",
-  "role": "member",
-  "expiresAt": ISO8601DateFormatter().string(from: Date().addingTimeInterval(7 * 86400)),
-  "source": "team-onboarding-flow",
-  "note": "Backend hire — Q2 cohort",
-  "sendEmail": true,
-])
+_ = try await client.invitations.create(
+  params: CreateInvitationParams(
+    email: "alice@example.com",
+    role: "member",
+    expiresAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(7 * 86400)),
+    source: "team-onboarding-flow",
+    note: "Backend hire — Q2 cohort",
+    sendEmail: true
+  )
+)
 
 // Members: gate on quota first
 let quota = try await client.invitations.quota()
-let unlimited = quota["unlimited"] as? Bool ?? false
-let remaining = quota["remaining"] as? Int ?? 0
-if !unlimited && remaining <= 0 {
+if !quota.unlimited && quota.remaining <= 0 {
   return showQuotaExhausted()
 }
-_ = try await client.invitations.create(params: ["email": email, "role": "member"])
+_ = try await client.invitations.create(
+  params: CreateInvitationParams(email: email, role: "member")
+)
 ```
 
 ### Member invitations + quotas
@@ -197,10 +198,9 @@ For resend / lookup after the initial response is gone, fetch the invitation by 
 
 ```swift
 let inv = try await client.invitations.get(invitationId: invitationId)
-let inviteToken = inv["inviteToken"] as? String ?? ""
-let email = inv["email"] as? String ?? ""
+let inviteToken = inv.inviteToken ?? ""
 let acceptUrl = "\(myApp.baseURL)/invite/accept?inviteToken=\(inviteToken)"
-try await myEmailService.send(to: email, link: acceptUrl)
+try await myEmailService.send(to: inv.email, link: acceptUrl)
 ```
 
 Permissions for `invitations.get`: app admin/owner, OR the invitation's original inviter. Members who did not create the invitation receive 403 — `inviteToken` is a bearer credential, so read access is intentionally narrow.
@@ -250,9 +250,11 @@ Deferred grants are re-validated at resolution time. In a `domain`-restricted ap
 ### Inspecting pending state (debug only)
 
 ```swift
-let (grants, nextCursor) = try await client.invitations.listDeferredGrants(
+let result = try await client.invitations.listDeferredGrants(
   email: "alice@example.com"
 )
+let grants = result.grants        // [DeferredGrant]
+let nextCursor = result.nextCursor
 ```
 
 Reserve this for admin/debug UIs. For end-user "people with access + pending invitations" UI, use the per-resource `listPendingInvitations` endpoints on documents/groups/collections (see the [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#building-a-members--pending-ui)).
@@ -268,21 +270,21 @@ Check quota, mint the app invitation, share the project document by email, and a
 ```swift
 func onboardTeammate(email: String, projectDocId: String) async throws {
   let quota = try await client.invitations.quota()
-  let unlimited = quota["unlimited"] as? Bool ?? false
-  let remaining = quota["remaining"] as? Int ?? 0
-  if !unlimited && remaining <= 0 {
+  if !quota.unlimited && quota.remaining <= 0 {
     throw OnboardingError.quotaExhausted
   }
 
-  _ = try await client.invitations.create(params: ["email": email, "role": "member"])
+  _ = try await client.invitations.create(
+    params: CreateInvitationParams(email: email, role: "member")
+  )
 
   _ = try await client.documents.updatePermissions(
     documentId: projectDocId,
-    params: ["permissions": [["email": email, "permission": "read-write"]]]
+    params: .email(email, permission: "read-write")
   )
 
   _ = try await client.groups.addMember(
-    groupType: "team", groupId: "engineering", params: ["email": email]
+    groupType: "team", groupId: "engineering", params: .email(email)
   )
 }
 ```
@@ -294,13 +296,15 @@ func onboardTeammate(email: String, projectDocId: String) async throws {
 The `invitation` event is the only typed app-membership event. The lifecycle action is on `event.action` (not `event.type`, which is always `"invitation"`). Branch on `action`: `created`/`updated`/`cancelled` go to the invitee only; `declined` to both; `accepted` to the inviter only (with `event.acceptedBy` carrying the userId). Treat unknown actions as a no-op.
 
 ```swift
-client.events.on(.invitation) { event in
-  switch event.action {
+client.events.onAny(.invitation) { payload in
+  guard let event = payload as? [String: Any],
+        let action = event["action"] as? String else { return }
+  switch action {
   case "created":   break  // invitee only
   case "updated":   break  // invitee only
   case "cancelled": break  // invitee only
   case "declined":  break  // both invitee and inviter
-  case "accepted":  break  // inviter only — event.acceptedBy carries the userId
+  case "accepted":  break  // inviter only — event["acceptedBy"] carries the userId
   default:          break  // future-proof: no-op, don't throw
   }
 }

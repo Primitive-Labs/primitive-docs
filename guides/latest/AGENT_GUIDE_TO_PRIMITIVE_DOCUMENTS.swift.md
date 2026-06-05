@@ -355,8 +355,10 @@ final class MyAppState: PrimitiveAppState {
             // createWithAlias — that has a TOCTOU window where two clients
             // onboarding at once both create and one doc is lost.
             let result = try await client.documents.getOrCreateWithAlias(
-                alias: DocumentAlias(scope: .user, aliasKey: "library"),
-                title: "Library"
+                options: GetOrCreateWithAliasOptions(
+                    alias: AliasRef(scope: .user, aliasKey: "library"),
+                    title: "Library"
+                )
             )
             // selectDocumentAwaiting opens the doc, routes the base class's
             // sync hooks at it, and fires onDocumentOpened below.

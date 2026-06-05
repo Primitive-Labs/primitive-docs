@@ -43,11 +43,11 @@ A page needs several pieces of data from the same database, fetched one at a tim
 
 ```swift
 // 5 sequential round trips to the SAME database
-let groups = try await db.executeOperation(name: "listGroups")
-let accounts = try await db.executeOperation(name: "listAccounts")
-let holdings = try await db.executeOperation(name: "listHoldings")
-let targets = try await db.executeOperation(name: "listAllTargets")
-let latest = try await db.executeOperation(name: "listLatestSnapshot")
+let groups = try await client.databases.executeOperation(databaseId: databaseId, name: "listGroups")
+let accounts = try await client.databases.executeOperation(databaseId: databaseId, name: "listAccounts")
+let holdings = try await client.databases.executeOperation(databaseId: databaseId, name: "listHoldings")
+let targets = try await client.databases.executeOperation(databaseId: databaseId, name: "listAllTargets")
+let latest = try await client.databases.executeOperation(databaseId: databaseId, name: "listLatestSnapshot")
 ```
 
 Each call has its own request/response overhead. They serialize even though none depend on each other.
@@ -103,9 +103,10 @@ A per-item operation called once for every item in a collection:
 
 ```swift
 for group in groups {
-  let targets = try await db.executeOperation(
+  let targets = try await client.databases.executeOperation(
+    databaseId: databaseId,
     name: "listTargetsByGroup",
-    params: ["groupId": group.id]
+    options: ExecuteOperationOptions(params: ["groupId": .string(group.id)])
   )
   // ...use targets
 }
@@ -129,10 +130,11 @@ definition = '{"filter":{},"sort":{"groupId":1},"limit":1000}'
 Call it once, then group client-side:
 
 ```swift
-let all = try await db.executeOperation(name: "listAllTargets")
-var byGroup: [String: [Target]] = [:]
-for t in all.data {
-  byGroup[t.groupId, default: []].append(t)
+let all = try await client.databases.executeOperation(databaseId: databaseId, name: "listAllTargets")
+var byGroup: [String: [JSONValue]] = [:]
+for t in all["data"]?.arrayValue ?? [] {
+  guard let groupId = t["groupId"]?.stringValue else { continue }
+  byGroup[groupId, default: []].append(t)
 }
 for group in groups {
   let targets = byGroup[group.id] ?? []
@@ -153,9 +155,9 @@ Any time you find an `await ...executeOperation(...)` inside a `for` loop. This 
 Three independent reads awaited one after another:
 
 ```swift
-let a = try await db.executeOperation(name: "opA")
-let b = try await db.executeOperation(name: "opB")
-let c = try await db.executeOperation(name: "opC")
+let a = try await client.databases.executeOperation(databaseId: databaseId, name: "opA")
+let b = try await client.databases.executeOperation(databaseId: databaseId, name: "opB")
+let c = try await client.databases.executeOperation(databaseId: databaseId, name: "opC")
 ```
 
 Three sequential round trips even though none depends on the others.
@@ -412,10 +414,14 @@ final class SourceStore: ObservableObject {
   // a server-registered subscription key, and an options object carrying the
   // `onChange` callback (plus any `params` forwarded to the subscription's
   // filter CEL).
-  func observe(dbId: String) {
-    client.databases.subscribe(databaseId: dbId, key: "source-changes") { [weak self] _ in
-      self?.invalidate()
-    }
+  func observe(dbId: String) throws {
+    _ = try client.databases.subscribe(
+      databaseId: dbId,
+      subscriptionKey: "source-changes",
+      options: DatabaseSubscribeOptions(onChange: { [weak self] _ in
+        self?.invalidate()
+      })
+    )
   }
 }
 ```

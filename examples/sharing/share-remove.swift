@@ -7,7 +7,7 @@ func removeShare(
   userId: String
 ) async throws {
   // #region example
-  _ = try await client.documents.removePermission(documentId: documentId, userId: userId)
-  _ = try await client.documents.removePermission(documentId: documentId, email: "alice@example.com")
+  _ = try await client.documents.removePermission(documentId: documentId, .userId(userId))
+  _ = try await client.documents.removePermission(documentId: documentId, .email("alice@example.com"))
   // #endregion example
 }

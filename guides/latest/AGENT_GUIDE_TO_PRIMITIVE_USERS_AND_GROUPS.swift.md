@@ -181,7 +181,7 @@ The current authenticated user has its own namespace. Use it for "me"-scoped rea
   )
 
   // Upload an image directly; the server hosts it and returns a URL.
-  let uploaded = try await client.me.uploadAvatar(imageData: avatar, contentType: "image/png")
+  let uploaded = try await client.me.uploadAvatar(imageData: avatar, contentType: .png)
   let avatarUrl = uploaded.avatarUrl
 
   // update() and uploadAvatar() clear the cache automatically; reach for
@@ -756,18 +756,20 @@ autoAddCreator = true
 
 ```swift
 // User creates a team
-try await client.groups.create(
+try await client.groups.create(params: CreateGroupParams(
   groupType: "team",
   groupId: "alpha-team",
   name: "Alpha Team"
-)
+))
 
 // Share a document with the team
 try await client.documents.grantGroupPermission(
-  docId,
-  groupType: "team",
-  groupId: "alpha-team",
-  permission: "read-write"
+  documentId: docId,
+  params: GrantGroupPermissionParams(
+    groupType: "team",
+    groupId: "alpha-team",
+    permission: "read-write"
+  )
 )
 
 // Database operations gated by team membership
@@ -780,14 +782,16 @@ Use group types as roles within a context.
 
 ```swift
 // Create role groups for a project
-try await client.groups.create(groupType: "editor", groupId: "project-1", name: "Project 1 Editors")
-try await client.groups.create(groupType: "viewer", groupId: "project-1", name: "Project 1 Viewers")
+try await client.groups.create(params: CreateGroupParams(groupType: "editor", groupId: "project-1", name: "Project 1 Editors"))
+try await client.groups.create(params: CreateGroupParams(groupType: "viewer", groupId: "project-1", name: "Project 1 Viewers"))
 
 // Grant different document permissions
 try await client.documents.grantGroupPermission(
-  docId, groupType: "editor", groupId: "project-1", permission: "read-write")
+  documentId: docId,
+  params: GrantGroupPermissionParams(groupType: "editor", groupId: "project-1", permission: "read-write"))
 try await client.documents.grantGroupPermission(
-  docId, groupType: "viewer", groupId: "project-1", permission: "reader")
+  documentId: docId,
+  params: GrantGroupPermissionParams(groupType: "viewer", groupId: "project-1", permission: "reader"))
 
 // Database operations with role checks
 // Editors can modify:
@@ -820,12 +824,14 @@ The per-parameter `access` expression ensures parents can only view their own ch
 
 ```swift
 // A "parent-of" group per student
-try await client.groups.create(
+try await client.groups.create(params: CreateGroupParams(
   groupType: "parent-of",
   groupId: "student-123",
   name: "Parents of Student 123"
+))
+try await client.groups.addMember(
+  groupType: "parent-of", groupId: "student-123", params: .userId(parentUserId)
 )
-try await client.groups.addMember("parent-of", "student-123", userId: parentUserId)
 
 // Parent queries their child's grades — server enforces access
 let grades = try await client.databases.executeOperation(
@@ -838,19 +844,19 @@ Model nested organizational structure with multiple group types.
 
 ```swift
 // Organization-level groups
-try await client.groups.create(groupType: "org", groupId: "acme-corp", name: "Acme Corp")
+try await client.groups.create(params: CreateGroupParams(groupType: "org", groupId: "acme-corp", name: "Acme Corp"))
 
 // Department-level groups
-try await client.groups.create(groupType: "dept", groupId: "engineering", name: "Engineering")
-try await client.groups.create(groupType: "dept", groupId: "marketing", name: "Marketing")
+try await client.groups.create(params: CreateGroupParams(groupType: "dept", groupId: "engineering", name: "Engineering"))
+try await client.groups.create(params: CreateGroupParams(groupType: "dept", groupId: "marketing", name: "Marketing"))
 
 // Team-level groups
-try await client.groups.create(groupType: "team", groupId: "backend", name: "Backend Team")
+try await client.groups.create(params: CreateGroupParams(groupType: "team", groupId: "backend", name: "Backend Team"))
 
 // A user can be in multiple groups at different levels
-try await client.groups.addMember("org", "acme-corp", userId: userId)
-try await client.groups.addMember("dept", "engineering", userId: userId)
-try await client.groups.addMember("team", "backend", userId: userId)
+try await client.groups.addMember(groupType: "org", groupId: "acme-corp", params: .userId(userId))
+try await client.groups.addMember(groupType: "dept", groupId: "engineering", params: .userId(userId))
+try await client.groups.addMember(groupType: "team", groupId: "backend", params: .userId(userId))
 
 // CEL can check any level:
 // "isMemberOf('org', database.metadata.orgId)"
