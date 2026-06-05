@@ -255,7 +255,12 @@ primitive sync diff
 
 # Push local changes to server
 primitive sync push
+
+# Restore the sync directory from a pre-pull snapshot
+primitive sync revert
 ```
+
+Every `pull` snapshots the sync directory before writing; `sync revert` restores the most recent snapshot, `--list` enumerates the available ones, and `--snapshot <id>` picks a specific one.
 
 Pass `--dir <path>` to override and use a fixed directory:
 

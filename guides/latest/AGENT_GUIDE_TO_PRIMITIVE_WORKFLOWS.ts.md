@@ -175,6 +175,8 @@ text = "Summarize: {{ input.content }}"
 
 `prompt` may be an object (forwarded as the body) or an array of messages. `gemini.generateRaw` is the same shape, forwarded as a raw API payload. `gemini.countTokens` returns a token count.
 
+The effective model — `prompt.model` when `prompt` is an object, otherwise the top-level `model` — is validated against the server's Gemini model allow-list **at save time**: a disallowed model rejects the workflow save (the error names the step index and lists the allowed models) instead of failing at run time. A model containing template syntax resolves at run time and is validated then.
+
 ### `prompt.execute`
 
 Execute a managed prompt (configured separately via the prompts API/CLI).

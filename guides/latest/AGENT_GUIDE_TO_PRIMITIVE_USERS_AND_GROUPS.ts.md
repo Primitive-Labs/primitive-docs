@@ -572,6 +572,7 @@ primitive sync push --dir ./config
 | `user.role` | yes | Requesting user's app role (`"owner"` / `"admin"` / `"member"`). NOT `user.appRole`. |
 | `group.groupType` | yes | Target group's type |
 | `group.groupId` | yes | Target group's ID (also present at `create` time — server passes the requested ID) |
+| `group.contextId` | yes | Read-alias of `group.groupId` — the same value under the `contextId` name collection rules use, so group and collection rule sets can share expressions |
 | `group.name` | yes | Target group's display name |
 | `group.createdBy` | yes (after create) | userId of the group creator |
 | `target.userId` | only `category: "member"`, ops `create`/`edit`/`delete` | Target user being added/removed. Absent for `member.list`. |
