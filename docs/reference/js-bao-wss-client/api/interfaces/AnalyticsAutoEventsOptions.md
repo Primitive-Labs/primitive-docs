@@ -26,27 +26,9 @@
 
 ***
 
-### boot?
-
-> `optional` **boot**: `boolean`
-
-***
-
 ### dailyAuth?
 
 > `optional` **dailyAuth**: `boolean`
-
-***
-
-### firstDocEdit?
-
-> `optional` **firstDocEdit**: `boolean`
-
-***
-
-### firstDocOpen?
-
-> `optional` **firstDocOpen**: `boolean`
 
 ***
 
@@ -68,21 +50,9 @@
 
 ***
 
-### offlineRecovery?
-
-> `optional` **offlineRecovery**: `boolean` \| \{ `enabled?`: `boolean`; `minIntervalMs?`: `number`; \}
-
-***
-
 ### returnActive?
 
 > `optional` **returnActive**: `boolean`
-
-***
-
-### serviceWorker?
-
-> `optional` **serviceWorker**: `boolean` \| \{ `control?`: `boolean`; `tokenUpdate?`: `boolean`; \}
 
 ***
 

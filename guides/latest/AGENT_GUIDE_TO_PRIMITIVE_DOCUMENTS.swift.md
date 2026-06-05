@@ -57,7 +57,7 @@ Documents must be opened before querying or modifying data within them.
 
 ```swift
   _ = try await client.documents.open(documentId)
-  let result = tasks.query([:])
+  let result = Task.query([:], options: QueryOptions(documents: [documentId]))
 ```
 
 Documents are ready to be queried once the `.open()` call finishes. Applications should wait for all required documents to be opened and show a loading state until then, then track document-specific readiness explicitly. `open()` is idempotent — calling it on an already-open document is a no-op. Handle open failures explicitly: surface an error or redirect; don't silently continue.
@@ -74,27 +74,27 @@ There is **no single "my documents" list**. A user reaches documents through **f
 **a. Documents they own** (`ownedDocuments` — created, or ownership transferred):
 
 ```swift
-  // The unified { items, cursor } envelope as [String: Any] — same shape as
-  // sharedDocuments(tag:).
-  let page = try await client.me.ownedDocuments(tag: "channel")
-  let items = page["items"] as? [[String: Any]] ?? []
-  let cursor = page["cursor"] as? String
+  // A typed `[DocumentInfo]` — each row carries title, permission, tags, …
+  let owned = try await client.me.ownedDocuments(tag: "channel")
+
+  for doc in owned {
+    print(doc.title, doc.permission)
+  }
 ```
 
 **b. Documents shared directly with them** (`sharedDocuments` — non-owner `DocumentPermission` rows + pending `DocumentInvitation`s; group/collection shares do NOT appear here):
 
 ```swift
   let page = try await client.me.sharedDocuments(limit: 50, tag: "channel")
-  let items = page["items"] as? [[String: Any]] ?? []
 
-  for doc in items {
-    // Each row carries the base document fields (title, createdAt, …) plus the
-    // share extras (permission, source, grantedBy, invitationId).
-    print(doc["title"] ?? "", doc["permission"] ?? "", doc["grantedBy"] ?? "")
+  for share in page.items {
+    // Each row nests the base document fields (title, createdAt, …) under
+    // `.document`, alongside the share extras (grantedBy, source, invitationId).
+    print(share.document.title, share.document.permission, share.grantedBy)
   }
 
   // `cursor` is a raw-JSON pagination cursor — pass it back for the next page.
-  if let cursor = page["cursor"] as? String {
+  if let cursor = page.cursor {
     _ = try await client.me.sharedDocuments(cursor: cursor)
   }
 ```
@@ -112,7 +112,7 @@ There is **no single "my documents" list**. A user reaches documents through **f
     collectionId: collectionId,
     options: PaginationOptions(limit: 50)
   )
-  let items = page["items"] as? [[String: Any]] ?? []
+  let items = page.items
 ```
 
 Each shared document in the result extends the base `DocumentInfo` (`title`, `createdBy`, `createdAt`, `lastModified`, plus `tags`/`metadata`/`thumbnailBlobId` when set) with the share-only extras `permission` (never `"owner"`), `source` (`"permission"` | `"invitation"`), `grantedBy`, `invitationId` (invitation rows only).
@@ -122,14 +122,17 @@ Each shared document in the result extends the base `DocumentInfo` (`title`, `cr
 
 Every example below is compiled against the real client as part of the docs build. The [Querying Data](#querying-data) and [Saving Data](#saving-data) sections below go deeper on projections, includes, and save options.
 
+The generated model statics route through the process-wide default client — call `JsBaoClient.configureDefault(client)` once at startup, before the first read or write. Reads are synchronous against the local CRDT and span every open document by default (scope with `QueryOptions(documents: [docId])`); writes target one document — `save(in:)` inserts or updates in place and throws (it validates the write and requires the document to be open), `delete(in:)` throws only if the document isn't open.
+
 ### Create
 
 ```swift
-  let task = try tasks.create(Task(
+  let task = try Task(
     id: UUID().uuidString,
     title: "Review pull request",
-    priority: 2
-  ))
+    priority: 2,
+    dueDate: ISO8601DateFormatter().string(from: Date())
+  ).save(in: documentId)
   _ = task
 ```
 
@@ -137,49 +140,56 @@ Every example below is compiled against the real client as part of the docs buil
 
 ```swift
   // Find one by id
-  let task = tasks.find("task-id")
+  let task = Task.find("task-id")
 
   // Query with filters
-  let urgent = tasks.query(["priority": ["$gte": 2], "completed": false])
+  let urgent = Task.query(["priority": ["$gte": 2], "completed": false])
 
   // First match (with a sort)
-  let topTask = tasks.query(
+  let topTask = Task.query(
     ["completed": false],
     options: QueryOptions(sort: ["priority": -1])
   ).first
 
   // Count
-  let remaining = tasks.dynamic.count(["completed": false])
+  let remaining = Task.count(["completed": false])
 ```
 
 ### Update
 
 ```swift
-  if let task = tasks.find(taskId) {
-    tasks.update(task.id, ["completed": true])
+  if var task = Task.find(taskId) {
+    task.completed = true
+    try task.save(in: documentId)
   }
 ```
 
 ### Delete
 
 ```swift
-  tasks.delete(taskId)
+  if let task = Task.find(taskId) {
+    try task.delete(in: documentId)
+  }
 ```
 
 ### Upsert by natural key
 
 ```swift
-  // Creates a new record, or merges into the existing one with that email.
-  _ = try users.dynamic.upsert(
-    ["email": .string("alice@example.com"), "name": .string("Alice")],
-    on: "email"
+  let email = "alice@example.com"
+  // Reuse the existing record's id when one matches the email; otherwise mint a new id.
+  let existing = AppUser.query(["email": email]).first
+  let user = AppUser(
+    id: existing?.id ?? UUID().uuidString,
+    email: email,
+    name: "Alice"
   )
+  try user.save(in: documentId)
 ```
 
 ### Logical query operators
 
 ```swift
-  let result = tasks.query([
+  let result = Task.query([
     "$or": [
       ["priority": 3],
       ["dueDate": ["$lt": "2026-06-02T00:00:00Z"]],
@@ -190,13 +200,13 @@ Every example below is compiled against the real client as part of the docs buil
 ### Sort + cursor pagination
 
 ```swift
-  let page1 = try tasks.dynamic.queryPaged(
+  let page1 = try Task.queryPaged(
     ["completed": false],
     options: QueryOptions(sortOrder: [("priority", -1)], limit: 20)
   )
 
   if let cursor = page1.nextCursor {
-    let page2 = try tasks.dynamic.queryPaged(
+    let page2 = try Task.queryPaged(
       ["completed": false],
       options: QueryOptions(sortOrder: [("priority", -1)], limit: 20, cursor: cursor)
     )
@@ -207,7 +217,7 @@ Every example below is compiled against the real client as part of the docs buil
 ### Aggregation
 
 ```swift
-  let stats = tasks.dynamic.aggregate(AggregateOptions(
+  let stats = Task.aggregate(AggregateOptions(
     groupBy: ["category"],
     operations: [
       AggregateOperation(type: .count),
@@ -223,7 +233,7 @@ Every example below is compiled against the real client as part of the docs buil
 ### Subscribe to changes
 
 ```swift
-  let unsubscribe = tasks.dynamic.subscribe {
+  let unsubscribe = Task.subscribe {
     // re-query and update your UI
   }
 
@@ -235,12 +245,12 @@ Every example below is compiled against the real client as part of the docs buil
 
 ```swift
   let result = try await client.documents.getOrCreateWithAlias(
-    alias: ["scope": "user", "aliasKey": "default-doc"],
-    title: "My Data"
+    options: GetOrCreateWithAliasOptions(
+      alias: AliasRef(scope: .user, aliasKey: "default-doc"),
+      title: "My Data"
+    )
   )
-  if let documentId = result["documentId"] as? String {
-    _ = try await client.documents.open(documentId)
-  }
+  _ = try await client.documents.open(result.documentId)
 ```
 
 ### Share a document (user / email / group)
@@ -249,19 +259,19 @@ Every example below is compiled against the real client as part of the docs buil
   // By user ID
   _ = try await client.documents.updatePermissions(
     documentId: documentId,
-    params: ["userId": "user-abc", "permission": "read-write"]
+    params: .user("user-abc", permission: "read-write")
   )
 
   // By email — works whether or not the recipient is a member yet
   _ = try await client.documents.updatePermissions(
     documentId: documentId,
-    params: ["email": "colleague@example.com", "permission": "read-write"]
+    params: .email("colleague@example.com", permission: "read-write")
   )
 
   // With a group
   _ = try await client.documents.grantGroupPermission(
     documentId: documentId,
-    params: ["groupType": "team", "groupId": "engineering", "permission": "read-write"]
+    params: GrantGroupPermissionParams(groupType: "team", groupId: "engineering", permission: "read-write")
   )
 ```
 
@@ -270,11 +280,11 @@ Every example below is compiled against the real client as part of the docs buil
 ```swift
   _ = try await client.documents.update(
     documentId: documentId,
-    data: [
-      "title": "Q2 Planning",
-      "thumbnailBlobId": blobId,                                 // a blob you uploaded
-      "metadata": ["color": "blue", "tags": ["plan", "q2"]],     // ≤4KB JSON, replace semantics
-    ]
+    data: UpdateDocumentData(
+      title: "Q2 Planning",
+      thumbnailBlobId: .value(blobId),                              // a blob you uploaded
+      metadata: ["color": "blue", "tags": ["plan", "q2"]]          // ≤4KB JSON, replace semantics
+    )
   )
 ```
 
@@ -304,10 +314,9 @@ List with `me.ownedDocuments()` and `open()` the selected document; create a new
 
 ```swift
   let result = try await client.documents.create(
-    options: ["title": "New Project", "tags": ["workspace"]]
+    options: CreateDocumentOptions(title: "New Project", tags: ["workspace"])
   )
-  let metadata = result["metadata"] as? [String: Any]
-  let documentId = metadata?["documentId"] as? String
+  let documentId = result.metadata?["documentId"]?.stringValue
   if let documentId {
     _ = try await client.documents.open(documentId)
   }
@@ -684,7 +693,7 @@ For documents that should exist exactly once (default document, settings), use `
 
 The most common multi-doc shape is one library document per user (alias-resolved on launch) holding an index of refs to per-item documents (each shareable independently). Three patterns make it converge correctly:
 
-**Key refs by the entity id, never a random `UUID()`.** A ref's CRDT row id is the map key, and `model.create(record)` is an upsert on that key. Set `id` to the document/collection id the ref points at, so two writes for the same entity (your create path and a reconcile pass, possibly on another device) converge on one row instead of producing a permanent visible duplicate:
+**Key refs by the entity id, never a random `UUID()`.** A ref's CRDT row id is the map key, and `save(in:)` is an upsert on that key. Set `id` to the document/collection id the ref points at, so two writes for the same entity (your create path and a reconcile pass, possibly on another device) converge on one row instead of producing a permanent visible duplicate:
 
 ```swift
 public extension LibraryItemRef {
@@ -701,13 +710,13 @@ public extension LibraryItemRef {
 
 Reserve random `UUID()` ids for records *born* in the CRDT with no external identity (todos, notes, messages).
 
-**Tombstone instead of hard-delete.** Soft-delete with a `deletedAt` field and filter at query time (`refs.query(["deletedAt": ""])`). Setting `deletedAt` rather than calling `.delete(...)` avoids the race where a reconcile pass recreates a just-deleted ref because the server still reports the entity as accessible.
+**Tombstone instead of hard-delete.** Soft-delete with a `deletedAt` field and filter at query time (`LibraryItemRef.query(["deletedAt": ""])`). Setting `deletedAt` rather than calling `.delete(in:)` avoids the race where a reconcile pass recreates a just-deleted ref because the server still reports the entity as accessible.
 
 **Reconcile server access → local refs in one pass.** "Shared-with-me" lists are *not* reactive — `me.accessibleDocumentSummaries`, `collections.list`, `documents.getPermissions`, and the invitation reads are plain server queries with no change feed, so nothing fires on the user's open docs when someone shares with them. Run an explicit reconcile on the triggers you control (app launch / `connectClient`, foreground via `scenePhase` → `.active`, pull-to-refresh) that: enumerates every access channel, computes the **max** permission across channels, upserts a ref per server entity keyed by entity id, and tombstones/deletes refs whose `id` is no longer in the server set. Because refs are keyed by entity id the prune is `where !serverIds.contains(ref.id)` and a double-run can't duplicate.
 
 > **Guard freshly-created docs from the prune.** `createDocument(...)` is local-first — it returns a `documentId` immediately but commits to the server in the background, so a doc you just created is **not yet** in `me.accessibleDocumentSummaries`. A reconcile firing in that window deletes the brand-new ref and the item vanishes until a later reconcile re-adds it. Track locally-created ids in a `pendingCreateIds: Set<String>` (add on create, remove once the id appears in the server set) and exclude them from the prune: `where !serverIds.contains(ref.id) && !pendingCreateIds.contains(ref.id)`.
 
-For reads that return raw `[String: Any]`, prefer the typed `*Summaries` wrappers — see [the typed summary wrappers](#typed-summaries-for-permission--collection-reads) below.
+For the reconcile reads, prefer the `*Summaries` wrappers — they merge owned + shared and resolve user fields in one call; see [the typed summary wrappers](#typed-summaries-for-permission--collection-reads) below.
 
 ## Sharing Documents
 
@@ -770,18 +779,18 @@ When `evictLocal: true` is passed, the client performs a state vector check agai
 Use these methods to confirm the server has received your writes before taking irreversible actions (e.g., logging out, clearing local storage):
 
 ```swift
-  // Point-in-time local checks
-  let hasAllWrites = client.documents.includesWrites(documentId: documentId)
-  let fullyInSync = client.documents.inSync(documentId: documentId)
+  // Point-in-time checks
+  let hasAllWrites = await client.documents.includesWrites(documentId: documentId)
+  let fullyInSync = await client.documents.inSync(documentId: documentId)
 
   // Polling helpers: wait until confirmed
-  try await client.documents.waitForWriteConfirmation(documentId: documentId)
+  _ = await client.documents.waitForWriteConfirmation(documentId: documentId)
   try await client.documents.waitForInSync(documentId: documentId)
 ```
 
 The point-in-time checks return `false` if the client is disconnected or the check times out. The `waitFor*` polling helpers exist on both `documents.*` and the client root: `waitForWriteConfirmation` returns true on success / false on timeout, and `waitForInSync` throws on timeout.
 
-The point-in-time `includesWrites` / `inSync` checks are synchronous local reads.
+The point-in-time checks accept a `timeoutMs` (default 5s). For a cheap synchronous local read — no round-trip — use `documents.isSynced(documentId:)`.
 
 ### Updating Document Metadata
 
@@ -801,10 +810,13 @@ Delete a document (it must be closed first, or pass `forceCloseIfOpen: true`) �
 
 ```swift
   // Must be closed first
-  _ = try await client.documents.delete(documentId: documentId)
+  try await client.documents.delete(documentId: documentId)
 
   // Force-close before deleting
-  _ = try await client.documents.delete(documentId: documentId, forceCloseIfOpen: true)
+  try await client.documents.delete(
+    documentId: documentId,
+    options: DeleteDocumentOptions(forceCloseIfOpen: true)
+  )
 ```
 
 ### Programmatic Sharing — Full Reference
@@ -867,7 +879,7 @@ The owner UI when a non-member hits a 403 they're allowed to escalate. The end-t
   // A user with the link requests access
   _ = try await client.documents.requestAccess(
     documentId: documentId,
-    params: ["permission": "read-write", "message": "Please add me to this doc"]
+    options: RequestAccessOptions(permission: .readWrite, message: "Please add me to this doc")
   )
 
   // An owner lists pending requests and approves one
@@ -930,9 +942,9 @@ Create a collection, add/remove documents, and share it with a group or an indiv
 ```swift
   // Create
   let collection = try await client.collections.create(
-    params: ["name": "Q1 Reports", "description": "All quarterly report documents"]
+    params: CreateCollectionParams(name: "Q1 Reports", description: "All quarterly report documents")
   )
-  let collectionId = collection["collectionId"] as? String ?? ""
+  let collectionId = collection.collectionId
 
   // Add / remove documents
   _ = try await client.collections.addDocument(collectionId: collectionId, documentId: documentId)
@@ -941,13 +953,13 @@ Create a collection, add/remove documents, and share it with a group or an indiv
   // Share with a group (fans out to every document in the collection)
   _ = try await client.collections.grantGroupPermission(
     collectionId: collectionId,
-    params: ["groupType": "team", "groupId": "engineering", "permission": "read-write"]
+    params: GrantCollectionGroupPermissionParams(groupType: "team", groupId: "engineering", permission: "read-write")
   )
 
   // Share with an individual user (O(1)). userId only — no email form.
   _ = try await client.collections.addMember(
     collectionId: collectionId,
-    params: ["userId": targetUserId, "permission": "reader"]
+    params: .user(targetUserId, permission: .reader)
   )
 ```
 
@@ -989,7 +1001,7 @@ The canonical sharing panel: people with access + people invited but not yet sig
 
 #### Typed `*Summaries` for permission / collection reads {#typed-summaries-for-permission--collection-reads}
 
-The permission / collection read endpoints return raw `[String: Any]`, but `PrimitiveApp` (`TypedReadSummaries`) ships a typed companion for each whose field contract was verified against the server handlers — prefer them over hand-parsing `result["items"]` or guessing key names (`permission` vs `role`, `userId` vs `id`), which is the single most common way these screens go subtly wrong:
+`PrimitiveApp` (`TypedReadSummaries`) ships a convenience companion for each permission / collection read. Beyond the field contract (verified against the server handlers), they do the assembly the raw reads leave to you — merging owned + shared into one set, resolving `email`/`name` on permission rows — so sharing screens don't reimplement it:
 
 | Raw read | Typed companion | Returns |
 |---|---|---|
@@ -1002,7 +1014,7 @@ The permission / collection read endpoints return raw `[String: Any]`, but `Prim
 
 `accessibleDocumentSummaries` does the merged owned + shared set in one call.
 
-For **writes**, pass the documented keys directly to the params-dict methods — `documents.updatePermissions(documentId:params: ["email": …, "permission": …, "sendEmail": false, "documentUrl": …])` and `collections.addMember(collectionId:params: ["email": …, "permission": …])` (or `["userId": …, "permission": …]`). To cancel a pending email invite, read the row's `deferredId` via `pendingInvitationSummaries(...)`, then `client.invitations.revokeDeferredGrant(deferredId:, type:)` (`"document"` for a per-doc invite, `"group"` for a collection one).
+For **writes**, use the typed params factories — `documents.updatePermissions(documentId:params: .email("…", permission: "read-write", sendEmail: false, documentUrl: …))` (or `.user(…)` / `.batch([…])`) and `collections.addMember(collectionId:params: .email("…", permission: .readWrite))` (or `.user(…)`). To cancel a pending email invite, read the row's `deferredId` via `pendingInvitationSummaries(...)`, then `client.invitations.revokeDeferredGrant(deferredId:type:)` (`.document` for a per-doc invite, `.group` for a collection one).
 
 ### Sharing Discovery Cheat Sheet
 

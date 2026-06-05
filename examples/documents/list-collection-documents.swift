@@ -7,7 +7,7 @@ func listCollectionDocuments(client: JsBaoClient, collectionId: String) async th
     collectionId: collectionId,
     options: PaginationOptions(limit: 50)
   )
-  let items = page["items"] as? [[String: Any]] ?? []
+  let items = page.items
   // #endregion example
   _ = items
 }

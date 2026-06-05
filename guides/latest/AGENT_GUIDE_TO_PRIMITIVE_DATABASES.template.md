@@ -623,7 +623,7 @@ params = '{"email":{"type":"string","required":true},"name":{"type":"string","re
 Two failure modes to know:
 
 - `"upsertOn": "$params.email"` gets **value-substituted** like any other definition string, so the server receives the email *value* as the field name and rejects with `upsertOn field 'alice@example.com' must be present in data and not null/empty`.
-- `upsertOn` requires a registered **unique index** on the field at runtime — `unique = true` in the type schema is not sufficient. Without one, saves fail with `upsertOn field '<field>' does not have a registered unique index`. Create it once per database: `primitive databases indexes create <database-id> --model <model> --field <field> --unique`.
+- `upsertOn` requires a **unique index** on the field — declare `unique = true` on the field in the type schema. Databases created from the type provision the index automatically; a static `upsertOn` naming a field that isn't declared `unique = true` is rejected at push time. For a database created before the field was declared unique, back-provision with `primitive databases reindex <database-id> --from-schema` (idempotent) — without the index, saves fail with `upsertOn field '<field>' does not have a registered unique index`.
 
 #### Count — count matching records
 
@@ -1244,35 +1244,11 @@ The two phases see different contexts:
 
 `subscribe()` returns an `unsub()` function (synchronously). There is no event-emitter API.
 
-```typescript
-const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
-  onChange: (event) => {
-    // event.type === "db.change"
-    // event.databaseId, event.subscriptionKey, event.timestamp
-    // event.originConnectionId, event.originUserId, event.isOrigin, event.isOriginUser
-    if (event.isOrigin) return;  // this tab wrote it; UI already updated
-    for (const change of event.changes) {
-      // change.op:         "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet"
-      // change.changeType: "enter" | "update" | "leave"
-      // change.modelName, change.id
-      // change.data, change.previousData  (subject to the subscription's `select`)
-      applyChange(change);
-    }
-  },
-});
-
-// Later — REQUIRED for cleanup
-unsub();
-```
+{{ example: databases/db-subscribe }}
 
 Parameterized:
 
-```typescript
-const unsub = client.databases.subscribe(databaseId, "tickets-by-team", {
-  params: { teamId: "eng" },
-  onChange: (event) => { ... },
-});
-```
+{{ example: databases/db-subscribe-params }}
 
 The client auto-reissues `db.subscribe` on WebSocket reconnect — no app code needed.
 
@@ -1453,36 +1429,23 @@ primitive databases import-csv <database-id> <file.csv> --model products \
 
 The CLI imports through a registered batch (bulk) save operation — `--operation` defaults to `seed_save`, so the database type needs a save-like op (`{ modelName, id, data }`) by that name (or pass your own). `--batch-size` defaults to 5000, `--delimiter` to `,`; use `--dry-run` to report row/batch counts without writing and `--stop-on-error` to abort on the first failing chunk (default is best-effort continue).
 
+For programmatic imports with per-row `transform` or progress callbacks, use `importCsv` from app code:
+
+{{ example: databases/db-import-csv }}
+
+Other options: `data` (pre-parsed rows, instead of `csv`), `delimiter`, `batchSize` (default 5000), `idGenerator` (per-row ID factory; the fallback chain is `idColumn` → `idGenerator` → generated ULID), `onBatchError` (return `false` to abort remaining batches), and `operationName` (the registered save op, default `"save"`, called as `{ modelName, id, data }`).
+
 {{#lang ts}}
-For programmatic imports with per-row `transform` or progress callbacks, use `importCsv()` from app code:
+A generated model class can stand in for `modelName` — the import then filters columns to the model's schema and syncs its indexes afterwards (`syncIndexes`, reported as `indexesCreated`):
 
 ```typescript
 import { Product } from "./models";
 
-// With model class
 const result = await client.databases.importCsv(databaseId, {
   csv: csvString,
   model: Product,
   columnMap: { "Product Name": "name", "Unit Price": "price" },
 });
-
-// Without model class (csv string or pre-parsed data array)
-const result = await client.databases.importCsv(databaseId, {
-  csv: csvString,       // provide csv or data, not both
-  // data: parsedRows,  // alternative: pre-parsed array of objects
-  modelName: "products",
-  types: { price: "number", stock: "number" },
-  idColumn: "sku",
-  transform: (row, index) => {
-    if (!row.name) return null; // skip
-    return { ...row, importedAt: new Date().toISOString() };
-  },
-  batchSize: 10000,
-  onProgress: ({ processed, total, imported, failed }) => {
-    console.log(`${processed}/${total} processed`);
-  },
-});
-// result: { imported: number, failed: number, errors: [...], indexesCreated: number, durationMs: number }
 ```
 {{/lang}}
 

@@ -19,5 +19,6 @@ The essentials you're most likely to violate mid-draft:
 Mechanics:
 
 - Guides are built artifacts: edit `.template.md` + `examples/` corpus only, then `pnpm render:guides`. Never edit `.ts.md`/`.swift.md`.
+- **Compilable client code in a guide template goes in the corpus, included via `{{ example: <subject>/<op> }}` — never as an inline ts/swift fence, and never inside a `{{#lang}}` block.** The corpus is what gives an example its compile gate and its JS/Swift parity enforcement; an inline fence gets neither, and code tucked into a lang block silently exempts itself from both *and* hides from the other language's build. `{{#lang}}` blocks are for language-scoped **prose** (implementation notes, gotchas); inline fences are for what can't compile standalone (shell commands, TOML, output shapes, one-line fragments). If you're writing more than a fragment of ts/swift in a template, stop and add a corpus pair instead. (The renderer copies inline blocks through unchanged — a legacy-migration affordance, not permission for new ones.)
 - Content changed on one side (docs ↔ guides) must be checked on the other.
 - Before finishing: `pnpm check:examples`, `npx vitepress build docs`, sidebar/links updated for new or moved pages.

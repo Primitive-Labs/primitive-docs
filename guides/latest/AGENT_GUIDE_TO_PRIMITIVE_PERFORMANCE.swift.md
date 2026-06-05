@@ -206,7 +206,7 @@ Use the third party's bulk endpoint (most have one) and a single proxy call:
     integrationKey: "yahoo-finance",
     method: "GET",
     path: "/v7/finance/quote",
-    query: ["symbols": symbols.joined(separator: ",")]
+    query: ["symbols": .string(symbols.joined(separator: ","))]
   ))
 ```
 

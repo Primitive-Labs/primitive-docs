@@ -260,6 +260,47 @@ now = "2026-04-27T00:00:00Z"
 
 Workflows have no batch-write step kind. To apply a set of updates, run `forEach` over a `database.mutate` step (see `forEach` below), or use `database.applyToQuery` for query-driven updates.
 
+### `document.query` / `queryOne` / `count` / `save` / `patch` / `delete`
+
+Read and write records in a document's models server-side. All take `documentId` + `modelName`. Writes are durable when the step completes and reach connected clients like any other document change — they do not use the client-apply flow (`requiresClientApply` is for results only clients write).
+
+| Kind | Additional fields | Output |
+|---|---|---|
+| `document.query` | optional `filter`, `options` | `{ data: [...], hasMore?, nextCursor? }` — `collect`-compatible |
+| `document.queryOne` | optional `filter`, `options` | `{ record }` — `null` when nothing matches (does not fail) |
+| `document.count` | optional `filter` | `{ count }` |
+| `document.save` | `recordId`, `data` | `{ record }` — creates or replaces the record at `recordId` |
+| `document.patch` | `recordId`, `data` | `{ record }` — merges `data` fields into the record |
+| `document.delete` | `recordId` | `{ deleted: true, id }` |
+
+`filter` uses the same operator syntax as client-side model queries; empty or omitted matches all records. `options` supports `sort` (`{ field = 1 }` / `-1`), `limit`, and cursor pagination (`uniqueStartKey` — feed it the previous page's `nextCursor`).
+
+```toml
+[[steps]]
+id = "overdue"
+kind = "document.query"
+documentId = "{{ input.docId }}"
+modelName = "Invoice"
+saveAs = "invoices"
+[steps.filter]
+status = "overdue"
+amount = { "$gt" = 100 }
+[steps.options]
+sort = { dueDate = 1 }
+limit = 50
+
+[[steps]]
+id = "mark-paid"
+kind = "document.patch"
+documentId = "{{ input.docId }}"
+modelName = "Invoice"
+recordId = "{{ input.invoiceId }}"
+[steps.data]
+status = "paid"
+```
+
+A missing `documentId`/`modelName` (or `recordId` on a write), or a `documentId` that doesn't resolve to a document, fails the step non-retryably.
+
 ### `group.addMember` / `removeMember` / `checkMembership` / `listMembers` / `listUserMemberships`
 
 ```toml
@@ -321,7 +362,6 @@ kind = "workflow.start"
 forEach = "steps.get-users.data"
 as = "user"
 workflowKey = "process-item"
-maxConcurrent = 25                # default 25; cap on in-flight child runs at any moment
 [steps.input]
 userId = "{{ user.id }}"
 
@@ -471,7 +511,7 @@ Given `steps.fetch.body = { "items": [{ "sku": "a1", "qty": 2, "price": 5.0 }, {
 - `ref` (required) names a `Script` — a stored Rhai body, unique per app. Script bodies live in `transforms/<name>.rhai` in your sync directory and are mirrored to the server by `primitive sync push` (and pulled back by `primitive sync pull`); the `<name>` is the filename without `.rhai`. There is no separate `transforms` CLI command — scripts ride the normal sync flow.
 - `with` is the JSON context handed to the script. Inside the script the whole table is exposed as **`input.*`** (with `ctx.*` as an alias) — NOT as bare top-level variables. `let x = payload;` fails with `Variable not found: payload`; write `input.payload`. Also, `with` itself is a reserved Rhai keyword — a script can't declare a variable named `with`.
 - **Result nesting.** A script step's return value lands under `steps.<id>.output.*` (alongside `scriptMetrics` and the engine's `ok`) — unlike `transform`, whose result is the templated table directly (`steps.<id>.<field>`). Wire downstream templates/`runIf` as `{{ steps.normalize.output.total }}`, not `{{ steps.normalize.total }}`.
-- **Script bodies are pinned at publish.** The referencing workflow's published snapshot freezes each script body (by content) at workflow publish/save; the run path does no lookup. Pushing a changed `.rhai` alone does NOT change runtime behavior — republish the referencing workflow (e.g. touch + `sync push` it) to pick up the new body.
+- **Script bodies are pinned at publish.** The referencing workflow's published snapshot freezes each script body (by content) at workflow publish/save; the run path does no lookup. Pushing a changed `.rhai` alone does NOT change runtime behavior — republish the referencing workflow (e.g. touch + `sync push` it) to pick up the new body. `sync push` warns when a script update leaves referencing workflows on the previous body, naming each one.
 - Handy patterns: `parse_json(input.someJsonString)` for JSON-string fields (e.g. payload columns stored as strings); missing keys read as `()` (test with `h.symbol != ()`); `NaN`/`Infinity` can't survive JSON output — they serialize as `null`, so return a sentinel instead.
 - `limits` (optional) lets a step lower the per-run ceilings (`maxOperations`, `wallMsHint`, `maxOutputBytes`, `maxArrayLength`, `maxObjectKeys`, `maxNestingDepth`, `maxStringSize`, `maxCallDepth`, `maxLogBytes`); requested values are clamped at the app ceiling, never raised.
 - Deterministic failures (parse / compile / runtime / limit / validation) come back as a non-retryable step error so durable retries don't re-run a guaranteed failure; transient/transport errors throw and retry normally. The runtime fails closed — it never silently passes input through.
@@ -1015,20 +1055,14 @@ Server-side constraints on a `syncCallable` workflow:
 
 Long-running workflows should keep using `start()` plus the WebSocket / polling lifecycle.
 
-{{#lang ts}}
-Call `client.workflows.runSync()` and `await` the final envelope:
+Call `workflows.runSync` and await the final envelope:
 
-```typescript
-const sync = await client.workflows.runSync({
-  workflowKey: "validate-token",
-  input: { token },
-  timeoutMs: 5000,                 // default 5000; server caps at 30000
-  // signal: abortSignal,            // optional AbortSignal
-});
-// → { runId, runKey, status, output?, error?, run?, existing? }
-// status: "completed" | "failed" | "terminated" | "timeout" | "apply_pending"
-// Promise resolves for every terminal outcome — only transport errors reject.
-```
+{{ example: workflows/workflow-run-sync }}
+
+`runSync` also accepts `runKey`, `contextDocId`, and `meta` — the same idempotency and scoping fields as `start`.
+
+{{#lang ts}}
+An optional `signal` (`AbortSignal`) is accepted as well.
 {{/lang}}
 
 ## Workflow lifecycle
@@ -1148,54 +1182,7 @@ Start a workflow, check its status, and list recent runs:
 
 Full options and result shapes for these calls:
 
-{{#lang ts}}
-```typescript
-const result = await client.workflows.start({
-  workflowKey: "my-workflow",
-  input: { text: "hello" },        // optional, default {}
-  runKey: "...",                    // optional, idempotency key — auto-generated otherwise
-  contextDocId: "doc-id",           // optional
-  meta: { source: "api" },          // optional, max 1KB
-  forceRerun: false,                // optional — terminate existing run with same key
-});
-// → { runId, runKey, instanceId, status, existing? }
-
-const status = await client.workflows.getStatus({
-  workflowKey: "my-workflow",
-  runKey: result.runKey,
-  contextDocId: "doc-id",           // optional, must match the start call's scope
-});
-// → { status, output?, error?, run? }
-// status.status: "running" | "complete" | "failed" | "terminated" | "apply_pending" | "apply_claimed"
-// (NOTE: "complete", not "completed", in this method)
-
-await client.workflows.terminate({ workflowKey, runKey, contextDocId });
-const { items, cursor } = await client.workflows.listRuns({ workflowKey, status, limit: 50 });
-```
-{{/lang}}
-
-{{#lang swift}}
-`start`, `getStatus`, and `listRuns` take the same fields — `workflowKey`, optional `input`, `runKey`, `contextDocId`, `meta` (max 1KB), and `forceRerun` on start — and return untyped `[String: Any]` dictionaries. Read fields by key:
-
-```swift
-let started = try await client.workflows.start(
-    workflowKey: "my-workflow",
-    input: ["text": "hello"],
-    options: StartWorkflowOptions(contextDocId: "doc-id")
-)
-let runKey = started["runKey"] as? String          // → runId, runKey, instanceId, status, existing?
-
-let status = try await client.workflows.getStatus(
-    workflowKey: "my-workflow",
-    runKey: runKey,
-    contextDocId: "doc-id"                          // must match the start call's scope
-)
-// status["status"]: "running" | "complete" | "failed" | "terminated" | "apply_pending" | "apply_claimed"
-
-try await client.workflows.terminate(workflowKey: "my-workflow", runKey: runKey, contextDocId: "doc-id")
-let runs = try await client.workflows.listRuns(workflowKey: "my-workflow", status: status, limit: 50)
-```
-{{/lang}}
+{{ example: workflows/workflow-run-options }}
 
 Inspect the per-step debug records of a run:
 
@@ -1227,7 +1214,7 @@ Subscribe through `client.events.on(_:)` with the typed event payload; hold the 
 
 ```swift
 let started = client.events.on(.workflowStarted) { (e: WorkflowStartedEvent) in
-    // e.workflowKey, e.runId
+    // e.workflowKey, e.runId, e.runKey?, e.instanceId?, e.contextDocId?, e.meta?
 }
 
 let sub = client.events.on(.workflowStatus) { (e: WorkflowStatusEvent) in
@@ -1268,7 +1255,7 @@ let ctx = try await client.workflows.runAndApply(
     options: StartWorkflowOptions(contextDocId: documentId),
     timeout: 120                          // default 120s; raise for slow LLM workflows
 )
-let output = ctx.output                   // [String: Any]
+let output = ctx.output                   // Any? — cast to the final step's JSON shape
 // Terminal non-success throws WorkflowRunError.terminalFailure(status:message:);
 // missing output within the window throws .timedOut; task cancellation propagates.
 ```

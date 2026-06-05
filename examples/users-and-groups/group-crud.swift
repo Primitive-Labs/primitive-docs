@@ -6,18 +6,17 @@ func manageGroups(client: JsBaoClient) async throws {
   // #region example
   // Create. If the group type has autoAddCreator (default), the creator is
   // added as a member.
-  _ = try await client.groups.create(params: [
-    "groupType": "team",
-    "groupId": "engineering",
-    "name": "Engineering Team",
-    "description": "Platform engineering team",  // optional
-  ])
+  _ = try await client.groups.create(params: CreateGroupParams(
+    groupType: "team",
+    groupId: "engineering",
+    name: "Engineering Team",
+    description: "Platform engineering team"  // optional
+  ))
 
   // List — returns { items, cursor }. Filter by type and page through.
-  let page1 = try await client.groups.list(options: ["type": "team", "limit": 10])
-  let cursor = page1["cursor"] as? String
+  let page1 = try await client.groups.list(options: ListGroupsOptions(type: "team", limit: 10))
   let page2 = try await client.groups.list(
-    options: ["type": "team", "limit": 10, "cursor": cursor as Any]
+    options: ListGroupsOptions(type: "team", limit: 10, cursor: page1.cursor)
   )
 
   // Get a single group.
@@ -26,7 +25,7 @@ func manageGroups(client: JsBaoClient) async throws {
   // Update name and/or description (both optional).
   _ = try await client.groups.update(
     groupType: "team", groupId: "engineering",
-    params: ["name": "Platform Engineering", "description": "Owns the platform stack"]
+    params: UpdateGroupParams(name: "Platform Engineering", description: "Owns the platform stack")
   )
 
   // Cascade-deletes all memberships and group permissions.

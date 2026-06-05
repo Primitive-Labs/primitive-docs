@@ -2,9 +2,9 @@ import JsBaoClient
 
 // Subscribe to model changes (local edits and synced remote edits). Returns an
 // unsubscribe closure — always call it when you're done.
-func watchTasks(tasks: TypedModel<Task>) {
+func watchTasks() {
   // #region example
-  let unsubscribe = tasks.dynamic.subscribe {
+  let unsubscribe = Task.subscribe {
     // re-query and update your UI
   }
 

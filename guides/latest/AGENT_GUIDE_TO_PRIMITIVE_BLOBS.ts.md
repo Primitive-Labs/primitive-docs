@@ -316,6 +316,7 @@ if (blobs.hasServiceWorkerControl()) {
 
 `proxyUrl` returns the same URL as `downloadUrl`; it just signals intent to be intercepted by the service worker. See the js-bao-wss-client README for a service-worker implementation.
 
+
 ---
 
 ## Permissions (document blobs)

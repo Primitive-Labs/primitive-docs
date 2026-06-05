@@ -70,33 +70,49 @@ Events are buffered on the device and persisted locally while offline; persisted
 `action` and `user_ulid` are required; `feature` (defaults to `"unspecified"`) groups related events.
 
 ```swift
-  client.logAnalyticsEvent([
-    "action": "photo_uploaded",
-    "feature": "gallery",
-    "user_ulid": currentUserUlid,
-  ])
+  client.analytics.logEvent(AnalyticsEventInput(
+    action: "photo_uploaded",
+    feature: "gallery",
+    user_ulid: currentUserUlid
+  ))
 ```
 
-`logAnalyticsEvent` takes a `[String: Any]` dictionary. If `user_ulid` is omitted it is back-filled from the client's current user, or set to the unauthenticated-user constant when no user is signed in.
+`analytics.logEvent` takes an `AnalyticsEventInput`. `user_ulid` is optional on the struct: when omitted it is back-filled from the client's current user, or set to `AnalyticsEventInput.unauthenticatedUser` when no user is signed in.
 
 ### Event with Context
 
 Pass a `context_json` object for per-event debug data. The serialized payload is bounded at **1 KiB**, so keep it small — don't dump request bodies or full reports.
 
 ```swift
-  client.logAnalyticsEvent([
-    "action": "search_executed",
-    "feature": "search",
-    "user_ulid": currentUserUlid,
-    "context_json": [
+  client.analytics.logEvent(AnalyticsEventInput(
+    action: "search_executed",
+    feature: "search",
+    user_ulid: currentUserUlid,
+    context_json: [
       "query": "quarterly report",
       "resultCount": 42,
-    ],
-  ])
+    ]
+  ))
 ```
 
-`context_json` accepts a `[String: Any]` dictionary. If its serialized size exceeds 1 KiB, the field is dropped from the event before sending.
+`context_json` is a `JSONValue` — construct it with object/array/scalar literals. If its serialized size exceeds 1 KiB, the field is dropped from the event before sending.
 
+
+### AnalyticsEventInput Fields
+
+`AnalyticsEventInput` carries the same fields as the event row (`action`, `feature`, `route`, `plan`, `tenant_id`, `user_ulid`, `device_type`, `os_name`, `os_version`, `browser_name`, `browser_version`, `app_version`, `context_json`, `user_created_at_epoch_s`). Only `action` is required at the initializer: `user_ulid` is back-filled from the signed-in user (or the unauthenticated-user constant), and `context_json` is a `JSONValue`.
+
+---
+
+## Logging Snapshots
+
+`logSnapshot` records a state snapshot event. It auto-resolves the user; if no user is authenticated, the call is a no-op (no error).
+
+```swift
+  client.analytics.logSnapshot(context: ["screen": "settings", "tab": "billing"])
+```
+
+This logs an event with `action: "_snapshot"`, `feature: "_state"`, and your context as `context_json`.
 
 ---
 
@@ -105,11 +121,11 @@ Pass a `context_json` object for per-event debug data. The serialized payload is
 Events with no authenticated user are dropped. To log on pre-auth screens (landing pages, sign-up flow), pass the unauthenticated-user constant as the `user_ulid`. Its value is `"UNAUTHENTICATED"`. Use sparingly — most analytics should be tied to real users.
 
 ```swift
-  client.logAnalyticsEvent([
-    "action": "landing_page_view",
-    "feature": "onboarding",
-    "user_ulid": AnalyticsQueue.unauthenticatedUser,
-  ])
+  client.analytics.logEvent(AnalyticsEventInput(
+    action: "landing_page_view",
+    feature: "onboarding",
+    user_ulid: AnalyticsEventInput.unauthenticatedUser
+  ))
 ```
 
 ---
@@ -121,7 +137,7 @@ Events are buffered and flushed automatically — including when the WebSocket r
 The queue auto-flushes every **100ms** (or earlier when batched). `client.destroy()` cancels the flush timer and triggers a final flush before storage closes, so you don't need a manual flush on teardown.
 
 ```swift
-client.flushAnalytics()
+client.analytics.flush()
 ```
 
 ---
@@ -131,15 +147,39 @@ client.flushAnalytics()
 If your app reports its plan/version dynamically (e.g. after an in-app upgrade), set them on the client. They flow into every subsequent event automatically. Pass `null`/`nil` to clear an override.
 
 ```swift
-  client.setAnalyticsPlanOverride("pro")
-  client.setAnalyticsAppVersionOverride("2.1.4")
+  client.analytics.setPlanOverride("pro")
+  client.analytics.setAppVersionOverride("2.1.4")
 
   // Pass nil to clear an override
-  client.setAnalyticsPlanOverride(nil)
+  client.analytics.setPlanOverride(nil)
 ```
 
 ---
 
+## Configuring Auto Events
+
+Pass `analyticsAutoEvents` to the constructor. All sub-options default to enabled.
+
+```swift
+  let client = JsBaoClient(options: JsBaoClientOptions(
+    apiUrl: "https://primitiveapi.com",
+    wsUrl: "wss://primitiveapi.com",
+    appId: "YOUR_APP_ID",
+    analyticsAutoEvents: AnalyticsAutoEventsConfig(
+      dailyAuth: true,
+      returnActive: true,
+      minResumeMs: 5 * 60 * 1000, // gap before another user_returned fires
+      syncErrorsEnabled: true,
+      syncErrorsMinIntervalMs: 30_000,
+      blobUploadsStart: false,
+      blobUploadsSuccess: true,
+      blobUploadsFailure: true,
+      sessionEnd: true
+    )
+  ))
+```
+
+`AnalyticsAutoEventsConfig` exposes each toggle as a flat field: `dailyAuth`, `returnActive`, `minResumeMs` (ms before another `user_returned` will fire), `syncErrorsEnabled` + `syncErrorsMinIntervalMs`, `blobUploadsStart` / `blobUploadsSuccess` / `blobUploadsFailure`, and `sessionEnd`.
 
 ---
 

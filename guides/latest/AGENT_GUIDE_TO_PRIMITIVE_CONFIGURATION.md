@@ -40,7 +40,7 @@ Every command resolves its target environment in order: `--env <name>` flag → 
 
 ## Push failures
 
-`sync push` validates as it applies and reports the failing entity and file. For workflows it validates `$params.X` references against declared `[[operations.params]]` entries at push time, naming the file and line of a bad reference. Diagnostics go to stderr; `--json` data goes to stdout (pipes stay clean).
+`sync push` validates every TOML file before applying anything — any validation error aborts the push with no changes applied (`Aborting push: N TOML validation error(s) — no changes were applied.`). For workflows it validates `$params.X` references against declared `[[operations.params]]` entries at push time, naming the file and line of a bad reference. When validation passes but the server rejects an entity, the error names the entity and file. A cron trigger that already exists on the server but is missing from local sync state is adopted by key and updated in place rather than failing on the 409 — re-running a failed push converges. Diagnostics go to stderr; `--json` data goes to stdout (pipes stay clean).
 
 ## What sync does NOT carry
 
@@ -50,6 +50,7 @@ Some flags are set with dedicated update commands rather than TOML:
 primitive workflows update <id> --requires-client-apply false
 primitive workflows update <id> --sync-callable true
 primitive apps update --cors-origins "..." --base-url "..." --google-oauth true
+primitive apps update --member-invitations-enabled true --member-invitation-limit 5
 primitive apps update --test-account-bases alice@example.com
 ```
 

@@ -30,13 +30,13 @@ There is no client-side `users.list()` / `users.get()`; the current user lives o
   // Add a member by email (recommended for user-facing flows)
   let result = try await client.groups.addMember(
     groupType: "team", groupId: "engineering",
-    params: ["email": "alice@example.com"]
+    params: .email("alice@example.com")
   )
 
   // ...or by user id (internal / programmatic)
   _ = try await client.groups.addMember(
     groupType: "team", groupId: "engineering",
-    params: ["userId": "user-456"]
+    params: .userId("user-456")
   )
 
   // List a group's members
@@ -51,11 +51,11 @@ There is no client-side `users.list()` / `users.get()`; the current user lives o
 ```swift
   _ = try await client.documents.grantGroupPermission(
     documentId: documentId,
-    params: [
-      "groupType": "team",
-      "groupId": "engineering-team",
-      "permission": "read-write",
-    ]
+    params: GrantGroupPermissionParams(
+      groupType: "team",
+      groupId: "engineering-team",
+      permission: "read-write"
+    )
   )
 ```
 
@@ -172,14 +172,17 @@ The current authenticated user has its own namespace. Use it for "me"-scoped rea
     )
   )
 
-  // Update name and/or avatar (pass NSNull() to clear the avatar).
+  // Update name and/or avatar (pass .clear to remove the avatar).
   _ = try await client.me.update(
-    params: ["name": "Alice Reyes", "avatarUrl": "https://cdn.example.com/u/alice.png"]
+    params: UpdateMeParams(
+      name: "Alice Reyes",
+      avatarUrl: .value("https://cdn.example.com/u/alice.png")
+    )
   )
 
   // Upload an image directly; the server hosts it and returns a URL.
   let uploaded = try await client.me.uploadAvatar(imageData: avatar, contentType: "image/png")
-  let avatarUrl = uploaded["avatarUrl"] as? String
+  let avatarUrl = uploaded.avatarUrl
 
   // update() and uploadAvatar() clear the cache automatically; reach for
   // these only when you need to inspect or force a refresh yourself.
@@ -198,8 +201,8 @@ The current authenticated user has its own namespace. Use it for "me"-scoped rea
   // Documents shared directly with the user (non-owner permission rows +
   // pending invitations). Group/collection shares do NOT appear here.
   let shared = try await client.me.sharedDocuments(limit: 50, tag: "shared")
-  let items = shared["items"] as? [[String: Any]] ?? []
-  let cursor = shared["cursor"] as? String
+  let items = shared.items
+  let cursor = shared.cursor
 
   // Document invitations the user can accept — an inbox view.
   let pending = try await client.me.pendingDocumentInvitations()
@@ -238,18 +241,17 @@ The full create/list/get/update/delete surface is in [Managing Groups](#managing
 ```swift
   // Create. If the group type has autoAddCreator (default), the creator is
   // added as a member.
-  _ = try await client.groups.create(params: [
-    "groupType": "team",
-    "groupId": "engineering",
-    "name": "Engineering Team",
-    "description": "Platform engineering team",  // optional
-  ])
+  _ = try await client.groups.create(params: CreateGroupParams(
+    groupType: "team",
+    groupId: "engineering",
+    name: "Engineering Team",
+    description: "Platform engineering team"  // optional
+  ))
 
   // List — returns { items, cursor }. Filter by type and page through.
-  let page1 = try await client.groups.list(options: ["type": "team", "limit": 10])
-  let cursor = page1["cursor"] as? String
+  let page1 = try await client.groups.list(options: ListGroupsOptions(type: "team", limit: 10))
   let page2 = try await client.groups.list(
-    options: ["type": "team", "limit": 10, "cursor": cursor as Any]
+    options: ListGroupsOptions(type: "team", limit: 10, cursor: page1.cursor)
   )
 
   // Get a single group.
@@ -258,7 +260,7 @@ The full create/list/get/update/delete surface is in [Managing Groups](#managing
   // Update name and/or description (both optional).
   _ = try await client.groups.update(
     groupType: "team", groupId: "engineering",
-    params: ["name": "Platform Engineering", "description": "Owns the platform stack"]
+    params: UpdateGroupParams(name: "Platform Engineering", description: "Owns the platform stack")
   )
 
   // Cascade-deletes all memberships and group permissions.
@@ -282,26 +284,24 @@ Add a member by `userId` (always direct) or by `email` (direct if the email maps
 ```swift
   let result = try await client.groups.addMember(
     groupType: "team", groupId: "engineering",
-    params: ["email": email]
+    params: .email(email)
   )
 
-  switch result["status"] as? String {
-  case "added":
-    // New membership: ["userId", "userName"?, "userEmail"?, "addedAt", "addedBy"]
-    print("added", result["userId"] as? String ?? "")
-  case "already_member":
-    // Idempotent no-op (replaces the old HTTP 409).
+  switch result {
+  case let .direct(add) where add.status == "added":
+    // New membership: userId, userName?, userEmail?, addedAt, addedBy
+    print("added", add.userId)
+  case .direct:
+    // status == "already_member": idempotent no-op (replaces the old HTTP 409).
     print("already a member")
-  case "pending_signup":
+  case let .deferred(deferred):
     // Email isn't an app user yet. The server created an AppInvitation +
-    // DeferredGroupAdd: ["email", "appInvitationCreated", "deferredId",
-    // "expiresAt", "groupType", "groupId", "invitationId", "inviteToken"].
-    // Use inviteToken to build an accept URL; cancel via revokeDeferredGrant.
-    if let deferredId = result["deferredId"] as? String {
-      _ = try await client.invitations.revokeDeferredGrant(deferredId: deferredId, type: "group")
-    }
-  default:
-    break
+    // DeferredGroupAdd: email, appInvitationCreated, deferredId, expiresAt,
+    // groupType, groupId, invitationId, inviteToken. Use inviteToken to build
+    // an accept URL; cancel via revokeDeferredGrant.
+    _ = try await client.invitations.revokeDeferredGrant(
+      deferredId: deferred.deferredId, type: .group
+    )
   }
 ```
 
@@ -323,12 +323,11 @@ See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-gra
 
 ```swift
   let page = try await client.groups.listMembers(groupType: "team", groupId: "engineering")
-  // page["items"]: [["userId", "userName"?, "userEmail"?, "addedAt", "addedBy"]]
-  let cursor = page["cursor"] as? String
+  // page.items: [GroupMemberInfo(userId, userName?, userEmail?, addedAt, addedBy)]
 
   let next = try await client.groups.listMembers(
     groupType: "team", groupId: "engineering",
-    options: PaginationOptions(limit: 50, cursor: cursor)
+    options: PaginationOptions(limit: 50, cursor: page.cursor)
   )
 ```
 
@@ -423,7 +422,9 @@ Databases support a coarse-grained group grant that gives every member of the gr
 ```swift
   _ = try await client.databases.grantGroupPermission(
     databaseId: databaseId,
-    params: ["groupType": "team", "groupId": "engineering", "permission": "manager"]
+    params: GrantDatabaseGroupPermissionParams(
+      groupType: "team", groupId: "engineering", permission: "manager"
+    )
   )
 ```
 
@@ -632,30 +633,30 @@ Test a rule set with a simulated request, or debug against a real user's live me
   // Simulated request — no live data needed.
   let result = try await client.ruleSets.test(
     ruleSetId: ruleSetId,
-    data: [
-      "category": "group",  // "group" or "member" for resourceType "group"
-      "operation": "create",  // group: create|edit|delete|get; member: create|edit|delete|list
-      "user": ["userId": "user-123", "role": "member"],
-      "memberships": [["groupType": "team", "groupId": "engineering"]],  // optional
-      "group": [
-        "groupType": "team", "groupId": "engineering",
-        "name": "Eng", "createdBy": "user-456",
-      ],
-      "target": ["userId": "user-456"],  // for member.create/edit/delete
-    ]
+    data: TestRuleSetParams(
+      category: "group",  // "group" or "member" for resourceType "group"
+      operation: "create",  // group: create|edit|delete|get; member: create|edit|delete|list
+      user: TestRuleSetUser(userId: "user-123", role: "member"),
+      memberships: [RuleSetMembership(groupType: "team", groupId: "engineering")],  // optional
+      group: TestRuleSetGroup(
+        groupType: "team", groupId: "engineering",
+        name: "Eng", createdBy: "user-456"
+      ),
+      target: TestRuleSetTarget(userId: "user-456")  // for member.create/edit/delete
+    )
   )
-  // result: ["allowed", "expression"?, "context"?, "trace"?, "error"?]
+  // result: allowed, expression?, context?, trace?, error?
 
   // Debug against a real user (live memberships, full trace).
   // Requires console-admin auth — regular app callers get 403.
-  let debug = try await client.ruleSets.debug(data: [
-    "userId": "user-123",
-    "groupType": "team",
-    "groupId": "engineering",  // optional — omit for create
-    "category": "member",
-    "operation": "create",
-    "targetUserId": "user-456",  // optional
-  ])
+  let debug = try await client.ruleSets.debug(data: DebugRuleSetParams(
+    userId: "user-123",
+    groupType: "team",
+    category: "member",
+    operation: "create",
+    groupId: "engineering",  // optional — omit for create
+    targetUserId: "user-456"  // optional
+  ))
 ```
 
 `result.trace` shows every `isMemberOf`/`memberGroups`/`hasRole` call and its result. To update rule sets, edit the TOML file and run `primitive sync push --dir ./config`.

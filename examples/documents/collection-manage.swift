@@ -10,9 +10,9 @@ func manageCollection(
   // #region example
   // Create
   let collection = try await client.collections.create(
-    params: ["name": "Q1 Reports", "description": "All quarterly report documents"]
+    params: CreateCollectionParams(name: "Q1 Reports", description: "All quarterly report documents")
   )
-  let collectionId = collection["collectionId"] as? String ?? ""
+  let collectionId = collection.collectionId
 
   // Add / remove documents
   _ = try await client.collections.addDocument(collectionId: collectionId, documentId: documentId)
@@ -21,13 +21,13 @@ func manageCollection(
   // Share with a group (fans out to every document in the collection)
   _ = try await client.collections.grantGroupPermission(
     collectionId: collectionId,
-    params: ["groupType": "team", "groupId": "engineering", "permission": "read-write"]
+    params: GrantCollectionGroupPermissionParams(groupType: "team", groupId: "engineering", permission: "read-write")
   )
 
   // Share with an individual user (O(1)). userId only — no email form.
   _ = try await client.collections.addMember(
     collectionId: collectionId,
-    params: ["userId": targetUserId, "permission": "reader"]
+    params: .user(targetUserId, permission: .reader)
   )
   // #endregion example
 }

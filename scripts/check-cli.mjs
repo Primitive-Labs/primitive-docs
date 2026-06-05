@@ -9,10 +9,12 @@
 // library_repos/js-bao-wss submodule (`pnpm build:source-packages`), so docs
 // trued against unreleased library work validate against that same work.
 //
-// INTERIM MECHANISM (Option A): walks the command tree by spawning
-// `primitive <path…> --help` and parsing commander's Commands/Options
-// sections. Once js-bao-wss#983 ships `primitive help --json`, swap the
-// scraper for the manifest (tracked in a primitive-docs follow-up issue).
+// The command tree comes from `primitive help --json` (one spawn, exact
+// names/aliases/flags) when the channel's CLI provides the manifest. CLIs
+// without it (published primitive-admin ≤ 1.0.49) fall back to the help-text
+// scraper: spawning `primitive <path…> --help` per subcommand and parsing
+// commander's Commands/Options sections. The fallback can be deleted once the
+// pinned published CLI ships the manifest (primitive-docs#82).
 //
 // What's validated per documented invocation:
 //   • the subcommand path exists (`primitive sync push`, …)
@@ -37,7 +39,51 @@ const CLI =
     ? ["node", join(sourcePackageDir("primitive-admin"), "dist", "bin", "primitive.js")]
     : [join(ROOT, "node_modules", ".bin", "primitive")];
 
-// ── Command tree, lazily discovered via --help ──────────────────────────────
+function runCli(argv) {
+  return execFileSync(CLI[0], [...CLI.slice(1), ...argv], {
+    encoding: "utf-8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
+// "-e, --env <name>  description" → ["-e", "--env"]
+function flagTokens(spec) {
+  return [...spec.matchAll(/(?<![\w-])(--?[\w-]+)/g)].map((m) => m[1]);
+}
+
+// ── Command tree from the `help --json` manifest ────────────────────────────
+// Every node is { commands: Map(name|alias → child node), flags: Set, container }.
+// Commander accepts -h/--help everywhere and a `help` subcommand on every
+// container, neither of which the manifest lists — add them explicitly.
+function nodeFromManifest(cmd) {
+  const commands = new Map();
+  for (const child of cmd.commands ?? []) {
+    const node = nodeFromManifest(child);
+    for (const name of [child.name, ...(child.aliases ?? [])]) commands.set(name, node);
+  }
+  const flags = new Set(["-h", "--help"]);
+  for (const opt of cmd.options ?? []) for (const t of flagTokens(opt.flags)) flags.add(t);
+  const container = (cmd.args ?? []).length === 0 && commands.size > 0;
+  if (commands.size > 0 && !commands.has("help")) {
+    commands.set("help", { commands: new Map(), flags: new Set(["-h", "--help"]), container: false });
+  }
+  return { commands, flags, container };
+}
+
+function manifestRoot() {
+  let manifest;
+  try {
+    manifest = JSON.parse(runCli(["help", "--json"]));
+  } catch {
+    return null; // CLI predates the manifest — use the scraper
+  }
+  if (manifest?.schemaVersion !== 1) return null;
+  const root = nodeFromManifest(manifest);
+  for (const opt of manifest.globalOptions ?? []) for (const t of flagTokens(opt.flags)) root.flags.add(t);
+  return root;
+}
+
+// ── Fallback: command tree lazily scraped via --help ────────────────────────
 const helpCache = new Map(); // "path tokens".join(" ") -> { commands: Map, flags: Set } | null
 
 function parseHelp(text) {
@@ -78,11 +124,7 @@ function helpFor(pathTokens) {
       : [...pathTokens.slice(0, -1), "help", pathTokens[pathTokens.length - 1]];
   let parsed = null;
   try {
-    const out = execFileSync(CLI[0], [...CLI.slice(1), ...argv], {
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    parsed = parseHelp(out);
+    parsed = parseHelp(runCli(argv));
   } catch {
     parsed = null; // unknown command
   }
@@ -90,7 +132,15 @@ function helpFor(pathTokens) {
   return parsed;
 }
 
-const rootHelp = helpFor([]);
+// Descend to a named subcommand: manifest nodes carry their children inline;
+// scraper nodes mark children with `true` and load them lazily by path.
+function childNode(node, name, pathTokens) {
+  const child = node.commands.get(name);
+  return child === true ? helpFor(pathTokens) : (child ?? null);
+}
+
+const rootHelp = manifestRoot() ?? helpFor([]);
+const MECHANISM = helpCache.size === 0 ? "help --json manifest" : "help-text scrape";
 if (!rootHelp) {
   console.error(
     CHANNEL === "next"
@@ -154,9 +204,9 @@ function checkInvocation(tokens, loc) {
     }
     path.push(alternatives[0]);
     i++;
-    const next = helpFor(path);
+    const next = childNode(node, alternatives[0], path);
     if (!next) {
-      problems.push(`✘ ${loc}: \`primitive ${path.join(" ")}\` — help for subcommand failed to load`);
+      problems.push(`✘ ${loc}: \`primitive ${path.join(" ")}\` — subcommand failed to load`);
       return;
     }
     node = next;
@@ -214,8 +264,7 @@ for (const file of sources) {
 
 // ── Report ──────────────────────────────────────────────────────────────────
 console.log(
-  `CLI invocations: ${checked} checked against primitive-admin (${CHANNEL === "next" ? "submodule source" : "published package"}, ` +
-    `${helpCache.size - 1} subcommand help pages walked)` +
+  `CLI invocations: ${checked} checked against primitive-admin (${CHANNEL === "next" ? "submodule source" : "published package"}, via ${MECHANISM})` +
     (skipped.length ? `, ${skipped.length} opted out (docs:nocheck)` : ""),
 );
 for (const s of skipped) console.log(`  ~ skipped ${s}`);

@@ -1,9 +1,9 @@
 import JsBaoClient
 
 // Group-by aggregation with count/avg/sum, an optional filter, sort, and limit.
-func taskStats(tasks: TypedModel<Task>) {
+func taskStats() {
   // #region example
-  let stats = tasks.dynamic.aggregate(AggregateOptions(
+  let stats = Task.aggregate(AggregateOptions(
     groupBy: ["category"],
     operations: [
       AggregateOperation(type: .count),

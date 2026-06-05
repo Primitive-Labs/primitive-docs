@@ -57,15 +57,15 @@ If you cannot answer one of these from context, ask before building:
 ```swift
   // On app load, after sign-in
   let result = try await client.documents.getOrCreateWithAlias(
-    alias: ["scope": "user", "aliasKey": "default"],
-    title: "My Data"
+    options: GetOrCreateWithAliasOptions(
+      alias: AliasRef(scope: .user, aliasKey: "default"),
+      title: "My Data"
+    )
   )
-  if let documentId = result["documentId"] as? String {
-    _ = try await client.documents.open(documentId)
-  }
+  _ = try await client.documents.open(result.documentId)
 
   // Reads run against local state after open()
-  let openTasks = tasks.query(["completed": false])
+  let openTasks = Task.query(["completed": false])
 ```
 
 Use for: task managers, journals, settings, preferences. Root document also works for a single per-user doc with no sharing.
@@ -73,17 +73,15 @@ Use for: task managers, journals, settings, preferences. Root document also work
 ### Document — one per workspace (shared collaboratively)
 
 ```swift
-  let created = try await client.documents.create(options: [
-    "title": "Project Alpha",
-    "tags": ["workspace"],
-  ])
-  let metadata = created["metadata"] as? [String: Any]
-  let documentId = metadata?["documentId"] as? String ?? ""
+  let created = try await client.documents.create(
+    options: CreateDocumentOptions(title: "Project Alpha", tags: ["workspace"])
+  )
+  let documentId = created.metadata?["documentId"]?.stringValue ?? ""
   _ = try await client.documents.open(documentId)
 
   _ = try await client.documents.updatePermissions(
     documentId: documentId,
-    params: ["email": "alice@example.com", "permission": "read-write"]
+    params: .email("alice@example.com", permission: "read-write")
   )
 ```
 
@@ -102,18 +100,17 @@ definition = '{"filter":{"assigneeId":"$user.userId"},"sort":{"createdAt":-1},"l
 ```
 
 ```swift
-  let db = try await client.databases.create(params: [
-    "title": "Alpha",
-    "databaseType": "project",
-  ])
-  let databaseId = db["databaseId"] as? String ?? ""
+  let db = try await client.databases.create(params: CreateDatabaseParams(
+    title: "Alpha",
+    databaseType: "project"
+  ))
   _ = try await client.databases.updateCelContext(
-    databaseId: databaseId,
+    databaseId: db.databaseId,
     celContext: ["teamId": "team-1"]
   )
 
   let result = try await client.databases.executeOperation(
-    databaseId: databaseId,
+    databaseId: db.databaseId,
     name: "listMyTasks"
   )
 ```

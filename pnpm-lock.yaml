@@ -21,11 +21,11 @@ importers:
         specifier: 0.5.1
         version: 0.5.1(yjs@13.6.31)
       js-bao-wss-client:
-        specifier: 2.0.0
-        version: 2.0.0(better-sqlite3@12.10.0)(js-bao@0.5.1(yjs@13.6.31))(lib0@0.2.117)(yjs@13.6.31)
+        specifier: 2.0.1
+        version: 2.0.1(better-sqlite3@12.10.0)(js-bao@0.5.1(yjs@13.6.31))(lib0@0.2.117)(yjs@13.6.31)
       primitive-admin:
-        specifier: ^1.0.49
-        version: 1.0.49(@types/node@25.0.9)(yjs@13.6.31)
+        specifier: ^1.0.50
+        version: 1.0.50(@types/node@25.0.9)(yjs@13.6.31)
       typedoc:
         specifier: ^0.28.15
         version: 0.28.15(typescript@5.9.3)
@@ -1136,16 +1136,19 @@ packages:
   isomorphic.js@0.2.5:
     resolution: {integrity: sha512-PIeMbHqMt4DnUP3MA/Flc0HElYjMXArsw1qwJZcm9sqR8mq3l8NYizFMty0pWwE/tzIGH3EKK5+jes5mAr85yw==}
 
-  js-bao-wss-client@2.0.0:
-    resolution: {integrity: sha512-KXqViMOXSxbSlS9CceSyAJ0B8ZiVKa8TvhbDdAW9JlFXThOgIVSs99vA9Dd8vLprAlpH07/5l8JLCTiQnf6Sew==}
+  js-bao-wss-client@2.0.1:
+    resolution: {integrity: sha512-ICZiTk6PxDUvPayP+bS8yNIW7Tn/LNCad4CGAnlWi6keQWaSP0BUovalWmassy5RrZVlIekmfC1b+IPMfXRJsQ==}
     peerDependencies:
       better-sqlite3: ^11.0.0
       js-bao: '>=0.5.0'
       lib0: ^0.2.0
+      react: '>=17.0.0'
       y-sqlite3: ^0.1.0
       yjs: ^13.6.0
     peerDependenciesMeta:
       better-sqlite3:
+        optional: true
+      react:
         optional: true
       y-sqlite3:
         optional: true
@@ -1360,8 +1363,8 @@ packages:
     engines: {node: '>=10.13.0'}
     hasBin: true
 
-  primitive-admin@1.0.49:
-    resolution: {integrity: sha512-deFJTTuAYLMiWT+gqwQHVx5m0Le1UU1gO/XWkhP9Xz0ZM6G41Mz238FNP8Q6XUgWFmn7eMjgdyaWLvcFRqHNBg==}
+  primitive-admin@1.0.50:
+    resolution: {integrity: sha512-axupi7XbkuIpjDrrDP30iogpWlPMXWY7f6WGw0znR8ss24TyhSmOghD7PI3iQoVRzWPQZhs+zZNd0uUCo4TVzA==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
@@ -2759,7 +2762,7 @@ snapshots:
 
   isomorphic.js@0.2.5: {}
 
-  js-bao-wss-client@2.0.0(better-sqlite3@12.10.0)(js-bao@0.5.1(yjs@13.6.31))(lib0@0.2.117)(yjs@13.6.31):
+  js-bao-wss-client@2.0.1(better-sqlite3@12.10.0)(js-bao@0.5.1(yjs@13.6.31))(lib0@0.2.117)(yjs@13.6.31):
     dependencies:
       js-bao: 0.5.1(yjs@13.6.31)
       lib0: 0.2.117
@@ -2985,7 +2988,7 @@ snapshots:
 
   prettier@2.8.8: {}
 
-  primitive-admin@1.0.49(@types/node@25.0.9)(yjs@13.6.31):
+  primitive-admin@1.0.50(@types/node@25.0.9)(yjs@13.6.31):
     dependencies:
       '@iarna/toml': 2.2.5
       '@inquirer/prompts': 7.10.1(@types/node@25.0.9)

@@ -8,7 +8,7 @@ func cronLifecycle(client: JsBaoClient, triggerId: String) async throws {
   _ = try await client.cronTriggers.get(triggerId: triggerId)      // includes runtime.scheduledAlarmAt
   _ = try await client.cronTriggers.update(                        // change cron/timezone/state etc.
     triggerId: triggerId,
-    params: ["cron": "0 8 * * *", "timezone": "America/New_York"]
+    params: UpdateCronTriggerParams(cron: "0 8 * * *", timezone: "America/New_York")
   )
   _ = try await client.cronTriggers.pause(triggerId: triggerId)    // cancels the pending alarm
   _ = try await client.cronTriggers.resume(triggerId: triggerId)   // clears lastError, reschedules

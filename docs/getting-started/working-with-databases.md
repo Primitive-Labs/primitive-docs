@@ -314,7 +314,7 @@ This reads the `[models.*]` blocks and `[[operations]]` definitions and emits ty
 
 ## Bulk CSV Import
 
-Two paths for loading a lot of records. From app code, `client.databases.importCsv(databaseId, { csv, model, columnMap, ... })` imports a CSV string with column mapping, optional per-row transforms, and progress callbacks. From a terminal:
+Two paths for loading a lot of records. From a terminal:
 
 ```bash
 primitive databases import-csv <database-id> ./products.csv --model products \
@@ -323,6 +323,16 @@ primitive databases import-csv <database-id> ./products.csv --model products \
 ```
 
 The CLI loads rows through a registered batch save operation in batches; add `--dry-run` to preview counts without writing.
+
+From app code, `importCsv` imports a CSV string with column mapping, type coercion, optional per-row transforms, and progress callbacks:
+
+::: code-group
+
+<<< ../../examples/databases/db-import-csv.ts#example{ts} [JavaScript]
+
+<<< ../../examples/databases/db-import-csv.swift#example{swift} [Swift]
+
+:::
 
 ## Optional Filter Params
 
@@ -375,28 +385,15 @@ Each subscription has:
 
 ### Subscribing from Your App
 
-`databases.subscribe(databaseId, subscriptionKey, { onChange })` returns an `unsub()` function:
+`databases.subscribe` takes the database id, the subscription key, and an `onChange` handler, and returns an unsubscribe function:
 
-```typescript
-const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
-  onChange: (event) => {
-    if (event.isOrigin) {
-      // This same tab wrote it — we already updated the UI optimistically.
-      return;
-    }
-    for (const change of event.changes) {
-      // change.op:         "save" | "patch" | "delete" | "increment" | ...
-      // change.changeType: "enter" | "update" | "leave"
-      // change.data, change.previousData (subject to the select projection)
-      if (change.op === "delete") removeTicket(change.id);
-      else upsertTicket(change.data);
-    }
-  },
-});
+::: code-group
 
-// Later
-unsub();
-```
+<<< ../../examples/databases/db-subscribe.ts#example{ts} [JavaScript]
+
+<<< ../../examples/databases/db-subscribe.swift#example{swift} [Swift]
+
+:::
 
 The usual pattern is **load + subscribe**: run a query operation once for current state, then subscribe for future changes.
 
@@ -423,12 +420,13 @@ filter = "record.data.teamId == params.teamId"
 teamId = { type = "string", required = true }
 ```
 
-```typescript
-const unsub = client.databases.subscribe(databaseId, "tickets-by-team", {
-  params: { teamId: "eng" },
-  onChange: (event) => { /* ... */ },
-});
-```
+::: code-group
+
+<<< ../../examples/databases/db-subscribe-params.ts#example{ts} [JavaScript]
+
+<<< ../../examples/databases/db-subscribe-params.swift#example{swift} [Swift]
+
+:::
 
 ### Server-Side Writes
 

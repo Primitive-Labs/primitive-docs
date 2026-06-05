@@ -78,11 +78,12 @@ Use sparingly — most analytics should be tied to real users.
 
 ### Snapshots
 
-`logSnapshot()` records a single state snapshot. The user is auto-resolved; if no user is signed in the call is a no-op (no error).
+`logSnapshot` records a single state snapshot. The user is auto-resolved; if no user is signed in the call is a no-op (no error).
 
-```typescript
-client.analytics.logSnapshot({ screen: "settings", tab: "billing" });
-```
+::: code-group
+<<< ../../examples/analytics/log-snapshot.ts#example{ts} [JavaScript]
+<<< ../../examples/analytics/log-snapshot.swift#example{swift} [Swift]
+:::
 
 This emits an event with `action: "_snapshot"`, `feature: "_state"`, and your payload as `context_json`.
 
@@ -103,27 +104,12 @@ If your app reports plan/version dynamically (e.g. after an in-app upgrade), set
 
 ## Configuring Auto Events
 
-Pass an `analyticsAutoEvents` option to the client constructor to fine-tune the lifecycle events. Sub-options accept either a boolean or a granular `{ start, success, failure }` shape for the upload/LLM events.
+Pass an `analyticsAutoEvents` option to the client constructor to fine-tune the lifecycle events per feature:
 
-```typescript
-import { JsBaoClient } from "js-bao-wss-client";
-
-const client = new JsBaoClient({
-  appId: "app-123",
-  apiUrl: "https://api.example.com",
-  wsUrl: "wss://ws.example.com",
-  analyticsAutoEvents: {
-    dailyAuth: true,
-    returnActive: true,
-    minResumeMs: 5 * 60 * 1000,
-    sessionEnd: true,
-    syncErrors: { enabled: true, minIntervalMs: 30_000 },
-    blobUploads: { start: false, success: true, failure: true },
-    llm: { start: false, success: true, failure: true },
-    gemini: false,
-  },
-});
-```
+::: code-group
+<<< ../../examples/analytics/auto-events-config.ts#example{ts} [JavaScript]
+<<< ../../examples/analytics/auto-events-config.swift#example{swift} [Swift]
+:::
 
 ## Querying Analytics
 

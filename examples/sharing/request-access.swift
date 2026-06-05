@@ -10,7 +10,7 @@ func accessRequests(
   // A user with the link requests access
   _ = try await client.documents.requestAccess(
     documentId: documentId,
-    params: ["permission": "read-write", "message": "Please add me to this doc"]
+    options: RequestAccessOptions(permission: .readWrite, message: "Please add me to this doc")
   )
 
   // An owner lists pending requests and approves one

@@ -9,7 +9,7 @@ func fetchQuotes(client: JsBaoClient, symbols: [String]) async throws {
     integrationKey: "yahoo-finance",
     method: "GET",
     path: "/v7/finance/quote",
-    query: ["symbols": symbols.joined(separator: ",")]
+    query: ["symbols": .string(symbols.joined(separator: ","))]
   ))
   // #endregion example
   _ = response

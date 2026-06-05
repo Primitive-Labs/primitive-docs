@@ -5,9 +5,12 @@ import JsBaoClient
 func deleteDocument(client: JsBaoClient, documentId: String) async throws {
   // #region example
   // Must be closed first
-  _ = try await client.documents.delete(documentId: documentId)
+  try await client.documents.delete(documentId: documentId)
 
   // Force-close before deleting
-  _ = try await client.documents.delete(documentId: documentId, forceCloseIfOpen: true)
+  try await client.documents.delete(
+    documentId: documentId,
+    options: DeleteDocumentOptions(forceCloseIfOpen: true)
+  )
   // #endregion example
 }

@@ -160,14 +160,15 @@ window.addEventListener("mousemove", () => {
 });
 ```
 
+
 ---
 
 ## Logging Snapshots
 
-`logSnapshot()` records a state snapshot event. It auto-resolves the user; if no user is authenticated, the call is a no-op (no error).
+`logSnapshot` records a state snapshot event. It auto-resolves the user; if no user is authenticated, the call is a no-op (no error).
 
 ```typescript
-client.analytics.logSnapshot({ screen: "settings", tab: "billing" });
+  client.analytics.logSnapshot({ screen: "settings", tab: "billing" });
 ```
 
 This logs an event with `action: "_snapshot"`, `feature: "_state"`, and your context as `context_json`.
@@ -227,23 +228,21 @@ If your app reports its plan/version dynamically (e.g. after an in-app upgrade),
 Pass `analyticsAutoEvents` to the constructor. All sub-options default to enabled.
 
 ```typescript
-import { JsBaoClient } from "js-bao-wss-client";
-
-const client = new JsBaoClient({
-  appId: "app-123",
-  apiUrl: "https://api.example.com",
-  wsUrl: "wss://ws.example.com",
-  analyticsAutoEvents: {
-    dailyAuth: true,
-    returnActive: true,
-    minResumeMs: 5 * 60 * 1000, // default
-    sessionEnd: true,
-    syncErrors: { enabled: true, minIntervalMs: 30_000 }, // or just `true`/`false`
-    blobUploads: { start: false, success: true, failure: true },
-    llm: { start: false, success: true, failure: true }, // or `false` to disable all
-    gemini: false,
-  },
-});
+  const client = await initializeClient({
+    apiUrl: "https://primitiveapi.com",
+    wsUrl: "wss://primitiveapi.com",
+    appId: "YOUR_APP_ID",
+    analyticsAutoEvents: {
+      dailyAuth: true,
+      returnActive: true,
+      minResumeMs: 5 * 60 * 1000, // gap before another user_returned fires
+      sessionEnd: true,
+      syncErrors: { enabled: true, minIntervalMs: 30_000 },
+      blobUploads: { start: false, success: true, failure: true },
+      llm: { start: false, success: true, failure: true },
+      gemini: false,
+    },
+  });
 ```
 
 Accepted shapes:

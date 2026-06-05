@@ -16,11 +16,12 @@
 //   schema     (`models` only)                  → loadSchemaFromTomlString({strict})
 //   other                                       → parse gate only
 //
-// The workflow/database validators are the CLI's own `sync push` validators,
-// transpiled at run time from the source-of-truth submodule
-// (library_repos/js-bao-wss/cli/src/lib/*). INTERIM: once js-bao-wss#983
-// ships `primitive-admin/validators`, import from the published package
-// instead (tracked in a primitive-docs issue).
+// The workflow/operations validators are the CLI's own `sync push` validators,
+// imported from its public `validators` export: the submodule-built CLI on the
+// next channel, the installed `primitive-admin/validators` on production (with
+// a transpile-from-submodule fallback while the pinned published CLI predates
+// the export). The database-config normalizers aren't part of the export, so
+// they always transpile from the submodule source.
 //
 // A block opts out with `novalidate` in the fence info string
 // (```toml novalidate) — e.g. deliberately-wrong teaching snippets. Opt-outs
@@ -28,13 +29,14 @@
 //
 // Usage:  node scripts/check-toml.mjs
 
-import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import TOML from "@iarna/toml";
 import { loadSchemaFromTomlString } from "js-bao";
 import ts from "typescript";
 import { VARIANTS } from "./variants.mjs";
+import { docsChannel } from "./channel.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CLI_LIB = join(ROOT, "library_repos", "js-bao-wss", "cli", "src", "lib");
@@ -52,25 +54,35 @@ async function importCliLib(name) {
   return import(pathToFileURL(out).href);
 }
 
-const { validateWorkflowToml } = await importCliLib("workflow-toml-validator");
-const { validateOperations, normalizeOperationFromToml, normalizeSubscriptionFromToml } =
-  await Promise.all([
-    importCliLib("toml-params-validator"),
-    importCliLib("toml-database-config"),
-  ]).then(([params, dbcfg]) => ({ ...params, ...dbcfg }));
+// ── Channel-resolved validators export (js-bao-wss#983) ─────────────────────
+async function importValidators() {
+  if (docsChannel() === "next") {
+    const built = join(ROOT, "library_repos", "js-bao-wss", "cli", "dist", "src", "validators.js");
+    if (!existsSync(built)) {
+      console.error("✘ next channel: submodule CLI not built — run `pnpm build:source-packages`");
+      process.exit(1);
+    }
+    return import(pathToFileURL(built).href);
+  }
+  try {
+    return await import("primitive-admin/validators");
+  } catch {
+    // Pinned published CLI predates the export — transpile the same sources.
+    const [wf, params] = await Promise.all([
+      importCliLib("workflow-toml-validator"),
+      importCliLib("toml-params-validator"),
+    ]);
+    return { ...wf, ...params };
+  }
+}
 
-// Fields the step runners actually read but the CLI allowlist is missing —
-// suppressed here so correct docs don't fail on a stale validator. DELETE
-// this set when js-bao-wss#985 lands.
-const KNOWN_VALIDATOR_GAPS = new Set([
-  "maxConcurrent", // workflow.start
-  "iterationName", "pageSize", "onConflict", "source", "perUser", // iterate-users
-  "js", // script
-]);
+const { validateWorkflowToml, validateOperations } = await importValidators();
+const { normalizeOperationFromToml, normalizeSubscriptionFromToml } =
+  await importCliLib("toml-database-config");
 
 // Registry-derived step kinds: every `kind: "<x>"` literal in the step-runner
-// sources, plus the `database.*` kinds (declared as a type union in
-// runner/types.ts and instantiated programmatically). Catches documented
+// sources, plus the `database.*` / `document.*` kinds (declared as type unions
+// in runner/types.ts and instantiated programmatically). Catches documented
 // steps with a missing/unknown/renamed `kind`.
 const WORKFLOWS_SRC = join(ROOT, "library_repos", "js-bao-wss", "src", "workflows");
 const STEPS_DIR = join(WORKFLOWS_SRC, "steps");
@@ -80,7 +92,7 @@ const KNOWN_KINDS = new Set([
     .flatMap((f) =>
       [...readFileSync(join(STEPS_DIR, f), "utf-8").matchAll(/kind: "([\w.-]+)"/g)].map((m) => m[1]),
     ),
-  ...[...readFileSync(join(WORKFLOWS_SRC, "runner", "types.ts"), "utf-8").matchAll(/"(database\.\w+)"/g)].map(
+  ...[...readFileSync(join(WORKFLOWS_SRC, "runner", "types.ts"), "utf-8").matchAll(/"((?:database|document)\.\w+)"/g)].map(
     (m) => m[1],
   ),
 ]);
@@ -160,7 +172,6 @@ for (const file of sources) {
 
     if (kind === "workflow") {
       for (const e of validateWorkflowToml(parsed)) {
-        if (KNOWN_VALIDATOR_GAPS.has(e.field)) continue; // js-bao-wss#985
         const where = e.stepId ? `step '${e.stepId}'` : `step #${e.stepIndex + 1}`;
         problems.push(`✘ ${loc}: workflow ${where}, field '${e.field}' — ${e.hint}`);
       }

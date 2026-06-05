@@ -6,7 +6,7 @@ func runPrompt(client: JsBaoClient, documentText: String) async throws {
   let result = try await client.prompts.execute(
     promptKey: "my-summarizer",
     options: ExecutePromptOptions(
-      variables: ["text": documentText, "style": "concise"],
+      variables: ["text": .string(documentText), "style": "concise"],
       modelOverride: "gpt-4o" // optional; defaults to the active config's model
     )
   )

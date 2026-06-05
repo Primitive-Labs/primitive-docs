@@ -59,6 +59,12 @@ By default only admins can invite. To let regular members invite teammates, enab
 | `memberInvitationsEnabled` | If `true`, users with role `"member"` can create invitations |
 | `memberInvitationLimit` | Max active (non-accepted, non-expired) invitations per member |
 
+Set both with the CLI (a limit of `0` means unlimited):
+
+```bash
+primitive apps update --member-invitations-enabled true --member-invitation-limit 5
+```
+
 Admins and owners are exempt from the quota, and members can only invite other members (passing `role: "admin"` is rejected). Members check their quota before showing an invite UI:
 
 ::: code-group

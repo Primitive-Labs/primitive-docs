@@ -6,18 +6,17 @@ import JsBaoClient
 // the per-row scoping.
 func listMyTasks(client: JsBaoClient) async throws {
   // #region example
-  let db = try await client.databases.create(params: [
-    "title": "Alpha",
-    "databaseType": "project",
-  ])
-  let databaseId = db["databaseId"] as? String ?? ""
+  let db = try await client.databases.create(params: CreateDatabaseParams(
+    title: "Alpha",
+    databaseType: "project"
+  ))
   _ = try await client.databases.updateCelContext(
-    databaseId: databaseId,
+    databaseId: db.databaseId,
     celContext: ["teamId": "team-1"]
   )
 
   let result = try await client.databases.executeOperation(
-    databaseId: databaseId,
+    databaseId: db.databaseId,
     name: "listMyTasks"
   )
   // #endregion example

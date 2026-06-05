@@ -7,7 +7,7 @@ func readFromBucket(client: JsBaoClient, blobId: String) async throws {
   let signed = try await client.blobBuckets.getSignedUrl(
     bucketIdOrKey: "avatars", blobId: blobId, expiresInSeconds: 3600
   )
-  let url = signed["url"] as? String
+  let url = signed.url
 
   // Or download the bytes directly
   let bytes = try await client.blobBuckets.download(bucketIdOrKey: "avatars", blobId: blobId)

@@ -6,19 +6,19 @@ func shareDocument(client: JsBaoClient, documentId: String) async throws {
   // By user ID
   _ = try await client.documents.updatePermissions(
     documentId: documentId,
-    params: ["userId": "user-abc", "permission": "read-write"]
+    params: .user("user-abc", permission: "read-write")
   )
 
   // By email — works whether or not the recipient is a member yet
   _ = try await client.documents.updatePermissions(
     documentId: documentId,
-    params: ["email": "colleague@example.com", "permission": "read-write"]
+    params: .email("colleague@example.com", permission: "read-write")
   )
 
   // With a group
   _ = try await client.documents.grantGroupPermission(
     documentId: documentId,
-    params: ["groupType": "team", "groupId": "engineering", "permission": "read-write"]
+    params: GrantGroupPermissionParams(groupType: "team", groupId: "engineering", permission: "read-write")
   )
   // #endregion example
 }

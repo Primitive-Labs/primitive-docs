@@ -16,7 +16,7 @@ The API is **flat** (`client.blobBuckets.upload(bucketIdOrKey, …)`), not a `.b
     contentType: "image/jpeg",
     tags: ["profile"]
   )
-  let blobId = result["blobId"] as? String
+  let blobId = result.blobId
 ```
 
 ### Read (signed URL / download)
@@ -26,7 +26,7 @@ The API is **flat** (`client.blobBuckets.upload(bucketIdOrKey, …)`), not a `.b
   let signed = try await client.blobBuckets.getSignedUrl(
     bucketIdOrKey: "avatars", blobId: blobId, expiresInSeconds: 3600
   )
-  let url = signed["url"] as? String
+  let url = signed.url
 
   // Or download the bytes directly
   let bytes = try await client.blobBuckets.download(bucketIdOrKey: "avatars", blobId: blobId)
@@ -37,7 +37,8 @@ The API is **flat** (`client.blobBuckets.upload(bucketIdOrKey, …)`), not a `.b
 ```swift
   // List blobs in the bucket
   let page = try await client.blobBuckets.list(bucketIdOrKey: "avatars", limit: 50)
-  let items = page["items"] as? [[String: Any]] ?? []
+  let items = page.items
+  let cursor = page.cursor
 
   // One blob's metadata
   let meta = try await client.blobBuckets.getMetadata(bucketIdOrKey: "avatars", blobId: blobId)
@@ -51,12 +52,12 @@ The API is **flat** (`client.blobBuckets.upload(bucketIdOrKey, …)`), not a `.b
 Admin/owner only. Deleting a bucket cascades to every blob inside it.
 
 ```swift
-  _ = try await client.blobBuckets.createBucket(params: [
-    "bucketKey": "uploads",
-    "name": "User uploads",
-    "ttlTier": "28d",
-    "accessPolicy": "authenticated",
-  ])
+  _ = try await client.blobBuckets.createBucket(params: CreateBlobBucketParams(
+    bucketKey: "uploads",
+    name: "User uploads",
+    ttlTier: .twentyEightDays,
+    accessPolicy: .authenticated
+  ))
 
   let buckets = try await client.blobBuckets.listBuckets()
   let bucket = try await client.blobBuckets.getBucket(bucketIdOrKey: "uploads")

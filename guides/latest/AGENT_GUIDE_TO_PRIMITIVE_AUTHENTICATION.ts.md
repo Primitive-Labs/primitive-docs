@@ -118,33 +118,30 @@ await client.startOAuthFlow(continueUrl, {
 When the callback page can construct a client (you already have the JWT or are happy to re-init), extract `code`/`state` from the callback and pass them to `handleOAuthCallback`:
 
 ```typescript
-const params = new URLSearchParams(window.location.search);
-const code = params.get("code");
-const state = params.get("state");
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  const state = params.get("state");
 
-if (code && state) {
-  await client.handleOAuthCallback(code, state);
-  // Token now stored, WebSocket reconnected. Navigate.
-  window.location.href = "/";
-}
+  if (code && state) {
+    await client.handleOAuthCallback(code, state);
+    // Token now stored, WebSocket reconnected. Navigate.
+    window.location.href = "/";
+  }
 ```
 
 ### Handle the callback (static method — when no client yet)
 
 ```typescript
-import { JsBaoClient } from "js-bao-wss-client";
-
-const token = await JsBaoClient.exchangeOAuthCode({
-  apiUrl: API_URL,
-  appId: APP_ID,
-  code,
-  state,
-  // Pass these if your app uses a refresh proxy:
-  refreshProxyBaseUrl: `${window.location.origin}/proxy`,
-  refreshProxyCookieMaxAgeSeconds: 7 * 24 * 60 * 60,
-});
-// Persist however your app does (storage / cookie / pass to initializeClient)
+  const token = await JsBaoClient.exchangeOAuthCode({
+    apiUrl,
+    appId,
+    code,
+    state,
+  });
+  // Persist however your app does (storage / cookie / pass to initializeClient)
 ```
+
+If your app uses a refresh proxy, also pass `refreshProxyBaseUrl` (e.g. `` `${window.location.origin}/proxy` ``) and `refreshProxyCookieMaxAgeSeconds` to `exchangeOAuthCode`.
 
 **Don't:**
 
@@ -179,20 +176,19 @@ const { token } = await client.handleOAuthCallback(code, state);
 
 ### Reading the token (callback page)
 
-The callback page reads `?magic_token=...` off the URL and feeds it to `magicLinkVerify`:
+The callback delivers the token as a `magic_token` value — **not** `token`, `magicToken`, or `code`:
 
 ```typescript
-const magicToken = new URLSearchParams(window.location.search).get("magic_token");
+  const magicToken = new URLSearchParams(window.location.search).get("magic_token");
 
-if (magicToken) {
-  const { user, isNewUser, promptAddPasskey } = await client.magicLinkVerify(magicToken);
-  // Token is now stored on the client and WS auto-connects.
-  if (isNewUser) showOnboarding();
-  if (promptAddPasskey) offerPasskeyRegistration();
-}
+  if (magicToken) {
+    const { user, isNewUser, promptAddPasskey } = await client.magicLinkVerify(magicToken);
+    // Token is now stored on the client and WS auto-connects.
+    if (isNewUser) showOnboarding();
+    if (promptAddPasskey) offerPasskeyRegistration();
+    return user;
+  }
 ```
-
-The query param name is **`magic_token`** (not `token`, `magicToken`, or `code`).
 
 The callback URL may also carry `?purpose=login-add-passkey`. The server appends this when the link was sent for an existing user the platform thinks should add a passkey (e.g. they signed in via OTP/magic-link but have no passkey on file). The `magicLinkVerify` call itself is unchanged — apps that read `purpose` from the URL can use it as a hint to route the user to passkey registration after sign-in instead of straight to the home screen.
 
@@ -218,50 +214,46 @@ await client.magicLinkVerify(magicToken, { inviteToken: inviteTokenFromUrl });
 
 ### Error handling
 
-`AuthError` is thrown for non-2xx responses with a machine-readable code.
-
-Import from the package and switch on `err.code`:
+`AuthError` is thrown for non-2xx responses with a machine-readable code:
 
 ```typescript
-import { AuthError, AUTH_CODES } from "js-bao-wss-client";
-
-try {
-  await client.otpVerify(email, code);
-} catch (err) {
-  if (err instanceof AuthError) {
-    switch (err.code) {
-      case AUTH_CODES.INVALID_TOKEN:          // bad/expired code
-      case AUTH_CODES.TOKEN_EXPIRED:          // token expired
-      case AUTH_CODES.INVITATION_REQUIRED:    // invite-only app, no invitation
-      case AUTH_CODES.DOMAIN_NOT_ALLOWED:     // domain-mode app, email not in allowed domains
-      case AUTH_CODES.ADDED_TO_WAITLIST:      // waitlist enabled, user added
-      case AUTH_CODES.WAITLIST_ENTRY_UPDATED: // existing waitlist entry updated
-      case AUTH_CODES.PASSKEY_NOT_ENABLED:    // passkey off in admin console
-      case AUTH_CODES.MAGIC_LINK_NOT_ENABLED: // magic link off in admin console
-      case AUTH_CODES.INVITE_TOKEN_INVALID:   // bad invite token (#466)
-      case AUTH_CODES.INVITE_TOKEN_EXPIRED:   // invite token expired
-      case AUTH_CODES.INVITE_ALREADY_ACCEPTED: // invite already used
-        showUserMessage(err.message);
-        return;
+  try {
+    await client.otpVerify(email, code);
+  } catch (err) {
+    if (err instanceof AuthError) {
+      switch (err.code) {
+        case AUTH_CODES.INVALID_TOKEN:          // bad/expired code
+        case AUTH_CODES.TOKEN_EXPIRED:          // token expired
+        case AUTH_CODES.INVITATION_REQUIRED:    // invite-only app, no invitation
+        case AUTH_CODES.DOMAIN_NOT_ALLOWED:     // domain-mode app, email not in allowed domains
+        case AUTH_CODES.ADDED_TO_WAITLIST:      // waitlist enabled, user added
+        case AUTH_CODES.WAITLIST_ENTRY_UPDATED: // existing waitlist entry updated
+        case AUTH_CODES.PASSKEY_NOT_ENABLED:    // passkey off in admin console
+        case AUTH_CODES.MAGIC_LINK_NOT_ENABLED: // magic link off in admin console
+        case AUTH_CODES.INVITE_TOKEN_INVALID:   // bad invite token
+        case AUTH_CODES.INVITE_TOKEN_EXPIRED:   // invite token expired
+        case AUTH_CODES.INVITE_ALREADY_ACCEPTED: // invite already used
+          showUserMessage(err.message);
+          return;
+      }
+      // Server-only codes — not in the client's AUTH_CODES constant, so check
+      // the string directly:
+      switch (err.code) {
+        case "RATE_LIMITED":             // too many requests; err may include retryAfter
+        case "OTP_MAX_ATTEMPTS":         // too many bad guesses; request new code
+        case "OTP_NOT_ENABLED":          // OTP off in admin console
+        case "RESERVED_EMAIL_FOR_ADMIN": // +primitivetest emails can't hold admin/owner roles
+          showUserMessage(err.message);
+          return;
+      }
     }
-    // Server-only codes — not in the client's AUTH_CODES constant, so check
-    // the string directly:
-    switch (err.code) {
-      case "RATE_LIMITED":            // too many requests; err may include retryAfter
-      case "OTP_MAX_ATTEMPTS":        // too many bad guesses; request new code
-      case "OTP_NOT_ENABLED":         // OTP off in admin console
-      case "RESERVED_EMAIL_FOR_ADMIN": // +primitivetest emails can't hold admin/owner roles
-        showUserMessage(err.message);
-        return;
-    }
+    throw err;
   }
-  throw err;
-}
 ```
 
-The exported `AUTH_CODES` constant covers: `ADDED_TO_WAITLIST`, `INVITATION_REQUIRED`, `DOMAIN_NOT_ALLOWED`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `PASSKEY_NOT_ENABLED`, `MAGIC_LINK_NOT_ENABLED`, `WAITLIST_ENTRY_UPDATED`, `INVITE_TOKEN_INVALID`, `INVITE_TOKEN_EXPIRED`, `INVITE_ALREADY_ACCEPTED`. The server may also return `RATE_LIMITED`, `OTP_MAX_ATTEMPTS`, and `RESERVED_EMAIL_FOR_ADMIN` — compare those as string literals.
+> **Caveat on OTP disabled.** When OTP is disabled the request endpoint returns a plain 400 with the message `"OTP authentication is not enabled for this app"` and **no `code` field**. Don't rely on a code to detect that case — gate the OTP UI on `getAuthConfig()`'s `otpEnabled` up front instead.
 
-> **Caveat on `OTP_NOT_ENABLED`.** The constant is defined and exported, but the OTP request endpoint returns a plain 400 with the message `"OTP authentication is not enabled for this app"` and **no `code` field** when OTP is disabled. Don't rely on switching on `OTP_NOT_ENABLED` to detect that case — gate the OTP UI on `getAuthConfig().otpEnabled` up front instead.
+The exported `AUTH_CODES` constant covers: `ADDED_TO_WAITLIST`, `INVITATION_REQUIRED`, `DOMAIN_NOT_ALLOWED`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `PASSKEY_NOT_ENABLED`, `MAGIC_LINK_NOT_ENABLED`, `WAITLIST_ENTRY_UPDATED`, `INVITE_TOKEN_INVALID`, `INVITE_TOKEN_EXPIRED`, `INVITE_ALREADY_ACCEPTED`. The server may also return `RATE_LIMITED`, `OTP_MAX_ATTEMPTS`, and `RESERVED_EMAIL_FOR_ADMIN` — compare those as string literals.
 
 The same `AuthError` codes apply to `magicLinkRequest`/`magicLinkVerify` and `passkey*` methods.
 
@@ -334,39 +326,39 @@ await client.passkeyDelete(passkeyId);
 
 ## Auth Events
 
-These are the canonical events. `auth-failed` and `auth:onlineAuthRequired` are the ones most apps must handle.
+These are the canonical events.
 
-Register handlers with `client.on(...)`:
+`auth-failed` and `auth:onlineAuthRequired` are the ones most apps must handle. Register handlers with `client.on(...)`:
 
 ```typescript
-// Token refresh failed or server invalidated session — prompt re-login.
-client.on("auth-failed", ({ message, reason }) => {
-  redirectToLogin();
-});
+  // Token refresh failed or server invalidated session — prompt re-login.
+  client.on("auth-failed", ({ message, reason }) => {
+    redirectToLogin();
+  });
 
-// Token applied successfully (login, refresh, or OAuth callback).
-client.on("auth-success", ({ token, previousToken, cause }) => {
-  // cause names the operation that produced the token. Stable values:
-  //   Sign-in:    "oauthCallback" | "magicLinkVerify" | "otpVerify" | "passkeyAuth"
-  //   Refresh:    "httpRefresh" | "ws-challenge" | "bootstrap:refresh" | "backoff-retry"
-  //   Lifecycle:  "persisted-hydrate" | "ws-handshake" | "auto-network:online"
-  //               | "networkMode:online" | "http-request"
-  //   Manual:     "manual"
-  // Treat unknown values as a generic success — the set may grow.
-});
+  // Token applied successfully (login, refresh, or OAuth callback).
+  client.on("auth-success", ({ token, previousToken, cause }) => {
+    // cause names the operation that produced the token. Stable values:
+    //   Sign-in:    "oauthCallback" | "magicLinkVerify" | "otpVerify" | "passkeyAuth"
+    //   Refresh:    "httpRefresh" | "ws-challenge" | "bootstrap:refresh" | "backoff-retry"
+    //   Lifecycle:  "persisted-hydrate" | "ws-handshake" | "auto-network:online"
+    //               | "networkMode:online" | "http-request"
+    //   Manual:     "manual"
+    // Treat unknown values as a generic success — the set may grow.
+  });
 
-// Came back online without a valid token. Show sign-in.
-client.on("auth:onlineAuthRequired", () => {
-  promptSignIn();
-});
+  // Came back online without a valid token. Show sign-in.
+  client.on("auth:onlineAuthRequired", () => {
+    promptSignIn();
+  });
 
-// Generic state machine event — fires on transitions.
-client.on("auth:state", ({ authenticated, mode, userId }) => {
-  // mode: "online" | "offline" | "none" | "auto"
-});
+  // Generic state machine event — fires on transitions.
+  client.on("auth:state", ({ authenticated, mode, userId }) => {
+    // mode: "online" | "offline" | "none" | "auto"
+  });
 
-client.on("auth:logout", () => clearSensitiveUI());
-client.on("auth:logout:complete", () => navigateHome());
+  client.on("auth:logout", () => clearSensitiveUI());
+  client.on("auth:logout:complete", () => navigateHome());
 ```
 
 **Don't:**
@@ -381,10 +373,12 @@ await client.signInWithGoogle();
 ### Minimal handler
 
 ```typescript
-const promptLogin = () => navigateToLogin();
-client.on("auth-failed", promptLogin);
-client.on("auth:onlineAuthRequired", promptLogin);
-client.on("auth:state", ({ authenticated }) => { if (!authenticated) promptLogin(); });
+  const promptLogin = () => navigateToLogin();
+  client.on("auth-failed", promptLogin);
+  client.on("auth:onlineAuthRequired", promptLogin);
+  client.on("auth:state", ({ authenticated }) => {
+    if (!authenticated) promptLogin();
+  });
 ```
 
 ---
@@ -433,11 +427,11 @@ The admin console exposes the same toggles. App code does not need to special-ca
 To read or manually set the token:
 
 ```typescript
-client.getToken(); // string | null
+  client.getToken(); // string | null
 
-// Manually set a token (e.g. you obtained one out-of-band). Triggers
-// auth-success and pushes through the normal apply-token pipeline.
-client.setToken(jwt, { cause: "external" });
+  // Manually set a token (e.g. you obtained one out-of-band). Triggers
+  // auth-success and pushes through the normal apply-token pipeline.
+  client.setToken(jwt, { cause: "external" });
 ```
 
 **Don't:**
@@ -627,14 +621,15 @@ If you're using the template, this route is already wired in `src/router/routes.
 There is **no `primitive test-users` CLI command**. The bypass is server-side: an OTP request for an email shaped like `<base-local>+primitivetest<suffix>@<base-domain>` accepts the magic code `"000000"` instead of the emailed code, but **only when the base address is on the app's `testAccountBaseEmails` whitelist**.
 
 ```typescript
-// Requires the app owner to have added "alice@example.com" to the app's
-// testAccountBaseEmails whitelist. Then any `alice+primitivetest<suffix>@example.com`
-// derivative becomes a test account that accepts code "000000".
-await client.otpRequest("alice+primitivetest@example.com");
-const { user } = await client.otpVerify("alice+primitivetest@example.com", "000000");
+  // Requires the app owner to have added "alice@example.com" to the app's
+  // testAccountBaseEmails whitelist. Then any `alice+primitivetest<suffix>@example.com`
+  // derivative becomes a test account that accepts code "000000".
+  await client.otpRequest("alice+primitivetest@example.com");
+  await client.otpVerify("alice+primitivetest@example.com", "000000");
+  // client is now authenticated; the access token expires in 30 minutes
 
-// Role-distinguished derivatives (Gmail/Workspace deliver them to the same inbox):
-await client.otpRequest("alice+primitivetest-teacher@example.com");
+  // Role-distinguished derivatives (Gmail/Workspace deliver them to the same inbox):
+  await client.otpRequest("alice+primitivetest-teacher@example.com");
 ```
 
 Guardrails:

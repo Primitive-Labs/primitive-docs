@@ -7,7 +7,7 @@ func runOperation(client: JsBaoClient, databaseId: String) async throws {
   let result = try await client.databases.executeOperation(
     databaseId: databaseId,
     name: "list-products",
-    options: ["params": ["search": "widget"]]
+    options: ExecuteOperationOptions(params: ["search": "widget"])
   )
   // result: { data: [...records], hasMore, nextCursor? }
   // #endregion example

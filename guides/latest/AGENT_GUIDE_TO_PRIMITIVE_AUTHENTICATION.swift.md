@@ -36,17 +36,17 @@ In the starter template this wiring is owned for you by `PrimitiveAppState.initi
 ## Discovering Available Methods
 
 ```swift
-  let config = try await client.getAuthConfig()
-  // keys: appId, name, mode, waitlistEnabled,
+  let config = try await client.auth.getAuthConfig()
+  // AuthConfigInfo: appId, name, mode, waitlistEnabled,
   //   googleOAuthEnabled, googleClientId, hasOAuth, redirectUris,
   //   passkeyEnabled, passkeyRpId, passkeyRpName, hasPasskey,
   //   magicLinkEnabled, otpEnabled
 
   let methods = (
-    google: config["hasOAuth"] as? Bool ?? false,
-    magicLink: config["magicLinkEnabled"] as? Bool ?? false,
-    otp: config["otpEnabled"] as? Bool ?? false,
-    passkey: config["hasPasskey"] as? Bool ?? false
+    google: config.hasOAuth,
+    magicLink: config.magicLinkEnabled,
+    otp: config.otpEnabled,
+    passkey: config.hasPasskey
   )
 ```
 
@@ -94,25 +94,24 @@ Dev → prod checklist: add the production origin to `corsAllowedOrigins`, add t
 When the callback page can construct a client (you already have the JWT or are happy to re-init), extract `code`/`state` from the callback and pass them to `handleOAuthCallback`:
 
 ```swift
-// `code` and `state` come from the redirect URI delivered to your
-// ASWebAuthenticationSession completion handler.
-if !code.isEmpty && !state.isEmpty {
-  try await client.handleOAuthCallback(code: code, state: state)
-  // Token now stored, WebSocket reconnected. Navigate.
-}
+  if !code.isEmpty && !state.isEmpty {
+    try await client.handleOAuthCallback(code: code, state: state)
+    // Token now stored, WebSocket reconnected. Navigate.
+  }
 ```
 
 ### Handle the callback (static method — when no client yet)
 
 ```swift
-let token = try await JsBaoClient.exchangeOAuthCode(
-  apiUrl: apiUrl,
-  appId: appId,
-  code: code,
-  state: state
-)
-// Persist however your app does (e.g. Keychain), or pass to the client.
+  let token = try await JsBaoClient.exchangeOAuthCode(
+    apiUrl: apiUrl,
+    appId: appId,
+    code: code,
+    state: state
+  )
+  // Persist however your app does (e.g. Keychain), or pass to the client.
 ```
+
 
 **Don't:**
 
@@ -129,68 +128,82 @@ let token = try await client.handleOAuthCallback(code: code, state: state)
 
 ```swift
   // Request the email. Pass the magic-link callback redirect URI.
-  _ = try await client.magicLinkRequest(
+  _ = try await client.auth.magicLinkRequest(
     email: email,
     redirectUri: "https://app.example.com/auth/magic-callback"
   )
 
   // On the callback, read the `magic_token` value and verify it.
-  let result = try await client.magicLinkVerify(token: magicToken)
+  let result = try await client.auth.magicLinkVerify(token: magicToken)
   // Token is now stored on the client and the WS auto-connects.
-  let user = result["user"] as? [String: Any]
-  let isNewUser = result["isNewUser"] as? Bool ?? false
+  let user = result.user
+  let isNewUser = result.isNewUser ?? false
 ```
 
-`magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument. `magicLinkVerify(token:)` returns the raw `[String: Any]` response.
+`auth.magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument. `auth.magicLinkVerify(token:)` returns a `MagicLinkVerifyResult` (`.user`, `.promptAddPasskey?`, `.isNewUser?`).
 
-### Reading the token
+### Reading the token (callback page)
 
-The magic-link callback delivers the token as a `magic_token` value (not `token`, `magicToken`, or `code`). Read it from the redirect URI and pass it to `magicLinkVerify(token:)`.
+The callback delivers the token as a `magic_token` value — **not** `token`, `magicToken`, or `code`:
+
+```swift
+  let magicToken = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?
+    .queryItems?.first(where: { $0.name == "magic_token" })?.value
+
+  if let magicToken {
+    let result = try await client.auth.magicLinkVerify(token: magicToken)
+    // Token is now stored on the client and WS auto-connects.
+    if result.isNewUser == true { showOnboarding() }
+    if result.promptAddPasskey == true { offerPasskeyRegistration() }
+  }
+```
+
 
 ---
 
 ## OTP (Email Code)
 
 ```swift
-  _ = try await client.otpRequest(email: email)
+  _ = try await client.auth.otpRequest(email: email)
 
   // User enters the 6-digit code from the email.
-  let result = try await client.otpVerify(email: email, code: code)
+  let result = try await client.auth.otpVerify(email: email, code: code)
   // Token is now stored on the client and the WS auto-connects.
-  let user = result["user"] as? [String: Any]
-  let isNewUser = result["isNewUser"] as? Bool ?? false
+  let user = result.user
+  let isNewUser = result.isNewUser ?? false
 ```
 
-`otpVerify(email:code:)` returns the raw `[String: Any]` response.
+`auth.otpVerify(email:code:)` returns an `OtpVerifyResult` (`.user`, `.isNewUser?`).
 
 ### Error handling
 
-`AuthError` is thrown for non-2xx responses with a machine-readable code.
-
-`AuthError` carries an optional `code: AuthCode?` enum — switch on `error.code`:
+`AuthError` is thrown for non-2xx responses with a machine-readable code:
 
 ```swift
-do {
-  let result = try await client.otpVerify(email: email, code: code)
-} catch let error as AuthError {
-  switch error.code {
-  case .invalidToken,          // bad/expired code
-       .invitationRequired,    // invite-only app, no invitation
-       .domainNotAllowed,      // domain-mode app, email not in allowed domains
-       .magicLinkNotEnabled,   // magic link off in admin console
-       .inviteTokenInvalid,    // bad invite token
-       .inviteTokenExpired,    // invite token expired
-       .inviteAlreadyAccepted, // invite already used
-       .addedToWaitlist,       // waitlist enabled, user added
-       .waitlistEntryUpdated:  // existing waitlist entry updated
-    showUserMessage(error.message)
-  default:
-    throw error
+  do {
+    _ = try await client.auth.otpVerify(email: email, code: code)
+  } catch let error as AuthError {
+    switch error.code {
+    case .invalidToken,          // bad/expired code
+         .tokenExpired,          // token expired
+         .invitationRequired,    // invite-only app, no invitation
+         .domainNotAllowed,      // domain-mode app, email not in allowed domains
+         .addedToWaitlist,       // waitlist enabled, user added
+         .waitlistEntryUpdated,  // existing waitlist entry updated
+         .magicLinkNotEnabled,   // magic link off in admin console
+         .inviteTokenInvalid,    // bad invite token
+         .inviteTokenExpired,    // invite token expired
+         .inviteAlreadyAccepted: // invite already used
+      showUserMessage(error.message)
+    default:
+      throw error
+    }
   }
-}
 ```
 
-> **Caveat on OTP disabled.** When OTP is disabled the request endpoint returns a plain 400 with the message `"OTP authentication is not enabled for this app"` and no machine-readable code. Don't rely on a code to detect that case — gate the OTP UI on `getAuthConfig()`'s `otpEnabled` up front instead.
+> **Caveat on OTP disabled.** When OTP is disabled the request endpoint returns a plain 400 with the message `"OTP authentication is not enabled for this app"` and **no `code` field**. Don't rely on a code to detect that case — gate the OTP UI on `getAuthConfig()`'s `otpEnabled` up front instead.
+
+`AuthCode` also carries the SDK-generated cases `.tokenInvalid`, `.refreshFailed`, `.networkError`, and `.unauthorized`, plus `.passkeyNotEnabled` and `.memberInvitationsDisabled` from the server. Server codes outside the enum (e.g. rate limiting) arrive with `code == nil` — fall back to `error.message`.
 
 The same `AuthError` codes apply to `magicLinkRequest`/`magicLinkVerify`.
 
@@ -201,46 +214,38 @@ The same `AuthError` codes apply to `magicLinkRequest`/`magicLinkVerify`.
 
 ## Auth Events
 
-These are the canonical events. `auth-failed` and `auth:onlineAuthRequired` are the ones most apps must handle.
+These are the canonical events.
 
-Register handlers with `client.events.on(...)`, which delivers typed event structs:
+`authFailed` and `authState` are the ones most apps must handle. Register handlers with `client.events.on(...)`, which delivers typed event structs and returns an `EventSubscription` — hold it for as long as you want the handler live:
 
 ```swift
-// Token refresh failed or server invalidated session — prompt re-login.
-client.events.on(.authFailed) { event in
-  redirectToLogin()
-}
+  // Token refresh failed or server invalidated session — prompt re-login.
+  let failed = client.events.on(.authFailed) { (event: AuthFailedEvent) in
+    redirectToLogin()
+  }
 
-// Token applied successfully (login, refresh, or OAuth callback).
-client.events.on(.authSuccess) { event in
-  // event.cause names the operation that produced the token.
-  // Treat unknown values as a generic success — the set may grow.
-}
+  // Token applied successfully (login, refresh, or OAuth callback).
+  let success = client.events.on(.authSuccess) { (event: AuthSuccessEvent) in
+    // event.cause names the operation that produced the token.
+    // Treat unknown values as a generic success — the set may grow.
+  }
 
-// Came back online without a valid token. Show sign-in.
-client.events.on(.onlineAuthRequired) { _ in
-  promptSignIn()
-}
-
-// Generic state-machine event — fires on transitions.
-client.events.on(.authState) { event in
-  // event.mode: "online" | "offline" | "none" | "auto"
-}
-
-client.events.on(.logout) { _ in clearSensitiveUI() }
-client.events.on(.logoutComplete) { _ in navigateHome() }
+  // Generic state-machine event — fires on transitions.
+  let state = client.events.on(.authState) { (event: AuthStateEvent) in
+    // event.authenticated, event.userId, event.mode (NetworkMode)
+  }
 ```
+
 
 ### Minimal handler
 
 ```swift
-func promptLogin() { navigateToLogin() }
-client.events.on(.authFailed) { _ in promptLogin() }
-client.events.on(.onlineAuthRequired) { _ in promptLogin() }
-client.events.on(.authState) { event in if !event.authenticated { promptLogin() } }
+  func promptLogin() { navigateToLogin() }
+  let failed = client.events.on(.authFailed) { (_: AuthFailedEvent) in promptLogin() }
+  let state = client.events.on(.authState) { (event: AuthStateEvent) in
+    if !event.authenticated { promptLogin() }
+  }
 ```
-
-Subscriptions are retained for the lifetime of the client; keep a reference to any token the API returns if you need to unsubscribe earlier.
 
 ---
 
@@ -288,13 +293,13 @@ The admin console exposes the same toggles. App code does not need to special-ca
 To read or manually set the token:
 
 ```swift
-// Manually set a token (e.g. obtained out-of-band). Triggers authSuccess
-// and pushes through the normal apply-token pipeline.
-client.updateToken(jwt, cause: "external")
+  // Manually set a token (e.g. obtained out-of-band). Triggers authSuccess
+  // and pushes through the normal apply-token pipeline.
+  client.updateToken(jwt, cause: "external")
 
-// Read the current token via the decoded JWT payload, or track it from the
-// authSuccess event.
-let payload = client.getJwtPayload()
+  // Read the current token via the decoded JWT payload, or track it from the
+  // authSuccess event.
+  let payload = client.getJwtPayload()
 ```
 
 **Don't:**
@@ -317,11 +322,12 @@ The client persists the token to the Keychain across app launches. `waitForAuthB
 ## Logout
 
 ```swift
-  try await client.logout(wipeLocal: true)
-  // Fires `auth:logout` immediately and `auth:logout:complete` when finished.
+  try await client.auth.logout(options: LogoutOptions(
+    wipeLocal: true // delete locally cached document data + KV cache
+  ))
 ```
 
-`logout(wipeLocal:)` takes a single `wipeLocal` flag (delete locally cached document data + KV cache). Logout fires `logout` immediately and `logoutComplete` when finished.
+`auth.logout(options:)` takes a `LogoutOptions` — `wipeLocal` (delete locally cached document data + KV cache), `revokeOffline` (also revoke any stored offline grant), `clearOfflineIdentity` (defaults `true`).
 
 ---
 
@@ -386,14 +392,15 @@ See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-gra
 There is **no `primitive test-users` CLI command**. The bypass is server-side: an OTP request for an email shaped like `<base-local>+primitivetest<suffix>@<base-domain>` accepts the magic code `"000000"` instead of the emailed code, but **only when the base address is on the app's `testAccountBaseEmails` whitelist**.
 
 ```swift
-// Requires the app owner to have added "alice@example.com" to the app's
-// testAccountBaseEmails whitelist. Then any `alice+primitivetest<suffix>@example.com`
-// derivative becomes a test account that accepts code "000000".
-_ = try await client.otpRequest(email: "alice+primitivetest@example.com")
-let result = try await client.otpVerify(email: "alice+primitivetest@example.com", code: "000000")
+  // Requires the app owner to have added "alice@example.com" to the app's
+  // testAccountBaseEmails whitelist. Then any `alice+primitivetest<suffix>@example.com`
+  // derivative becomes a test account that accepts code "000000".
+  _ = try await client.auth.otpRequest(email: "alice+primitivetest@example.com")
+  _ = try await client.auth.otpVerify(email: "alice+primitivetest@example.com", code: "000000")
+  // client is now authenticated; the access token expires in 30 minutes
 
-// Role-distinguished derivatives (Gmail/Workspace deliver them to the same inbox):
-_ = try await client.otpRequest(email: "alice+primitivetest-teacher@example.com")
+  // Role-distinguished derivatives (Gmail/Workspace deliver them to the same inbox):
+  _ = try await client.auth.otpRequest(email: "alice+primitivetest-teacher@example.com")
 ```
 
 Guardrails:

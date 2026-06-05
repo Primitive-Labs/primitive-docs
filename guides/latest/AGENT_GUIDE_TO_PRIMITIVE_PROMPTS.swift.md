@@ -8,7 +8,7 @@ How to author, test, and execute LLM prompts on Primitive using the `primitive` 
   let result = try await client.prompts.execute(
     promptKey: "my-summarizer",
     options: ExecutePromptOptions(
-      variables: ["text": documentText, "style": "concise"],
+      variables: ["text": .string(documentText), "style": "concise"],
       modelOverride: "gpt-4o" // optional; defaults to the active config's model
     )
   )
@@ -642,12 +642,12 @@ The TOML `[prompt].outputSchema` field is read on push and applies to the prompt
     )
   )
 
-  let success = result["success"] as? Bool          // generated successfully
-  let output = result["output"] as? String          // generated text
-  let error = result["error"] as? String             // error message, if any
-  let configId = result["configId"] as? String        // which config was used
-  let metrics = result["metrics"] as? [String: Any]   // { durationMs, inputTokens?, ... }
-  let rawResponse = result["rawResponse"]              // raw provider response
+  let success = result.success         // Bool — generated successfully
+  let output = result.output           // String — generated text
+  let error = result.error             // String? — error message, if any
+  let configId = result.configId       // String — which config was used
+  let metrics = result.metrics         // { durationMs, inputTokens?, outputTokens?, totalTokens? }
+  let rawResponse = result.rawResponse // raw provider response (don't depend on shape)
 ```
 
 The first arg is the `promptKey`, NOT the `promptId`. The endpoint is `POST /prompts/:promptKey/execute`.

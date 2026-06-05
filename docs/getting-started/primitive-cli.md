@@ -160,6 +160,9 @@ primitive apps get
 
 # Update app settings
 primitive apps update --mode invite-only
+
+# Let members send invitations, capped at 5 active each (0 = unlimited)
+primitive apps update --member-invitations-enabled true --member-invitation-limit 5
 ```
 
 ### Managing Users
@@ -279,13 +282,21 @@ This creates a directory structure like:
 
 ### When `sync push` fails
 
-`sync push` reports the server's error message along with the entity it was applying when the failure happened, so you can jump straight to the offending file:
+`sync push` validates every TOML file before applying anything — a validation error in any file aborts the whole push with no changes applied, so a typo in one workflow can't leave a half-pushed configuration behind:
+
+```
+Aborting push: 2 TOML validation error(s) — no changes were applied.
+```
+
+For workflows in particular, the CLI validates referenced operation params at push time: every `$params.X` substitution inside a workflow's database operations must match a declared `[[operations.params]]` entry, and the error names the file and line of the operation block where the bad reference appears. This catches typos like `$params.proectId` that would otherwise silently no-op at runtime.
+
+When validation passes but the server rejects an entity, the error names the entity being applied, so you can jump straight to the offending file:
 
 ```
 Failed to update workflow "send-digest": Workflow contains sync-incompatible steps
 ```
 
-For workflows in particular, the CLI validates referenced operation params at push time: every `$params.X` substitution inside a workflow's database operations must match a declared `[[operations.params]]` entry, and the error names the file and line of the operation block where the bad reference appears. This catches typos like `$params.proectId` that would otherwise silently no-op at runtime.
+Re-running a failed push converges: if a cron trigger with the same key already exists on the server but isn't recorded in your local sync state (say, from an interrupted earlier push), `sync push` adopts the existing trigger and updates it in place instead of failing on the conflict.
 
 CLI diagnostics (success/warning/info messages) are written to stderr; only structured data (e.g. `--json` output) goes to stdout, so piping `primitive sync diff --json | jq` works without any extra redirects.
 
@@ -519,6 +530,21 @@ primitive tokens revoke <token-id>
 ```
 
 TTL accepts `m`/`h`/`d`/`w`/`mo`/`y` units; omit `--ttl` for a non-expiring token. Treat these like passwords — store them in your CI's secret store and revoke any token you no longer need.
+
+### Non-Interactive `primitive init`
+
+`primitive init` (the command behind `npx create-primitive-app`) prompts for anything it needs — app name, target platform, access mode. For scripted setups, put the answers in a `.primitive-init.toml` file in the directory where you run it (or point at one elsewhere with `--config <path>`), and init skips every prompt:
+
+```toml
+action = "create"            # or "use-existing" (then set app_id instead of app_name)
+app_name = "My App"
+platform = "web"             # "web" or "ios" (defaults to web)
+dir = "my-app"
+access_mode = "invite-only"  # "public", "domain", or "invite-only"
+skip_install = false
+```
+
+Run `primitive init --help` for the full key list (dev port, invite emails, allowed domains, overwrite behavior).
 
 ## Getting Help
 

@@ -8,17 +8,15 @@ func listTasksPage(
   previousCursor: String?
 ) async throws {
   // #region example
-  var options: [String: Any] = [
-    "params": ["projectId": "proj-1"],
-    "limit": 10,
-    "direction": 1, // 1 for forward, -1 for backward
-  ]
-  if let previousCursor { options["cursor"] = previousCursor }
-
   let result = try await client.databases.executeOperation(
     databaseId: databaseId,
     name: "listTasks",
-    options: options
+    options: ExecuteOperationOptions(
+      params: ["projectId": "proj-1"],
+      limit: 10,
+      cursor: previousCursor,
+      direction: .ascending // forward; use .descending to page backward
+    )
   )
   // result: { data: [...records], hasMore, nextCursor? }
   // #endregion example

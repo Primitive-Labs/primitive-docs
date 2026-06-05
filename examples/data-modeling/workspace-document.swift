@@ -5,17 +5,15 @@ import JsBaoClient
 // contents; Yjs merges concurrent edits.
 func createWorkspaceDocument(client: JsBaoClient) async throws {
   // #region example
-  let created = try await client.documents.create(options: [
-    "title": "Project Alpha",
-    "tags": ["workspace"],
-  ])
-  let metadata = created["metadata"] as? [String: Any]
-  let documentId = metadata?["documentId"] as? String ?? ""
+  let created = try await client.documents.create(
+    options: CreateDocumentOptions(title: "Project Alpha", tags: ["workspace"])
+  )
+  let documentId = created.metadata?["documentId"]?.stringValue ?? ""
   _ = try await client.documents.open(documentId)
 
   _ = try await client.documents.updatePermissions(
     documentId: documentId,
-    params: ["email": "alice@example.com", "permission": "read-write"]
+    params: .email("alice@example.com", permission: "read-write")
   )
   // #endregion example
 }

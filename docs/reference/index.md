@@ -16,10 +16,12 @@ Generated reference documentation for each project.
   - [attachAndRegisterModel](/reference/js-bao-wss-client/api/functions/attachAndRegisterModel)
   - [createModelClass](/reference/js-bao-wss-client/api/functions/createModelClass)
   - [defineModelSchema](/reference/js-bao-wss-client/api/functions/defineModelSchema)
+  - [discoverSchema](/reference/js-bao-wss-client/api/functions/discoverSchema)
   - [generateULID](/reference/js-bao-wss-client/api/functions/generateULID)
   - [initializeClient](/reference/js-bao-wss-client/api/functions/initializeClient)
   - [initJsBao](/reference/js-bao-wss-client/api/functions/initJsBao)
   - [isJsBaoError](/reference/js-bao-wss-client/api/functions/isJsBaoError)
+  - [loadSchemaFromTomlString](/reference/js-bao-wss-client/api/functions/loadSchemaFromTomlString)
 - **Interfaces**
   - [AcceptInviteResult](/reference/js-bao-wss-client/api/interfaces/AcceptInviteResult)
   - [AddManagerParams](/reference/js-bao-wss-client/api/interfaces/AddManagerParams)
@@ -94,6 +96,11 @@ Generated reference documentation for each project.
   - [DirectCollectionAdd](/reference/js-bao-wss-client/api/interfaces/DirectCollectionAdd)
   - [DirectGroupAdd](/reference/js-bao-wss-client/api/interfaces/DirectGroupAdd)
   - [DirectPermissionGrant](/reference/js-bao-wss-client/api/interfaces/DirectPermissionGrant)
+  - [DiscoveredConstraint](/reference/js-bao-wss-client/api/interfaces/DiscoveredConstraint)
+  - [DiscoveredField](/reference/js-bao-wss-client/api/interfaces/DiscoveredField)
+  - [DiscoveredModel](/reference/js-bao-wss-client/api/interfaces/DiscoveredModel)
+  - [DiscoveredRelationship](/reference/js-bao-wss-client/api/interfaces/DiscoveredRelationship)
+  - [DiscoveredSchema](/reference/js-bao-wss-client/api/interfaces/DiscoveredSchema)
   - [DOClientEngine](/reference/js-bao-wss-client/api/interfaces/DOClientEngine)
   - [DocumentAccessResult](/reference/js-bao-wss-client/api/interfaces/DocumentAccessResult)
   - [DocumentAliasesAPI](/reference/js-bao-wss-client/api/interfaces/DocumentAliasesAPI)
@@ -237,7 +244,6 @@ Generated reference documentation for each project.
 - **Variables**
   - [ANALYTICS_UNAUTHENTICATED_USER](/reference/js-bao-wss-client/api/variables/ANALYTICS_UNAUTHENTICATED_USER)
   - [AUTH_CODES](/reference/js-bao-wss-client/api/variables/AUTH_CODES)
-  - [discoverSchema](/reference/js-bao-wss-client/api/variables/discoverSchema)
 - [globals](/reference/js-bao-wss-client/api/globals)
 - [README](/reference/js-bao-wss-client/api/README)
 
