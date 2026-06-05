@@ -21,7 +21,7 @@ primitive sync diff --dir ./config    # see what would change
 primitive sync push --dir ./config    # apply your changes to the server
 ```
 
-The files live in your repo, so configuration changes ride the same workflow as code: branches, diffs, reviews, rollbacks. `sync push` validates as it applies and reports the file and entity behind any failure.
+The files live in your repo, so configuration changes ride the same workflow as code: branches, diffs, reviews, rollbacks. `sync push` validates every file before applying anything — a validation error aborts the push with no changes applied — and reports the file and entity behind any failure.
 
 ## What Lives in the Config Directory
 
