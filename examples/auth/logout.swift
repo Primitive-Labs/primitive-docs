@@ -6,6 +6,5 @@ func signOut(client: JsBaoClient) async throws {
   try await client.auth.logout(options: LogoutOptions(
     wipeLocal: true // delete locally cached document data + KV cache
   ))
-  // Fires `auth:logout` immediately and `auth:logout:complete` when finished.
   // #endregion example
 }
