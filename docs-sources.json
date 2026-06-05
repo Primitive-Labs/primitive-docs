@@ -1,13 +1,13 @@
 {
-  "channel": "next",
+  "channel": "production",
   "stampedAt": "2026-06-05",
   "libraries": {
     "js-bao-wss": {
       "commit": "8249eb353cff04a9ff9bd7a871dc1791358296b1",
       "npm": {
-        "js-bao-wss-client": "2.0.0",
+        "js-bao-wss-client": "2.0.1",
         "js-bao": "0.5.1",
-        "primitive-admin": "1.0.49"
+        "primitive-admin": "1.0.50"
       }
     },
     "primitive-app-dev": {
