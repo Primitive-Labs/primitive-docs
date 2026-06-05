@@ -1344,33 +1344,36 @@ The two phases see different contexts:
 `subscribe()` returns an `unsub()` function (synchronously). There is no event-emitter API.
 
 ```typescript
-const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
-  onChange: (event) => {
-    // event.type === "db.change"
-    // event.databaseId, event.subscriptionKey, event.timestamp
-    // event.originConnectionId, event.originUserId, event.isOrigin, event.isOriginUser
-    if (event.isOrigin) return;  // this tab wrote it; UI already updated
-    for (const change of event.changes) {
-      // change.op:         "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet"
-      // change.changeType: "enter" | "update" | "leave"
-      // change.modelName, change.id
-      // change.data, change.previousData  (subject to the subscription's `select`)
-      applyChange(change);
-    }
-  },
-});
+  const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
+    onChange: (event) => {
+      // event.originConnectionId, event.originUserId, event.isOrigin, event.isOriginUser
+      if (event.isOrigin) {
+        // This same tab wrote it — the UI is already updated optimistically.
+        return;
+      }
+      for (const change of event.changes) {
+        // change.op:         "save" | "patch" | "delete" | "increment" | ...
+        // change.changeType: "enter" | "update" | "leave"
+        // change.data, change.previousData (subject to the select projection)
+        if (change.op === "delete") removeTicket(change.id);
+        else upsertTicket(change.data);
+      }
+    },
+  });
 
-// Later — REQUIRED for cleanup
-unsub();
+  // Later — required for cleanup
+  unsub();
 ```
 
 Parameterized:
 
 ```typescript
-const unsub = client.databases.subscribe(databaseId, "tickets-by-team", {
-  params: { teamId: "eng" },
-  onChange: (event) => { ... },
-});
+  const unsub = client.databases.subscribe(databaseId, "tickets-by-team", {
+    params: { teamId: "eng" },
+    onChange: (event) => {
+      for (const change of event.changes) handleChange(change);
+    },
+  });
 ```
 
 The client auto-reissues `db.subscribe` on WebSocket reconnect — no app code needed.
