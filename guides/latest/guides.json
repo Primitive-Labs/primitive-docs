@@ -68,7 +68,7 @@
     {
       "topic": "blobs",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_BLOBS.ts.md",
-      "description": "Document-scoped blob storage — uploads, downloads, offline queue, caching, and permissions for files attached to documents",
+      "description": "Document-scoped blob storage — upload, download, offline queue, caching, and permissions",
       "keywords": [
         "blobs",
         "files",
@@ -242,7 +242,7 @@
     {
       "topic": "databases",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DATABASES.ts.md",
-      "description": "Server-side database storage with CEL-based access control, registered operations, triggers, real-time subscriptions, and group permissions",
+      "description": "Server-side databases — CEL access rules, registered operations, triggers, realtime subscriptions",
       "keywords": [
         "databases",
         "database",
@@ -333,7 +333,7 @@
     {
       "topic": "documents",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.ts.md",
-      "description": "Local-first collaborative documents — models and CRUD, opening/finding documents, sharing and permissions, collections, and access requests",
+      "description": "Local-first collaborative documents — models, CRUD, sharing, collections, access requests",
       "keywords": [
         "documents",
         "models",
@@ -401,7 +401,7 @@
     {
       "topic": "workflows",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.ts.md",
-      "description": "Creating multi-step automation pipelines with AI/LLM calls, integrations, email, blobs, analytics, cron scheduling, synchronous invocation, and database operations",
+      "description": "Multi-step automation pipelines — LLM calls, integrations, cron, sync runs, database steps",
       "keywords": [
         "workflows",
         "automation",
@@ -600,7 +600,7 @@
     {
       "topic": "app-secrets",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_APP_SECRETS.md",
-      "description": "Server-side credential store — managing secrets with the CLI and referencing them from integrations, workflows, and database rules as {{ secrets.KEY }}",
+      "description": "Server-side credential store — manage secrets via the CLI, reference as {{ secrets.KEY }}",
       "keywords": [
         "secrets",
         "app secrets",
@@ -809,7 +809,7 @@
     {
       "topic": "configuration",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_CONFIGURATION.md",
-      "description": "Managing backend configuration as code — the TOML sync loop, directory map, environments, secrets, and headless CI auth",
+      "description": "Backend configuration as code — TOML sync loop, directory map, environments, headless CI auth",
       "keywords": [
         "configuration",
         "config",
@@ -840,7 +840,7 @@
     {
       "topic": "access-control",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_ACCESS_CONTROL.md",
-      "description": "Writing CEL access rules — identity context, per-surface rule contexts (database ops, subscriptions, workflows), and rule sets for management operations",
+      "description": "CEL access rules — identity context, per-surface rule contexts, management rule sets",
       "keywords": [
         "access control",
         "CEL",
@@ -866,7 +866,7 @@
     {
       "topic": "invitations",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.ts.md",
-      "description": "App membership — access modes (public/invite-only/domain), the waitlist, invitations and quotas, custom invitation emails, and deferred grants that resolve when someone becomes a user",
+      "description": "App membership — access modes, waitlist, invitations and quotas, custom emails, deferred grants",
       "keywords": [
         "invitations",
         "invite",
@@ -903,7 +903,7 @@
     {
       "topic": "blob-buckets",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_BLOB_BUCKETS.ts.md",
-      "description": "General-purpose blob bucket storage — bucket configuration, access policies, TTL tiers, signed URLs, and workflow integration",
+      "description": "Blob buckets — configuration, access policies, TTL tiers, signed URLs, workflow integration",
       "keywords": [
         "blob bucket",
         "buckets",
@@ -936,7 +936,7 @@
     {
       "topic": "deploying",
       "file": "AGENT_GUIDE_TO_PRIMITIVE_DEPLOYING.ts.md",
-      "description": "Shipping Primitive apps to production — web deploys (cf-deploy, environments) and iOS distribution (signing, devices, TestFlight, App Store via Fastlane)",
+      "description": "Ship to production — web deploys (cf-deploy) and iOS distribution (TestFlight, App Store)",
       "keywords": [
         "deploy",
         "deploying",
