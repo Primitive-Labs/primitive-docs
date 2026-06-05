@@ -4,7 +4,7 @@ Every divergence note flagged in the [dev-docs cookbook](dev-docs/) — **all of
 
 **Flag:** 🔴 unintentional gap / missing-in-Swift · 🟡 intentional (deferred / skipped / by-design / Swift-only) · 🟢 divergent shape (same capability, different shape) · 🔵 info.
 
-**Totals:** 🔴 12 · 🟡 9 · 🟢 32 · 🔵 0
+**Totals:** 🔴 11 · 🟡 9 · 🟢 33 · 🔵 0
 
 
 ## analytics
@@ -107,14 +107,14 @@ Every divergence note flagged in the [dev-docs cookbook](dev-docs/) — **all of
 
 | Section | Flag | Divergence |
 |---|---|---|
-| [(page intro)](dev-docs/model-surface.md) | 🟢 | **Why the JS and Swift model APIs look a little different** — Same verbs on both; almost every difference comes from one root cause — JS stores records in an in-app SQL database (async, `await`ed reads), Swift keeps them as in-memory data (instant, synchronous reads). |
+| [(page intro)](dev-docs/model-surface.md) | 🟢 | **Why the JS and Swift model APIs look a little different** — Same verbs, and **both run queries through an embedded SQLite engine**. They differ in style only: JS's SQLite is WASM/IndexedDB-backed and reached asynchronously (`await`ed reads); Swift mirrors records into a native in-memory SQLite read synchronously. |
 | [save(options?)](dev-docs/model-surface.md#saveoptions) | 🟢 | **Swift makes you name the document** — JS keeps a hidden "active document" pointer and `save()` writes to it; Swift has no hidden active doc, so you always say which one with `save(in:)`. Same write, explicit target. |
-| [find(id)](dev-docs/model-surface.md#findid) | 🟢 | **JS awaits, Swift doesn't** — Same lookup; JS `find` is `async` (reads the in-app SQL DB), Swift `find(_:)` is synchronous (the record is already in memory). |
-| [findAll()](dev-docs/model-surface.md#findall) | 🟢 | **JS awaits, Swift doesn't** — JS `findAll()` is `async` (SQL DB), Swift is synchronous (in-memory read); Swift silently drops rows that drifted from the typed shape. |
-| [query(filter?, options?)](dev-docs/model-surface.md#queryfilter-options) | 🟢 | **Different return shape** — JS (SQL-backed) returns a `PaginatedResult<Task>` with `.nextCursor` / `.hasMore`; Swift reads in-memory and returns a plain `[Task]` (one bounded, sorted page, no cursor). |
-| [query — paginate](dev-docs/model-surface.md#query-paginate) | 🔴 | **Swift can't page through results yet** — A real gap, not a style difference: JS feeds `nextCursor` forward to walk large result sets; Swift's `query` returns a plain array with no cursor, so you only get one page ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)). |
-| [count(filter?)](dev-docs/model-surface.md#countfilter) | 🟢 | **JS awaits, Swift doesn't** — JS `count` is `async` (asks the in-app SQL DB); Swift `count` is a synchronous static returning an `Int` across every open document in memory. |
-| [aggregate(options)](dev-docs/model-surface.md#aggregateoptions) | 🔴 | **Swift's group-by is more limited** — A real gap: JS (SQL-backed) returns a fully-typed result with richer grouping; Swift returns untyped `[[String: Any]]` rows and groups by plain fields only ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)). |
+| [find(id)](dev-docs/model-surface.md#findid) | 🟢 | **JS awaits, Swift doesn't** — Same lookup; JS `find` is `async` (its WASM SQLite store is reached asynchronously), Swift `find(_:)` reads its native in-memory SQLite mirror synchronously. |
+| [findAll()](dev-docs/model-surface.md#findall) | 🟢 | **JS awaits, Swift doesn't** — JS `findAll()` is `async`, Swift is synchronous (same SQLite-vs-SQLite story as `find`); Swift silently drops rows that drifted from the typed shape. |
+| [query(filter?, options?)](dev-docs/model-surface.md#queryfilter-options) | 🟢 | **Two methods vs one** — JS folds paging into one `query` that always returns `PaginatedResult<Task>`; Swift splits it — `query()` returns plain `[Task]`, `queryPaged()` returns the cursor page. Same capability, two entry points. |
+| [query — paginate](dev-docs/model-surface.md#query-paginate) | 🟢 | **Same cursor paging, different method** — Full parity: JS reuses `query` + `uniqueStartKey`; Swift uses `queryPaged` (returns `.nextCursor`/`.prevCursor`/`.hasMore`, carried forward via `options.cursor`). Only the method name differs. |
+| [count(filter?)](dev-docs/model-surface.md#countfilter) | 🟢 | **JS awaits, Swift doesn't** — JS `count` is `async` (its SQLite store is reached asynchronously); Swift `count` is a synchronous static returning an `Int` across every open document. |
+| [aggregate(options)](dev-docs/model-surface.md#aggregateoptions) | 🔴 | **Swift's group-by is more limited** — The one real model-surface gap. Both run SQL `GROUP BY`, but JS's model facade returns a typed result and can group by string-set membership; Swift's facade returns untyped `[[String: Any]]` rows with `[String]`-only `groupBy` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). |
 | [subscribe(callback)](dev-docs/model-surface.md#subscribecallback) | 🟢 | **Divergent shape** — Both clients expose `Task.subscribe`. |
 | [update](dev-docs/model-surface.md#update) | 🟢 | **Divergent shape** — Both clients now update the same way: load the record, mutate fields on the value, then persist. |
 | [delete()](dev-docs/model-surface.md#delete) | 🟢 | **Divergent shape** — Both clients load the record and call `delete` on the instance. |

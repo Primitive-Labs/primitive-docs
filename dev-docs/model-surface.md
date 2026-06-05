@@ -4,24 +4,25 @@ The typed model surface (`Task.save()`, `Task.query()`, …) — record CRUD, qu
 
 ::: tip Why the JS and Swift model APIs look a little different
 Both clients give you **one model per type** with the same verbs — `save`, `find`,
-`findAll`, `query`, `count`, `subscribe`, `delete`. Almost every difference below
-comes from **one root cause: the two clients store your records differently.**
+`findAll`, `query`, `count`, `aggregate`, `subscribe`, `delete` — and **both run
+those queries through an embedded SQLite engine** under the hood. They differ in
+two small ways, neither of which is a capability gap:
 
-- **JavaScript** loads your records into a tiny SQL database that runs *inside* the
-  app (SQLite compiled to WebAssembly in the browser). Talking to that database is
-  asynchronous, so every read is `await`ed and hands back a `Promise`. Because it's
-  real SQL, you also get conveniences for free: a `PaginatedResult` with a
-  `nextCursor`, and a fully-typed `aggregate` result.
-- **Swift** keeps the same records as plain in-memory data and reads them directly.
-  That makes reads **instant and synchronous** — no `await`, no `Promise` — but it
-  also means a couple of SQL-only conveniences (cursor pagination, fully-typed
-  group-by) aren't built yet.
+- **Async vs synchronous reads.** JavaScript's SQLite runs as WebAssembly (sql.js,
+  persisted via IndexedDB) and is reached through an async interface, so every read
+  is `await`ed and returns a `Promise`. Swift mirrors the same records into a
+  *native, in-memory* SQLite database (kept in sync with the document) and reads it
+  **synchronously** — no `await`. Same SQL underneath; one platform's binding is
+  async, the other's is instant. Making Swift `async` would just add ceremony for
+  no benefit, so it stays synchronous.
+- **Where the document target lives.** JS keeps a hidden "active document" that
+  writes default to; Swift makes you name the document explicitly with `save(in:)`.
 
-So when a method below says *"JS is async, Swift is synchronous,"* that's not a
-missing feature — it's the **same data read two different ways**, and matching JS
-would mean shipping a whole SQL engine inside the Swift client for no real gain.
-The two spots where Swift is genuinely *behind* (cursor pagination, typed
-aggregate) are flagged in red and tracked in [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946).
+That's it for style. There is **one** spot where Swift is genuinely *behind* on
+capability — `aggregate` returns untyped rows and can't group by string-set
+membership ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)) — and
+it's flagged in red below. Cursor pagination, despite older notes, **is** supported
+in Swift (via `queryPaged`).
 
 (Mechanically: JS uses static/instance methods on the generated `BaseModel` class;
 Swift uses a matching static `Model.*` facade on the generated struct — reads are
@@ -52,11 +53,12 @@ Swift equivalent.)
 Look up a single record by its id. Resolves to null/nil when nothing matches.
 
 ::: tip JS awaits, Swift doesn't
-Same lookup on both clients. JS `Task.find` is `async` — you `await` it — because it
-reads from the in-app SQL database. Swift `Task.find(_:)` is a plain synchronous call:
-the record is already in memory, so there's nothing to wait for (no `await`/`throws`).
-One Swift caveat: if a stored row no longer matches your model's shape, Swift returns
-`nil`, so a decode miss looks the same as "not found" (sweep model D-find).
+Same lookup on both clients. JS `Task.find` is `async` — you `await` it — because its
+SQLite store (WebAssembly, IndexedDB-backed) is reached asynchronously. Swift
+`Task.find(_:)` reads its native in-memory SQLite mirror synchronously, so there's
+nothing to wait for (no `await`/`throws`). One Swift caveat: if a stored row no longer
+matches your model's shape, Swift returns `nil`, so a decode miss looks the same as
+"not found" (sweep model D-find).
 :::
 
 ::: code-group
@@ -69,10 +71,10 @@ One Swift caveat: if a stored row no longer matches your model's shape, Swift re
 Load every record of this model (no filter, no pagination).
 
 ::: tip JS awaits, Swift doesn't
-Same reason as `find`: JS `Task.findAll()` is `async` (it queries the in-app SQL
-database); Swift `Task.findAll()` is synchronous (it reads in-memory data directly).
-Swift silently drops rows that have drifted from the typed shape, so the returned
-count can be smaller than what's actually stored (sweep model D-findAll).
+Same reason as `find`: JS `Task.findAll()` is `async` (its SQLite store is reached
+asynchronously); Swift `Task.findAll()` reads its in-memory SQLite mirror
+synchronously. Swift silently drops rows that have drifted from the typed shape, so
+the returned count can be smaller than what's actually stored (sweep model D-findAll).
 :::
 
 ::: code-group
@@ -93,12 +95,13 @@ Look up a record by a registered unique constraint without knowing its id. Both 
 
 Mongo-style filtered query.
 
-::: tip Different return shape
-Because JS queries an in-app SQL database, it returns a `PaginatedResult<Task>` — rows
-on `.data`, plus `.nextCursor` / `.hasMore` for paging. Swift reads in-memory data and
-returns the records as a plain `[Task]` array. It accepts a `limit` and an ordered
-`sortOrder`, but returns no cursor — so you can get one bounded, sorted page, but can't
-yet page through a large set (see [paginate](#query-paginate) below, [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
+::: tip Two methods vs one
+JS folds pagination into a single `query` that **always** returns a
+`PaginatedResult<Task>` — rows on `.data`, plus `.nextCursor` / `.hasMore`. Swift
+splits that into two methods: `Task.query(...)` returns the rows as a plain `[Task]`
+(no wrapper) when you just want results, and `Task.queryPaged(...)` returns the
+cursor page (`.data` / `.nextCursor` / `.hasMore`) when you want to page — see
+[paginate](#query-paginate) below. Same capability, just two entry points.
 :::
 
 ::: code-group
@@ -128,12 +131,12 @@ Fetch just the first match (with an optional sort). Resolves to null/nil when no
 
 Sort and paginate with a cursor.
 
-::: danger Swift can't page through results yet
-This one is a **real gap, not a style difference.** In JS, a `query` hands back a
-`nextCursor` that you feed into the next call (`uniqueStartKey`) to walk through a
-large result set page by page. Swift's `query` returns a plain `[Task]` — you can cap
-it with `limit` and sort it, but there's no cursor to continue from, so you only ever
-get one page today. Tracked in [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946).
+::: tip Same cursor paging, different method name
+Both clients page with an opaque cursor. JS reuses `query` and carries
+`PaginatedResult.nextCursor` forward via `uniqueStartKey` on the next call. Swift
+uses the dedicated `Task.queryPaged(...)`, which returns `.nextCursor` /
+`.prevCursor` / `.hasMore`; you carry `nextCursor` forward via `options.cursor`. Full
+parity — the only difference is which method you call.
 :::
 
 ::: code-group
@@ -146,9 +149,9 @@ get one page today. Tracked in [#946](https://github.com/Primitive-Labs/js-bao-w
 Count records matching a filter (or all of them when omitted).
 
 ::: tip JS awaits, Swift doesn't
-Same reason as `find`: JS `Task.count` is `async` (it asks the in-app SQL database);
-Swift `Task.count` is a synchronous static returning an `Int`, counting across every
-open document in memory.
+Same reason as `find`: JS `Task.count` is `async` (its SQLite store is reached
+asynchronously); Swift `Task.count` is a synchronous static returning an `Int`,
+counting across every open document.
 :::
 
 ::: code-group
@@ -161,11 +164,14 @@ open document in memory.
 Group-by aggregation with count/avg/sum, an optional filter, sort, and limit.
 
 ::: danger Swift's group-by is more limited
-Another **real gap.** Both clients can group-and-count, but JS — backed by SQL —
-returns a fully-typed result and supports richer grouping. Swift returns untyped
-`[[String: Any]]` rows and only groups by plain field names, so two JS grouping shapes
-have no Swift form yet: grouping by membership in a string-set (`{ field, contains }`)
-and the single-facet map (sweep D2, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
+This is the **one real capability gap** on the model surface. Both clients run the
+aggregation as SQL `GROUP BY`, but the JS model facade returns a fully-typed result
+and lets you group by string-set *membership*; Swift's model facade returns untyped
+`[[String: Any]]` rows and its `groupBy` is plain field names only (`[String]`). So
+two JS grouping shapes have no Swift form on the facade yet — membership-in-a-string-set
+(`{ field, contains }`) and the single-facet map (sweep D2, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). (The lower-level `client.db` aggregate path does
+expose string-set grouping via `DoDbGroupBy`; it's only the typed model facade that's
+behind.)
 :::
 
 ::: code-group

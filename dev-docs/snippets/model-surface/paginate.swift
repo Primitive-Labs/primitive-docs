@@ -1,15 +1,21 @@
 import JsBaoClient
 
-// The model facade's `query` takes a `limit` and an ordered `sortOrder`, but
-// returns plain `[Task]` with no cursor — there is no `nextCursor` to carry
-// forward, so cursor pagination isn't expressible on the facade today. Use
-// `limit` + `sortOrder` for a bounded, ordered page.
-func paginate() {
+// `Task.queryPaged` returns a page of rows plus opaque cursors. Pass the
+// previous `nextCursor` back via `options.cursor` to walk through a large
+// result set page by page — mirroring JS's `query()` `{ data, nextCursor,
+// hasMore }` shape.
+func paginate() throws {
   // #region example
-  let page = Task.query(
-    ["completed": false],
-    options: QueryOptions(sortOrder: [("priority", -1)], limit: 20)
-  )
+  var cursor: String? = nil
+  repeat {
+    let page = try Task.queryPaged(
+      ["completed": false],
+      options: QueryOptions(sortOrder: [("priority", -1)], limit: 20, cursor: cursor)
+    )
+    process(page.data)
+    cursor = page.hasMore ? page.nextCursor : nil
+  } while cursor != nil
   // #endregion example
-  _ = page
 }
+
+func process(_ rows: [Task]) {}
