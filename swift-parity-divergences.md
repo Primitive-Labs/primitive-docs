@@ -1,10 +1,10 @@
 # Swift ↔ JS dev-docs divergence catalog
 
-Every divergence note flagged in the [dev-docs cookbook](dev-docs/) — **all of them, including intentional ones**. Auto-extracted from the `:::` callouts. 53 notes across 13 surfaces.
+Every divergence note flagged in the [dev-docs cookbook](dev-docs/) — **all of them, including intentional ones**. Auto-extracted from the `:::` callouts. 46 notes across 13 surfaces.
 
 **Flag:** 🔴 unintentional gap / missing-in-Swift · 🟡 intentional (deferred / skipped / by-design / Swift-only) · 🟢 divergent shape (same capability, different shape) · 🔵 info.
 
-**Totals:** 🔴 11 · 🟡 9 · 🟢 33 · 🔵 0
+**Totals:** 🔴 11 · 🟡 9 · 🟢 26 · 🔵 0
 
 
 ## analytics
@@ -109,15 +109,8 @@ Every divergence note flagged in the [dev-docs cookbook](dev-docs/) — **all of
 |---|---|---|
 | [(page intro)](dev-docs/model-surface.md) | 🟢 | **Why the JS and Swift model APIs look a little different** — Same verbs, and **both run queries through an embedded SQLite engine**. They differ in style only: JS's SQLite is WASM/IndexedDB-backed and reached asynchronously (`await`ed reads); Swift mirrors records into a native in-memory SQLite read synchronously. |
 | [save(options?)](dev-docs/model-surface.md#saveoptions) | 🟢 | **Swift makes you name the document** — JS keeps a hidden "active document" pointer and `save()` writes to it; Swift has no hidden active doc, so you always say which one with `save(in:)`. Same write, explicit target. |
-| [find(id)](dev-docs/model-surface.md#findid) | 🟢 | **JS awaits, Swift doesn't** — Same lookup; JS `find` is `async` (its WASM SQLite store is reached asynchronously), Swift `find(_:)` reads its native in-memory SQLite mirror synchronously. |
-| [findAll()](dev-docs/model-surface.md#findall) | 🟢 | **JS awaits, Swift doesn't** — JS `findAll()` is `async`, Swift is synchronous (same SQLite-vs-SQLite story as `find`); Swift silently drops rows that drifted from the typed shape. |
 | [query(filter?, options?)](dev-docs/model-surface.md#queryfilter-options) | 🟢 | **Two methods vs one** — JS folds paging into one `query` that always returns `PaginatedResult<Task>`; Swift splits it — `query()` returns plain `[Task]`, `queryPaged()` returns the cursor page. Same capability, two entry points. |
-| [query — paginate](dev-docs/model-surface.md#query-paginate) | 🟢 | **Same cursor paging, different method** — Full parity: JS reuses `query` + `uniqueStartKey`; Swift uses `queryPaged` (returns `.nextCursor`/`.prevCursor`/`.hasMore`, carried forward via `options.cursor`). Only the method name differs. |
-| [count(filter?)](dev-docs/model-surface.md#countfilter) | 🟢 | **JS awaits, Swift doesn't** — JS `count` is `async` (its SQLite store is reached asynchronously); Swift `count` is a synchronous static returning an `Int` across every open document. |
-| [aggregate(options)](dev-docs/model-surface.md#aggregateoptions) | 🔴 | **Swift's group-by is more limited** — The one real model-surface gap. Both run SQL `GROUP BY`, but JS's model facade returns a typed result and can group by string-set membership; Swift's facade returns untyped `[[String: Any]]` rows with `[String]`-only `groupBy` ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). |
-| [subscribe(callback)](dev-docs/model-surface.md#subscribecallback) | 🟢 | **Divergent shape** — Both clients expose `Task.subscribe`. |
-| [update](dev-docs/model-surface.md#update) | 🟢 | **Divergent shape** — Both clients now update the same way: load the record, mutate fields on the value, then persist. |
-| [delete()](dev-docs/model-surface.md#delete) | 🟢 | **Divergent shape** — Both clients load the record and call `delete` on the instance. |
+| [aggregate(options)](dev-docs/model-surface.md#aggregateoptions) | 🔴 | **Swift's group-by is more limited** — The one real model-surface gap. Both run SQL `GROUP BY` and both return untyped rows; the gap is `groupBy` only — JS allows string-set membership (`string \| StringSetMembership`), Swift's facade is `[String]`-only ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). |
 
 ## workflows
 

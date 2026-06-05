@@ -51,15 +51,9 @@ Swift equivalent.)
 ## find(id)
 
 Look up a single record by its id. Resolves to null/nil when nothing matches.
-
-::: tip JS awaits, Swift doesn't
-Same lookup on both clients. JS `Task.find` is `async` — you `await` it — because its
-SQLite store (WebAssembly, IndexedDB-backed) is reached asynchronously. Swift
-`Task.find(_:)` reads its native in-memory SQLite mirror synchronously, so there's
-nothing to wait for (no `await`/`throws`). One Swift caveat: if a stored row no longer
-matches your model's shape, Swift returns `nil`, so a decode miss looks the same as
-"not found" (sweep model D-find).
-:::
+(JS `await`s it; Swift's static is synchronous — see the page intro.) **Swift
+gotcha:** if a stored row no longer matches your model's shape, Swift returns `nil`,
+so a decode miss looks the same as "not found".
 
 ::: code-group
 <<< ./snippets/model-surface/find.ts#example{ts} [JavaScript]
@@ -68,14 +62,9 @@ matches your model's shape, Swift returns `nil`, so a decode miss looks the same
 
 ## findAll()
 
-Load every record of this model (no filter, no pagination).
-
-::: tip JS awaits, Swift doesn't
-Same reason as `find`: JS `Task.findAll()` is `async` (its SQLite store is reached
-asynchronously); Swift `Task.findAll()` reads its in-memory SQLite mirror
-synchronously. Swift silently drops rows that have drifted from the typed shape, so
-the returned count can be smaller than what's actually stored (sweep model D-findAll).
-:::
+Load every record of this model (no filter, no pagination). **Swift gotcha:** it
+silently drops rows that have drifted from the typed shape, so the returned count can
+be smaller than what's actually stored.
 
 ::: code-group
 <<< ./snippets/model-surface/find-all.ts#example{ts} [JavaScript]
@@ -129,15 +118,10 @@ Fetch just the first match (with an optional sort). Resolves to null/nil when no
 
 ## query — paginate
 
-Sort and paginate with a cursor.
-
-::: tip Same cursor paging, different method name
-Both clients page with an opaque cursor. JS reuses `query` and carries
-`PaginatedResult.nextCursor` forward via `uniqueStartKey` on the next call. Swift
-uses the dedicated `Task.queryPaged(...)`, which returns `.nextCursor` /
-`.prevCursor` / `.hasMore`; you carry `nextCursor` forward via `options.cursor`. Full
-parity — the only difference is which method you call.
-:::
+Sort and paginate with a cursor. Both clients have full cursor pagination — JS reuses
+`query` (carrying `nextCursor` forward via `uniqueStartKey`); Swift uses the dedicated
+`queryPaged` (carrying `nextCursor` forward via `options.cursor`), as shown in the
+[`query`](#queryfilter-options) note above.
 
 ::: code-group
 <<< ./snippets/model-surface/paginate.ts#example{ts} [JavaScript]
@@ -146,13 +130,9 @@ parity — the only difference is which method you call.
 
 ## count(filter?)
 
-Count records matching a filter (or all of them when omitted).
-
-::: tip JS awaits, Swift doesn't
-Same reason as `find`: JS `Task.count` is `async` (its SQLite store is reached
-asynchronously); Swift `Task.count` is a synchronous static returning an `Int`,
-counting across every open document.
-:::
+Count records matching a filter (or all of them when omitted). Returns an `Int`
+across every open document. (JS `await`s it; Swift's static is synchronous — see the
+page intro.)
 
 ::: code-group
 <<< ./snippets/model-surface/count.ts#example{ts} [JavaScript]
@@ -165,13 +145,15 @@ Group-by aggregation with count/avg/sum, an optional filter, sort, and limit.
 
 ::: danger Swift's group-by is more limited
 This is the **one real capability gap** on the model surface. Both clients run the
-aggregation as SQL `GROUP BY`, but the JS model facade returns a fully-typed result
-and lets you group by string-set *membership*; Swift's model facade returns untyped
-`[[String: Any]]` rows and its `groupBy` is plain field names only (`[String]`). So
-two JS grouping shapes have no Swift form on the facade yet — membership-in-a-string-set
-(`{ field, contains }`) and the single-facet map (sweep D2, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). (The lower-level `client.db` aggregate path does
-expose string-set grouping via `DoDbGroupBy`; it's only the typed model facade that's
-behind.)
+aggregation as SQL `GROUP BY` and **both return untyped rows** (JS
+`Record<string, any>[]`, Swift `[[String: Any]]`) — so the result shape is at parity.
+What differs is what you can group *by*: JS's `groupBy` is `string | StringSetMembership`,
+so it can group by membership in a string-set (`{ field, contains }`); Swift's model
+facade `groupBy` is plain field names only (`[String]`). So two JS grouping shapes have
+no Swift form on the facade yet — membership-in-a-string-set and the single-facet map
+([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). (The lower-level
+`client.db` aggregate path already exposes string-set grouping via `DoDbGroupBy`; it's
+only the typed model facade that's behind.)
 :::
 
 ::: code-group
@@ -181,11 +163,10 @@ behind.)
 
 ## subscribe(callback)
 
-Subscribe to model changes (local edits and synced remote edits). Returns an unsubscribe function — always call it.
-
-::: tip Divergent shape
-Both clients expose `Task.subscribe`. The Swift static fires the callback after any add/update/delete in any open document's copy of the model and returns an unsubscribe closure.
-:::
+Subscribe to model changes (local edits and synced remote edits). Returns an
+unsubscribe function — always call it. Both clients expose `Task.subscribe`; the Swift
+static fires the callback after any add/update/delete in any open document's copy of
+the model.
 
 ::: code-group
 <<< ./snippets/model-surface/subscribe.ts#example{ts} [JavaScript]
@@ -203,11 +184,10 @@ Insert-or-merge by a natural unique key, without knowing the existing record's i
 
 ## update
 
-Update a record: load it, change fields, persist.
-
-::: tip Divergent shape
-Both clients now update the same way: load the record, mutate fields on the value, then persist. JS calls `save()`; Swift calls the instance `save(in:)` (the unified create/update — it writes in place when the record already exists), which throws if the named document isn't open.
-:::
+Update a record: load it, change fields, persist. Both clients update the same way —
+load the record, mutate fields on the value, then persist. JS calls `save()`; Swift
+calls the instance `save(in:)` (the unified create/update — it writes in place when
+the record already exists), which throws if the named document isn't open.
 
 ::: code-group
 <<< ./snippets/model-surface/update.ts#example{ts} [JavaScript]
@@ -216,11 +196,8 @@ Both clients now update the same way: load the record, mutate fields on the valu
 
 ## delete()
 
-Delete a record by id.
-
-::: tip Divergent shape
-Both clients load the record and call `delete` on the instance. Swift's `delete(in:)` names the document to delete from and throws if it isn't open.
-:::
+Delete a record by id. Both clients load the record and call `delete` on the instance.
+Swift's `delete(in:)` names the document to delete from and throws if it isn't open.
 
 ::: code-group
 <<< ./snippets/model-surface/delete.ts#example{ts} [JavaScript]
