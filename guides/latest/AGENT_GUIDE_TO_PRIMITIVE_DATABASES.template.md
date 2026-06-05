@@ -623,7 +623,7 @@ params = '{"email":{"type":"string","required":true},"name":{"type":"string","re
 Two failure modes to know:
 
 - `"upsertOn": "$params.email"` gets **value-substituted** like any other definition string, so the server receives the email *value* as the field name and rejects with `upsertOn field 'alice@example.com' must be present in data and not null/empty`.
-- `upsertOn` requires a registered **unique index** on the field at runtime — `unique = true` in the type schema is not sufficient. Without one, saves fail with `upsertOn field '<field>' does not have a registered unique index`. Create it once per database: `primitive databases indexes create <database-id> --model <model> --field <field> --unique`.
+- `upsertOn` requires a **unique index** on the field — declare `unique = true` on the field in the type schema. Databases created from the type provision the index automatically; a static `upsertOn` naming a field that isn't declared `unique = true` is rejected at push time. For a database created before the field was declared unique, back-provision with `primitive databases reindex <database-id> --from-schema` (idempotent) — without the index, saves fail with `upsertOn field '<field>' does not have a registered unique index`.
 
 #### Count — count matching records
 

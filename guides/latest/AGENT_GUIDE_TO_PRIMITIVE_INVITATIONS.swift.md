@@ -160,6 +160,8 @@ By default only admins/owners can invite. Two app fields control member invitati
 | `memberInvitationsEnabled` | If `true`, users with role `"member"` can create invitations |
 | `memberInvitationLimit` | Max active (non-accepted, non-expired) invitations per member |
 
+Set both via `primitive apps update --member-invitations-enabled true --member-invitation-limit 5` (limit `0` = unlimited).
+
 `quota()` returns `{ used: 0, limit: 0, remaining: 0, unlimited: false }` for a member when `memberInvitationsEnabled` is `false` — treat that as "no quota, hide the button." Admins/owners always get `unlimited: true` and are exempt from the limit. Members can only invite at `role: "member"`; passing `"admin"`/`"owner"` is rejected.
 
 ### Server error codes (in the HTTP error body)
