@@ -79,3 +79,21 @@ auth · session · me · invitations · integrations · blob-buckets · cron-tri
 rule-sets · llm · analytics · errors · codegen · model-surface. The stale red
 `WorkflowStartedEvent` callout in `dev-docs/workflows.md` was removed (the Swift
 struct already carries the full payload).
+
+---
+
+## §3 — PR #1032 follow-ups ("booted to PR 2") 🆕
+
+Items the chunk-1 PR [#1032](https://github.com/Primitive-Labs/js-bao-wss/pull/1032)
+(typed surfaces + model one-API + behavioral fixes, merged to `main`) explicitly
+deferred to a follow-up pass during review. Filed as rolled-up issues; **not yet
+built**. The chunk-2 fixes branch is now **rebased onto `main`** (post-#1032) —
+note #1040 was independently fixed in the PR, so that hunk de-duplicated on rebase.
+
+| Issue | Area | Rolled-up follow-ups |
+|---|---|---|
+| [#1056](https://github.com/Primitive-Labs/js-bao-wss/issues/1056) | codegen | `auto_stamp` emitted as advisory metadata but **never applied on write** (JS `save()` stamps); invalid Swift for `enum` on a keyword-named field; zero fixture coverage for the enum/auto_stamp emit path |
+| [#1057](https://github.com/Primitive-Labs/js-bao-wss/issues/1057) | behavioral | `GeminiRole` decode throws on unknown provider roles (+ Unicode-digit identifiers); `UNSYNCED_CHANGES` has no JS counterpart; `databases.subscribe` empty-id no-ops where JS throws; `save()` lacks JS's dirty-check short-circuit |
+| [#1058](https://github.com/Primitive-Labs/js-bao-wss/issues/1058) | test health | New surfaces with zero coverage (runSync/subscribe/auth/auto-events/prefetch/me-merge, need live server); ~25 `ApiParityTests` downgraded `try await`→`try?` (decode regressions hidden); re-enable the skipped `AppCleanupTests` once the JS-side sync bug is fixed |
+
+(The PR's #993 suggestion — drop the orphaned `PromptsAPI.get/list` + `IntegrationsAPI.list/get` — is left under existing [#993](https://github.com/Primitive-Labs/js-bao-wss/issues/993), not refiled.)
