@@ -18,11 +18,11 @@ two small ways, neither of which is a capability gap:
 - **Where the document target lives.** JS keeps a hidden "active document" that
   writes default to; Swift makes you name the document explicitly with `save(in:)`.
 
-That's it for style. There is **one** spot where Swift is genuinely *behind* on
-capability — `aggregate` returns untyped rows and can't group by string-set
-membership ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)) — and
-it's flagged in red below. Cursor pagination, despite older notes, **is** supported
-in Swift (via `queryPaged`).
+That's it. There are **no remaining capability gaps** on the model surface — both
+cursor pagination (via `queryPaged`) and the full `aggregate` grouping set, including
+string-set facet and membership grouping ([#1068](https://github.com/Primitive-Labs/js-bao-wss/issues/1068)),
+are supported in Swift. Where shapes differ (e.g. `aggregate`'s flat rows vs JS's
+nested map) it's idiom, not a gap.
 
 (Mechanically: JS uses static/instance methods on the generated `BaseModel` class;
 Swift uses a matching static `Model.*` facade on the generated struct — reads are
@@ -143,17 +143,16 @@ page intro.)
 
 Group-by aggregation with count/avg/sum, an optional filter, sort, and limit.
 
-::: danger Swift's group-by is more limited
-This is the **one real capability gap** on the model surface. Both clients run the
-aggregation as SQL `GROUP BY` and **both return untyped rows** (JS
-`Record<string, any>[]`, Swift `[[String: Any]]`) — so the result shape is at parity.
-What differs is what you can group *by*: JS's `groupBy` is `string | StringSetMembership`,
-so it can group by membership in a string-set (`{ field, contains }`); Swift's model
-facade `groupBy` is plain field names only (`[String]`). So two JS grouping shapes have
-no Swift form on the facade yet — membership-in-a-string-set and the single-facet map
-([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). (The lower-level
-`client.db` aggregate path already exposes string-set grouping via `DoDbGroupBy`; it's
-only the typed model facade that's behind.)
+::: tip Same grouping, flat rows vs nested map
+Both clients run the aggregation as SQL `GROUP BY`, return untyped rows, and support
+the same grouping shapes — plain fields, **stringset facet** (group by a stringset
+field's member values), and **stringset membership** (group by whether the set
+contains a value). In Swift you pass `AggregateGroupBy`: a bare string is a field,
+and `.stringSetMembership(field:contains:)` is a membership check
+([#1068](https://github.com/Primitive-Labs/js-bao-wss/issues/1068)). The only
+remaining difference is the result *shape*: JS returns a nested map keyed by group
+value; Swift returns flat `[[String: Any]]` rows (one row per group). Same data,
+different container.
 :::
 
 ::: code-group

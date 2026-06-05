@@ -1,12 +1,14 @@
 import JsBaoClient
 
-// Aggregation is the static `Task.aggregate` and returns untyped
-// `[[String: Any]]` rows. `groupBy` is `[String]` only — the StringSet-
-// membership grouping the JS API accepts has no Swift form.
+// Aggregation is the static `Task.aggregate`, returning untyped
+// `[[String: Any]]` rows. `groupBy` takes `AggregateGroupBy`: a bare
+// string is a field, and `.stringSetMembership(field:contains:)` groups
+// by whether a stringset contains a value (a stringset field name on its
+// own groups by member value — a facet).
 func aggregate() {
   // #region example
   let stats = Task.aggregate(AggregateOptions(
-    groupBy: ["category"],
+    groupBy: ["category", .stringSetMembership(field: "tags", contains: "urgent")],
     operations: [
       AggregateOperation(type: .count),
       AggregateOperation(type: .avg, field: "priority"),

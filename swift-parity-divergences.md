@@ -4,7 +4,7 @@ Every divergence note flagged in the [dev-docs cookbook](dev-docs/) — **all of
 
 **Flag:** 🔴 unintentional gap / missing-in-Swift · 🟡 intentional (deferred / skipped / by-design / Swift-only) · 🟢 divergent shape (same capability, different shape) · 🔵 info.
 
-**Totals:** 🔴 11 · 🟡 9 · 🟢 26 · 🔵 0
+**Totals:** 🔴 10 · 🟡 9 · 🟢 27 · 🔵 0
 
 
 ## analytics
@@ -110,7 +110,7 @@ Every divergence note flagged in the [dev-docs cookbook](dev-docs/) — **all of
 | [(page intro)](dev-docs/model-surface.md) | 🟢 | **Why the JS and Swift model APIs look a little different** — Same verbs, and **both run queries through an embedded SQLite engine**. They differ in style only: JS's SQLite is WASM/IndexedDB-backed and reached asynchronously (`await`ed reads); Swift mirrors records into a native in-memory SQLite read synchronously. |
 | [save(options?)](dev-docs/model-surface.md#saveoptions) | 🟢 | **Swift makes you name the document** — JS keeps a hidden "active document" pointer and `save()` writes to it; Swift has no hidden active doc, so you always say which one with `save(in:)`. Same write, explicit target. |
 | [query(filter?, options?)](dev-docs/model-surface.md#queryfilter-options) | 🟢 | **Two methods vs one** — JS folds paging into one `query` that always returns `PaginatedResult<Task>`; Swift splits it — `query()` returns plain `[Task]`, `queryPaged()` returns the cursor page. Same capability, two entry points. |
-| [aggregate(options)](dev-docs/model-surface.md#aggregateoptions) | 🔴 | **Swift's group-by is more limited** — The one real model-surface gap. Both run SQL `GROUP BY` and both return untyped rows; the gap is `groupBy` only — JS allows string-set membership (`string \| StringSetMembership`), Swift's facade is `[String]`-only ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)). |
+| [aggregate(options)](dev-docs/model-surface.md#aggregateoptions) | 🟢 | **Same grouping, flat rows vs nested map** — Both run SQL `GROUP BY` with the same shapes (fields, stringset facet, stringset membership via `AggregateGroupBy`); the only difference is the container — JS returns a nested map, Swift returns flat `[[String: Any]]` rows ([#1068](https://github.com/Primitive-Labs/js-bao-wss/issues/1068)). |
 
 ## workflows
 
