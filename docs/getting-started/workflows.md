@@ -145,16 +145,13 @@ let sub = client.events.on(.workflowStatus) { (event: WorkflowStatusEvent) in
 
 For short, latency-sensitive workflows, opt the workflow into synchronous invocation by setting `syncCallable = true` in the workflow TOML or via `primitive workflows update --sync-callable true`. Clients can then `await` the final result in one round-trip:
 
-```typescript
-const result = await client.workflows.runSync({
-  workflowKey: "validate-coupon",
-  input: { code: "WELCOME10" },
-  timeoutMs: 5000,    // server caps at 30s
-});
-if (result.status === "completed") {
-  console.log(result.output);
-}
-```
+::: code-group
+
+<<< ../../examples/workflows/workflow-run-sync.ts#example{ts} [JavaScript]
+
+<<< ../../examples/workflows/workflow-run-sync.swift#example{swift} [Swift]
+
+:::
 
 The promise resolves for every terminal outcome; only network errors reject. Long-running workflows should use asynchronous `start()` instead.
 

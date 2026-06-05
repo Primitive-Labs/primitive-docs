@@ -1083,19 +1083,25 @@ Server-side constraints on a `syncCallable` workflow:
 
 Long-running workflows should keep using `start()` plus the WebSocket / polling lifecycle.
 
-Call `client.workflows.runSync()` and `await` the final envelope:
+Call `workflows.runSync` and await the final envelope:
 
 ```typescript
-const sync = await client.workflows.runSync({
-  workflowKey: "validate-token",
-  input: { token },
-  timeoutMs: 5000,                 // default 5000; server caps at 30000
-  // signal: abortSignal,            // optional AbortSignal
-});
-// → { runId, runKey, status, output?, error?, run?, existing? }
-// status: "completed" | "failed" | "terminated" | "timeout" | "apply_pending"
-// Promise resolves for every terminal outcome — only transport errors reject.
+  const result = await client.workflows.runSync({
+    workflowKey: "validate-coupon",
+    input: { code },
+    timeoutMs: 5000, // default 5000; server caps at 30000
+  });
+  // → { runId, runKey, status, output?, error?, run?, existing? }
+  // status: "completed" | "failed" | "terminated" | "timeout" | "apply_pending"
+  // Resolves for every terminal outcome — only transport errors reject.
+  if (result.status === "completed") {
+    console.log(result.output);
+  }
 ```
+
+`runSync` also accepts `runKey`, `contextDocId`, and `meta` — the same idempotency and scoping fields as `start`.
+
+An optional `signal` (`AbortSignal`) is accepted as well.
 
 ## Workflow lifecycle
 

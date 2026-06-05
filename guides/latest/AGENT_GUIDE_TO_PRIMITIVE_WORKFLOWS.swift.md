@@ -1078,6 +1078,24 @@ Server-side constraints on a `syncCallable` workflow:
 
 Long-running workflows should keep using `start()` plus the WebSocket / polling lifecycle.
 
+Call `workflows.runSync` and await the final envelope:
+
+```swift
+  let result = try await client.workflows.runSync(
+    workflowKey: "validate-coupon",
+    input: ["code": code],
+    timeoutMs: 5000 // default 5000; server caps at 30000
+  )
+  // RunSyncWorkflowResult: runId, runKey, status, output?, error?, run?, existing?
+  // status: "completed" | "failed" | "terminated" | "timeout" | "apply_pending"
+  // Resolves for every terminal outcome — only transport errors throw.
+  if result.status == "completed" {
+    print(result.output ?? "")
+  }
+```
+
+`runSync` also accepts `runKey`, `contextDocId`, and `meta` — the same idempotency and scoping fields as `start`.
+
 
 ## Workflow lifecycle
 
