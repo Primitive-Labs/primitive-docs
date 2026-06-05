@@ -118,6 +118,17 @@ There is **no single "my documents" list**. A user reaches documents through **f
 Each shared document in the result extends the base `DocumentInfo` (`title`, `createdBy`, `createdAt`, `lastModified`, plus `tags`/`metadata`/`thumbnailBlobId` when set) with the share-only extras `permission` (never `"owner"`), `source` (`"permission"` | `"invitation"`), `grantedBy`, `invitationId` (invitation rows only).
 
 
+For an "everything I can access" surface, combine the owned + shared calls with group and collection memberships:
+
+```swift
+  let owned = try await client.me.ownedDocuments()
+  let shared = try await client.me.sharedDocuments().items
+  let collections = try await client.collections.list()
+  // then iterate collections / group memberships and call
+  // collections.listDocuments / groups.listDocuments.
+```
+
+
 ## Core data operations
 
 Every example below is compiled against the real client as part of the docs build. The [Querying Data](#querying-data) and [Saving Data](#saving-data) sections below go deeper on projections, includes, and save options.
@@ -328,6 +339,17 @@ List with `me.ownedDocuments()` and `open()` the selected document; create a new
 
 All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `me.ownedDocuments({ tag })` (and `me.sharedDocuments({ tag })` if the user can also be a non-owner), open each, and track per-document readiness yourself. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over local tracking.
 
+```swift
+  // Open every document with a given tag
+  let channels = try await client.me.ownedDocuments(tag: "channel")
+  for channel in channels {
+    _ = try await client.documents.open(channel.documentId)
+  }
+
+  // Queries run across all open documents by default
+  let messages = Message.query()
+```
+
 
 The most common multi-doc shape is one ambient library/index document plus N per-item documents (each shareable independently); see [Index doc + per-item docs](#index-doc--per-item-docs-keying-tombstones-reconcile) below for keying, tombstones, and the reconcile pass. Open auxiliary docs with `appState.openAuxiliaryDoc(_:modelType:)` and close them with `appState.closeAuxiliaryDoc(_:)`.
 
@@ -443,6 +465,15 @@ Use tags to categorize documents by type. Pass `tags` to `create()`, filter the 
 
 You can also create a tagged document and filter locally:
 
+```swift
+  let result = try await client.documents.create(
+    options: CreateDocumentOptions(title: "My List", tags: ["todolist"])
+  )
+
+  // Filter locally
+  let owned = try await client.me.ownedDocuments()
+  let todoLists = owned.filter { $0.tags?.contains("todolist") == true }
+```
 
 ## Defining Models
 
@@ -596,8 +627,69 @@ fields = ["name", "parentId"]
 unique_constraints = [["name", "parentId"]]
 ```
 
+### Working with StringSets
+
+```swift
+  if var task = Task.find(taskId) {
+    // Add/remove tags
+    task.tags?.insert("urgent")
+    task.tags?.remove("low-priority")
+
+    // Check membership
+    if task.tags?.contains("urgent") == true {
+      // ...
+    }
+
+    try task.save(in: documentId)
+  }
+```
+
+### Working with Dates
+
+Dates are stored as ISO-8601 strings — lexicographic order matches chronological order, so string comparison works in queries:
+
+```swift
+  let now = ISO8601DateFormatter().string(from: Date())
+
+  // Store
+  if var task = Task.find(taskId) {
+    task.dueDate = now
+    try task.save(in: documentId)
+
+    // Compare
+    if let dueDate = task.dueDate, dueDate < now {
+      // overdue
+    }
+  }
+
+  // Query with date comparison
+  let overdue = Task.query(["dueDate": ["$lt": now]])
+```
 
 ## Querying Data
+
+
+**Logical operators** — see [Logical query operators](#logical-query-operators) above for the compiled `$or` example. Plain field maps AND together:
+
+```swift
+  let result = Task.query([
+    "completed": false,
+    "priority": ["$gte": 3],
+    "category": ["$in": ["work", "urgent"]],
+  ])
+```
+
+
+**StringSet facet aggregation** — grouping by a `stringset` field counts per value:
+
+```swift
+  let tagCounts = Task.aggregate(AggregateOptions(
+    groupBy: ["tags"], // "tags" is a stringset field
+    operations: [AggregateOperation(type: .count)]
+  ))
+```
+
+Only one stringset facet field is allowed per aggregation.
 
 
 ### View-data binding with `BaoDataLoader`
@@ -744,7 +836,33 @@ Documents can be shared with individual users (by userId or email), with groups,
 
 ### Quick Reference
 
-The core share calls — by userId, by email, and with a group — are in [Share a document (user / email / group)](#share-a-document-user--email--group) above. The full surface adds batch grants, deferred email shares, and access requests:
+The core share calls — by userId, by email, and with a group — are in [Share a document (user / email / group)](#share-a-document-user--email--group) above. The full surface adds batch grants and deferred email shares (for responding to a 403 with the `canRequestAccess` hint, see [Document Access Requests](#document-access-requests) below):
+
+```swift
+  _ = try await client.documents.updatePermissions(
+    documentId: documentId,
+    params: .batch([
+      PermissionAssignment(userId: "user-abc", permission: "read-write"),
+      PermissionAssignment(email: "alice@example.com", permission: "reader"),
+      PermissionAssignment(email: "bob@example.com", permission: "read-write"),
+    ])
+  )
+```
+
+```swift
+  let result = try await client.documents.updatePermissions(
+    documentId: documentId,
+    params: .email(
+      "alice@example.com",
+      permission: "read-write",
+      sendEmail: true,
+      documentUrl: "https://app.example.com/lists"
+    )
+  )
+  // Returns a direct grant (existing user) or a deferred grant
+  // (invitationId / inviteToken) that the recipient redeems via
+  // client.invitations.accept(inviteToken:) after signup.
+```
 
 
 
@@ -833,10 +951,7 @@ Beyond the Quick Reference and the `PrimitiveShareDocumentDialog` UI, the full p
 
 #### Direct shares: `updatePermissions`
 
-The method is **`updatePermissions`** (no `setPermissions`). Two forms — single user (by id or email) and batch (any mix of userId and email):
-
-
-Optional fields on either form: `sendEmail`, `documentUrl`, `note`.
+The method is **`updatePermissions`** (no `setPermissions`). Two forms — single user (by id or email; see [Share a document (user / email / group)](#share-a-document-user--email--group)) and batch (any mix of userId and email; see the [Quick Reference](#quick-reference)). Optional fields on either form: `sendEmail`, `documentUrl`, `note`.
 
 When `sendEmail: true`, the server delivers per-recipient emails:
 
@@ -848,6 +963,24 @@ Both branches share two preconditions when `sendEmail: true`: `documentUrl` must
 Repeated email-based calls are idempotent: a second `updatePermissions(documentId, { email })` with the same email updates the existing pending `DeferredDocumentPermission` in place rather than creating a duplicate row, so the latest `permission` value wins at signup-time resolution and `client.documents.listPendingInvitations(documentId)` shows one entry per pending recipient.
 
 **There is no `permission: null` to remove.** Removal is a separate call (`removePermission` by userId or by email; `transferOwnership` to hand a document to a new owner):
+
+```swift
+  // Remove a current member by userId:
+  try await client.documents.removePermission(
+    documentId: documentId, userId: "user-abc"
+  )
+
+  // Cancel a pending email-based invite, OR remove a current member
+  // matched by email:
+  try await client.documents.removePermission(
+    documentId: documentId, email: "alice@example.com"
+  )
+
+  // Hand the document to a new owner:
+  try await client.documents.transferOwnership(
+    documentId: documentId, newOwnerId: newOwnerId
+  )
+```
 
 
 Lowering a user's direct permission while they still have a higher one via a group is a no-op — the group wins (effective = MAX). To actually lower it, also lower or revoke the group permission.
@@ -866,6 +999,19 @@ The method is **`grantGroupPermission`** (no `setGroupPermission`). Member chang
 
 `client.users.lookup(email)` reports whether an email maps to an existing app user — use it to decide whether to share by `userId` (definitive) or `email` (will defer if no app user yet). The argument is a plain string, not `{ email }`.
 
+```swift
+  // One user's basic profile
+  let user = try await client.users.getBasic(userId: userId)
+
+  // Batch-fetch several profiles in one round-trip
+  let profiles = try await client.users.getProfiles(userIds: [userId, "user-456"])
+
+  // Find a user by email
+  let found = try await client.users.lookup(email: "alice@example.com")
+
+  // The current signed-in user
+  let me = try await client.me.get()
+```
 
 #### Redeeming a deferred grant
 
@@ -972,8 +1118,29 @@ A collection's members + pending invites in one call:
 Additional collection calls:
 
 
-Collections accept email-based members exactly like documents and groups — a deferred grant that resolves on signup:
+Collections accept email-based members exactly like documents and groups — a deferred grant that resolves on signup. Inspect the result's `status` (`"added"` / `"already_member"` / `"pending_signup"`); group shares, members + pending reads, and removals are in [Collections](#collections) above:
 
+```swift
+  // Add an individual member by userId
+  _ = try await client.collections.addMember(
+    collectionId: collectionId,
+    params: .user("user-abc", permission: .readWrite)
+  )
+
+  // Or by email — deferred grant resolves on signup
+  let result = try await client.collections.addMember(
+    collectionId: collectionId,
+    params: .email(
+      "newhire@example.com",
+      permission: .reader,
+      sendEmail: true, // optional: platform sends an invite email
+      collectionUrl: "https://app.example.com/onboarding", // required when sendEmail is true
+      note: "Sharing the onboarding docs"
+    )
+  )
+  // result is .direct (added / already_member) or .deferred —
+  // the deferred case carries invitationId / inviteToken / expiresAt.
+```
 
 The deferred-grant flow on `collections.addMember({ email })` mirrors the document share path: `app.baseUrl` must be configured, `sendEmail: true` requires `collectionUrl`, and `client.invitations.delete(invitationId)` cancels every pending collection add (plus any pending document shares and group adds) attached to the invitation. See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-grants) for the resolution lifecycle.
 

@@ -120,17 +120,13 @@ Each shared document in the result extends the base `DocumentInfo` (`title`, `cr
 
 {{#lang ts}}
 `ownedDocuments` and `sharedDocuments` return the unified `{ items, cursor }` envelope (raw-JSON `cursor`, NOT base64url). `ownedDocuments()` returns a flat `DocumentInfo[]` by default, or the envelope with `returnPage: true`.
+{{/lang}}
 
-For an "everything I can access" surface, combine these two calls with group and collection memberships:
+For an "everything I can access" surface, combine the owned + shared calls with group and collection memberships:
 
-```typescript
-const owned  = await jsBaoClient.me.ownedDocuments();
-const shared = (await jsBaoClient.me.sharedDocuments()).items;
-const collections = await jsBaoClient.collections.list();
-// then iterate collections / groups.listUserMemberships and call
-// collections.listDocuments / groups.listDocuments.
-```
+{{ example: documents/list-accessible }}
 
+{{#lang ts}}
 `jsBaoClient.documents.hasLocalCopy(documentId)` is the synchronous local-cache check, useful when deciding whether to render skeletons before `open()` resolves.
 
 #### Do not use
@@ -234,18 +230,9 @@ List with `me.ownedDocuments()` and `open()` the selected document; create a new
 
 All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `me.ownedDocuments({ tag })` (and `me.sharedDocuments({ tag })` if the user can also be a non-owner), open each, and track per-document readiness yourself. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over local tracking.
 
+{{ example: documents/open-tagged }}
+
 {{#lang ts}}
-```typescript
-// Open every document with a given tag
-const channels = await jsBaoClient.me.ownedDocuments({ tag: "channel" });
-await Promise.all(
-  channels.map((ch) => jsBaoClient.documents.open(ch.documentId))
-);
-
-// Query runs across all open documents by default
-const messages = await Message.query({});
-```
-
 The template does not ship a built-in "multi-document" Pinia store. A minimal store for "all documents tagged `channel`":
 
 ```typescript
@@ -410,18 +397,7 @@ Use tags to categorize documents by type. Pass `tags` to `create()`, filter the 
 
 You can also create a tagged document and filter locally:
 
-{{#lang ts}}
-```typescript
-const { metadata } = await jsBaoClient.documents.create({
-  title: "My List",
-  tags: ["todolist"],
-});
-
-// Filter locally
-const owned = await jsBaoClient.me.ownedDocuments();
-const todoListsLocal = owned.filter((doc) => doc.tags?.includes("todolist"));
-```
-{{/lang}}
+{{ example: documents/tag-filter-local }}
 
 ## Defining Models
 
@@ -657,41 +633,15 @@ fields = ["name", "parentId"]
 unique_constraints = [["name", "parentId"]]
 ```
 
-{{#lang ts}}
 ### Working with StringSets
 
-```typescript
-// Add/remove tags
-task.tags.add("urgent");
-task.tags.remove("low-priority");
-
-// Check membership
-if (task.tags.has("urgent")) { ... }
-
-// Convert to array for display
-const tagList = task.tags.toArray();
-```
+{{ example: documents/stringset-ops }}
 
 ### Working with Dates
 
-Dates are stored as ISO-8601 strings. Convert for comparisons:
+Dates are stored as ISO-8601 strings — lexicographic order matches chronological order, so string comparison works in queries:
 
-```typescript
-// Store
-task.dueDate = new Date().toISOString();
-
-// Compare
-const due = new Date(task.dueDate);
-if (due < new Date()) {
-  console.log("Overdue!");
-}
-
-// Query with date comparison
-const result = await Task.query({
-  dueDate: { $lt: new Date().toISOString() },
-});
-```
-{{/lang}}
+{{ example: documents/date-handling }}
 
 ## Querying Data
 
@@ -740,15 +690,13 @@ items.map(...);  // TypeError: items.map is not a function
 | `$all`          | StringSet contains all values  | `{ tags: { $all: ["work", "urgent"] } }`             |
 | `$size`         | StringSet size comparison      | `{ tags: { $size: { $gte: 2 } } }`                   |
 
+{{/lang}}
+
 **Logical operators** — see [Logical query operators](#logical-query-operators) above for the compiled `$or` example. Plain field maps AND together:
 
-```typescript
-const result = await Task.query({
-  completed: false,
-  priority: { $gte: 3 },
-  tags: { $in: ["work", "urgent"] },
-});
-```
+{{ example: documents/query-and }}
+
+{{#lang ts}}
 
 ### Pagination
 
@@ -848,17 +796,16 @@ Group and calculate statistics — see [Aggregation](#aggregation) above for the
 
 Multi-field `groupBy` produces deeper nesting (`result[group1][group2] = { ...ops }`). Operation result keys are `count`, `sum_<field>`, `avg_<field>`, `min_<field>`, `max_<field>`.
 
-**StringSet facet aggregation** — grouping by a `stringset` field counts per value. When the only operation is `count`, the value collapses to a number:
+{{/lang}}
 
-```typescript
-const tagCounts = await Task.aggregate({
-  groupBy: ["tags"],  // "tags" is a stringset field
-  operations: [{ type: "count" }],
-});
-// Returns: { "work": 15, "urgent": 8, "personal": 5, ... }
-```
+**StringSet facet aggregation** — grouping by a `stringset` field counts per value:
 
-Only one stringset facet field is allowed per aggregation. To check membership of a specific value across records, use a `StringSetMembership` groupBy entry: `{ field: "tags", contains: "urgent" }`.
+{{ example: documents/aggregate-facet }}
+
+Only one stringset facet field is allowed per aggregation.
+
+{{#lang ts}}
+When the only operation is `count`, the value collapses to a number. To check membership of a specific value across records, use a `StringSetMembership` groupBy entry: `{ field: "tags", contains: "urgent" }`.
 
 ### useJsBaoDataLoader Pattern
 
@@ -1285,46 +1232,13 @@ Documents can be shared with individual users (by userId or email), with groups,
 
 ### Quick Reference
 
-The core share calls — by userId, by email, and with a group — are in [Share a document (user / email / group)](#share-a-document-user--email--group) above. The full surface adds batch grants, deferred email shares, and access requests:
+The core share calls — by userId, by email, and with a group — are in [Share a document (user / email / group)](#share-a-document-user--email--group) above. The full surface adds batch grants and deferred email shares (for responding to a 403 with the `canRequestAccess` hint, see [Document Access Requests](#document-access-requests) below):
+
+{{ example: sharing/share-batch }}
+
+{{ example: sharing/share-email-deferred }}
 
 {{#lang ts}}
-```typescript
-// Batch — multiple users at once
-await client.documents.updatePermissions(documentId, {
-  permissions: [
-    { userId: "user-abc", permission: "read-write" },
-    { userId: "user-xyz", permission: "reader" },
-  ],
-});
-
-// By email with notification — resolves if the user exists, otherwise creates a
-// deferred grant that auto-applies when the recipient signs up. With
-// `sendEmail: true`, `documentUrl` is required AND the app must have `baseUrl`
-// configured (used to compose the accept URL for the deferred-share email).
-// Both preconditions return HTTP 400 if missing.
-await client.documents.updatePermissions(documentId, {
-  email: "alice@example.com",
-  permission: "read-write",
-  sendEmail: true,
-  documentUrl: `${window.location.origin}/lists`,
-});
-// Returns either a DirectPermissionGrant (existing user) or a
-// DeferredPermissionGrant ({ invitationId, inviteToken, ... }) that the
-// recipient redeems via client.invitations.accept(inviteToken) after signup.
-
-// Respond to a 403 with canRequestAccess hint. `permission` is REQUIRED.
-try {
-  await client.documents.open(documentId);
-} catch (err) {
-  if (err.details?.canRequestAccess) {
-    await client.documents.requestAccess(documentId, {
-      permission: "read-write",
-      message: "Please grant me access",
-    });
-  }
-}
-```
-
 **Wrong** — these names look reasonable but do not exist on the API:
 
 ```typescript
@@ -1428,28 +1342,7 @@ Beyond the Quick Reference and the `PrimitiveShareDocumentDialog` UI, the full p
 
 #### Direct shares: `updatePermissions`
 
-The method is **`updatePermissions`** (no `setPermissions`). Two forms — single user (by id or email) and batch (any mix of userId and email):
-
-{{#lang ts}}
-```typescript
-// Single user (by id or email)
-await client.documents.updatePermissions(documentId, {
-  email: "alice@example.com",
-  permission: "read-write",
-});
-
-// Batch (any mix of userId and email)
-await client.documents.updatePermissions(documentId, {
-  permissions: [
-    { userId: "user-abc", permission: "read-write" },
-    { email: "alice@example.com", permission: "reader" },
-    { email: "bob@example.com",   permission: "read-write" },
-  ],
-});
-```
-{{/lang}}
-
-Optional fields on either form: `sendEmail`, `documentUrl`, `note`.
+The method is **`updatePermissions`** (no `setPermissions`). Two forms — single user (by id or email; see [Share a document (user / email / group)](#share-a-document-user--email--group)) and batch (any mix of userId and email; see the [Quick Reference](#quick-reference)). Optional fields on either form: `sendEmail`, `documentUrl`, `note`.
 
 When `sendEmail: true`, the server delivers per-recipient emails:
 
@@ -1462,18 +1355,9 @@ Repeated email-based calls are idempotent: a second `updatePermissions(documentI
 
 **There is no `permission: null` to remove.** Removal is a separate call (`removePermission` by userId or by email; `transferOwnership` to hand a document to a new owner):
 
+{{ example: sharing/remove-permission }}
+
 {{#lang ts}}
-```typescript
-// Remove a current member by userId:
-await client.documents.removePermission(documentId, "user-abc");
-await client.documents.removePermission(documentId, { userId: "user-abc" });
-
-// Cancel a pending email-based invite, OR remove a current member matched by email:
-await client.documents.removePermission(documentId, { email: "alice@example.com" });
-
-await client.documents.transferOwnership(documentId, newOwnerId);
-```
-
 **Don't do this** (silent no-op for someone with a higher group permission, and there is no `null` form):
 
 ```typescript
@@ -1540,13 +1424,7 @@ await client.documents.revokeGroupPermission(documentId, "team", "engineering");
 
 `client.users.lookup(email)` reports whether an email maps to an existing app user — use it to decide whether to share by `userId` (definitive) or `email` (will defer if no app user yet). The argument is a plain string, not `{ email }`.
 
-{{#lang ts}}
-```typescript
-const result = await client.users.lookup("alice@example.com");
-// { exists: true, user: { userId, name, email } }
-// or { exists: false }
-```
-{{/lang}}
+{{ example: users-and-groups/users-lookup }}
 
 #### Redeeming a deferred grant
 
@@ -1689,44 +1567,9 @@ await client.collections.removeMember(collection.collectionId, targetUserId);
 ```
 {{/lang}}
 
-Collections accept email-based members exactly like documents and groups — a deferred grant that resolves on signup:
+Collections accept email-based members exactly like documents and groups — a deferred grant that resolves on signup. Inspect the result's `status` (`"added"` / `"already_member"` / `"pending_signup"`); group shares, members + pending reads, and removals are in [Collections](#collections) above:
 
-{{#lang ts}}
-```typescript
-// Add an individual member by userId
-await client.collections.addMember(collectionId, {
-  userId: "user-abc",
-  permission: "read-write",              // "reader" or "read-write"
-});
-
-// Or by email — deferred grant resolves on signup, mirroring documents/groups
-const result = await client.collections.addMember(collectionId, {
-  email: "newhire@example.com",
-  permission: "reader",
-  sendEmail: true,                       // optional: platform sends an invite email
-  collectionUrl: "https://...",          // required when sendEmail is true
-  note: "Sharing the onboarding docs",
-});
-// result.status: "added" | "already_member" | "pending_signup"
-// Pending case carries { invitationId, inviteToken, expiresAt }.
-
-// Share with a group (fans out to every document in the collection)
-await client.collections.grantGroupPermission(collectionId, {
-  groupType: "team",
-  groupId: "engineering",
-  permission: "reader",
-});
-
-// Inspect / undo
-const access = await client.collections.getAccess(collectionId);
-// → { members: [...], groups: [...] }
-const pending = await client.collections.listPendingInvitations(collectionId);
-// → [{ email, permission, invitationId, expiresAt, ... }]
-await client.collections.removeMember(collectionId, "user-abc");
-await client.collections.revokeGroupPermission(collectionId, "team", "engineering");
-// Change a user's permission: call addMember again with the new level.
-```
-{{/lang}}
+{{ example: sharing/collection-member-email }}
 
 The deferred-grant flow on `collections.addMember({ email })` mirrors the document share path: `app.baseUrl` must be configured, `sendEmail: true` requires `collectionUrl`, and `client.invitations.delete(invitationId)` cancels every pending collection add (plus any pending document shares and group adds) attached to the invitation. See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-grants) for the resolution lifecycle.
 
