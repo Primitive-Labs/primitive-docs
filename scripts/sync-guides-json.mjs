@@ -82,6 +82,19 @@ for (const g of manifest.guides) {
   }
 }
 
+// `description` is the primary signal an agent uses to pick a guide from
+// `primitive guides list`, where it renders in a fixed-width, ellipsized
+// table column. Budget each one to ≤100 chars (front-load the discriminating
+// part — the column shows roughly the first 48) so the selection signal
+// survives the table; full text stays available via `guides list --json`.
+const DESCRIPTION_BUDGET = 100;
+for (const g of manifest.guides) {
+  const len = (g.description ?? "").length;
+  if (len > DESCRIPTION_BUDGET) {
+    problems.push(`✘ ${g.topic}: description is ${len} chars (budget ${DESCRIPTION_BUDGET})`);
+  }
+}
+
 // relatedGuides/prerequisites are hand-maintained topic references — verify
 // each names a topic that exists in this manifest. A guide removal/rename
 // otherwise leaves dangling references that the CLI surfaces to agents, who
