@@ -161,7 +161,7 @@ A workflow runs on the server, but its result often belongs in a **document** �
 
 1. The client registers an apply handler for the workflow with `workflows.define(workflowKey, { onApply })`.
 2. When a run reaches `apply_pending`, a client calls `claimApply()` (an exclusive, time-limited claim), runs the handler, then `confirmApply()` — or `releaseApply()` on failure so another client can retry.
-3. The template helpers and Swift's `runAndApply(...)` wrap this loop for you — most apps never call claim/confirm directly.
+3. `define(...)` wraps this loop for you — when the status event arrives, the client claims the lease, runs your handler, and confirms (or releases on a thrown error). Most apps never call claim/confirm directly.
 
 If a workflow's output doesn't need to land in a document — it writes to databases, sends email, returns a value — leave `requiresClientApply` off. Server-only workflows (cron-fired jobs especially) should set it to `false` explicitly, otherwise runs sit in `apply_pending` waiting for a client that never comes:
 

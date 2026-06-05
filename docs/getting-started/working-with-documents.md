@@ -351,7 +351,7 @@ Pass a sort and a page size, then carry the cursor forward.
 
 :::
 
-In Swift, cursor pagination lives on the `.dynamic` layer (`queryPaged`); use `sortOrder` (an ordered list) so the cursor is stable across pages.
+In Swift, use `sortOrder` (an ordered list) so the cursor is stable across pages.
 
 ### Aggregations
 
@@ -365,7 +365,7 @@ Group-by with `count` / `avg` / `sum` / `min` / `max`, an optional pre-filter, s
 
 :::
 
-When you group by a `stringset` field (like `tags`), each member value becomes its own group — a tag-facet count.
+When you group by a `stringset` field (like `tags`), each member value becomes its own group — a tag-facet count. To split records by whether the set contains one specific value instead, use a membership `groupBy` entry (the `urgentSplit` call above). One stringset facet field is allowed per aggregation.
 
 ## Reacting to Changes
 
@@ -443,16 +443,17 @@ Splitting this into a resolve followed by a create looks fine but has a race: tw
 
 ### Opening Documents on iOS
 
-On iOS, the canonical place to open documents and bind models is your `PrimitiveAppState` subclass — open in `connectClient()`, bind in the `onDocumentOpened` hook:
+On iOS, the canonical place to open documents is your `PrimitiveAppState` subclass — open in `connectClient()`:
 
 ```swift
 @MainActor
 final class MyAppState: PrimitiveAppState {
-  @Published private(set) var tasks: TypedModel<TaskRecord>?
-
   override func connectClient() async {
     await super.connectClient()
     guard let client else { return }
+    // Pre-register models so every open document is mirrored into the
+    // client's shared store (and listed in the Debug Inspector).
+    client.registerModels([TaskRecord.self])
     let result = try? await client.documents.getOrCreateWithAlias(
       alias: DocumentAlias(scope: .user, aliasKey: "library"),
       title: "Library"
@@ -460,14 +461,10 @@ final class MyAppState: PrimitiveAppState {
     guard let id = result?.documentId else { return }
     await selectDocumentAwaiting(id)
   }
-
-  override func onDocumentOpened(doc: YDocument, documentId: String) async {
-    tasks = makeTypedModel(doc: doc, documentId: documentId)
-  }
 }
 ```
 
-One `TypedModel` per record type per document. Prefer `makeTypedModel(doc:documentId:)` over direct construction — it also registers the model with the in-app Debug Inspector.
+There is no per-document model binding: reads go through the model's statics (`TaskRecord.query(...)`, cross-document by default — scope to one document with `QueryOptions(documents: [documentId])`), and writes go through record instances (`try TaskRecord(...).save(in: documentId)`). `registerModels([...])` at connect time is optional but recommended — the facade also lazily registers a model on its first read. For per-document setup beyond models, override the `onDocumentOpened(doc:documentId:)` hook.
 
 ## Common Document Usage Patterns
 

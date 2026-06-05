@@ -4,7 +4,8 @@ import JsBaoClient
 func signOut(client: JsBaoClient) async throws {
   // #region example
   try await client.auth.logout(options: LogoutOptions(
-    wipeLocal: true // delete locally cached document data + KV cache
+    wipeLocal: true, // delete locally cached document data + KV cache
+    waitForDisconnect: true // wait for the WS to close before resolving
   ))
   // #endregion example
 }

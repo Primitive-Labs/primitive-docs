@@ -181,12 +181,12 @@ The current authenticated user has its own namespace. Use it for "me"-scoped rea
   )
 
   // Upload an image directly; the server hosts it and returns a URL.
-  let uploaded = try await client.me.uploadAvatar(imageData: avatar, contentType: "image/png")
+  let uploaded = try await client.me.uploadAvatar(imageData: avatar, contentType: .png)
   let avatarUrl = uploaded.avatarUrl
 
   // update() and uploadAvatar() clear the cache automatically; reach for
   // these only when you need to inspect or force a refresh yourself.
-  let info = await client.me.cacheInfo()  // (updatedAt?, ageMs?)
+  let info = await client.me.cacheInfo()  // MeCacheInfo(updatedAt?, ageMs?)
   await client.me.clearCache()  // next get() hits the network
 ```
 

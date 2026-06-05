@@ -1310,21 +1310,17 @@ The `workflowStatus` event uses `"completed"`; `getStatus` returns `"complete"`.
 For workflows with `requiresClientApply = true`, register an apply handler so a client deterministically runs follow-up logic exactly once.
 
 
-For "start a run and await its result", use `runAndApply`. It tracks each call by `runKey` (so N concurrent runs of the same `workflowKey` coexist), runs the full claim → getStatus → confirm flow internally, and returns a `WorkflowApplyContext` carrying the output:
-
 ```swift
-let ctx = try await client.workflows.runAndApply(
-    workflowKey: "ocr-content",
-    input: ["attachments": [["data": image.base64EncodedString(), "type": "image/jpeg"]]],
-    options: StartWorkflowOptions(contextDocId: documentId),
-    timeout: 120                          // default 120s; raise for slow LLM workflows
-)
-let output = ctx.output                   // Any? — cast to the final step's JSON shape
-// Terminal non-success throws WorkflowRunError.terminalFailure(status:message:);
-// missing output within the window throws .timedOut; task cancellation propagates.
+client.workflows.define("my-workflow-key") { ctx in
+    // Runs on exactly one connected client: the client claims the lease,
+    // fetches the run output, calls this handler, then confirms the apply.
+    // A thrown error releases the claim so another client (or a retry)
+    // can pick it up.
+    // ctx: workflowKey, runKey, runId, contextDocId?, output, startedByUserId?, meta?
+}
 ```
 
-Use the lower-level `define` + `start` pair when you need a long-lived per-`workflowKey` handler rather than a per-call awaiter. When you do, the mandatory guards are: **register `define(...)` before `start(...)`** (else the apply may deliver before you subscribe); **guard the handler on a matching `runKey`** (a `.workflowStatus` event from a prior app session can otherwise resolve a fresh continuation); and a **`resolved` flag** (server retries can fire the handler more than once, and a `CheckedContinuation` traps on double-resume). If the device was offline when the server finished the run, call `client.workflows.deliverPendingApplies(contextDocId:)` after reconnect to drive the queued apply.
+Register `define(...)` before `start(...)` so the apply can't arrive before the handler is in place. After an offline gap, `getPendingApplies(contextDocId:)` lists runs still awaiting apply.
 
 Manual flow if you need it: `claimApply` → run logic → `confirmApply` (success) or `releaseApply` (failure). 30s lease timeout for crashed clients.
 

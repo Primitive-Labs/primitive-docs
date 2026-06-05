@@ -140,7 +140,7 @@ let token = try await client.handleOAuthCallback(code: code, state: state)
   let isNewUser = result.isNewUser ?? false
 ```
 
-`auth.magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument. `auth.magicLinkVerify(token:)` returns a `MagicLinkVerifyResult` (`.user`, `.promptAddPasskey?`, `.isNewUser?`).
+`auth.magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument. `auth.magicLinkVerify(token:inviteToken:)` returns a `MagicLinkVerifyResult` (`.user`, `.promptAddPasskey?`, `.isNewUser?`).
 
 ### Reading the token (callback page)
 
@@ -158,6 +158,12 @@ The callback delivers the token as a `magic_token` value — **not** `token`, `m
   }
 ```
 
+
+To accept an invitation server-side at verify time (so the deferred grant resolves to the signing-in user even when emails differ), pass `inviteToken`:
+
+```swift
+let result = try await client.auth.magicLinkVerify(token: magicToken, inviteToken: inviteTokenFromUrl)
+```
 
 ---
 
@@ -323,11 +329,12 @@ The client persists the token to the Keychain across app launches. `waitForAuthB
 
 ```swift
   try await client.auth.logout(options: LogoutOptions(
-    wipeLocal: true // delete locally cached document data + KV cache
+    wipeLocal: true, // delete locally cached document data + KV cache
+    waitForDisconnect: true // wait for the WS to close before resolving
   ))
 ```
 
-`auth.logout(options:)` takes a `LogoutOptions` — `wipeLocal` (delete locally cached document data + KV cache), `revokeOffline` (also revoke any stored offline grant), `clearOfflineIdentity` (defaults `true`).
+`auth.logout(options:)` takes a `LogoutOptions` — `wipeLocal` (delete locally cached document data + KV cache), `revokeOffline` (also revoke any stored offline grant), `clearOfflineIdentity` (defaults `true`), `waitForDisconnect` (await WebSocket teardown before returning; defaults `false`).
 
 ---
 
