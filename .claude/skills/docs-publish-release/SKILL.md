@@ -57,9 +57,24 @@ If a gate fails because a doc relies on a merged-but-unpublished package API (th
 
 Walk every row of every summary table (New Features, Bug Fixes, Cleanup, Performance, Dependencies, Model Changes, Notes for users) and confirm its disposition in what's being published: documented (where?), or internal/not developer-facing (why?). This should be a checklist pass — the writing happened on `next`. Any gap is a missed `docs-next-sync` triage: fix it now on the publish branch using that skill's triage classes and STYLE.md rules, and note the miss so the next-sync cadence can improve.
 
-## Step 6 — Land and backflow
+## Step 6 — Summarize the docs delta
 
-1. PR the publish branch into `main`; merging publishes the site (publish-docs.yml verifies the channel is `production`).
+The publish PR carries a standalone summary of what the documentation now covers that it didn't at the last published release. **Audience: platform developers** — people who build Primitive, not external users and not docs-repo maintainers. The summary must stand on its own: no mention of branches, truing passes, channels, stamps, or any other publishing mechanics. Write "X is now documented" / "examples for Y now compile on both platforms", never "merged from next" or "trued against main".
+
+The window is the publish branch against the pre-publish `main`:
+
+```bash
+git log --first-parent --oneline origin/main..HEAD
+git diff --stat origin/main..HEAD -- docs/ guides/ examples/ scripts/ .github/
+```
+
+Read the underlying commits (and their diffs where the subject isn't enough), then write release-notes-altitude bullets **grouped by platform area** (Workflows, Databases, CLI & configuration, platform/language examples, Getting started, Reference…), not by docs product — a fact documented on a page, in a guide, and in an example is *one* bullet naming where it landed. Close with a **Documentation tooling** group for changes to how the docs are validated or built (new gates, validators, CI checks) — described by what they guarantee ("documented CLI invocations are validated against the CLI's manifest"), not by script names. Include parity bugs filed in lieu of documenting gaps.
+
+Skip mechanical noise entirely: source stamps, lockfiles, rendered guide builds, skill/process edits, regenerated reference pages (mention the regeneration once if its *content* changed meaningfully).
+
+## Step 7 — Land and backflow
+
+1. PR the publish branch into `main` with the release-coverage table (Step 5) **and** the docs-delta summary (Step 6); merging publishes the site (publish-docs.yml verifies the channel is `production`).
 2. Backflow so `next` contains everything `main` does:
 
    ```bash
@@ -69,4 +84,4 @@ Walk every row of every summary table (New Features, Bug Fixes, Cleanup, Perform
    ```
 
    Commit and push `next`.
-3. Report: release SHA published, merge point used, packages repinned, the summary-coverage table, and any held (unpublished-API) or gap items.
+3. Report: release SHA published, merge point used, packages repinned, the summary-coverage table, the docs-delta summary, and any held (unpublished-API) or gap items.
