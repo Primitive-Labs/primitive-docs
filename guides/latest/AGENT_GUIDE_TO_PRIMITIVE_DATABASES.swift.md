@@ -957,6 +957,35 @@ primitive databases import-csv <database-id> <file.csv> --model products \
 
 The CLI imports through a registered batch (bulk) save operation — `--operation` defaults to `seed_save`, so the database type needs a save-like op (`{ modelName, id, data }`) by that name (or pass your own). `--batch-size` defaults to 5000, `--delimiter` to `,`; use `--dry-run` to report row/batch counts without writing and `--stop-on-error` to abort on the first failing chunk (default is best-effort continue).
 
+For programmatic imports with per-row `transform` or progress callbacks, use `importCsv` from app code:
+
+```swift
+  let result = try await client.databases.importCsv(
+    databaseId: databaseId,
+    options: CsvImportOptions(
+      csv: csvString, // provide csv or data (pre-parsed rows), not both
+      modelName: "products",
+      columnMap: ["Product Name": "name", "Unit Price": "price"],
+      transform: { row, _ in
+        guard let name = row["name"]?.stringValue, !name.isEmpty else {
+          return nil // return nil to skip a row
+        }
+        var out = row
+        out["importedAt"] = .string(ISO8601DateFormatter().string(from: Date()))
+        return out
+      },
+      types: ["price": .number],
+      idColumn: "sku",
+      onProgress: { progress in
+        print("\(progress.processed)/\(progress.total) processed")
+      }
+    )
+  )
+  // CsvImportResult: imported, failed, errors, indexesCreated, durationMs
+```
+
+Other options: `data` (pre-parsed rows, instead of `csv`), `delimiter`, `batchSize` (default 5000), `idGenerator` (per-row ID factory; the fallback chain is `idColumn` → `idGenerator` → generated ULID), `onBatchError` (return `false` to abort remaining batches), and `operationName` (the registered save op, default `"save"`, called as `{ modelName, id, data }`).
+
 
 ### Database design
 

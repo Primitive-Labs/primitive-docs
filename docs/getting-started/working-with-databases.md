@@ -314,7 +314,7 @@ This reads the `[models.*]` blocks and `[[operations]]` definitions and emits ty
 
 ## Bulk CSV Import
 
-Two paths for loading a lot of records. From app code, `client.databases.importCsv(databaseId, { csv, model, columnMap, ... })` imports a CSV string with column mapping, optional per-row transforms, and progress callbacks. From a terminal:
+Two paths for loading a lot of records. From a terminal:
 
 ```bash
 primitive databases import-csv <database-id> ./products.csv --model products \
@@ -323,6 +323,16 @@ primitive databases import-csv <database-id> ./products.csv --model products \
 ```
 
 The CLI loads rows through a registered batch save operation in batches; add `--dry-run` to preview counts without writing.
+
+From app code, `importCsv` imports a CSV string with column mapping, type coercion, optional per-row transforms, and progress callbacks:
+
+::: code-group
+
+<<< ../../examples/databases/db-import-csv.ts#example{ts} [JavaScript]
+
+<<< ../../examples/databases/db-import-csv.swift#example{swift} [Swift]
+
+:::
 
 ## Optional Filter Params
 
