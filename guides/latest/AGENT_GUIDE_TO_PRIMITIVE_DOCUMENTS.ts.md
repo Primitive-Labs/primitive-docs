@@ -265,7 +265,21 @@ Every example below is compiled against the real client as part of the docs buil
     sort: { field: "count", direction: -1 },
     limit: 10,
   });
+
+  // Grouping by a stringset field counts per member value (facet):
+  const tagCounts = await Task.aggregate({
+    groupBy: ["tags"],
+    operations: [{ type: "count" }],
+  });
+
+  // Group by whether the set contains a value (membership):
+  const urgentSplit = await Task.aggregate({
+    groupBy: [{ field: "tags", contains: "urgent" }],
+    operations: [{ type: "count" }],
+  });
 ```
+
+Grouping by a `stringset` field counts per member value (facet); a membership `groupBy` entry groups by whether the set contains one specific value. Only one stringset facet field is allowed per aggregation, and a facet can't be mixed with other `groupBy` entries — unsupported mixes degrade (the facet is dropped or the result is empty) rather than throw.
 
 ### Subscribe to changes
 

@@ -6,9 +6,9 @@ func watchTeamTickets(
   client: JsBaoClient,
   databaseId: String,
   handleChange: @escaping (DatabaseChangeEvent) -> Void
-) -> () -> Void {
+) throws -> () -> Void {
   // #region example
-  let unsub = client.databases.subscribe(
+  let unsub = try client.databases.subscribe(
     databaseId: databaseId,
     subscriptionKey: "tickets-by-team",
     options: DatabaseSubscribeOptions(

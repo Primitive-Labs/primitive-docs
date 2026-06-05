@@ -8,9 +8,9 @@ func watchOpenTickets(
   databaseId: String,
   removeTicket: @escaping (String) -> Void,
   upsertTicket: @escaping (Any?) -> Void
-) {
+) throws {
   // #region example
-  let unsub = client.databases.subscribe(
+  let unsub = try client.databases.subscribe(
     databaseId: databaseId,
     subscriptionKey: "my-open-tickets",
     options: DatabaseSubscribeOptions(onChange: { event in

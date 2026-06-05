@@ -142,7 +142,7 @@ let token = try await client.handleOAuthCallback(code: code, state: state)
 `magicLinkRequest` accepts an optional `redirectUri` (defaulting to the client's `oauthRedirectUri`) and throws `Error("Redirect URI not configured")` if neither is set.
 {{/lang}}
 {{#lang swift}}
-`auth.magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument. `auth.magicLinkVerify(token:)` returns a `MagicLinkVerifyResult` (`.user`, `.promptAddPasskey?`, `.isNewUser?`).
+`auth.magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument. `auth.magicLinkVerify(token:inviteToken:)` returns a `MagicLinkVerifyResult` (`.user`, `.promptAddPasskey?`, `.isNewUser?`).
 {{/lang}}
 
 ### Reading the token (callback page)
@@ -153,11 +153,18 @@ The callback delivers the token as a `magic_token` value — **not** `token`, `m
 
 {{#lang ts}}
 The callback URL may also carry `?purpose=login-add-passkey`. The server appends this when the link was sent for an existing user the platform thinks should add a passkey (e.g. they signed in via OTP/magic-link but have no passkey on file). The `magicLinkVerify` call itself is unchanged — apps that read `purpose` from the URL can use it as a hint to route the user to passkey registration after sign-in instead of straight to the home screen.
+{{/lang}}
 
 To accept an invitation server-side at verify time (so the deferred grant resolves to the signing-in user even when emails differ), pass `inviteToken`:
 
+{{#lang ts}}
 ```typescript
 await client.magicLinkVerify(magicToken, { inviteToken: inviteTokenFromUrl });
+```
+{{/lang}}
+{{#lang swift}}
+```swift
+let result = try await client.auth.magicLinkVerify(token: magicToken, inviteToken: inviteTokenFromUrl)
 ```
 {{/lang}}
 
@@ -418,7 +425,7 @@ await client.logout({
 Logout fires `auth:logout` immediately and `auth:logout:complete` when finished.
 {{/lang}}
 {{#lang swift}}
-`auth.logout(options:)` takes a `LogoutOptions` — `wipeLocal` (delete locally cached document data + KV cache), `revokeOffline` (also revoke any stored offline grant), `clearOfflineIdentity` (defaults `true`).
+`auth.logout(options:)` takes a `LogoutOptions` — `wipeLocal` (delete locally cached document data + KV cache), `revokeOffline` (also revoke any stored offline grant), `clearOfflineIdentity` (defaults `true`), `waitForDisconnect` (await WebSocket teardown before returning; defaults `false`).
 {{/lang}}
 
 ---

@@ -143,7 +143,7 @@ The inspector covers the same ground as the web overlay, plus iOS-specific stora
 | **SQLite / Memory SQL** | The client's on-disk store and the in-memory SQL projection that backs queries, browsable directly |
 | **Events / Logs** | The live client event stream and the inspector's own log tail |
 
-Your typed models appear in the Documents tab automatically when you create them with `makeTypedModel(doc:documentId:)` in your `PrimitiveAppState` subclass. To register in-app tests, conform your app state to `InspectorTestHost`:
+Your models appear in the Documents tab automatically — the inspector reads the client's shared cross-document store, so every model registered with the client (`client.registerModels([...])`) or read/written once through its codegen'd facade is listed, per open document. To register in-app tests, conform your app state to `InspectorTestHost`:
 
 ```swift
 extension MyAppState: InspectorTestHost {

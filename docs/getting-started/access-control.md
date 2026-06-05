@@ -41,6 +41,7 @@ Each place a rule appears adds its own context on top — operation `params.*`, 
 | Database subscriptions (`accessRule` + `filter`) | Who can subscribe, and which changes they receive | [Real-Time Subscriptions](./working-with-databases.md#real-time-subscriptions) |
 | Workflows (`accessRule`) | Who can start a run directly from a client | [Controlling Access to Workflows](./workflows.md#controlling-access-to-workflows) |
 | Server-stamped fields (trigger `when` conditions) | Whether a computed field applies to this write | [Server-Stamped Fields](./working-with-databases.md#server-stamped-fields) |
+| Blob buckets (`ruleSetId`) | Member-level reads and writes of a bucket's blobs | [Blobs and Files](./blobs-and-files.md#access-policies) |
 | Rule sets | Who can perform **management operations** on groups and collections | below |
 
 ## Rule Sets: Governing Management Operations
@@ -56,7 +57,7 @@ primitive rule-sets create "team-management" \
   }'
 ```
 
-Bind a rule set to a **group type** or **collection type** via its type config — in TOML (`config/group-type-configs/<type>.toml`, `config/collection-type-configs/<type>.toml`) or from the client (`client.groupTypeConfigs.create({ groupType, ruleSetId })`).
+Bind a rule set to a **group type** or **collection type** via its type config — in TOML (`config/group-type-configs/<type>.toml`, `config/collection-type-configs/<type>.toml`) or from the client (`client.groupTypeConfigs.create({ groupType, ruleSetId })`). A **blob bucket** attaches one directly via its `ruleSetId`, where it governs member reads and writes — see [Blobs and Files](./blobs-and-files.md#access-policies).
 
 Two behaviors to know:
 
