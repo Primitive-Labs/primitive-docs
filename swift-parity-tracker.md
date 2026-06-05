@@ -69,6 +69,14 @@ genuinely out-of-scope items remain deferred).
 - **Close-recommendations:** [#846](https://github.com/Primitive-Labs/js-bao-wss/issues/846#issuecomment-4616843626), [#847](https://github.com/Primitive-Labs/js-bao-wss/issues/847#issuecomment-4616843740), [#953](https://github.com/Primitive-Labs/js-bao-wss/issues/953#issuecomment-4616843834).
 - **New issues filed:** #991–#996.
 
+### Issue close-out pass (2026-06-05, post-#1032 merge)
+PR [#1032](https://github.com/Primitive-Labs/js-bao-wss/pull/1032) merged `js-parity-jun-3` to `main` on 2026-06-04. Acting on that:
+- **Closed as completed (18):** #938 · #944 · #951 · #952 · #956 · #957 · #958 · #959 · #960 · #961 · #962 · #963 · #964 · #965 · #991 · #993 · #994 · #995 — each with a comment citing #1032 + fix commit(s). (#852 / #954 were already closed.)
+- **Closed as resolved/invalid (3):** #846 · #847 · #953 (already-present / in-neither-client).
+- **Commented "deferred from #1032," left open (9):** model-surface — #854 · #946 · #947 · #955 · #992 (held off the model layer PR #923 was rewriting; #923 since closed → chunk-2 follow-up); native track — #928 · #929 · #930 · #931.
+- **Commented "skipped," left open (1):** #859 (a deprecation-removal task, not a parity fix).
+- **Left open, NOT closed:** #996 — only the `WorkflowStartedEvent` slice shipped in #1032; the broader event-payload alignment landed in the chunk-2 pass, so it's deferred to the chunk-2 close-out.
+
 ## Non-code follow-ups (tracked in `user-facing-docs-todos.md`)
 - Client **test target** migration (library builds clean; tests still call old untyped signatures — needed before `swift test`).
 - User-facing **`docs/getting-started/` + `guides/latest/`** migration to the typed API.
