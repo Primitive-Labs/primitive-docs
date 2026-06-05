@@ -160,11 +160,9 @@ Grant or change a user's permission. By email it routes through the deferred-gra
 
 ## removePermission(documentId, target)
 
-Revoke a user's access, or cancel a pending email invitation.
-
-::: tip Divergent shape
-JS takes a `string | { userId } | { email }` union; Swift splits it into `userId:` / `email:` overloads. Both return `void`.
-:::
+Revoke a user's access, or cancel a pending email invitation. Both clients take a
+single `target` (JS `string | { userId } | { email }`; Swift `DocumentPermissionTarget`
+— `.userId` / `.email`, where a bare string literal means a user id).
 
 ::: code-group
 <<< ./snippets/documents/remove-permission.ts#example{ts} [JavaScript]

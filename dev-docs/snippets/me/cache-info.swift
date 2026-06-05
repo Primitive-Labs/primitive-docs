@@ -1,7 +1,8 @@
 import JsBaoClient
 
 // Read cache metadata for the current user's profile entry. Swift returns a
-// typed tuple `(updatedAt: String?, ageMs: Double?)` (JS returns an object).
+// `MeCacheInfo` struct (`updatedAt: String?`, `ageMs: Double?`); JS returns the
+// matching `{ updatedAt?, ageMs? }` object.
 func cacheInfo(client: JsBaoClient) async throws {
   // #region example
   let info = await client.me.cacheInfo()

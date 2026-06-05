@@ -1,10 +1,10 @@
 # Swift ↔ JS dev-docs divergence catalog
 
-Every divergence note flagged in the [dev-docs cookbook](dev-docs/) — **all of them, including intentional ones**. Auto-extracted from the `:::` callouts. 56 notes across 14 surfaces.
+Every divergence note flagged in the [dev-docs cookbook](dev-docs/) — **all of them, including intentional ones**. Auto-extracted from the `:::` callouts. 53 notes across 13 surfaces.
 
 **Flag:** 🔴 unintentional gap / missing-in-Swift · 🟡 intentional (deferred / skipped / by-design / Swift-only) · 🟢 divergent shape (same capability, different shape) · 🔵 info.
 
-**Totals:** 🔴 12 · 🟡 9 · 🟢 35 · 🔵 0
+**Totals:** 🔴 12 · 🟡 9 · 🟢 32 · 🔵 0
 
 
 ## analytics
@@ -62,14 +62,12 @@ Every divergence note flagged in the [dev-docs cookbook](dev-docs/) — **all of
 | [read(blobId, options?)](dev-docs/document-blob.md#readblobid-options) | 🟢 | **Divergent shape** — JS's `read` takes an `options` object (`as: "uint8array" \| "arrayBuffer" \| "blob" \| "text"`) and returns the requested format. |
 | [proxyUrl(blobId, options?)](dev-docs/document-blob.md#proxyurlblobid-options) | 🔴 | **No Swift equivalent** — JavaScript-only — relies on a browser service worker, which has no Swift counterpart (web-only by platform constraint). |
 | [hasServiceWorkerControl()](dev-docs/document-blob.md#hasserviceworkercontrol) | 🔴 | **No Swift equivalent** — JavaScript-only — service-worker-specific (web-only by platform constraint). |
-| [uploads()](dev-docs/document-blob.md#uploads) | 🟢 | **App-wide variants** — The same upload-queue verbs (`uploads`, `pauseUpload`, `resumeUpload`, `pauseAllUploads`, `resumeAllUploads`, `setUploadConcurrency`) also live on `client.documents` with an optional `documentId:`… |
 
 ## documents
 
 | Section | Flag | Divergence |
 |---|---|---|
 | [list(options?)](dev-docs/documents.md#listoptions) | 🟡 | **Deprecated** — Prefer `client.me.ownedDocuments()` / `client.me.sharedDocuments()` (#628). |
-| [removePermission(documentId, target)](dev-docs/documents.md#removepermissiondocumentid-target) | 🟢 | **Divergent shape** — JS takes a `string \| { userId } \| { email }` union; Swift splits it into `userId:` / `email:` overloads. |
 | [getDocumentPermission(documentId)](dev-docs/documents.md#getdocumentpermissiondocumentid) | 🟢 | **Equivalent shapes** — JS returns a string literal union (or `null`); Swift returns a typed `DocumentPermission?` enum whose raw values are exactly those strings (`"owner"`, `"read-write"`, `"reader"`, `"admin"`). |
 | [setAwareness(documentId, state)](dev-docs/documents.md#setawarenessdocumentid-state) | 🟡 | **No Swift equivalent (deferred)** — JavaScript-only — the awareness/presence subsystem (cursors/selections over the WebSocket) is not in the Swift v1 surface. |
 | [getAwarenessStates(documentId)](dev-docs/documents.md#getawarenessstatesdocumentid) | 🟡 | **No Swift equivalent (deferred)** — JavaScript-only — the awareness/presence subsystem (cursors/selections over the WebSocket) is not in the Swift v1 surface. |
@@ -105,24 +103,18 @@ Every divergence note flagged in the [dev-docs cookbook](dev-docs/) — **all of
 | [addMember(groupType, groupId, params)](dev-docs/groups.md#addmembergrouptype-groupid-params) | 🟢 | **Mutual exclusivity** — JS enforces the userId-XOR-email contract at compile time via a union type. |
 | [removeMemberByEmail(groupType, groupId, email)](dev-docs/groups.md#removememberbyemailgrouptype-groupid-email) | 🟡 | **Swift-only** — Swift splits the email removal path into its own method. |
 
-## me
-
-| Section | Flag | Divergence |
-|---|---|---|
-| [cacheInfo()](dev-docs/me.md#cacheinfo) | 🟢 | **Divergent shape** — JS returns `{ updatedAt?, ageMs? }`; Swift returns the typed tuple `(updatedAt: String?, ageMs: Double?)`. |
-
 ## model-surface
 
 | Section | Flag | Divergence |
 |---|---|---|
-| [(page intro)](dev-docs/model-surface.md) | 🟢 | **Divergent shape** — Both clients now expose the surface as one model per type. |
-| [save(options?)](dev-docs/model-surface.md#saveoptions) | 🟢 | **Divergent shape** — JS targets the active document by default (or `{ targetDocument }`); Swift's `save(in:)` always names the document explicitly — there's no active-document defaulting. |
-| [find(id)](dev-docs/model-surface.md#findid) | 🟢 | **Divergent shape** — JS `Task.find` is `async` (returns a `Promise`); Swift `Task.find(_:)` is synchronous (reads from the local cross-document store, no `await`/`throws`). |
-| [findAll()](dev-docs/model-surface.md#findall) | 🟢 | **Divergent shape** — JS `Task.findAll()` is `async`; Swift `Task.findAll()` is synchronous (local cross-document read). |
-| [query(filter?, options?)](dev-docs/model-surface.md#queryfilter-options) | 🟢 | **Divergent shape** — JS returns a `PaginatedResult<Task>` — rows on `.data`, plus `.nextCursor` / `.hasMore`. |
-| [query — paginate](dev-docs/model-surface.md#query-paginate) | 🔴 | **Swift parity gap** — JS carries `PaginatedResult.nextCursor` forward via `uniqueStartKey` on the same `query()`. |
-| [count(filter?)](dev-docs/model-surface.md#countfilter) | 🟢 | **Divergent shape** — JS `Task.count` is `async`; Swift `Task.count` is a synchronous static returning an `Int`, counting across every open document. |
-| [aggregate(options)](dev-docs/model-surface.md#aggregateoptions) | 🔴 | **Swift parity gap** — Swift `Task.aggregate` is a static returning untyped `[[String: Any]]` rows (vs JS's typed result). |
+| [(page intro)](dev-docs/model-surface.md) | 🟢 | **Why the JS and Swift model APIs look a little different** — Same verbs on both; almost every difference comes from one root cause — JS stores records in an in-app SQL database (async, `await`ed reads), Swift keeps them as in-memory data (instant, synchronous reads). |
+| [save(options?)](dev-docs/model-surface.md#saveoptions) | 🟢 | **Swift makes you name the document** — JS keeps a hidden "active document" pointer and `save()` writes to it; Swift has no hidden active doc, so you always say which one with `save(in:)`. Same write, explicit target. |
+| [find(id)](dev-docs/model-surface.md#findid) | 🟢 | **JS awaits, Swift doesn't** — Same lookup; JS `find` is `async` (reads the in-app SQL DB), Swift `find(_:)` is synchronous (the record is already in memory). |
+| [findAll()](dev-docs/model-surface.md#findall) | 🟢 | **JS awaits, Swift doesn't** — JS `findAll()` is `async` (SQL DB), Swift is synchronous (in-memory read); Swift silently drops rows that drifted from the typed shape. |
+| [query(filter?, options?)](dev-docs/model-surface.md#queryfilter-options) | 🟢 | **Different return shape** — JS (SQL-backed) returns a `PaginatedResult<Task>` with `.nextCursor` / `.hasMore`; Swift reads in-memory and returns a plain `[Task]` (one bounded, sorted page, no cursor). |
+| [query — paginate](dev-docs/model-surface.md#query-paginate) | 🔴 | **Swift can't page through results yet** — A real gap, not a style difference: JS feeds `nextCursor` forward to walk large result sets; Swift's `query` returns a plain array with no cursor, so you only get one page ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)). |
+| [count(filter?)](dev-docs/model-surface.md#countfilter) | 🟢 | **JS awaits, Swift doesn't** — JS `count` is `async` (asks the in-app SQL DB); Swift `count` is a synchronous static returning an `Int` across every open document in memory. |
+| [aggregate(options)](dev-docs/model-surface.md#aggregateoptions) | 🔴 | **Swift's group-by is more limited** — A real gap: JS (SQL-backed) returns a fully-typed result with richer grouping; Swift returns untyped `[[String: Any]]` rows and groups by plain fields only ([#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)). |
 | [subscribe(callback)](dev-docs/model-surface.md#subscribecallback) | 🟢 | **Divergent shape** — Both clients expose `Task.subscribe`. |
 | [update](dev-docs/model-surface.md#update) | 🟢 | **Divergent shape** — Both clients now update the same way: load the record, mutate fields on the value, then persist. |
 | [delete()](dev-docs/model-surface.md#delete) | 🟢 | **Divergent shape** — Both clients load the record and call `delete` on the instance. |

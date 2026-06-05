@@ -2,16 +2,44 @@
 
 The typed model surface (`Task.save()`, `Task.query()`, …) — record CRUD, queries, aggregation, and change subscriptions on a generated model class. Records are imported from your generated models, not reached through `client.<x>`.
 
-::: tip Divergent shape
-Both clients now expose the surface as one model per type. JavaScript uses **static/instance methods on the generated `BaseModel` class** (`Task.query`, `task.save`); Swift (post-[#918](https://github.com/Primitive-Labs/js-bao-wss/issues/918)) uses a matching **static `Model.*` facade** on the generated struct — reads are statics that span every open document by default (`Task.query`, `Task.queryOne`, `Task.count`, `Task.findAll`, `Task.find`, `Task.findByUnique`, `Task.aggregate`, `Task.subscribe`), and writes are the instance `save(in:)` / `save(in:upsertOn:)` / `delete(in:)` that target one document and throw if it isn't open. The old per-document `TypedModel<Task>` wrapper and its `.dynamic` escape hatch are gone — app code only ever touches the facade. One surface gap remains vs JS: Swift `query()` returns the hydrated `[Task]` directly rather than a `PaginatedResult`, so cursor pagination isn't expressible on the facade today ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)). Per-method divergences are noted inline.
+::: tip Why the JS and Swift model APIs look a little different
+Both clients give you **one model per type** with the same verbs — `save`, `find`,
+`findAll`, `query`, `count`, `subscribe`, `delete`. Almost every difference below
+comes from **one root cause: the two clients store your records differently.**
+
+- **JavaScript** loads your records into a tiny SQL database that runs *inside* the
+  app (SQLite compiled to WebAssembly in the browser). Talking to that database is
+  asynchronous, so every read is `await`ed and hands back a `Promise`. Because it's
+  real SQL, you also get conveniences for free: a `PaginatedResult` with a
+  `nextCursor`, and a fully-typed `aggregate` result.
+- **Swift** keeps the same records as plain in-memory data and reads them directly.
+  That makes reads **instant and synchronous** — no `await`, no `Promise` — but it
+  also means a couple of SQL-only conveniences (cursor pagination, fully-typed
+  group-by) aren't built yet.
+
+So when a method below says *"JS is async, Swift is synchronous,"* that's not a
+missing feature — it's the **same data read two different ways**, and matching JS
+would mean shipping a whole SQL engine inside the Swift client for no real gain.
+The two spots where Swift is genuinely *behind* (cursor pagination, typed
+aggregate) are flagged in red and tracked in [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946).
+
+(Mechanically: JS uses static/instance methods on the generated `BaseModel` class;
+Swift uses a matching static `Model.*` facade on the generated struct — reads are
+statics that span every open document, writes are the instance `save(in:)` /
+`save(in:upsertOn:)` / `delete(in:)` that name one document and throw if it isn't
+open. Per-method notes follow.)
 :::
 
 ## save(options?)
 
 Construct a record and persist it. JS `save` accepts `SaveOptions` (`targetDocument`, `forceWrite`, `upsertOn`); Swift's instance `save(in:)` (the unified create/update from [#918](https://github.com/Primitive-Labs/js-bao-wss/issues/918)) takes an explicit `documentId` and throws if that document isn't open. The `upsertOn` form is `save(in:upsertOn:)` (see [upsert](#upsert-save-with-upserton)).
 
-::: tip Divergent shape
-JS targets the active document by default (or `{ targetDocument }`); Swift's `save(in:)` always names the document explicitly — there's no active-document defaulting. `forceWrite` has no Swift equivalent.
+::: tip Swift makes you name the document
+JS keeps a hidden pointer to one "active" document and `save()` quietly writes to
+it (or you pass `{ targetDocument }`). Swift has **no hidden active document**, so
+you always say which one with `save(in:)`. It's the same write — Swift just makes
+the target explicit instead of guessing. (JS's `forceWrite` escape hatch has no
+Swift equivalent.)
 :::
 
 ::: code-group
@@ -23,11 +51,12 @@ JS targets the active document by default (or `{ targetDocument }`); Swift's `sa
 
 Look up a single record by its id. Resolves to null/nil when nothing matches.
 
-::: tip Divergent shape
-JS `Task.find` is `async` (returns a `Promise`); Swift `Task.find(_:)` is synchronous
-(reads from the local cross-document store, no `await`/`throws`). Swift also returns `nil`
-when the stored row has drifted from the typed shape — a decode miss is silently
-indistinguishable from "not found" (sweep model D-find).
+::: tip JS awaits, Swift doesn't
+Same lookup on both clients. JS `Task.find` is `async` — you `await` it — because it
+reads from the in-app SQL database. Swift `Task.find(_:)` is a plain synchronous call:
+the record is already in memory, so there's nothing to wait for (no `await`/`throws`).
+One Swift caveat: if a stored row no longer matches your model's shape, Swift returns
+`nil`, so a decode miss looks the same as "not found" (sweep model D-find).
 :::
 
 ::: code-group
@@ -39,10 +68,11 @@ indistinguishable from "not found" (sweep model D-find).
 
 Load every record of this model (no filter, no pagination).
 
-::: tip Divergent shape
-JS `Task.findAll()` is `async`; Swift `Task.findAll()` is synchronous (local cross-document
-read). Swift silently drops rows that have drifted from the typed shape, so the
-returned count can be smaller than what's actually stored (sweep model D-findAll).
+::: tip JS awaits, Swift doesn't
+Same reason as `find`: JS `Task.findAll()` is `async` (it queries the in-app SQL
+database); Swift `Task.findAll()` is synchronous (it reads in-memory data directly).
+Swift silently drops rows that have drifted from the typed shape, so the returned
+count can be smaller than what's actually stored (sweep model D-findAll).
 :::
 
 ::: code-group
@@ -63,8 +93,12 @@ Look up a record by a registered unique constraint without knowing its id. Both 
 
 Mongo-style filtered query.
 
-::: tip Divergent shape
-JS returns a `PaginatedResult<Task>` — rows on `.data`, plus `.nextCursor` / `.hasMore`. Swift `Task.query()` returns the hydrated `[Task]` directly (no wrapper). It accepts a `limit` and an ordered `sortOrder` on `QueryOptions`, but returns no cursor, so cursor pagination isn't expressible on the facade today ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
+::: tip Different return shape
+Because JS queries an in-app SQL database, it returns a `PaginatedResult<Task>` — rows
+on `.data`, plus `.nextCursor` / `.hasMore` for paging. Swift reads in-memory data and
+returns the records as a plain `[Task]` array. It accepts a `limit` and an ordered
+`sortOrder`, but returns no cursor — so you can get one bounded, sorted page, but can't
+yet page through a large set (see [paginate](#query-paginate) below, [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
 :::
 
 ::: code-group
@@ -94,8 +128,12 @@ Fetch just the first match (with an optional sort). Resolves to null/nil when no
 
 Sort and paginate with a cursor.
 
-::: danger Swift parity gap
-JS carries `PaginatedResult.nextCursor` forward via `uniqueStartKey` on the same `query()`. The Swift model facade has **no** cursor pagination: `Task.query` accepts `limit` and an ordered `sortOrder` but returns a plain `[Task]` with no `nextCursor` to advance, so only a single bounded, ordered page is expressible today ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
+::: danger Swift can't page through results yet
+This one is a **real gap, not a style difference.** In JS, a `query` hands back a
+`nextCursor` that you feed into the next call (`uniqueStartKey`) to walk through a
+large result set page by page. Swift's `query` returns a plain `[Task]` — you can cap
+it with `limit` and sort it, but there's no cursor to continue from, so you only ever
+get one page today. Tracked in [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946).
 :::
 
 ::: code-group
@@ -107,8 +145,10 @@ JS carries `PaginatedResult.nextCursor` forward via `uniqueStartKey` on the same
 
 Count records matching a filter (or all of them when omitted).
 
-::: tip Divergent shape
-JS `Task.count` is `async`; Swift `Task.count` is a synchronous static returning an `Int`, counting across every open document.
+::: tip JS awaits, Swift doesn't
+Same reason as `find`: JS `Task.count` is `async` (it asks the in-app SQL database);
+Swift `Task.count` is a synchronous static returning an `Int`, counting across every
+open document in memory.
 :::
 
 ::: code-group
@@ -120,8 +160,12 @@ JS `Task.count` is `async`; Swift `Task.count` is a synchronous static returning
 
 Group-by aggregation with count/avg/sum, an optional filter, sort, and limit.
 
-::: danger Swift parity gap
-Swift `Task.aggregate` is a static returning untyped `[[String: Any]]` rows (vs JS's typed result). Its `groupBy` is `[String]` only, so two JS grouping shapes have no Swift form: StringSet-membership grouping (`{ field, contains }`) and the single-facet map (sweep D2, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
+::: danger Swift's group-by is more limited
+Another **real gap.** Both clients can group-and-count, but JS — backed by SQL —
+returns a fully-typed result and supports richer grouping. Swift returns untyped
+`[[String: Any]]` rows and only groups by plain field names, so two JS grouping shapes
+have no Swift form yet: grouping by membership in a string-set (`{ field, contains }`)
+and the single-facet map (sweep D2, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954), [#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)).
 :::
 
 ::: code-group

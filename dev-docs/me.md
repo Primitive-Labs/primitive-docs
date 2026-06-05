@@ -87,14 +87,9 @@ typed array (`invitationId`, `documentId`, `permission`, `accepted`, nested
 
 ## cacheInfo()
 
-Read cache metadata for the current user's profile entry.
-
-::: tip Divergent shape
-JS returns `{ updatedAt?, ageMs? }`; Swift returns the typed tuple
-`(updatedAt: String?, ageMs: Double?)`. This is the one spot on the `me` surface
-where Swift is typed rather than an untyped dictionary — a benign access-pattern
-difference, not a drift.
-:::
+Read cache metadata for the current user's profile entry. JS returns
+`{ updatedAt?, ageMs? }`; Swift returns the matching `MeCacheInfo` struct
+(`updatedAt: String?`, `ageMs: Double?`).
 
 ::: code-group
 <<< ./snippets/me/cache-info.ts#example{ts} [JavaScript]

@@ -183,7 +183,7 @@ The current authenticated user has its own namespace. Use it for "me"-scoped rea
 
   // update() and uploadAvatar() clear the cache automatically; reach for
   // these only when you need to inspect or force a refresh yourself.
-  let info = await client.me.cacheInfo()  // (updatedAt?, ageMs?)
+  let info = await client.me.cacheInfo()  // -> MeCacheInfo(updatedAt: String?, ageMs: Double?)
   await client.me.clearCache()  // next get() hits the network
 ```
 
