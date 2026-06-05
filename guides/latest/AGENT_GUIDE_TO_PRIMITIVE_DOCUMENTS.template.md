@@ -144,6 +144,10 @@ const collections = await jsBaoClient.collections.list();
 
 Every example below is compiled against the real client as part of the docs build. The [Querying Data](#querying-data) and [Saving Data](#saving-data) sections below go deeper on projections, includes, and save options.
 
+{{#lang swift}}
+The generated model statics route through the process-wide default client — call `JsBaoClient.configureDefault(client)` once at startup, before the first read or write. Reads are synchronous against the local CRDT and span every open document by default (scope with `QueryOptions(documents: [docId])`); writes target one document — `save(in:)` inserts or updates in place and throws (it validates the write and requires the document to be open), `delete(in:)` throws only if the document isn't open.
+{{/lang}}
+
 ### Create
 
 {{ example: documents/model-create }}
@@ -1229,7 +1233,7 @@ For documents that should exist exactly once (default document, settings), use `
 
 The most common multi-doc shape is one library document per user (alias-resolved on launch) holding an index of refs to per-item documents (each shareable independently). Three patterns make it converge correctly:
 
-**Key refs by the entity id, never a random `UUID()`.** A ref's CRDT row id is the map key, and `model.create(record)` is an upsert on that key. Set `id` to the document/collection id the ref points at, so two writes for the same entity (your create path and a reconcile pass, possibly on another device) converge on one row instead of producing a permanent visible duplicate:
+**Key refs by the entity id, never a random `UUID()`.** A ref's CRDT row id is the map key, and `save(in:)` is an upsert on that key. Set `id` to the document/collection id the ref points at, so two writes for the same entity (your create path and a reconcile pass, possibly on another device) converge on one row instead of producing a permanent visible duplicate:
 
 ```swift
 public extension LibraryItemRef {
@@ -1246,13 +1250,13 @@ public extension LibraryItemRef {
 
 Reserve random `UUID()` ids for records *born* in the CRDT with no external identity (todos, notes, messages).
 
-**Tombstone instead of hard-delete.** Soft-delete with a `deletedAt` field and filter at query time (`refs.query(["deletedAt": ""])`). Setting `deletedAt` rather than calling `.delete(...)` avoids the race where a reconcile pass recreates a just-deleted ref because the server still reports the entity as accessible.
+**Tombstone instead of hard-delete.** Soft-delete with a `deletedAt` field and filter at query time (`LibraryItemRef.query(["deletedAt": ""])`). Setting `deletedAt` rather than calling `.delete(in:)` avoids the race where a reconcile pass recreates a just-deleted ref because the server still reports the entity as accessible.
 
 **Reconcile server access → local refs in one pass.** "Shared-with-me" lists are *not* reactive — `me.accessibleDocumentSummaries`, `collections.list`, `documents.getPermissions`, and the invitation reads are plain server queries with no change feed, so nothing fires on the user's open docs when someone shares with them. Run an explicit reconcile on the triggers you control (app launch / `connectClient`, foreground via `scenePhase` → `.active`, pull-to-refresh) that: enumerates every access channel, computes the **max** permission across channels, upserts a ref per server entity keyed by entity id, and tombstones/deletes refs whose `id` is no longer in the server set. Because refs are keyed by entity id the prune is `where !serverIds.contains(ref.id)` and a double-run can't duplicate.
 
 > **Guard freshly-created docs from the prune.** `createDocument(...)` is local-first — it returns a `documentId` immediately but commits to the server in the background, so a doc you just created is **not yet** in `me.accessibleDocumentSummaries`. A reconcile firing in that window deletes the brand-new ref and the item vanishes until a later reconcile re-adds it. Track locally-created ids in a `pendingCreateIds: Set<String>` (add on create, remove once the id appears in the server set) and exclude them from the prune: `where !serverIds.contains(ref.id) && !pendingCreateIds.contains(ref.id)`.
 
-For reads that return raw `[String: Any]`, prefer the typed `*Summaries` wrappers — see [the typed summary wrappers](#typed-summaries-for-permission--collection-reads) below.
+For the reconcile reads, prefer the `*Summaries` wrappers — they merge owned + shared and resolve user fields in one call; see [the typed summary wrappers](#typed-summaries-for-permission--collection-reads) below.
 {{/lang}}
 
 ## Sharing Documents
@@ -1395,7 +1399,7 @@ The point-in-time checks return `false` if the client is disconnected or the che
 The point-in-time checks accept an optional `timeoutMs`.
 {{/lang}}
 {{#lang swift}}
-The point-in-time `includesWrites` / `inSync` checks are synchronous local reads.
+The point-in-time checks accept a `timeoutMs` (default 5s). For a cheap synchronous local read — no round-trip — use `documents.isSynced(documentId:)`.
 {{/lang}}
 
 ### Updating Document Metadata
@@ -1807,7 +1811,7 @@ await client.invitations.delete(invitationId);
 {{#lang swift}}
 #### Typed `*Summaries` for permission / collection reads {#typed-summaries-for-permission--collection-reads}
 
-The permission / collection read endpoints return raw `[String: Any]`, but `PrimitiveApp` (`TypedReadSummaries`) ships a typed companion for each whose field contract was verified against the server handlers — prefer them over hand-parsing `result["items"]` or guessing key names (`permission` vs `role`, `userId` vs `id`), which is the single most common way these screens go subtly wrong:
+`PrimitiveApp` (`TypedReadSummaries`) ships a convenience companion for each permission / collection read. Beyond the field contract (verified against the server handlers), they do the assembly the raw reads leave to you — merging owned + shared into one set, resolving `email`/`name` on permission rows — so sharing screens don't reimplement it:
 
 | Raw read | Typed companion | Returns |
 |---|---|---|
@@ -1820,7 +1824,7 @@ The permission / collection read endpoints return raw `[String: Any]`, but `Prim
 
 `accessibleDocumentSummaries` does the merged owned + shared set in one call.
 
-For **writes**, pass the documented keys directly to the params-dict methods — `documents.updatePermissions(documentId:params: ["email": …, "permission": …, "sendEmail": false, "documentUrl": …])` and `collections.addMember(collectionId:params: ["email": …, "permission": …])` (or `["userId": …, "permission": …]`). To cancel a pending email invite, read the row's `deferredId` via `pendingInvitationSummaries(...)`, then `client.invitations.revokeDeferredGrant(deferredId:, type:)` (`"document"` for a per-doc invite, `"group"` for a collection one).
+For **writes**, use the typed params factories — `documents.updatePermissions(documentId:params: .email("…", permission: "read-write", sendEmail: false, documentUrl: …))` (or `.user(…)` / `.batch([…])`) and `collections.addMember(collectionId:params: .email("…", permission: .readWrite))` (or `.user(…)`). To cancel a pending email invite, read the row's `deferredId` via `pendingInvitationSummaries(...)`, then `client.invitations.revokeDeferredGrant(deferredId:type:)` (`.document` for a per-doc invite, `.group` for a collection one).
 {{/lang}}
 
 ### Sharing Discovery Cheat Sheet

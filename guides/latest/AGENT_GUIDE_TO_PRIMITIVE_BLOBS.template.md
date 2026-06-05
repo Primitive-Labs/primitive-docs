@@ -221,7 +221,7 @@ const { deleted } = await blobs.delete(blobId); // { deleted: true }
 
 {{#lang swift}}
 ```swift
-_ = try await blobs.delete(blobId: blobId) // returns [String: Any]
+let result = try await blobs.delete(blobId: blobId) // BlobDeleteResult: .deleted
 ```
 {{/lang}}
 
@@ -344,6 +344,36 @@ if (blobs.hasServiceWorkerControl()) {
 ```
 
 `proxyUrl` returns the same URL as `downloadUrl`; it just signals intent to be intercepted by the service worker. See the js-bao-wss-client README for a service-worker implementation.
+{{/lang}}
+
+{{#lang swift}}
+---
+
+## Upload queue, prefetch, and events
+
+Failed uploads retry with exponential backoff (2s base, 60s max). Inspect and control the queue through the document blob context, and read/prefetch cached bytes with the typed `read` overloads:
+
+```swift
+let blobs = client.documents.blobs(documentId: documentId)
+
+// Inspect what's queued — each BlobUploadStatus carries queueId, blobId,
+// filename, contentType, numBytes, status, attempts, nextAttemptAt, lastError
+let tasks = blobs.uploads()
+
+// Pause/resume by blobId (the queueId is the blobId for document uploads)
+_ = blobs.pauseUpload(blobId: blobId)
+_ = blobs.resumeUpload(blobId: blobId)
+
+// Warm the local cache; per-blob errors are logged and swallowed
+await blobs.prefetch(blobIds: [blobId1, blobId2], concurrency: 4)
+
+// Cached-first reads; pass force: true to bypass the cache
+let bytes = try await blobs.read(blobId: blobId)              // Data
+let text = try await blobs.read(blobId: blobId, as: String.self)
+let payload = try await blobs.read(blobId: blobId, as: MyCodable.self)
+```
+
+Queue lifecycle events arrive on `client.events`: `.blobsUploadQueued`, `.blobsUploadProgress` (status transitions, not per-byte progress), `.blobsUploadCompleted`, `.blobsUploadFailed`, `.blobsUploadPaused`, `.blobsUploadResumed`, and `.blobsQueueDrained` once the queue empties. `delete(blobId:)` issued mid-upload cancels the in-flight transfer, evicts the cached bytes, and fires `.blobsQueueDrained` when the queue empties.
 {{/lang}}
 
 ---

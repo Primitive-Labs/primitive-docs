@@ -5,24 +5,22 @@ import JsBaoClient
 func quickStart(client: JsBaoClient) async throws {
   // #region example
   // Create a database instance of the configured type
-  let db = try await client.databases.create(params: [
-    "title": "Alpha Project", "databaseType": "project",
-  ])
-  let databaseId = db["databaseId"] as? String ?? ""
+  let db = try await client.databases.create(params: CreateDatabaseParams(
+    title: "Alpha Project", databaseType: "project"
+  ))
 
   // Execute registered operations
   let result = try await client.databases.executeOperation(
-    databaseId: databaseId, name: "listTasks",
-    options: ["params": ["projectId": "proj-1"]]
+    databaseId: db.databaseId, name: "listTasks",
+    options: ExecuteOperationOptions(params: ["projectId": "proj-1"])
   )
 
   let createResult = try await client.databases.executeOperation(
-    databaseId: databaseId, name: "createTask",
-    options: ["params": ["title": "Ship v1", "projectId": "proj-1"]]
+    databaseId: db.databaseId, name: "createTask",
+    options: ExecuteOperationOptions(params: ["title": "Ship v1", "projectId": "proj-1"])
   )
-  // executeOperation returns Any; mutation result shape is { results: [{ id }] }.
-  let results = (createResult as? [String: Any])?["results"] as? [[String: Any]]
-  let taskId = results?.first?["id"] as? String // server-assigned ULID
+  // executeOperation returns a JSONValue; mutation result shape is { results: [{ id }] }.
+  let taskId = createResult["results"]?.arrayValue?.first?["id"]?.stringValue // server-assigned ULID
   // #endregion example
   _ = (result, taskId)
 }

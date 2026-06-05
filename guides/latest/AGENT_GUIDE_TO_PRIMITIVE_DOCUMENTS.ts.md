@@ -167,6 +167,7 @@ const collections = await jsBaoClient.collections.list();
 
 Every example below is compiled against the real client as part of the docs build. The [Querying Data](#querying-data) and [Saving Data](#saving-data) sections below go deeper on projections, includes, and save options.
 
+
 ### Create
 
 ```typescript

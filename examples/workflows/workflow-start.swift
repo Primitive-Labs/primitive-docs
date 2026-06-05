@@ -8,11 +8,11 @@ func startWorkflow(client: JsBaoClient) async throws {
     workflowKey: "welcome-email",
     input: ["userName": "Alice", "userEmail": "alice@example.com"]
   )
-  let runKey = started["runKey"] as? String ?? ""
+  let runKey = started.runKey
 
   // Check status
   let status = try await client.workflows.getStatus(
-    workflowKey: "welcome-email", runKey: runKey, contextDocId: nil
+    workflowKey: "welcome-email", runKey: runKey
   )
 
   // List recent runs
@@ -20,5 +20,5 @@ func startWorkflow(client: JsBaoClient) async throws {
     options: ListWorkflowRunsOptions(workflowKey: "welcome-email", limit: 50)
   )
   // #endregion example
-  _ = (started, status, runs)
+  _ = (started.runId, status, runs.items)
 }

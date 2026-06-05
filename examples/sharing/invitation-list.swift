@@ -7,7 +7,7 @@ func listAndCancelInvitations(
 ) async throws {
   // #region example
   let list = try await client.invitations.list()
-  let items = list["items"] as? [[String: Any]] ?? []
+  let items = list.items
 
   _ = try await client.invitations.delete(invitationId: invitationId)
   // #endregion example

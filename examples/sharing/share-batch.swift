@@ -5,13 +5,11 @@ func batchShare(client: JsBaoClient, documentId: String) async throws {
   // #region example
   _ = try await client.documents.updatePermissions(
     documentId: documentId,
-    params: [
-      "permissions": [
-        ["userId": "user-abc", "permission": "read-write"],
-        ["email": "alice@example.com", "permission": "reader"],
-        ["email": "bob@example.com", "permission": "read-write"],
-      ],
-    ]
+    params: .batch([
+      PermissionAssignment(userId: "user-abc", permission: "read-write"),
+      PermissionAssignment(email: "alice@example.com", permission: "reader"),
+      PermissionAssignment(email: "bob@example.com", permission: "read-write"),
+    ])
   )
   // #endregion example
 }

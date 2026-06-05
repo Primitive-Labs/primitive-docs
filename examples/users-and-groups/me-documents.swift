@@ -10,8 +10,8 @@ func myDocuments(client: JsBaoClient) async throws {
   // Documents shared directly with the user (non-owner permission rows +
   // pending invitations). Group/collection shares do NOT appear here.
   let shared = try await client.me.sharedDocuments(limit: 50, tag: "shared")
-  let items = shared["items"] as? [[String: Any]] ?? []
-  let cursor = shared["cursor"] as? String
+  let items = shared.items
+  let cursor = shared.cursor
 
   // Document invitations the user can accept — an inbox view.
   let pending = try await client.me.pendingDocumentInvitations()

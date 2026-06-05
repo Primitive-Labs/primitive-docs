@@ -1227,29 +1227,38 @@ Start a workflow, check its status, and list recent runs:
 Full options and result shapes for these calls:
 
 ```typescript
-const result = await client.workflows.start({
-  workflowKey: "my-workflow",
-  input: { text: "hello" },        // optional, default {}
-  runKey: "...",                    // optional, idempotency key — auto-generated otherwise
-  contextDocId: "doc-id",           // optional
-  meta: { source: "api" },          // optional, max 1KB
-  forceRerun: false,                // optional — terminate existing run with same key
-});
-// → { runId, runKey, instanceId, status, existing? }
+  const result = await client.workflows.start({
+    workflowKey: "my-workflow",
+    input: { text: "hello" }, // optional, default {}
+    runKey: "order-1234", // optional, idempotency key — auto-generated otherwise
+    contextDocId: "doc-id", // optional
+    meta: { source: "api" }, // optional, max 1KB
+    forceRerun: false, // optional — terminate existing run with same key
+  });
+  // → { runId, runKey, instanceId, status, existing? }
 
-const status = await client.workflows.getStatus({
-  workflowKey: "my-workflow",
-  runKey: result.runKey,
-  contextDocId: "doc-id",           // optional, must match the start call's scope
-});
-// → { status, output?, error?, run? }
-// status.status: "running" | "complete" | "failed" | "terminated" | "apply_pending" | "apply_claimed"
-// (NOTE: "complete", not "completed", in this method)
+  const status = await client.workflows.getStatus({
+    workflowKey: "my-workflow",
+    runKey: result.runKey,
+    contextDocId: "doc-id", // optional, must match the start call's scope
+  });
+  // → { status, output?, error?, run? }
+  // status.status: "running" | "complete" | "failed" | "terminated" |
+  //                "apply_pending" | "apply_claimed"
+  // (NOTE: "complete", not "completed", in this method)
 
-await client.workflows.terminate({ workflowKey, runKey, contextDocId });
-const { items, cursor } = await client.workflows.listRuns({ workflowKey, status, limit: 50 });
+  await client.workflows.terminate({
+    workflowKey: "my-workflow",
+    runKey: result.runKey,
+    contextDocId: "doc-id",
+  });
+
+  const { items, cursor } = await client.workflows.listRuns({
+    workflowKey: "my-workflow",
+    status: "complete",
+    limit: 50,
+  });
 ```
-
 
 Inspect the per-step debug records of a run:
 

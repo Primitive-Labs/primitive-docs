@@ -6,13 +6,13 @@ func manageGroupMembers(client: JsBaoClient, userId: String) async throws {
   // Add a member by email (recommended for user-facing flows)
   let result = try await client.groups.addMember(
     groupType: "team", groupId: "engineering",
-    params: ["email": "alice@example.com"]
+    params: .email("alice@example.com")
   )
 
   // ...or by user id (internal / programmatic)
   _ = try await client.groups.addMember(
     groupType: "team", groupId: "engineering",
-    params: ["userId": "user-456"]
+    params: .userId("user-456")
   )
 
   // List a group's members

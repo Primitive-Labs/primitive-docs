@@ -1,15 +1,13 @@
 import JsBaoClient
 
 // Create a new (non-singleton) document with tags, then open it so it can be
-// queried and written to. `create()` returns the new document's metadata as a
-// [String: Any] dict.
+// queried and written to. `create()` returns the new document's metadata.
 func createWorkspace(client: JsBaoClient) async throws -> String? {
   // #region example
   let result = try await client.documents.create(
-    options: ["title": "New Project", "tags": ["workspace"]]
+    options: CreateDocumentOptions(title: "New Project", tags: ["workspace"])
   )
-  let metadata = result["metadata"] as? [String: Any]
-  let documentId = metadata?["documentId"] as? String
+  let documentId = result.metadata?["documentId"]?.stringValue
   if let documentId {
     _ = try await client.documents.open(documentId)
   }

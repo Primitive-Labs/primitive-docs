@@ -4,10 +4,10 @@ import JsBaoClient
 // `feature` groups related events for per-feature dashboards.
 func logFeatureEvent(client: JsBaoClient, currentUserUlid: String) {
   // #region example
-  client.logAnalyticsEvent([
-    "action": "photo_uploaded",
-    "feature": "gallery",
-    "user_ulid": currentUserUlid,
-  ])
+  client.analytics.logEvent(AnalyticsEventInput(
+    action: "photo_uploaded",
+    feature: "gallery",
+    user_ulid: currentUserUlid
+  ))
   // #endregion example
 }

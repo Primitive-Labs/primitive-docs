@@ -4,8 +4,8 @@ import JsBaoClient
 // OTP code. The derived account must already exist as a user in the app.
 func signInTestUser(client: JsBaoClient) async throws {
   // #region example
-  _ = try await client.otpRequest(email: "alice+primitivetest-teacher@example.com")
-  _ = try await client.otpVerify(email: "alice+primitivetest-teacher@example.com", code: "000000")
+  _ = try await client.auth.otpRequest(email: "alice+primitivetest-teacher@example.com")
+  _ = try await client.auth.otpVerify(email: "alice+primitivetest-teacher@example.com", code: "000000")
   // client is now authenticated; the access token expires in 30 minutes
   // #endregion example
 }

@@ -8,8 +8,8 @@ func importContacts(client: JsBaoClient, databaseId: String) async throws {
     databaseId: databaseId,
     operationName: "import-contacts",
     batch: [
-      ["params": ["name": "Alice", "email": "alice@example.com"]],
-      ["params": ["name": "Bob", "email": "bob@example.com"]],
+      DatabaseBatchOperation(params: ["name": "Alice", "email": "alice@example.com"]),
+      DatabaseBatchOperation(params: ["name": "Bob", "email": "bob@example.com"]),
     ]
   )
   // result: { imported, failed }

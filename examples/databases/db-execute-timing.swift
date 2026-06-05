@@ -7,7 +7,7 @@ func executeWithTiming(client: JsBaoClient, databaseId: String) async throws {
   let result = try await client.databases.executeOperation(
     databaseId: databaseId,
     name: "listTasks",
-    options: ["params": ["projectId": "proj-1"], "timing": true]
+    options: ExecuteOperationOptions(params: ["projectId": "proj-1"], timing: true)
   )
   // result._timing: { totalMs, databaseLookup, operationLookup, celEvaluation, ... }
   // #endregion example

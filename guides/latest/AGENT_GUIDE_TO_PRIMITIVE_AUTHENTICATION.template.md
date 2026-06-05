@@ -211,7 +211,7 @@ await client.magicLinkVerify(magicToken, { inviteToken: inviteTokenFromUrl });
 ```
 {{/lang}}
 {{#lang swift}}
-`magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument. `magicLinkVerify(token:)` returns the raw `[String: Any]` response.
+`auth.magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument. `auth.magicLinkVerify(token:)` returns a `MagicLinkVerifyResult` (`.user`, `.promptAddPasskey?`, `.isNewUser?`).
 
 ### Reading the token
 
@@ -228,7 +228,7 @@ The magic-link callback delivers the token as a `magic_token` value (not `token`
 `otpVerify` also accepts an `{ inviteToken }` option to accept an invitation at verify time.
 {{/lang}}
 {{#lang swift}}
-`otpVerify(email:code:)` returns the raw `[String: Any]` response.
+`auth.otpVerify(email:code:)` returns an `OtpVerifyResult` (`.user`, `.isNewUser?`).
 {{/lang}}
 
 ### Error handling
@@ -286,7 +286,7 @@ The same `AuthError` codes apply to `magicLinkRequest`/`magicLinkVerify` and `pa
 
 ```swift
 do {
-  let result = try await client.otpVerify(email: email, code: code)
+  let result = try await client.auth.otpVerify(email: email, code: code)
 } catch let error as AuthError {
   switch error.code {
   case .invalidToken,          // bad/expired code
@@ -622,7 +622,7 @@ await client.logout({
 Logout fires `auth:logout` immediately and `auth:logout:complete` when finished.
 {{/lang}}
 {{#lang swift}}
-`logout(wipeLocal:)` takes a single `wipeLocal` flag (delete locally cached document data + KV cache). Logout fires `logout` immediately and `logoutComplete` when finished.
+`auth.logout(options:)` takes a `LogoutOptions` — `wipeLocal` (delete locally cached document data + KV cache), `revokeOffline` (also revoke any stored offline grant), `clearOfflineIdentity` (defaults `true`). Logout fires `logout` immediately and `logoutComplete` when finished.
 {{/lang}}
 
 ---
@@ -778,11 +778,11 @@ await client.otpRequest("alice+primitivetest-teacher@example.com");
 // Requires the app owner to have added "alice@example.com" to the app's
 // testAccountBaseEmails whitelist. Then any `alice+primitivetest<suffix>@example.com`
 // derivative becomes a test account that accepts code "000000".
-_ = try await client.otpRequest(email: "alice+primitivetest@example.com")
-let result = try await client.otpVerify(email: "alice+primitivetest@example.com", code: "000000")
+_ = try await client.auth.otpRequest(email: "alice+primitivetest@example.com")
+let result = try await client.auth.otpVerify(email: "alice+primitivetest@example.com", code: "000000")
 
 // Role-distinguished derivatives (Gmail/Workspace deliver them to the same inbox):
-_ = try await client.otpRequest(email: "alice+primitivetest-teacher@example.com")
+_ = try await client.auth.otpRequest(email: "alice+primitivetest-teacher@example.com")
 ```
 {{/lang}}
 

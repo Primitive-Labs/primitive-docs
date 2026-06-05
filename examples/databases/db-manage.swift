@@ -9,15 +9,18 @@ func manageDatabases(client: JsBaoClient, databaseId: String) async throws {
   // NOT returned here — use groups.listDatabases for group-shared ones.
   let databases = try await client.databases.list()
 
+  // Narrow to one databaseType (post-join filter — narrows, never widens).
+  let projects = try await client.databases.list(databaseType: "project")
+
   let db = try await client.databases.get(databaseId: databaseId)
 
   _ = try await client.databases.update(
     databaseId: databaseId,
-    params: ["title": "New Title"]
+    params: UpdateDatabaseParams(title: "New Title")
   )
 
   // Owner only — permanently removes all records and permissions.
   _ = try await client.databases.delete(databaseId: databaseId)
   // #endregion example
-  _ = (databases, db)
+  _ = (databases, projects, db)
 }

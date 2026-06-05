@@ -65,7 +65,7 @@ pnpm codegen
 # 2. Regenerate — codegen is wired into both build paths:
 ./run-ios.sh        # regenerates, then builds + launches (Xcode path)
 swift build         # the SPM plugin regenerates automatically
-# 3. Consume the generated structs through TypedModel<T>
+# 3. Use the generated model statics (Task.query / save(in:))
 ```
 
 :::
@@ -224,7 +224,7 @@ const open = await Todo.query({ completed: false });
 
 The barrel runs `attachAndRegisterModel` for every model exactly once — that's why importing from `@/models` is essential. Importing directly from `Todo.generated.ts` skips registration, which fails at runtime with "Model not properly initialized" on the first save or query.
 
-On iOS, codegen emits value-type `PrimitiveModel` structs (`Codable`, `Equatable`, `Hashable`) — set `class_name = "TaskRecord"` on the model block to control the Swift type name. You consume them through a `TypedModel<T>` bound to an open document (see [Working with Documents](./working-with-documents.md#creating-and-opening-documents)). A few Swift conventions worth knowing:
+On iOS, codegen emits value-type `PrimitiveModel` structs (`Codable`, `Equatable`, `Hashable`) — set `class_name = "TaskRecord"` on the model block to control the Swift type name. Each struct carries its API directly: static reads (`TaskRecord.query(...)`, `find`, `findAll`, `count`) and instance writes (`save(in: documentId)`, `delete(in: documentId)`). The statics route through the app's default client — call `JsBaoClient.configureDefault(client)` once at startup, before the first read or write. A few Swift conventions worth knowing:
 
 - **IDs are `String`** — generate with `UUID().uuidString` when the caller doesn't supply one.
 - **`type = "number"` codegens a `Double`** — cast to `Int` on read if you need to.
@@ -310,7 +310,7 @@ Save-or-update by a unique field (such as `email`) without knowing the existing 
 For composite keys, use `upsertByUnique(constraintName, …)` — see [Unique Constraints](#unique-constraints) above.
 
 ::: tip iOS semantics
-Under a bound `TypedModel`, reads are **synchronous** against the local CRDT (`tasks.findAll()`, `tasks.query([...])` — no `await`). `create` is the only CRUD call that throws (it validates required fields, types, and unique constraints); `update`/`delete` don't throw, and unknown field keys in an `update` payload are dropped silently. Writes are local-first: visible to local reads on the next line, synced to peers in the background.
+Model reads are **synchronous** against the local CRDT (`Task.findAll()`, `Task.query([...])` — no `await`) and span every open document by default; scope with `QueryOptions(documents: [docId])`. Writes target one document — `save(in:)` inserts or updates in place and `throws` (it validates the write and requires the document to be open); `delete(in:)` throws only if the document isn't open. Writes are local-first: visible to local reads on the next line, synced to peers in the background.
 :::
 
 ## Querying
@@ -477,7 +477,7 @@ A document is both the unit of sync and the unit of sharing, so "how many docume
 
 **One document per sharing context.** Anything shared as a unit — a project, a company's books, a household shopping list — gets its own document, shared with exactly the people in that context. Users work in one at a time: list them with the [`me` listing APIs](#finding-documents-a-user-can-access), open the selected one, and close it when they switch.
 
-**Many documents, queried together.** Apps like chat read across several sharing contexts at once — each channel is its own document, all open simultaneously. Tag documents at creation (`tags: ["channel"]`) so you can fetch the set with `me.ownedDocuments({ tag })`, then open each one. In JavaScript a query then spans all open documents; in Swift each document gets its own `TypedModel`. To share a set of documents as one unit, use [Collections](#collections) rather than sharing each individually.
+**Many documents, queried together.** Apps like chat read across several sharing contexts at once — each channel is its own document, all open simultaneously. Tag documents at creation (`tags: ["channel"]`) so you can fetch the set with `me.ownedDocuments({ tag })`, then open each one. A model query then spans all open documents. To share a set of documents as one unit, use [Collections](#collections) rather than sharing each individually.
 
 Whether a feature belongs in documents at all — versus a server-side database — is its own decision: see [Choosing Your Data Model](./choosing-your-data-model.md).
 

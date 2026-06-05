@@ -5,12 +5,11 @@ import JsBaoClient
 func listGroupMembers(client: JsBaoClient) async throws {
   // #region example
   let page = try await client.groups.listMembers(groupType: "team", groupId: "engineering")
-  // page["items"]: [["userId", "userName"?, "userEmail"?, "addedAt", "addedBy"]]
-  let cursor = page["cursor"] as? String
+  // page.items: [GroupMemberInfo(userId, userName?, userEmail?, addedAt, addedBy)]
 
   let next = try await client.groups.listMembers(
     groupType: "team", groupId: "engineering",
-    options: PaginationOptions(limit: 50, cursor: cursor)
+    options: PaginationOptions(limit: 50, cursor: page.cursor)
   )
   // #endregion example
   _ = (page, next)

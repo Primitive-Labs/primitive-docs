@@ -4,10 +4,10 @@ import JsBaoClient
 // dropped, so pass the unauthenticated-user constant for landing/sign-up flows.
 func logLandingView(client: JsBaoClient) {
   // #region example
-  client.logAnalyticsEvent([
-    "action": "landing_page_view",
-    "feature": "onboarding",
-    "user_ulid": AnalyticsQueue.unauthenticatedUser,
-  ])
+  client.analytics.logEvent(AnalyticsEventInput(
+    action: "landing_page_view",
+    feature: "onboarding",
+    user_ulid: AnalyticsEventInput.unauthenticatedUser
+  ))
   // #endregion example
 }

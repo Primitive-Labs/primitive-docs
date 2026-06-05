@@ -887,17 +887,17 @@ The TOML key `key` maps to the API field `triggerKey`. The field name is `cron` 
 ### Creating (client / CLI)
 
 ```swift
-  let trigger = try await client.cronTriggers.create(params: [
-    "triggerKey": "nightly-digest",
-    "displayName": "Nightly digest email",
-    "cron": "0 9 * * *",                    // NOT `schedule`
-    "timezone": "America/Los_Angeles",      // set whenever the hour is user-visible
-    "workflowKey": "send-digest",
-    "overlapPolicy": "skip",                // "skip" (default) | "allow" — no "queue"
-    "rootInput": ["digestType": "daily"],   // NOT `input`
-    "inputMapping": ["firedAt": "{{now}}"], // merged over rootInput; {{now}} = fire time
-  ])
-  // trigger["triggerId"] is a ULID — use it for get/update/pause/test/delete.
+  let trigger = try await client.cronTriggers.create(params: CreateCronTriggerParams(
+    triggerKey: "nightly-digest",
+    displayName: "Nightly digest email",
+    cron: "0 9 * * *",                    // NOT `schedule`
+    workflowKey: "send-digest",
+    timezone: "America/Los_Angeles",      // set whenever the hour is user-visible
+    overlapPolicy: .skip,                 // .skip (default) | .allow — no "queue"
+    rootInput: ["digestType": "daily"],   // NOT `input`
+    inputMapping: ["firedAt": "{{now}}"]  // merged over rootInput; {{now}} = fire time
+  ))
+  // trigger.triggerId is a ULID — use it for get/update/pause/test/delete.
 ```
 
 Via the CLI:
@@ -991,7 +991,7 @@ run.meta.manual     // true if started via cronTriggers.test()
   _ = try await client.cronTriggers.get(triggerId: triggerId)      // includes runtime.scheduledAlarmAt
   _ = try await client.cronTriggers.update(                        // change cron/timezone/state etc.
     triggerId: triggerId,
-    params: ["cron": "0 8 * * *", "timezone": "America/New_York"]
+    params: UpdateCronTriggerParams(cron: "0 8 * * *", timezone: "America/New_York")
   )
   _ = try await client.cronTriggers.pause(triggerId: triggerId)    // cancels the pending alarm
   _ = try await client.cronTriggers.resume(triggerId: triggerId)   // clears lastError, reschedules
@@ -1018,9 +1018,8 @@ There is no `triggerSource` filter on `workflows.listRuns()`. Cron runs are iden
   let result = try await client.workflows.listRuns(
     options: ListWorkflowRunsOptions(workflowKey: "send-digest")
   )
-  let items = result["items"] as? [[String: Any]] ?? []
-  let cronRuns = items.filter {
-    ($0["contextDocId"] as? String)?.hasPrefix("cron:") ?? false
+  let cronRuns = result.items.filter {
+    $0.contextDocId?.hasPrefix("cron:") ?? false
   }
 ```
 
@@ -1028,7 +1027,7 @@ There is no `triggerSource` filter on `workflows.listRuns()`. Cron runs are iden
 
 ```swift
   let list = try await client.cronTriggers.list()
-  let items = list["items"] as? [[String: Any]] ?? []
+  let items = list.items
   let trigger = try await client.cronTriggers.get(triggerId: triggerId)
   _ = try await client.cronTriggers.test(triggerId: triggerId) // fire once, now
 ```
@@ -1199,11 +1198,11 @@ Start a workflow, check its status, and list recent runs:
     workflowKey: "welcome-email",
     input: ["userName": "Alice", "userEmail": "alice@example.com"]
   )
-  let runKey = started["runKey"] as? String ?? ""
+  let runKey = started.runKey
 
   // Check status
   let status = try await client.workflows.getStatus(
-    workflowKey: "welcome-email", runKey: runKey, contextDocId: nil
+    workflowKey: "welcome-email", runKey: runKey
   )
 
   // List recent runs
@@ -1214,41 +1213,50 @@ Start a workflow, check its status, and list recent runs:
 
 Full options and result shapes for these calls:
 
-
-`start`, `getStatus`, and `listRuns` take the same fields — `workflowKey`, optional `input`, `runKey`, `contextDocId`, `meta` (max 1KB), and `forceRerun` on start — and return untyped `[String: Any]` dictionaries. Read fields by key:
-
 ```swift
-let started = try await client.workflows.start(
+  let result = try await client.workflows.start(
     workflowKey: "my-workflow",
-    input: ["text": "hello"],
-    options: StartWorkflowOptions(contextDocId: "doc-id")
-)
-let runKey = started["runKey"] as? String          // → runId, runKey, instanceId, status, existing?
+    input: ["text": "hello"], // default [:]
+    options: StartWorkflowOptions(
+      runKey: "order-1234", // idempotency key — auto-generated otherwise
+      contextDocId: "doc-id",
+      meta: ["source": "api"], // max 1KB
+      forceRerun: false // terminate existing run with same key
+    )
+  )
+  // StartWorkflowResult: runId, runKey, instanceId?, status, existing?
 
-let status = try await client.workflows.getStatus(
+  let status = try await client.workflows.getStatus(
     workflowKey: "my-workflow",
-    runKey: runKey,
-    contextDocId: "doc-id"                          // must match the start call's scope
-)
-// status["status"]: "running" | "complete" | "failed" | "terminated" | "apply_pending" | "apply_claimed"
+    runKey: result.runKey,
+    contextDocId: "doc-id" // must match the start call's scope
+  )
+  // WorkflowStatusResult: status, output?, error?, run?
+  // status.status: "running" | "complete" | "failed" | "terminated" |
+  //                "apply_pending" | "apply_claimed"
+  // (NOTE: "complete", not "completed", in this method)
 
-try await client.workflows.terminate(workflowKey: "my-workflow", runKey: runKey, contextDocId: "doc-id")
-let runs = try await client.workflows.listRuns(workflowKey: "my-workflow", status: status, limit: 50)
+  _ = try await client.workflows.terminate(
+    workflowKey: "my-workflow",
+    runKey: result.runKey,
+    contextDocId: "doc-id"
+  )
+
+  let runs = try await client.workflows.listRuns(
+    options: ListWorkflowRunsOptions(workflowKey: "my-workflow", status: "complete", limit: 50)
+  )
+  // ListWorkflowRunsResult: items ([WorkflowRunInfo]), cursor?
 ```
 
 Inspect the per-step debug records of a run:
 
 ```swift
   // Fetch the per-step run records for a run (debugging / admin views)
-  let result = try await client.workflows.listStepRuns(runId: runId)
-  let stepRuns = result["items"] as? [[String: Any]] ?? []
+  let stepRuns = try await client.workflows.listStepRuns(runId: runId).items
 
   for step in stepRuns {
-    // step["stepId"], step["stepKind"], step["status"], step["input"], step["output"], step["error"]
-    let stepId = step["stepId"] as? String ?? ""
-    let kind = step["stepKind"] as? String ?? ""
-    let status = step["status"] as? String ?? ""
-    print(stepId, kind, status)
+    // step.stepId, step.stepKind, step.status, step.input, step.output, step.error
+    print(step.stepId ?? "", step.stepKind ?? "", step.status)
   }
 ```
 
@@ -1265,7 +1273,7 @@ Subscribe through `client.events.on(_:)` with the typed event payload; hold the 
 
 ```swift
 let started = client.events.on(.workflowStarted) { (e: WorkflowStartedEvent) in
-    // e.workflowKey, e.runId
+    // e.workflowKey, e.runId, e.runKey?, e.instanceId?, e.contextDocId?, e.meta?
 }
 
 let sub = client.events.on(.workflowStatus) { (e: WorkflowStatusEvent) in
@@ -1291,7 +1299,7 @@ let ctx = try await client.workflows.runAndApply(
     options: StartWorkflowOptions(contextDocId: documentId),
     timeout: 120                          // default 120s; raise for slow LLM workflows
 )
-let output = ctx.output                   // [String: Any]
+let output = ctx.output                   // Any? — cast to the final step's JSON shape
 // Terminal non-success throws WorkflowRunError.terminalFailure(status:message:);
 // missing output within the window throws .timedOut; task cancellation propagates.
 ```

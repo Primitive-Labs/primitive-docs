@@ -7,10 +7,9 @@ func manageAppInvitations(client: JsBaoClient, invitationId: String) async throw
   let quota = try await client.invitations.quota()
 
   // Invite someone to the app by email
-  let invitation = try await client.invitations.create(params: [
-    "email": "alice@example.com",
-    "role": "member",
-  ])
+  let invitation = try await client.invitations.create(
+    params: CreateInvitationParams(email: "alice@example.com", role: "member")
+  )
 
   // Pending invitations
   let list = try await client.invitations.list()

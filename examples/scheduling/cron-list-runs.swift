@@ -7,9 +7,8 @@ func listCronRuns(client: JsBaoClient) async throws {
   let result = try await client.workflows.listRuns(
     options: ListWorkflowRunsOptions(workflowKey: "send-digest")
   )
-  let items = result["items"] as? [[String: Any]] ?? []
-  let cronRuns = items.filter {
-    ($0["contextDocId"] as? String)?.hasPrefix("cron:") ?? false
+  let cronRuns = result.items.filter {
+    $0.contextDocId?.hasPrefix("cron:") ?? false
   }
   // #endregion example
   _ = cronRuns

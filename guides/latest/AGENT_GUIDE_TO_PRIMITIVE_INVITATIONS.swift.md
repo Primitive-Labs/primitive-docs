@@ -11,10 +11,9 @@ Guidelines for AI agents implementing app membership: access modes, invitations 
   let quota = try await client.invitations.quota()
 
   // Invite someone to the app by email
-  let invitation = try await client.invitations.create(params: [
-    "email": "alice@example.com",
-    "role": "member",
-  ])
+  let invitation = try await client.invitations.create(
+    params: CreateInvitationParams(email: "alice@example.com", role: "member")
+  )
 
   // Pending invitations
   let list = try await client.invitations.list()
@@ -107,17 +106,17 @@ primitive waitlist remove <waitlist-id>                  # drop an entry
 ### API surface
 
 ```swift
-client.invitations.create(params: [String: Any]) async throws -> [String: Any]   // keys: email, role?, expiresAt?, source?, note?, sendEmail?
-client.invitations.list(limit:cursor:) async throws -> [String: Any]              // -> { items, cursor }   (admin/owner only)
-client.invitations.delete(invitationId:) async throws -> [String: Any]            // CASCADES to deferred grants
-client.invitations.quota() async throws -> [String: Any]                          // -> { used, limit, remaining, unlimited }
-client.invitations.get(invitationId:) async throws -> [String: Any]               // -> invitation dict (includes inviteToken + status)
-client.invitations.accept(inviteToken:) async throws -> [String: Any]             // authenticated cross-identity acceptance
-client.invitations.listDeferredGrants(type:email:limit:) async throws -> [String: Any]  // admin debug only
-client.invitations.revokeDeferredGrant(deferredId:type:) async throws -> [String: Any]  // type: "document" | "group"
+client.invitations.create(params: CreateInvitationParams) async throws -> AppInvitationInfo   // email, role?, expiresAt?, source?, note?, sendEmail?
+client.invitations.list(limit:cursor:) async throws -> InvitationListResult                   // .items / .cursor   (admin/owner only)
+client.invitations.delete(invitationId:) async throws -> InvitationDeleteResult               // CASCADES to deferred grants
+client.invitations.quota() async throws -> InvitationQuota                                    // .used / .limit / .remaining / .unlimited
+client.invitations.get(invitationId:) async throws -> AppInvitationInfo                       // includes inviteToken + status
+client.invitations.accept(inviteToken:) async throws -> AcceptInviteResult                    // authenticated cross-identity acceptance
+client.invitations.listDeferredGrants(type:email:limit:) async throws -> DeferredGrantListResult  // admin debug only
+client.invitations.revokeDeferredGrant(deferredId:type:) async throws -> DeferredGrantRevokeResult  // type: .document | .group
 ```
 
-Responses are untyped `[String: Any]` dictionaries. The `items` array returned by `list()` carries entries with: `invitationId`, `email`, `role`, `invitedBy`, `invitedAt`, `expiresAt`, `accepted`, `acceptedAt`, `source`, `note`, `inviteToken`. Derive a `"pending" | "expired" | "accepted"` status from `accepted` + `expiresAt` if you need it on a list row; `get()` also returns a computed `status`.
+`AppInvitationInfo` rows returned by `list()` carry: `invitationId`, `email`, `role`, `invitedBy`, `invitedAt`, `expiresAt`, `accepted`, `acceptedAt`, `source`, `note`, `inviteToken`. The `status` field (`.pending | .expired | .accepted`) is computed server-side and only returned by `get(invitationId:)`, not by `list()` — derive it on the client from `accepted` + `expiresAt` if you need it on a list row.
 
 The cascading delete is `client.invitations.delete(id)` — there is **no `client.invitations.revoke()`**.
 

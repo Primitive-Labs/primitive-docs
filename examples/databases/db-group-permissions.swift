@@ -6,7 +6,9 @@ func manageGroupAccess(client: JsBaoClient, databaseId: String) async throws {
   // #region example
   _ = try await client.databases.grantGroupPermission(
     databaseId: databaseId,
-    params: ["groupType": "team", "groupId": "engineering", "permission": "manager"]
+    params: GrantDatabaseGroupPermissionParams(
+      groupType: "team", groupId: "engineering", permission: "manager"
+    )
   )
 
   let groupPerms = try await client.databases.listGroupPermissions(databaseId: databaseId)

@@ -106,7 +106,7 @@ The offline buffer is persisted to IndexedDB with a **1 MiB** cap; when it excee
 `action` and `user_ulid` are required by the TypeScript interface. At runtime, `user_ulid` will be back-filled from the queue's user-resolver if you omit it AND the resolver returns a value — but the type checker won't let you omit it, so always pass it explicitly (or use `ANALYTICS_UNAUTHENTICATED_USER`).
 {{/lang}}
 {{#lang swift}}
-`logAnalyticsEvent` takes a `[String: Any]` dictionary. If `user_ulid` is omitted it is back-filled from the client's current user, or set to the unauthenticated-user constant when no user is signed in.
+`analytics.logEvent` takes an `AnalyticsEventInput`. `user_ulid` is optional on the struct: when omitted it is back-filled from the client's current user, or set to `AnalyticsEventInput.unauthenticatedUser` when no user is signed in.
 {{/lang}}
 
 ### Event with Context
@@ -119,7 +119,7 @@ Pass a `context_json` object for per-event debug data. The serialized payload is
 `context_json` accepts a `Record<string, unknown>` or a JSON string. It is serialized then truncated to 1 KiB of UTF-8 (truncation respects code-point boundaries). If you pass an object and don't override defaults, the queue auto-includes `ua`, `language`, and `screen` dimensions.
 {{/lang}}
 {{#lang swift}}
-`context_json` accepts a `[String: Any]` dictionary. If its serialized size exceeds 1 KiB, the field is dropped from the event before sending.
+`context_json` is a `JSONValue` — construct it with object/array/scalar literals. If its serialized size exceeds 1 KiB, the field is dropped from the event before sending.
 {{/lang}}
 
 {{#lang ts}}
@@ -160,19 +160,23 @@ window.addEventListener("mousemove", () => {
   client.analytics.logEvent({ action: "mouse_move", user_ulid: u });
 });
 ```
+{{/lang}}
+
+{{#lang swift}}
+### AnalyticsEventInput Fields
+
+`AnalyticsEventInput` carries the same fields as the event row (`action`, `feature`, `route`, `plan`, `tenant_id`, `user_ulid`, `device_type`, `os_name`, `os_version`, `browser_name`, `browser_version`, `app_version`, `context_json`, `user_created_at_epoch_s`). Only `action` is required at the initializer: `user_ulid` is back-filled from the signed-in user (or the unauthenticated-user constant), and `context_json` is a `JSONValue`.
+{{/lang}}
 
 ---
 
 ## Logging Snapshots
 
-`logSnapshot()` records a state snapshot event. It auto-resolves the user; if no user is authenticated, the call is a no-op (no error).
+`logSnapshot` records a state snapshot event. It auto-resolves the user; if no user is authenticated, the call is a no-op (no error).
 
-```typescript
-client.analytics.logSnapshot({ screen: "settings", tab: "billing" });
-```
+{{ example: analytics/log-snapshot }}
 
 This logs an event with `action: "_snapshot"`, `feature: "_state"`, and your context as `context_json`.
-{{/lang}}
 
 ---
 
@@ -207,7 +211,7 @@ So **don't** add your own `beforeunload → flush` listener — it's redundant a
 The queue auto-flushes every **100ms** (or earlier when batched). `client.destroy()` cancels the flush timer and triggers a final flush before storage closes, so you don't need a manual flush on teardown.
 
 ```swift
-client.flushAnalytics()
+client.analytics.flush()
 ```
 {{/lang}}
 
@@ -221,37 +225,22 @@ If your app reports its plan/version dynamically (e.g. after an in-app upgrade),
 
 ---
 
-{{#lang ts}}
 ## Configuring Auto Events
 
 Pass `analyticsAutoEvents` to the constructor. All sub-options default to enabled.
 
-```typescript
-import { JsBaoClient } from "js-bao-wss-client";
+{{ example: analytics/auto-events-config }}
 
-const client = new JsBaoClient({
-  appId: "app-123",
-  apiUrl: "https://api.example.com",
-  wsUrl: "wss://ws.example.com",
-  analyticsAutoEvents: {
-    dailyAuth: true,
-    returnActive: true,
-    minResumeMs: 5 * 60 * 1000, // default
-    sessionEnd: true,
-    syncErrors: { enabled: true, minIntervalMs: 30_000 }, // or just `true`/`false`
-    blobUploads: { start: false, success: true, failure: true },
-    llm: { start: false, success: true, failure: true }, // or `false` to disable all
-    gemini: false,
-  },
-});
-```
-
+{{#lang ts}}
 Accepted shapes:
 - `dailyAuth`, `returnActive`, `sessionEnd`: `boolean`
 - `minResumeMs`: `number` (ms before another `user_returned` will fire)
 - `syncErrors`: `boolean | { enabled?: boolean; minIntervalMs?: number }`
 - `blobUploads`: `{ start?: boolean; success?: boolean; failure?: boolean }`
 - `llm`, `gemini`: `boolean | { start?: boolean; success?: boolean; failure?: boolean }`
+{{/lang}}
+{{#lang swift}}
+`AnalyticsAutoEventsConfig` exposes each toggle as a flat field: `dailyAuth`, `returnActive`, `minResumeMs` (ms before another `user_returned` will fire), `syncErrorsEnabled` + `syncErrorsMinIntervalMs`, `blobUploadsStart` / `blobUploadsSuccess` / `blobUploadsFailure`, and `sessionEnd`.
 {{/lang}}
 
 ---

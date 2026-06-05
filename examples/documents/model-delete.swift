@@ -1,8 +1,10 @@
 import JsBaoClient
 
-// Delete a record by id.
-func deleteTask(tasks: TypedModel<Task>, taskId: String) {
+// Delete a record: load it, then delete.
+func deleteTask(documentId: String, taskId: String) throws {
   // #region example
-  tasks.delete(taskId)
+  if let task = Task.find(taskId) {
+    try task.delete(in: documentId)
+  }
   // #endregion example
 }

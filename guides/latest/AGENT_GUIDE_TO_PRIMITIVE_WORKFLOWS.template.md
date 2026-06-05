@@ -1188,54 +1188,7 @@ Start a workflow, check its status, and list recent runs:
 
 Full options and result shapes for these calls:
 
-{{#lang ts}}
-```typescript
-const result = await client.workflows.start({
-  workflowKey: "my-workflow",
-  input: { text: "hello" },        // optional, default {}
-  runKey: "...",                    // optional, idempotency key — auto-generated otherwise
-  contextDocId: "doc-id",           // optional
-  meta: { source: "api" },          // optional, max 1KB
-  forceRerun: false,                // optional — terminate existing run with same key
-});
-// → { runId, runKey, instanceId, status, existing? }
-
-const status = await client.workflows.getStatus({
-  workflowKey: "my-workflow",
-  runKey: result.runKey,
-  contextDocId: "doc-id",           // optional, must match the start call's scope
-});
-// → { status, output?, error?, run? }
-// status.status: "running" | "complete" | "failed" | "terminated" | "apply_pending" | "apply_claimed"
-// (NOTE: "complete", not "completed", in this method)
-
-await client.workflows.terminate({ workflowKey, runKey, contextDocId });
-const { items, cursor } = await client.workflows.listRuns({ workflowKey, status, limit: 50 });
-```
-{{/lang}}
-
-{{#lang swift}}
-`start`, `getStatus`, and `listRuns` take the same fields — `workflowKey`, optional `input`, `runKey`, `contextDocId`, `meta` (max 1KB), and `forceRerun` on start — and return untyped `[String: Any]` dictionaries. Read fields by key:
-
-```swift
-let started = try await client.workflows.start(
-    workflowKey: "my-workflow",
-    input: ["text": "hello"],
-    options: StartWorkflowOptions(contextDocId: "doc-id")
-)
-let runKey = started["runKey"] as? String          // → runId, runKey, instanceId, status, existing?
-
-let status = try await client.workflows.getStatus(
-    workflowKey: "my-workflow",
-    runKey: runKey,
-    contextDocId: "doc-id"                          // must match the start call's scope
-)
-// status["status"]: "running" | "complete" | "failed" | "terminated" | "apply_pending" | "apply_claimed"
-
-try await client.workflows.terminate(workflowKey: "my-workflow", runKey: runKey, contextDocId: "doc-id")
-let runs = try await client.workflows.listRuns(workflowKey: "my-workflow", status: status, limit: 50)
-```
-{{/lang}}
+{{ example: workflows/workflow-run-options }}
 
 Inspect the per-step debug records of a run:
 
@@ -1267,7 +1220,7 @@ Subscribe through `client.events.on(_:)` with the typed event payload; hold the 
 
 ```swift
 let started = client.events.on(.workflowStarted) { (e: WorkflowStartedEvent) in
-    // e.workflowKey, e.runId
+    // e.workflowKey, e.runId, e.runKey?, e.instanceId?, e.contextDocId?, e.meta?
 }
 
 let sub = client.events.on(.workflowStatus) { (e: WorkflowStatusEvent) in
@@ -1308,7 +1261,7 @@ let ctx = try await client.workflows.runAndApply(
     options: StartWorkflowOptions(contextDocId: documentId),
     timeout: 120                          // default 120s; raise for slow LLM workflows
 )
-let output = ctx.output                   // [String: Any]
+let output = ctx.output                   // Any? — cast to the final step's JSON shape
 // Terminal non-success throws WorkflowRunError.terminalFailure(status:message:);
 // missing output within the window throws .timedOut; task cancellation propagates.
 ```

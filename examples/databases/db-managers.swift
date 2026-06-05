@@ -9,10 +9,13 @@ func manageDatabaseAdmins(
   newOwnerId: String
 ) async throws {
   // #region example
-  _ = try await client.databases.addManager(databaseId: databaseId, userId: coAdminUserId)
+  _ = try await client.databases.addManager(
+    databaseId: databaseId,
+    params: AddManagerParams(userId: coAdminUserId)
+  )
 
   let permissions = try await client.databases.listPermissions(databaseId: databaseId)
-  // [["databaseId": ..., "userId": ..., "permission": ..., "grantedAt": ...]]
+  // [DatabasePermissionEntry { databaseId, userId, permission, grantedAt, grantedBy, userName?, userEmail? }]
 
   _ = try await client.databases.removeManager(databaseId: databaseId, userId: coAdminUserId)
 

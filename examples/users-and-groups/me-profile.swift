@@ -14,14 +14,17 @@ func manageMyProfile(client: JsBaoClient, avatar: Data) async throws {
     )
   )
 
-  // Update name and/or avatar (pass NSNull() to clear the avatar).
+  // Update name and/or avatar (pass .clear to remove the avatar).
   _ = try await client.me.update(
-    params: ["name": "Alice Reyes", "avatarUrl": "https://cdn.example.com/u/alice.png"]
+    params: UpdateMeParams(
+      name: "Alice Reyes",
+      avatarUrl: .value("https://cdn.example.com/u/alice.png")
+    )
   )
 
   // Upload an image directly; the server hosts it and returns a URL.
   let uploaded = try await client.me.uploadAvatar(imageData: avatar, contentType: "image/png")
-  let avatarUrl = uploaded["avatarUrl"] as? String
+  let avatarUrl = uploaded.avatarUrl
 
   // update() and uploadAvatar() clear the cache automatically; reach for
   // these only when you need to inspect or force a refresh yourself.

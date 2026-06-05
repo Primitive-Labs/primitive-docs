@@ -4,10 +4,10 @@ import JsBaoClient
 // event automatically. Pass nil to clear an override.
 func setAnalyticsOverrides(client: JsBaoClient) {
   // #region example
-  client.setAnalyticsPlanOverride("pro")
-  client.setAnalyticsAppVersionOverride("2.1.4")
+  client.analytics.setPlanOverride("pro")
+  client.analytics.setAppVersionOverride("2.1.4")
 
   // Pass nil to clear an override
-  client.setAnalyticsPlanOverride(nil)
+  client.analytics.setPlanOverride(nil)
   // #endregion example
 }

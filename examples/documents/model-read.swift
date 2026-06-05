@@ -1,22 +1,22 @@
 import JsBaoClient
 
 // Read records: by id, by filter, the first match, and a count.
-func readTasks(tasks: TypedModel<Task>) {
+func readTasks() {
   // #region example
   // Find one by id
-  let task = tasks.find("task-id")
+  let task = Task.find("task-id")
 
   // Query with filters
-  let urgent = tasks.query(["priority": ["$gte": 2], "completed": false])
+  let urgent = Task.query(["priority": ["$gte": 2], "completed": false])
 
   // First match (with a sort)
-  let topTask = tasks.query(
+  let topTask = Task.query(
     ["completed": false],
     options: QueryOptions(sort: ["priority": -1])
   ).first
 
   // Count
-  let remaining = tasks.dynamic.count(["completed": false])
+  let remaining = Task.count(["completed": false])
   // #endregion example
   _ = (task, urgent, topTask, remaining)
 }

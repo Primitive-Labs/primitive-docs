@@ -302,15 +302,9 @@ primitive workflows runs steps <workflow-id> <run-id>
 
 ::: code-group
 
-```typescript [JavaScript]
-const { items: steps } = await client.workflows.listStepRuns({ runId });
-steps.forEach((step) => console.log(step.kind, step.status, step.output));
-```
+<<< ../../examples/workflows/workflow-list-step-runs.ts#example{ts} [JavaScript]
 
-```swift [Swift]
-let result = try await client.workflows.listStepRuns(runId: runId)
-let steps = result["items"] as? [[String: Any]] ?? []
-```
+<<< ../../examples/workflows/workflow-list-step-runs.swift#example{swift} [Swift]
 
 :::
 

@@ -36,17 +36,17 @@ In the starter template this wiring is owned for you by `PrimitiveAppState.initi
 ## Discovering Available Methods
 
 ```swift
-  let config = try await client.getAuthConfig()
-  // keys: appId, name, mode, waitlistEnabled,
+  let config = try await client.auth.getAuthConfig()
+  // AuthConfigInfo: appId, name, mode, waitlistEnabled,
   //   googleOAuthEnabled, googleClientId, hasOAuth, redirectUris,
   //   passkeyEnabled, passkeyRpId, passkeyRpName, hasPasskey,
   //   magicLinkEnabled, otpEnabled
 
   let methods = (
-    google: config["hasOAuth"] as? Bool ?? false,
-    magicLink: config["magicLinkEnabled"] as? Bool ?? false,
-    otp: config["otpEnabled"] as? Bool ?? false,
-    passkey: config["hasPasskey"] as? Bool ?? false
+    google: config.hasOAuth,
+    magicLink: config.magicLinkEnabled,
+    otp: config.otpEnabled,
+    passkey: config.hasPasskey
   )
 ```
 
@@ -129,19 +129,19 @@ let token = try await client.handleOAuthCallback(code: code, state: state)
 
 ```swift
   // Request the email. Pass the magic-link callback redirect URI.
-  _ = try await client.magicLinkRequest(
+  _ = try await client.auth.magicLinkRequest(
     email: email,
     redirectUri: "https://app.example.com/auth/magic-callback"
   )
 
   // On the callback, read the `magic_token` value and verify it.
-  let result = try await client.magicLinkVerify(token: magicToken)
+  let result = try await client.auth.magicLinkVerify(token: magicToken)
   // Token is now stored on the client and the WS auto-connects.
-  let user = result["user"] as? [String: Any]
-  let isNewUser = result["isNewUser"] as? Bool ?? false
+  let user = result.user
+  let isNewUser = result.isNewUser ?? false
 ```
 
-`magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument. `magicLinkVerify(token:)` returns the raw `[String: Any]` response.
+`auth.magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument. `auth.magicLinkVerify(token:)` returns a `MagicLinkVerifyResult` (`.user`, `.promptAddPasskey?`, `.isNewUser?`).
 
 ### Reading the token
 
@@ -152,16 +152,16 @@ The magic-link callback delivers the token as a `magic_token` value (not `token`
 ## OTP (Email Code)
 
 ```swift
-  _ = try await client.otpRequest(email: email)
+  _ = try await client.auth.otpRequest(email: email)
 
   // User enters the 6-digit code from the email.
-  let result = try await client.otpVerify(email: email, code: code)
+  let result = try await client.auth.otpVerify(email: email, code: code)
   // Token is now stored on the client and the WS auto-connects.
-  let user = result["user"] as? [String: Any]
-  let isNewUser = result["isNewUser"] as? Bool ?? false
+  let user = result.user
+  let isNewUser = result.isNewUser ?? false
 ```
 
-`otpVerify(email:code:)` returns the raw `[String: Any]` response.
+`auth.otpVerify(email:code:)` returns an `OtpVerifyResult` (`.user`, `.isNewUser?`).
 
 ### Error handling
 
@@ -171,7 +171,7 @@ The magic-link callback delivers the token as a `magic_token` value (not `token`
 
 ```swift
 do {
-  let result = try await client.otpVerify(email: email, code: code)
+  let result = try await client.auth.otpVerify(email: email, code: code)
 } catch let error as AuthError {
   switch error.code {
   case .invalidToken,          // bad/expired code
@@ -317,11 +317,13 @@ The client persists the token to the Keychain across app launches. `waitForAuthB
 ## Logout
 
 ```swift
-  try await client.logout(wipeLocal: true)
+  try await client.auth.logout(options: LogoutOptions(
+    wipeLocal: true // delete locally cached document data + KV cache
+  ))
   // Fires `auth:logout` immediately and `auth:logout:complete` when finished.
 ```
 
-`logout(wipeLocal:)` takes a single `wipeLocal` flag (delete locally cached document data + KV cache). Logout fires `logout` immediately and `logoutComplete` when finished.
+`auth.logout(options:)` takes a `LogoutOptions` — `wipeLocal` (delete locally cached document data + KV cache), `revokeOffline` (also revoke any stored offline grant), `clearOfflineIdentity` (defaults `true`). Logout fires `logout` immediately and `logoutComplete` when finished.
 
 ---
 
@@ -389,11 +391,11 @@ There is **no `primitive test-users` CLI command**. The bypass is server-side: a
 // Requires the app owner to have added "alice@example.com" to the app's
 // testAccountBaseEmails whitelist. Then any `alice+primitivetest<suffix>@example.com`
 // derivative becomes a test account that accepts code "000000".
-_ = try await client.otpRequest(email: "alice+primitivetest@example.com")
-let result = try await client.otpVerify(email: "alice+primitivetest@example.com", code: "000000")
+_ = try await client.auth.otpRequest(email: "alice+primitivetest@example.com")
+let result = try await client.auth.otpVerify(email: "alice+primitivetest@example.com", code: "000000")
 
 // Role-distinguished derivatives (Gmail/Workspace deliver them to the same inbox):
-_ = try await client.otpRequest(email: "alice+primitivetest-teacher@example.com")
+_ = try await client.auth.otpRequest(email: "alice+primitivetest-teacher@example.com")
 ```
 
 Guardrails:

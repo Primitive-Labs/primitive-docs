@@ -6,19 +6,17 @@ func userScopedItems(client: JsBaoClient, dbId: String) async throws {
   // #region example
   // Each user only sees their own items (the operation filters on $user.userId).
   let result = try await client.databases.executeOperation(
-    databaseId: dbId, name: "myItems", options: [:]
+    databaseId: dbId, name: "myItems"
   )
 
   // Creates an item owned by the calling user; server assigns the id.
   let createResult = try await client.databases.executeOperation(
     databaseId: dbId, name: "createItem",
-    options: ["params": ["title": "My Item"]]
+    options: ExecuteOperationOptions(params: ["title": "My Item"])
   )
-  // executeOperation returns Any; the mutation result shape is
-  // { results: [{ success, id }] } — cast to read the server-assigned id.
-  let dict = createResult as? [String: Any]
-  let results = dict?["results"] as? [[String: Any]]
-  let itemId = results?.first?["id"] as? String // server-assigned ULID
+  // executeOperation returns a JSONValue; the mutation result shape is
+  // { results: [{ success, id }] } — read the server-assigned id from it.
+  let itemId = createResult["results"]?.arrayValue?.first?["id"]?.stringValue // server-assigned ULID
   // #endregion example
   _ = (result, itemId)
 }

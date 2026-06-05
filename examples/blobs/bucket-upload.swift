@@ -11,7 +11,7 @@ func uploadToBucket(client: JsBaoClient, data: Data) async throws {
     contentType: "image/jpeg",
     tags: ["profile"]
   )
-  let blobId = result["blobId"] as? String
+  let blobId = result.blobId
   // #endregion example
   _ = blobId
 }

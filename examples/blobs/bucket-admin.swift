@@ -4,12 +4,12 @@ import JsBaoClient
 // buckets. Deleting a bucket cascades to every blob inside it.
 func adminBuckets(client: JsBaoClient) async throws {
   // #region example
-  _ = try await client.blobBuckets.createBucket(params: [
-    "bucketKey": "uploads",
-    "name": "User uploads",
-    "ttlTier": "28d",
-    "accessPolicy": "authenticated",
-  ])
+  _ = try await client.blobBuckets.createBucket(params: CreateBlobBucketParams(
+    bucketKey: "uploads",
+    name: "User uploads",
+    ttlTier: .twentyEightDays,
+    accessPolicy: .authenticated
+  ))
 
   let buckets = try await client.blobBuckets.listBuckets()
   let bucket = try await client.blobBuckets.getBucket(bucketIdOrKey: "uploads")

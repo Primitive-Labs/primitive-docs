@@ -10,7 +10,7 @@ Guidelines for building apps with Primitive's server-side database storage.
   let result = try await client.databases.executeOperation(
     databaseId: databaseId,
     name: "list-products",
-    options: ["params": ["search": "widget"]]
+    options: ExecuteOperationOptions(params: ["search": "widget"])
   )
   // result: { data: [...records], hasMore, nextCursor? }
 ```
@@ -30,7 +30,9 @@ Guidelines for building apps with Primitive's server-side database storage.
 ```swift
   _ = try await client.databases.grantGroupPermission(
     databaseId: databaseId,
-    params: ["groupType": "team", "groupId": "engineering", "permission": "manager"]
+    params: GrantDatabaseGroupPermissionParams(
+      groupType: "team", groupId: "engineering", permission: "manager"
+    )
   )
 ```
 
@@ -114,24 +116,22 @@ Construct the client, then create a database and call its registered operations:
 
 ```swift
   // Create a database instance of the configured type
-  let db = try await client.databases.create(params: [
-    "title": "Alpha Project", "databaseType": "project",
-  ])
-  let databaseId = db["databaseId"] as? String ?? ""
+  let db = try await client.databases.create(params: CreateDatabaseParams(
+    title: "Alpha Project", databaseType: "project"
+  ))
 
   // Execute registered operations
   let result = try await client.databases.executeOperation(
-    databaseId: databaseId, name: "listTasks",
-    options: ["params": ["projectId": "proj-1"]]
+    databaseId: db.databaseId, name: "listTasks",
+    options: ExecuteOperationOptions(params: ["projectId": "proj-1"])
   )
 
   let createResult = try await client.databases.executeOperation(
-    databaseId: databaseId, name: "createTask",
-    options: ["params": ["title": "Ship v1", "projectId": "proj-1"]]
+    databaseId: db.databaseId, name: "createTask",
+    options: ExecuteOperationOptions(params: ["title": "Ship v1", "projectId": "proj-1"])
   )
-  // executeOperation returns Any; mutation result shape is { results: [{ id }] }.
-  let results = (createResult as? [String: Any])?["results"] as? [[String: Any]]
-  let taskId = results?.first?["id"] as? String // server-assigned ULID
+  // executeOperation returns a JSONValue; mutation result shape is { results: [{ id }] }.
+  let taskId = createResult["results"]?.arrayValue?.first?["id"]?.stringValue // server-assigned ULID
 ```
 
 ## Configuring with the CLI
@@ -737,11 +737,11 @@ The client library is used at runtime to create database instances, execute oper
 ### Creating database instances
 
 ```swift
-  let db = try await client.databases.create(params: [
-    "title": "Alpha Project",
-    "databaseType": "project", // must match a configured database type
-  ])
-  // db: ["databaseId": ..., "title": ..., "databaseType": ..., "permission": ...]
+  let db = try await client.databases.create(params: CreateDatabaseParams(
+    title: "Alpha Project",
+    databaseType: "project" // must match a configured database type
+  ))
+  // db: DatabaseInfo { databaseId, title, databaseType, celContext, permission, createdBy, ... }
 ```
 
 `db.databaseType` is the configured type; `db.celContext` holds the per-database CEL context dict (`db.metadata` resolves to the same field).
@@ -756,11 +756,14 @@ The client library is used at runtime to create database instances, execute oper
   // NOT returned here — use groups.listDatabases for group-shared ones.
   let databases = try await client.databases.list()
 
+  // Narrow to one databaseType (post-join filter — narrows, never widens).
+  let projects = try await client.databases.list(databaseType: "project")
+
   let db = try await client.databases.get(databaseId: databaseId)
 
   _ = try await client.databases.update(
     databaseId: databaseId,
-    params: ["title": "New Title"]
+    params: UpdateDatabaseParams(title: "New Title")
   )
 
   // Owner only — permanently removes all records and permissions.
@@ -772,17 +775,15 @@ The client library is used at runtime to create database instances, execute oper
 Callers can override `limit`, `cursor`, and `direction` at call time:
 
 ```swift
-  var options: [String: Any] = [
-    "params": ["projectId": "proj-1"],
-    "limit": 10,
-    "direction": 1, // 1 for forward, -1 for backward
-  ]
-  if let previousCursor { options["cursor"] = previousCursor }
-
   let result = try await client.databases.executeOperation(
     databaseId: databaseId,
     name: "listTasks",
-    options: options
+    options: ExecuteOperationOptions(
+      params: ["projectId": "proj-1"],
+      limit: 10,
+      cursor: previousCursor,
+      direction: .ascending // forward; use .descending to page backward
+    )
   )
   // result: { data: [...records], hasMore, nextCursor? }
 ```
@@ -804,7 +805,7 @@ Callers can override `limit`, `cursor`, and `direction` at call time:
   let result = try await client.databases.executeOperation(
     databaseId: databaseId,
     name: "listTasks",
-    options: ["params": ["projectId": "proj-1"], "timing": true]
+    options: ExecuteOperationOptions(params: ["projectId": "proj-1"], timing: true)
   )
   // result._timing: { totalMs, databaseLookup, operationLookup, celEvaluation, ... }
 ```
@@ -818,8 +819,8 @@ Callers can override `limit`, `cursor`, and `direction` at call time:
     databaseId: databaseId,
     operationName: "import-contacts",
     batch: [
-      ["params": ["name": "Alice", "email": "alice@example.com"]],
-      ["params": ["name": "Bob", "email": "bob@example.com"]],
+      DatabaseBatchOperation(params: ["name": "Alice", "email": "alice@example.com"]),
+      DatabaseBatchOperation(params: ["name": "Bob", "email": "bob@example.com"]),
     ]
   )
   // result: { imported, failed }
@@ -880,10 +881,13 @@ The database creator is automatically the `owner`. Console admins bypass all che
 These calls are for administrative access — not for end-user data access:
 
 ```swift
-  _ = try await client.databases.addManager(databaseId: databaseId, userId: coAdminUserId)
+  _ = try await client.databases.addManager(
+    databaseId: databaseId,
+    params: AddManagerParams(userId: coAdminUserId)
+  )
 
   let permissions = try await client.databases.listPermissions(databaseId: databaseId)
-  // [["databaseId": ..., "userId": ..., "permission": ..., "grantedAt": ...]]
+  // [DatabasePermissionEntry { databaseId, userId, permission, grantedAt, grantedBy, userName?, userEmail? }]
 
   _ = try await client.databases.removeManager(databaseId: databaseId, userId: coAdminUserId)
 
@@ -899,7 +903,9 @@ These calls are for administrative access — not for end-user data access:
 ```swift
   _ = try await client.databases.grantGroupPermission(
     databaseId: databaseId,
-    params: ["groupType": "team", "groupId": "engineering", "permission": "manager"]
+    params: GrantDatabaseGroupPermissionParams(
+      groupType: "team", groupId: "engineering", permission: "manager"
+    )
   )
 
   let groupPerms = try await client.databases.listGroupPermissions(databaseId: databaseId)
@@ -1049,19 +1055,17 @@ params = '{"title":{"type":"string","required":true}}'
 ```swift
   // Each user only sees their own items (the operation filters on $user.userId).
   let result = try await client.databases.executeOperation(
-    databaseId: dbId, name: "myItems", options: [:]
+    databaseId: dbId, name: "myItems"
   )
 
   // Creates an item owned by the calling user; server assigns the id.
   let createResult = try await client.databases.executeOperation(
     databaseId: dbId, name: "createItem",
-    options: ["params": ["title": "My Item"]]
+    options: ExecuteOperationOptions(params: ["title": "My Item"])
   )
-  // executeOperation returns Any; the mutation result shape is
-  // { results: [{ success, id }] } — cast to read the server-assigned id.
-  let dict = createResult as? [String: Any]
-  let results = dict?["results"] as? [[String: Any]]
-  let itemId = results?.first?["id"] as? String // server-assigned ULID
+  // executeOperation returns a JSONValue; the mutation result shape is
+  // { results: [{ success, id }] } — read the server-assigned id from it.
+  let itemId = createResult["results"]?.arrayValue?.first?["id"]?.stringValue // server-assigned ULID
 ```
 
 ## Reserved Field Names

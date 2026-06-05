@@ -1,10 +1,11 @@
 import JsBaoClient
 
-// Update a record: look it up, then apply the change.
-func completeTask(tasks: TypedModel<Task>, taskId: String) {
+// Update a record: load it, mutate fields, save.
+func completeTask(documentId: String, taskId: String) throws {
   // #region example
-  if let task = tasks.find(taskId) {
-    tasks.update(task.id, ["completed": true])
+  if var task = Task.find(taskId) {
+    task.completed = true
+    try task.save(in: documentId)
   }
   // #endregion example
 }

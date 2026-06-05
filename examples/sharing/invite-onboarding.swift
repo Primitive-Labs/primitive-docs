@@ -8,22 +8,21 @@ func inviteOnboarding(
 ) async throws {
   // #region example
   // 1. Invite a teammate
-  _ = try await client.invitations.create(params: [
-    "email": "newhire@example.com",
-    "role": "member",
-  ])
+  _ = try await client.invitations.create(
+    params: CreateInvitationParams(email: "newhire@example.com", role: "member")
+  )
 
   // 2. Share a project document with them (pending until signup)
   _ = try await client.documents.updatePermissions(
     documentId: projectDocId,
-    params: ["email": "newhire@example.com", "permission": "read-write"]
+    params: .email("newhire@example.com", permission: "read-write")
   )
 
   // 3. Add them to the engineering group (pending until signup)
   _ = try await client.groups.addMember(
     groupType: "team",
     groupId: "engineering",
-    params: ["email": "newhire@example.com"]
+    params: .email("newhire@example.com")
   )
 
   // When they sign up, all three apply in one transaction. They land in the
