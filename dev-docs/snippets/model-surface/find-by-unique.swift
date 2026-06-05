@@ -1,11 +1,11 @@
 import JsBaoClient
 
-// Look up a record by a unique field without knowing its id. The model facade
-// has no dedicated `findByUnique` — filter on the unique field and take the
-// first match. For a compound constraint, filter on every field of it.
-func findByUnique() {
+// Look up a record by a registered unique constraint, without knowing its id.
+// `findByUnique(constraintName, value)` mirrors the JS client; pass an array
+// for a compound constraint. Throws if the constraint isn't registered.
+func findByUnique() throws {
   // #region example
-  let user = AppUser.query(["email": "alice@example.com"]).first
+  let user = try AppUser.findByUnique("email", .string("alice@example.com"))
   // #endregion example
   _ = user
 }

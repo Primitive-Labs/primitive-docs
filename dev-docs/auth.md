@@ -3,7 +3,7 @@
 Sign users in (OAuth, magic link, OTP, passkeys), enable offline access, read auth config, and log out.
 
 ::: tip Typed `client.auth` namespace (Swift)
-The non-native auth surface — magic-link, OTP, `getAuthConfig`, `logout`, the offline-grant suite, and the identity/token accessors (`getUserId`/`getToken`/`isAuthenticated`/`waitForUserId`) — now lives on a **typed `client.auth.*` namespace** in Swift ([#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)). These methods return named result types (`MagicLinkVerifyResult`, `OtpVerifyResult`, `AuthConfigInfo`, `EnableOfflineAccessResult`, …) rather than `[String: Any]`. The JS client keeps the same calls **top-level** on `client.*`, so the call shapes differ slightly per language. A handful of **behavioral**/option gaps remain and are flagged inline below: `logout` still skips the server `/auth/logout` cookie clear and honors only `wipeLocal`; `enableOfflineAccess` is missing JS options and inverts the biometric default; `getAppConfig` is still untyped; and OAuth + passkeys are native-deferred ([#928](https://github.com/Primitive-Labs/js-bao-wss/issues/928) / [#929](https://github.com/Primitive-Labs/js-bao-wss/issues/929)).
+The non-native auth surface — magic-link, OTP, `getAuthConfig`, `getAppConfig`, `logout`, the offline-grant suite, and the identity/token accessors (`getUserId`/`getToken`/`isAuthenticated`/`waitForUserId`) — now lives on a **typed `client.auth.*` namespace** in Swift ([#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)). These methods return named result types (`MagicLinkVerifyResult`, `OtpVerifyResult`, `AuthConfigInfo`, `AppConfigInfo`, `EnableOfflineAccessResult`, …) rather than `[String: Any]`. The JS client keeps the same calls **top-level** on `client.*`, so the call shapes differ slightly per language. One behavioral gap remains, flagged inline below: `logout` still skips the server `/auth/logout` cookie-clear POST. OAuth + passkeys are native-deferred ([#928](https://github.com/Primitive-Labs/js-bao-wss/issues/928) / [#929](https://github.com/Primitive-Labs/js-bao-wss/issues/929)).
 :::
 
 ## OAuth
@@ -72,7 +72,7 @@ Both clients return a typed `{ success }` result (Swift `MagicLinkRequestResult`
 Verify a magic-link token and sign the user in.
 
 ::: tip Divergent shape
-Both clients return a typed result with `{ user, isNewUser?, promptAddPasskey? }` (Swift `MagicLinkVerifyResult` via `client.auth.magicLinkVerify`). JS additionally accepts an `{ inviteToken }` option for invite-only signups; Swift has no `inviteToken` option yet ([#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)).
+Both clients return a typed result with `{ user, isNewUser?, promptAddPasskey? }` (Swift `MagicLinkVerifyResult` via `client.auth.magicLinkVerify`). Swift takes the optional `inviteToken` as a named parameter (`magicLinkVerify(token:inviteToken:)`) for invite-only signups; JS carries it in the options object.
 :::
 
 ::: code-group
@@ -162,11 +162,7 @@ Update a passkey's metadata (e.g. rename its device).
 
 Enable offline access using a passkey (largeBlob) or PIN-based grant. Requires online connectivity.
 
-The result is now a typed `EnableOfflineAccessResult` (`{ enabled, method?, reason? }`) via `client.auth.enableOfflineAccess`.
-
-::: danger Swift parity gap
-JS's `EnableOfflineAccessOptions` accepts `{ preferBiometric, allowPinFallback, ttlDays, retention, pinProvider }`; Swift exposes only `ttlDays` plus a **Swift-only `requireBiometric` flag** — the `preferBiometric`/`allowPinFallback`/`retention`/`pinProvider` options are all missing (sweep auth D1). The defaults also diverge: Swift's `requireBiometric` **defaults to `true`** (→ a `"biometric"` grant), whereas JS defaults to the non-biometric `"signed"` grant method (sweep auth D2). Both option/default gaps remain open ([#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)).
-:::
+The result is a typed `EnableOfflineAccessResult` (`{ enabled, method?, reason? }`) via `client.auth.enableOfflineAccess`. `EnableOfflineAccessOptions` accepts `{ preferBiometric, allowPinFallback, ttlDays, retention, pinProvider }`, matching JS — including the non-biometric default (`preferBiometric` defaults to `false`).
 
 ::: code-group
 <<< ./snippets/auth/enable-offline-access.ts#example{ts} [JavaScript]
@@ -195,11 +191,7 @@ Fetch the full auth configuration (providers, passkey/OTP/magic-link flags, redi
 
 ### getAppConfig()
 
-Fetch the app-launch config subset (mode, waitlist, available auth methods).
-
-::: danger Swift parity gap
-JS returns a typed `AppConfig` object with 7 named fields; Swift returns the raw `[String: Any]` envelope, so the app-launch config must be read by string key with no typed shape (sweep auth D4, [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
+Fetch the app-launch config subset (mode, waitlist, available auth methods). Both clients return a typed object — Swift `AppConfigInfo` via `client.auth.getAppConfig()`, with 7 named fields (`appId`, `name`, `mode`, `waitlistEnabled`, `hasOAuth`, `hasPasskey`, `magicLinkEnabled`).
 
 ::: code-group
 <<< ./snippets/auth/get-app-config.ts#example{ts} [JavaScript]
@@ -212,8 +204,10 @@ JS returns a typed `AppConfig` object with 7 named fields; Swift returns the raw
 
 Sign the user out: best-effort server cookie clear, tear down networking, clear auth state, and optionally evict local data.
 
+`LogoutOptions` honors `{ wipeLocal, revokeOffline, clearOfflineIdentity, waitForDisconnect }`.
+
 ::: danger Swift parity gap
-JS accepts `{ redirectTo, wipeLocal, revokeOffline, clearOfflineIdentity, waitForDisconnect }`; Swift exposes only `wipeLocal:`. Beyond the options gap, Swift's `logout` also **skips the server `/auth/logout` POST** that clears the auth cookie — it only tears down local state — so the session cookie can linger server-side. JS performs the best-effort server cookie clear described above; Swift currently does not (sweep auth D8, [#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)).
+Swift's `logout` **skips the server `/auth/logout` POST** that clears the auth cookie — it only tears down local state — so the session cookie can linger server-side. JS performs the best-effort server cookie clear; Swift currently does not (sweep auth D8, [#964](https://github.com/Primitive-Labs/js-bao-wss/issues/964)).
 :::
 
 ::: code-group

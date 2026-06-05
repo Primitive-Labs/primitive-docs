@@ -4,11 +4,7 @@ Client calls reject/throw a `JsBaoError` carrying a machine-readable `code`. Cat
 
 ## The error code enum
 
-Both clients ship the same wire strings for `JsBaoErrorCode`. In JS it's a string-literal union you compare directly (`e.code === "NOT_FOUND"`); in Swift it's a `String`-backed enum you match against cases (`err.code == .notFound`).
-
-::: tip Divergent shape
-The JS union carries one extra code, `WORKFLOW_APPLY_NOT_CONFIRMED`, that the Swift `JsBaoErrorCode` enum does not yet have ([#959](https://github.com/Primitive-Labs/js-bao-wss/issues/959)). The other 19 codes match one-to-one.
-:::
+Both clients ship the same wire strings for `JsBaoErrorCode`. In JS it's a string-literal union you compare directly (`e.code === "NOT_FOUND"`); in Swift it's a `String`-backed enum you match against cases (`err.code == .notFound`). The codes match one-to-one across platforms.
 
 ## Catching an error
 
@@ -42,8 +38,10 @@ Swift. (Same enum-vs-string split described under "The error code enum" above.)
 
 Pull structured diagnostics off `error.details`.
 
+`details` is typed `any` in JS and carries heterogeneous structured objects — numbers (`status`), nested objects (`payload`), and booleans. Swift types it as `[String: JSONValue]?`, so the same nested and non-string values are representable; unwrap a `JSONValue` to its scalar (`.numberValue`, `.boolValue`, etc.) before reading it.
+
 ::: tip Divergent shape
-`details` is typed `any` in JS and carries **heterogeneous structured objects** — numbers (`status`), nested objects (`payload`), and booleans. Swift types it as a flat `[String: String]?`, so non-string values (and any nesting) are not representable; cross-platform code that reads `error.details.status` as a number (or e.g. `err.details?.canRequestAccess` as a bool, as the sharing docs do) works in JS but has nothing to read in Swift (sweep errors D1). Swift also drops the JS `name` field on the error object — use the typed `catch`/`is JsBaoError` check rather than a `name` discriminator (sweep errors D2).
+Swift drops the JS `name` field on the error object — use the typed `catch`/`is JsBaoError` check rather than a `name` discriminator (sweep errors D2).
 :::
 
 ::: code-group

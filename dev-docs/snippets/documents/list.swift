@@ -5,7 +5,7 @@ import JsBaoClient
 func list(client: JsBaoClient) async throws {
   // #region example
   let items = try await client.documents.list(
-    options: PaginationOptions(limit: 50)
+    options: ListDocumentsOptions(limit: 50)
   )
   let firstTitle = items.first?.title
   // #endregion example

@@ -4,8 +4,8 @@ import JsBaoClient
 func blobsUploadFailed(client: JsBaoClient) {
   // #region example
   let sub = client.events.on(.blobsUploadFailed) { (event: BlobUploadFailedEvent) in
-    // Swift renames JS `lastError?` -> non-optional `error` and drops several fields.
-    print("failed", event.blobId, event.error, "retry:", event.willRetry)
+    // Full record matching JS: lastError? / attempts / nextAttemptAt / willRetry / …
+    print("failed", event.blobId, event.lastError ?? "", "retry:", event.willRetry)
   }
   // #endregion example
   _ = sub

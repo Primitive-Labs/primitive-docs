@@ -53,7 +53,8 @@ into the URL.
 ## read(blobId, options?)
 
 Read blob content from the cache or server. Pass `force: true` (Swift) /
-`forceRedownload: true` (JS) to bypass the local cache and re-download.
+`forceRedownload: true` (JS) to bypass the local cache and re-download, and
+`disposition` to serve `inline` vs `attachment`.
 
 ::: tip Divergent shape
 JS's `read` takes an `options` object (`as: "uint8array" | "arrayBuffer" | "blob"

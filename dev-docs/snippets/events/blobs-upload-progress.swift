@@ -4,8 +4,8 @@ import JsBaoClient
 func blobsUploadProgress(client: JsBaoClient) {
   // #region example
   let sub = client.events.on(.blobsUploadProgress) { (event: BlobUploadProgressEvent) in
-    // Swift exposes a 4-field byte-progress view; JS sends the full queue item.
-    print(event.blobId, "\(event.bytesTransferred)/\(event.totalBytes)")
+    // Full queue-item record, matching JS (queueId/filename/contentType/numBytes/status/attempts/…).
+    print(event.blobId, event.filename, "\(event.numBytes) bytes, status \(event.status)")
   }
   // #endregion example
   _ = sub

@@ -7,9 +7,9 @@ func subscribe(
   databaseId: String,
   subscriptionKey: String,
   currentUserId: String
-) {
+) throws {
   // #region example
-  let unsubscribe = client.databases.subscribe(
+  let unsubscribe = try client.databases.subscribe(
     databaseId: databaseId,
     subscriptionKey: subscriptionKey,
     options: DatabaseSubscribeOptions(

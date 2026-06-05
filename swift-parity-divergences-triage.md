@@ -9,6 +9,14 @@ Verdict for every divergence in [`swift-parity-divergences.md`](swift-parity-div
 
 **Totals: ~61 ✅ fixable · ~28 ⛔ exempt.**
 
+> **✅ IMPLEMENTED** (clone `js-parity-chunk-2-jun-4`, waves `678d529e` / `fbc9ab2f` /
+> `6e6b58cf`). The catalog dropped **86 → 56** divergences. The Swift-only extras
+> were **removed** (your call). Remaining 56 are the exempt set (typed-vs-dynamic
+> idiom + platform/native) plus four small follow-ups: aggregate `groupBy`
+> stringset-membership (reverted — single-doc junction SQL), `syncPerf`/blob-progress
+> emit-site instrumentation, `logout` server `/auth/logout` cookie-clear POST, and
+> the awareness/presence subsystem.
+
 > **One decision for you** (the "fixable-by-removal" rows below): a chunk of the
 > divergences are **Swift-only *additive* helpers** — Swift has *more* than JS.
 > "Matching" them means **deleting useful API**. They're flagged

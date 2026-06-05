@@ -11,17 +11,6 @@ and `localOnly: true` keeps it on-device (commit it later with
 rather than failing. The response carries the document's `metadata` blob — use
 `createWithAlias` when you need the id back.
 
-::: tip Aligned
-`documents.create` returns `{ metadata }` on both clients — same local-first
-flow, including the create-time `metadata` blob being replayed into the server
-commit ([#852](https://github.com/Primitive-Labs/js-bao-wss/issues/852),
-[#673](https://github.com/Primitive-Labs/js-bao-wss/issues/673)). Swift
-additionally exposes a lower-level `client.createDocument(options:)` that hands
-back the writable document handle alongside the metadata — a Swift-only
-convenience on the authoritative method, not a divergence in the documented
-`documents.create` surface.
-:::
-
 ::: code-group
 <<< ./snippets/documents/create.ts#example{ts} [JavaScript]
 <<< ./snippets/documents/create.swift#example{swift} [Swift]
@@ -47,10 +36,10 @@ Resolve an alias to a document, creating one if it doesn't exist yet (singleton 
 
 ## list(options?)
 
-List documents accessible to the current user. Deprecated in favor of `client.me.ownedDocuments()` / `client.me.sharedDocuments()` ([#628](https://github.com/Primitive-Labs/js-bao-wss/issues/628)).
+List documents accessible to the current user as a typed `[DocumentInfo]`. Swift accepts the full `ListDocumentsOptions` (`includeRoot`, `refreshFromServer`, `localOnly`, `serverTimeoutMs`, `waitForLoad`, `limit`, `cursor`, `tag`, `forward`, `returnPage`); use `listPage(...)` for the `{ items, cursor }` page envelope.
 
-::: warning SKIPPED — deprecated
-Swift returns a typed `[DocumentInfo]` but only supports `limit`/`cursor` pagination; JS adds `tag`, `forward`, `waitForLoad`, `refreshFromServer`, `localOnly`, and a `returnPage` array-vs-page duality ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)). We are **not** expanding `list`'s options — `documents.list` is deprecated in both clients; the pagination-parity work belongs on the `me.ownedDocuments()` / `me.sharedDocuments()` surface instead.
+::: warning Deprecated
+Prefer `client.me.ownedDocuments()` / `client.me.sharedDocuments()` ([#628](https://github.com/Primitive-Labs/js-bao-wss/issues/628)). `documents.list` is deprecated in both clients.
 :::
 
 ::: code-group
@@ -108,11 +97,7 @@ Delete a document from the server and evict its local data.
 Open a document for editing. `OpenDocumentOptions` carries `availabilityWaitMs`
 (the `.network`-wait timeout, default 30s) and `deferNetworkSync` (open locally
 and start sync only on a later explicit `startNetworkSync`), matching JS
-([#1038](https://github.com/Primitive-Labs/js-bao-wss/issues/1038)).
-
-::: tip Divergent shape (kept by design)
-JS returns `{ doc, metadata }`; Swift returns the `YDocument` directly and takes a typed `OpenDocumentOptions`. The bare `YDocument` is the ergonomic Swift shape — aligning the return to a `{ doc, metadata }` tuple is deferred rather than treated as a gap.
-:::
+([#1038](https://github.com/Primitive-Labs/js-bao-wss/issues/1038)). Both clients return `{ doc, metadata }` (Swift `OpenDocumentResult`).
 
 ::: code-group
 <<< ./snippets/documents/open.ts#example{ts} [JavaScript]
@@ -148,11 +133,7 @@ Fetch metadata for the app's shared root document.
 
 ## openAlias(params, options?)
 
-Resolve an alias and open the document it points at in one call.
-
-::: tip Divergent shape
-JS returns `{ doc, metadata }`; Swift returns the `YDocument` directly (consistent with `open`). Swift resolves the alias via `aliases.resolve` then opens.
-:::
+Resolve an alias and open the document it points at in one call. Both clients return `{ doc, metadata }` (Swift `OpenDocumentResult`, consistent with `open`); Swift resolves the alias via `aliases.resolve` then opens.
 
 ::: code-group
 <<< ./snippets/documents/open-alias.ts#example{ts} [JavaScript]
@@ -445,16 +426,10 @@ clients are async and return `{ documentId, title?, createdAt }` entries (Swift:
 
 ## commitOfflineCreate(documentId, opts?)
 
-Commit a locally-created (`localOnly`) document to the server.
-
-::: tip Aligned
-Namespaced under `documents.commitOfflineCreate` on both clients (Swift also
-keeps the lower-level top-level `client.commitOfflineCreate(documentId:onExists:)`
-this forwards to). Same flow — it replays the pending create's stashed
-`title`/`tags`/`metadata` into the server POST, and returns
-`{ created, linked?, reason? }`. Pair it with a `localOnly: true` create (or any
-create made while offline) to push the doc up once you're back online.
-:::
+Commit a locally-created (`localOnly`) document to the server. Replays the
+pending create's stashed `title`/`tags`/`metadata` into the server POST and
+returns `{ created, linked?, reason? }`. (Swift also keeps the lower-level
+top-level `client.commitOfflineCreate(documentId:onExists:)` this forwards to.)
 
 ::: code-group
 <<< ./snippets/documents/commit-offline-create.ts#example{ts} [JavaScript]
@@ -470,16 +445,6 @@ the document's local data after cancelling.
 <<< ./snippets/documents/cancel-pending-create.ts#example{ts} [JavaScript]
 <<< ./snippets/documents/cancel-pending-create.swift#example{swift} [Swift]
 :::
-
-## getOwner(documentId)
-
-Fetch a document and extract its owner id.
-
-::: warning Swift-only
-Swift-only convenience. In JavaScript, read `createdBy` off `documents.get(id)` directly.
-:::
-
-<<< ./snippets/documents/get-owner.swift#example{swift} [Swift]
 
 ## setAwareness(documentId, state)
 

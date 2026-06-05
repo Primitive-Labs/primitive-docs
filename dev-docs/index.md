@@ -21,16 +21,19 @@ without cluttering the main docs.
 The two clients aren't at full parity. Where they differ, the page says so explicitly:
 
 ::: danger No Swift equivalent
-The method exists in the JavaScript client but **not** the Swift client (or vice-versa). The
-available language is shown; the gap links to the tracking issue.
+The method exists in the JavaScript client but **not** the Swift client (or vice-versa) — an
+unintentional gap. The available language is shown; the gap links to the tracking issue.
+:::
+
+::: warning Intentional / deferred
+Both clients differ **on purpose** — a deliberate Swift-idiomatic shape, a native-track deferral,
+or a documented skip (deprecated / superseded). Not a gap to fix; the reason is stated inline.
 :::
 
 ::: tip Divergent shape
-Both clients have the method, but the Swift signature/return diverges (often untyped
-`[String: Any]` where JS is typed). Both compile; the difference is flagged inline.
+Both clients have the method, but the Swift signature/return diverges (often a typed Swift struct
+where JS takes an inline object). Both compile; the difference is flagged inline.
 :::
-
-These callouts come straight from the [JS↔Swift parity crosswalk](https://github.com/Primitive-Labs/primitive-docs/blob/docs-parity-jun-3/swift-parity-crosswalk.md).
 
 ## Build & verify
 

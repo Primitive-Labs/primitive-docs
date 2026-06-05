@@ -4,16 +4,7 @@ General-purpose key-value cache with in-memory + persistent storage, request ded
 
 ## key(base, params?)
 
-Build a deterministic cache key from a base string and optional params.
-
-::: danger Swift parity gap — keys are not portable
-The two clients produce **different keys** for the same inputs: JS serializes params as
-`base:<stable-JSON>` and accepts any value (scalar, array, object), while Swift accepts only
-`[String: Any]` and joins them as `base?k=v&…`. Keys are therefore **not portable across
-platforms** — a value cached under a JS key won't be found by Swift and vice versa. Behavioral
-divergence, no issue number filed yet (sweep cache D3); the param-typedness half (Swift `[String:
-Any]` only) is tracked under [#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954).
-:::
+Build a deterministic cache key from a base string and optional params. With no params the key is the bare `base`; with params it is `base:<sorted-JSON>`, matching JS so keys are portable across platforms.
 
 ::: code-group
 <<< ./snippets/cache/key.ts#example{ts} [JavaScript]
@@ -73,24 +64,9 @@ Remove every entry from the cache.
 
 ## Cache events (cacheUpdated / cacheUpdateFailed)
 
-The JS cache emits `cacheUpdated` (`{ key, updatedAt, source, value }`) on every successful network
-refresh and `cacheUpdateFailed` (`{ key, error }`) on failure.
-
-::: tip Now on both clients
-Swift's `KvCache` now emits `cacheUpdated` / `cacheUpdateFailed` on network refresh / failure,
-surfaced through `client.events.on(.cacheUpdated)` / `.cacheUpdateFailed`
+Both clients emit `cacheUpdated` (`{ key, updatedAt, source, value }`) on every successful network
+refresh and `cacheUpdateFailed` (`{ key, error }`) on failure, surfaced through
+`client.events.on(.cacheUpdated)` / `.cacheUpdateFailed`
 ([#1042](https://github.com/Primitive-Labs/js-bao-wss/issues/1042)). The JS `me`-record re-emit
 (`meUpdated` when `key == "me"`) is not yet wired on Swift — `.meUpdated` already fires from the
 WS path.
-:::
-
-## KvCache.get / KvCache.set
-
-Swift's underlying `KvCache` exposes public `get(key:)` and `set(key:value:)` methods for direct
-reads and writes that bypass the facade.
-
-::: warning No JavaScript equivalent
-Swift-only — neither the JS `CacheFacade` nor the JS `KvCache` exposes `get`/`set`. On Swift these
-live on the internal `KvCache` (not on `client.cache`), so they are not reachable through the
-public facade (sweep cache D10; no issue number filed yet).
-:::

@@ -28,14 +28,9 @@ Update the profile's `name` and/or `avatarUrl`, returning the updated
 ## uploadAvatar(imageData, contentType)
 
 Upload an avatar image and get back the new avatar URL (a typed
-`AvatarUploadResult` in Swift, `{ avatarUrl }` in JS).
-
-::: tip Minor divergence
-In JS `contentType` is a typed union
-(`image/png | image/jpeg | image/gif | image/webp`); Swift takes a bare `String`,
-so an invalid MIME type fails at runtime rather than compile-time. The return is
-now typed on both sides.
-:::
+`AvatarUploadResult` in Swift, `{ avatarUrl }` in JS). Swift takes a typed
+`AvatarContentType` enum (`.png` / `.jpeg` / `.gif` / `.webp`), matching JS's
+typed MIME union.
 
 ::: code-group
 <<< ./snippets/me/upload-avatar.ts#example{ts} [JavaScript]
@@ -44,24 +39,19 @@ now typed on both sides.
 
 ## ownedDocuments(options?)
 
-List documents the current user owns (live ownership, not creator). JS returns a
-flat `DocumentInfo[]` by default (or a `{ items, cursor }` page with
-`returnPage: true`) and accepts the full `documents.list` option set. Swift
-returns a typed `[DocumentInfo]`.
+List documents the current user owns (live ownership, not creator). Both clients
+return a flat `DocumentInfo[]` by default; for the `{ items, cursor }` page
+envelope, JS passes `returnPage: true` and Swift calls `ownedDocumentsPage(...)`.
+Swift accepts `cursor`/`limit`/`tag` plus the full `MeOwnedDocumentsOptions` set
+(`includeRoot`, `refreshFromServer`, `localOnly`, `serverTimeoutMs`,
+`waitForLoad`, `forward`, `returnPage`).
 
-Swift's `ownedDocuments` is now **offline-first** (#938): when online it fetches
+Swift's `ownedDocuments` is **offline-first** (#938): when online it fetches
 the server list AND merges in owner rows from the local metadata cache (deduped
 by `documentId`, server rows winning on conflict), so freshly-created
 `pendingCreate` docs and other locally-known owned docs the server list didn't
 return still appear; when offline it returns the owner subset of the local cache
 only.
-
-::: tip Narrower option set (Swift)
-Swift accepts `cursor`/`limit`/`tag` only — the JS-side `includeRoot`,
-`refreshFromServer`, `localOnly`, `serverTimeoutMs`, `waitForLoad`, `forward`,
-and `returnPage` knobs are not surfaced. The offline-first merge itself is
-on by default.
-:::
 
 ::: code-group
 <<< ./snippets/me/owned-documents.ts#example{ts} [JavaScript]

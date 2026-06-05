@@ -16,14 +16,10 @@ Start a workflow run and get back `{ runId, runKey, status, existing }`. In
 Swift, `input` is a positional `[String: Any]` and the idempotency/scoping
 fields live on `StartWorkflowOptions`.
 
-::: tip Divergent shape
 Swift flattens the JS options object: `input` is a positional `[String: Any]`
 and the remaining idempotency/scoping fields move onto `StartWorkflowOptions`.
-This positional-args-mirror-JS-options shape is the convention across the Swift
-workflows surface (`define` / `listStepRuns` / `getStatus` / `meta`) and is
-expected, not a gap (sweep workflows D3,
-[#954](https://github.com/Primitive-Labs/js-bao-wss/issues/954)).
-:::
+A single-object overload (`start(_ options: StartWorkflowOptions)`) is also
+available, mirroring the JS options-object call.
 
 ::: code-group
 <<< ./snippets/workflows/start.ts#example{ts} [JavaScript]
@@ -44,15 +40,8 @@ connectivity / abort-before-send errors reject.
 
 ## getStatus(options)
 
-Poll the status of a run. The Swift envelope adds a `normalizedStatus` field
-that reconciles the Cloudflare-workflow and DB status shapes.
-
-::: tip Divergent shape
-`normalizedStatus` is Swift-only — JS `getStatus` returns `WorkflowStatusResult`
-with no such field, so code that reads `status.normalizedStatus` won't port
-across clients. It's a Swift-side convenience (reconciles the CF-workflow and DB
-status shapes), not a JS gap.
-:::
+Poll the status of a run. Returns a `WorkflowStatusResult`
+(`status` / `output` / `error` / `run`).
 
 ::: code-group
 <<< ./snippets/workflows/get-status.ts#example{ts} [JavaScript]
@@ -64,12 +53,11 @@ status shapes), not a JS gap.
 Terminate a running workflow. Pass the same `contextDocId` the run was started
 with so the server can route to the right per-document instance.
 
-::: tip Divergent shape
-JS carries `contextDocId` inside the `TerminateWorkflowOptions` object; Swift
-takes it as a third optional positional parameter
-(`terminate(workflowKey:runKey:contextDocId:)`, defaulting to `nil`). The
-example omits it; supply it for runs started with a `contextDocId`.
-:::
+Swift takes `contextDocId` as a third optional positional parameter
+(`terminate(workflowKey:runKey:contextDocId:)`, defaulting to `nil`), or via a
+single-object overload (`terminate(_ options: TerminateWorkflowOptions)`)
+mirroring the JS options-object call. The example omits it; supply it for runs
+started with a `contextDocId`.
 
 ::: code-group
 <<< ./snippets/workflows/terminate.ts#example{ts} [JavaScript]
@@ -157,49 +145,3 @@ that receives a typed `WorkflowApplyContext`.
 <<< ./snippets/workflows/define.ts#example{ts} [JavaScript]
 <<< ./snippets/workflows/define.swift#example{swift} [Swift]
 :::
-
-## Swift-only orchestration helpers
-
-The Swift client adds higher-level, run-scoped helpers on top of the shared
-apply lifecycle. These are **Swift-only by design** — JS expresses the same
-flows through `runSync`, the `workflowStatus` event, and the single-handler
-`define` model, so they are not parity gaps (see
-[crosswalk](https://github.com/Primitive-Labs/primitive-docs/blob/docs-parity-jun-3/swift-parity-crosswalk.md), Workflows: "Swift-only orchestration").
-
-### runAndApply(workflowKey:input:options:timeout:)
-
-Start a workflow and await its applied output in one call. Tracks each
-invocation by `runKey`, so N parallel runs of the same key coexist (unlike the
-single-handler `define`). Terminal non-success statuses throw
-`WorkflowsAPI.WorkflowRunError`; missed output throws `.timedOut`.
-
-<<< ./snippets/workflows/run-and-apply.swift#example{swift} [Swift]
-
-### awaitRun(workflowKey:runKey:contextDocId:timeout:)
-
-Reconnect to an existing run and await its output. Use on app resume or
-document reopen to pick up a run started in a previous session; resolves across
-`apply_pending` / `running` / `completed` states.
-
-<<< ./snippets/workflows/await-run.swift#example{swift} [Swift]
-
-### recheckPendingRuns()
-
-Re-check every registered per-run waiter against the server's current state.
-Call after reconnect to pick up applies whose `workflowStatus` events were
-missed while offline.
-
-<<< ./snippets/workflows/recheck-pending-runs.swift#example{swift} [Swift]
-
-### deliverPendingApplies(contextDocId:)
-
-Fetch any pending applies for a document and run them through the registered
-`define` handlers. Call after reconnect or when a document is opened.
-
-<<< ./snippets/workflows/deliver-pending-applies.swift#example{swift} [Swift]
-
-### undefine(workflowKey)
-
-Drop a previously-registered apply handler.
-
-<<< ./snippets/workflows/undefine.swift#example{swift} [Swift]

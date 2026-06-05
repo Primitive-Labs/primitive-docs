@@ -3,15 +3,15 @@
 The typed model surface (`Task.save()`, `Task.query()`, …) — record CRUD, queries, aggregation, and change subscriptions on a generated model class. Records are imported from your generated models, not reached through `client.<x>`.
 
 ::: tip Divergent shape
-Both clients now expose the surface as one model per type. JavaScript uses **static/instance methods on the generated `BaseModel` class** (`Task.query`, `task.save`); Swift (post-[#918](https://github.com/Primitive-Labs/js-bao-wss/issues/918)) uses a matching **static `Model.*` facade** on the generated struct — reads are statics that span every open document by default (`Task.query`, `Task.count`, `Task.findAll`, `Task.find`, `Task.aggregate`, `Task.subscribe`), and writes are the instance `save(in:)` / `delete(in:)` that target one document and throw if it isn't open. The old per-document `TypedModel<Task>` wrapper and its `.dynamic` escape hatch are gone — app code only ever touches the facade. Two surface gaps remain vs JS: the model facade has no `findByUnique` / `upsert` / `queryOne` / cursor-paged `query` (filter and take `.first` / re-save by natural key instead), and Swift `query()` returns the hydrated `[Task]` directly rather than a `PaginatedResult` ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946) / [#955](https://github.com/Primitive-Labs/js-bao-wss/issues/955)). Per-method divergences are noted inline.
+Both clients now expose the surface as one model per type. JavaScript uses **static/instance methods on the generated `BaseModel` class** (`Task.query`, `task.save`); Swift (post-[#918](https://github.com/Primitive-Labs/js-bao-wss/issues/918)) uses a matching **static `Model.*` facade** on the generated struct — reads are statics that span every open document by default (`Task.query`, `Task.queryOne`, `Task.count`, `Task.findAll`, `Task.find`, `Task.findByUnique`, `Task.aggregate`, `Task.subscribe`), and writes are the instance `save(in:)` / `save(in:upsertOn:)` / `delete(in:)` that target one document and throw if it isn't open. The old per-document `TypedModel<Task>` wrapper and its `.dynamic` escape hatch are gone — app code only ever touches the facade. One surface gap remains vs JS: Swift `query()` returns the hydrated `[Task]` directly rather than a `PaginatedResult`, so cursor pagination isn't expressible on the facade today ([#946](https://github.com/Primitive-Labs/js-bao-wss/issues/946)). Per-method divergences are noted inline.
 :::
 
 ## save(options?)
 
-Construct a record and persist it. JS `save` accepts `SaveOptions` (`targetDocument`, `forceWrite`, `upsertOn`); Swift's instance `save(in:)` (the unified create/update from [#918](https://github.com/Primitive-Labs/js-bao-wss/issues/918)) takes an explicit `documentId` and throws if that document isn't open.
+Construct a record and persist it. JS `save` accepts `SaveOptions` (`targetDocument`, `forceWrite`, `upsertOn`); Swift's instance `save(in:)` (the unified create/update from [#918](https://github.com/Primitive-Labs/js-bao-wss/issues/918)) takes an explicit `documentId` and throws if that document isn't open. The `upsertOn` form is `save(in:upsertOn:)` (see [upsert](#upsert-save-with-upserton)).
 
 ::: tip Divergent shape
-JS targets the active document by default (or `{ targetDocument }`); Swift's `save(in:)` always names the document explicitly — there's no active-document defaulting. The other `SaveOptions` aren't on the Swift facade: `forceWrite` has no equivalent, and `upsertOn` has no facade form — upsert by re-saving a record you looked up by its natural key (see [upsert](#upsert-save-with-upserton)) (sweep D3/D4, [#947](https://github.com/Primitive-Labs/js-bao-wss/issues/947)).
+JS targets the active document by default (or `{ targetDocument }`); Swift's `save(in:)` always names the document explicitly — there's no active-document defaulting. `forceWrite` has no Swift equivalent.
 :::
 
 ::: code-group
@@ -52,11 +52,7 @@ returned count can be smaller than what's actually stored (sweep model D-findAll
 
 ## findByUnique(constraintName, value)
 
-Look up a record by a registered unique constraint without knowing its id. Pass an array for a compound constraint.
-
-::: tip Divergent shape
-JS has a dedicated `async` `findByUnique` (bare value, or an array for a compound constraint). The Swift model facade has **no** `findByUnique` — filter on the unique field and take `.first` (`Task.query(["email": "alice@example.com"]).first`); for a compound constraint, filter on every field of it ([#947](https://github.com/Primitive-Labs/js-bao-wss/issues/947)).
-:::
+Look up a record by a registered unique constraint without knowing its id. Both clients expose `findByUnique(constraintName, value)`; pass an array for a compound constraint. JS is `async`; Swift's static `throws` if the constraint isn't registered.
 
 ::: code-group
 <<< ./snippets/model-surface/find-by-unique.ts#example{ts} [JavaScript]
@@ -87,11 +83,7 @@ Combine conditions with `$or` / `$and`.
 
 ## queryOne(filter?, options?)
 
-Fetch just the first match (with an optional sort). Resolves to null/nil when nothing matches.
-
-::: tip Divergent shape
-JS has a dedicated `queryOne`; the Swift model facade has none — take `.first` of a sorted `Task.query(...)` ([#955](https://github.com/Primitive-Labs/js-bao-wss/issues/955)).
-:::
+Fetch just the first match (with an optional sort). Resolves to null/nil when nothing matches. Both clients expose `queryOne`; JS is `async`, Swift's static is synchronous.
 
 ::: code-group
 <<< ./snippets/model-surface/query-one.ts#example{ts} [JavaScript]
@@ -152,11 +144,7 @@ Both clients expose `Task.subscribe`. The Swift static fires the callback after 
 
 ## upsert (save with upsertOn)
 
-Insert-or-merge by a natural unique key, without knowing the existing record's id. The field must have a single-field unique constraint.
-
-::: tip Divergent shape
-JS expresses this as `save({ upsertOn: "email" })` on the typed instance. The Swift model facade has no `upsertOn` — look the record up by its unique field (`AppUser.query(["email": ...]).first`), mutate it in place if it exists or build a new one if it doesn't, then `save(in:)` (the unified create/update) ([#947](https://github.com/Primitive-Labs/js-bao-wss/issues/947)).
-:::
+Insert-or-merge by a natural unique key, without knowing the existing record's id. The field must have a single-field unique constraint. JS expresses this as `save({ upsertOn: "email" })`; Swift uses the instance `save(in:upsertOn:)` overload.
 
 ::: code-group
 <<< ./snippets/model-surface/upsert.ts#example{ts} [JavaScript]

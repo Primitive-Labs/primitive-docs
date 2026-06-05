@@ -1,11 +1,12 @@
 import JsBaoClient
 
-// Fetch the app-launch config subset. Swift returns an untyped `[String: Any]`
-// where JS exposes a typed object — read the 7 fields by key.
+// Fetch the app-launch config subset via the typed `client.auth` namespace.
+// Returns a typed `AppConfigInfo` (`appId`, `name`, `mode`, `waitlistEnabled`,
+// `hasOAuth`, `hasPasskey`, `magicLinkEnabled`).
 func getAppConfig(client: JsBaoClient) async throws {
   // #region example
-  let config = try await client.getAppConfig()
-  let magicLinkEnabled = config["magicLinkEnabled"] as? Bool ?? false
+  let config = try await client.auth.getAppConfig()
+  let magicLinkEnabled = config.magicLinkEnabled
   // #endregion example
   _ = magicLinkEnabled
 }

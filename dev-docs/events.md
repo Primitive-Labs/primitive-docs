@@ -40,13 +40,7 @@ Fires when a document is closed (unsubscribed) by this client.
 ### documentMetadataChanged
 
 Fires when a document's metadata (title, tags, etc.) is created, updated, evicted, or deleted.
-
-::: tip Divergent shape
-The `source` vocabulary differs: JS reports `"local" | "server" | "idb"`, Swift reports
-`"local" | "remote"` (sweep events D6). `source` is also **optional** in Swift (`event.source?`)
-but always present in JS, so cross-platform code must handle a nil `source`. Both deliver
-`documentId`, `action`, `metadata`, and `changedFields`.
-:::
+`source` is `"local"` | `"server"` on both clients (JS also has `"idb"`, which has no SQLite analog).
 
 ::: code-group
 <<< ./snippets/events/document-metadata-changed.ts#example{ts} [JavaScript]
@@ -73,13 +67,6 @@ Fires when this client's permission level on a document changes.
 
 Fires repeatedly as a queued blob upload makes progress.
 
-::: tip Divergent shape
-JS sends the full queue-item record (12 fields incl. `queueId`, `filename`, `contentType`, `status`,
-`attempts`, `numBytes`). Swift sends a 4-field byte-progress view (`documentId`, `blobId`,
-`bytesTransferred`, `totalBytes`) — note the byte fields are renamed (`numBytes`→`bytesTransferred`/
-`totalBytes`) and the other 8 fields are dropped (sweep events D2).
-:::
-
 ::: code-group
 <<< ./snippets/events/blobs-upload-progress.ts#example{ts} [JavaScript]
 <<< ./snippets/events/blobs-upload-progress.swift#example{swift} [Swift]
@@ -88,11 +75,6 @@ JS sends the full queue-item record (12 fields incl. `queueId`, `filename`, `con
 ### blobs:upload-completed
 
 Fires when a queued blob upload finishes successfully.
-
-::: tip Divergent shape
-Swift carries only `documentId`, `blobId`, `numBytes`; JS additionally sends 5 fields — `queueId`,
-`filename`, `contentType`, `attempts`, `retainLocal`, `updatedAt` (sweep events D3).
-:::
 
 ::: code-group
 <<< ./snippets/events/blobs-upload-completed.ts#example{ts} [JavaScript]
@@ -103,12 +85,6 @@ Swift carries only `documentId`, `blobId`, `numBytes`; JS additionally sends 5 f
 
 Fires when a queued blob upload fails (and may still retry).
 
-::: tip Divergent shape
-JS sends `lastError?` (optional) plus `queueId`/`filename`/`contentType`/`attempts`/`nextAttemptAt`/
-`updatedAt`; Swift renames it to a non-optional `error` (optionality flip) and drops the other 6
-fields, keeping only `documentId`, `blobId`, `willRetry` (sweep events D4).
-:::
-
 ::: code-group
 <<< ./snippets/events/blobs-upload-failed.ts#example{ts} [JavaScript]
 <<< ./snippets/events/blobs-upload-failed.swift#example{swift} [Swift]
@@ -118,12 +94,8 @@ fields, keeping only `documentId`, `blobId`, `willRetry` (sweep events D4).
 
 ### workflowStarted
 
-Fires when a workflow run starts.
-
-::: tip Divergent shape
-Swift's payload carries only `workflowKey` and `runId` (2 of 7 fields); JS additionally sends
-`workflowId`, `runKey`, `instanceId`, `contextDocId`, and `meta` (sweep events D1).
-:::
+Fires when a workflow run starts. Both clients carry the full payload
+(`workflowKey`/`runId`/`workflowId`/`runKey`/`instanceId`/`contextDocId`/`meta`).
 
 ::: code-group
 <<< ./snippets/events/workflow-started.ts#example{ts} [JavaScript]
@@ -154,9 +126,10 @@ Fires when a document's sync state with the server flips.
 
 Fires with sync-timing telemetry for a document.
 
-::: tip Divergent shape
-The payloads diverge entirely: JS sends `timings` / `clientTimings` (`Record<string, any>` maps),
-Swift sends a single `phase` / `elapsedMs` pair (sweep events D5).
+::: warning Partial
+Swift's `SyncPerfEvent` carries `timings`/`clientTimings` for decode parity, but the Swift client
+doesn't yet instrument the per-phase timing maps (it only computes `phase`/`elapsedMs`), so those
+maps arrive empty until a frame handler is wired.
 :::
 
 ::: code-group

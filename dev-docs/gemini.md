@@ -2,13 +2,7 @@
 
 Generate content with Google Gemini models: structured prompts, raw passthrough, model discovery, and token counting.
 
-::: danger Swift parity gap — no analytics events
-Across **all** `gemini.*` methods, the Swift `GeminiAPI` emits **no analytics events** — JS fires `prompt_started` / `prompt_succeeded` / `prompt_failed` for every generate call, but the Swift auto-events engine isn't wired for gemini (the context getter hardcodes `isEnabled = true` yet nothing fires). Treat gemini analytics as JS-only on iOS ([#963](https://github.com/Primitive-Labs/js-bao-wss/issues/963)).
-:::
-
-Error handling is now aligned: Swift normalizes provider/transport failures from
-`generate` / `countTokens` / `generateRaw` to `JsBaoError(GEMINI_ERROR)` like JS
-([#1039](https://github.com/Primitive-Labs/js-bao-wss/issues/1039)).
+Every generate call fires `prompt_started` / `prompt_succeeded` / `prompt_failed` analytics events. Provider/transport failures from `generate` / `countTokens` / `generateRaw` are normalized to `JsBaoError(GEMINI_ERROR)`.
 
 ## generate(options)
 
@@ -22,10 +16,6 @@ Send a structured prompt to Gemini and return the generated response.
 ## generateRaw(options)
 
 Send a raw request body to a specified model, bypassing structured prompt formatting. `model` and `body` are required.
-
-::: tip Divergent error code
-The client-side argument validation throws a **different error code**: Swift throws `INVALID_ARGUMENT`, JS throws `GEMINI_ERROR`. Catch accordingly when validating raw requests.
-:::
 
 ::: code-group
 <<< ./snippets/gemini/generate-raw.ts#example{ts} [JavaScript]

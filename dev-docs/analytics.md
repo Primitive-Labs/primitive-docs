@@ -8,18 +8,11 @@ The queue stamps each event with the signed-in `user_ulid` (falling back to the
 `UNAUTHENTICATED` sentinel), a timestamp, and any `plan` / `app_version`
 overrides, then sends batches over the WebSocket once connected.
 
-::: warning Swift parity gap — per-feature auto-events not yet instrumented
-The engine and **session lifecycle** auto-events are in place on Swift (the
-queue auto-flushes on connect and on app background/terminate, and emits a
-`session_end` event with the session `duration_ms`). The broader per-feature
-auto-event catalog JS emits from instrumented call sites — `boot`, `dailyAuth`,
-`returnActive`, `firstDocOpen`/`firstDocEdit`, `offlineRecovery`, `syncErrors`,
-`blobUploads`, `serviceWorker`, and the `llm`/`gemini` call-path events — is
-**not yet wired** on Swift, and the `analyticsAutoEvents` config option that
-gates them in JS does not exist on `JsBaoClientOptions`. Until those call sites
-are instrumented, iOS emits only `session_end` + whatever you `logEvent` by
-hand ([#963](https://github.com/Primitive-Labs/js-bao-wss/issues/963)).
-:::
+Auto-events fire on both clients, gated by the `analyticsAutoEvents` config on
+`JsBaoClientOptions`: `session_end`, `dailyAuth`, `returnActive`, `syncErrors`,
+`blobUploads`, and the `llm`/`gemini` call-path events. (`boot`/`firstDocOpen`/
+`firstDocEdit`/`offlineRecovery` are no-ops in current JS, so Swift doesn't emit
+them either; `serviceWorker` is browser-only.)
 
 ## logEvent(event)
 
