@@ -76,6 +76,8 @@ A bucket's **access policy** decides who can read and write its blobs. App admin
 
 Pick the simplest policy that fits.
 
+For member access that the three policies can't express, attach a [rule set](./access-control.md#rule-sets-governing-management-operations) to the bucket — set `ruleSetId` in the bucket's TOML, or pass `--rule-set-id` to `primitive blob-buckets create`. An attached rule set becomes the authority for member-level access: admins and owners are always allowed, unauthenticated callers are rejected, and every other read or write is decided by the rule set's CEL rules.
+
 ## TTL Tiers
 
 Each bucket has a **TTL tier** that governs how long blobs live before the storage layer deletes them. Pick the shortest tier that fits — short-lived blobs are cheaper and safer.

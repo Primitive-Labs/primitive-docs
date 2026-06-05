@@ -526,6 +526,8 @@ type = "text"
 text = "Summarize: {{ input.content }}"
 ```
 
+The `model` must be on the server's allow-list of Gemini models — a disallowed model is rejected when you save the workflow, not when it runs.
+
 ### `prompt.execute`
 
 Runs a [managed prompt](./prompts.md) — versioned, testable, and configured outside the workflow:

@@ -21,7 +21,17 @@ primitive sync diff --dir ./config    # see what would change
 primitive sync push --dir ./config    # apply your changes to the server
 ```
 
-The files live in your repo, so configuration changes ride the same workflow as code: branches, diffs, reviews, rollbacks. `sync push` validates as it applies and reports the file and entity behind any failure.
+The files live in your repo, so configuration changes ride the same workflow as code: branches, diffs, reviews, rollbacks. `sync push` validates every file before applying anything — a validation error aborts the push with no changes applied — and reports the file and entity behind any failure.
+
+Every `sync pull` snapshots the sync directory before writing, so a pull that overwrites local edits is recoverable:
+
+```bash
+primitive sync revert --list            # list available snapshots
+primitive sync revert                   # restore the most recent
+primitive sync revert --snapshot <id>   # restore a specific one
+```
+
+Snapshots are local CLI state, kept out of version control and pruned after 28 days. `revert` replaces the sync directory with the snapshot — run `primitive sync diff` afterwards to see where the restored files stand relative to the server.
 
 ## What Lives in the Config Directory
 

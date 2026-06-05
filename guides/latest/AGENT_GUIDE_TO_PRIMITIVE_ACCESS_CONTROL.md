@@ -37,7 +37,7 @@ primitive rule-sets create "team-management" \
   }'
 ```
 
-Bind via the type config: `config/group-type-configs/<type>.toml` / `config/collection-type-configs/<type>.toml` (synced), or `client.groupTypeConfigs.create({ groupType, ruleSetId })` / `client.collectionTypeConfigs.create(...)`.
+Bind via the type config: `config/group-type-configs/<type>.toml` / `config/collection-type-configs/<type>.toml` (synced), or `client.groupTypeConfigs.create({ groupType, ruleSetId })` / `client.collectionTypeConfigs.create(...)`. A **blob bucket** attaches a rule set directly via its `ruleSetId` (TOML, or `--rule-set-id` on `primitive blob-buckets create`), where it governs member-level reads/writes — see the Blob Buckets guide for precedence semantics.
 
 Semantics:
 - **App owners/admins bypass rule sets entirely**; rules apply to regular members.
