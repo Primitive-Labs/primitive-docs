@@ -1248,21 +1248,18 @@ Manual flow if you need it: `claimApply` → run logic → `confirmApply` (succe
 {{/lang}}
 
 {{#lang swift}}
-For "start a run and await its result", use `runAndApply`. It tracks each call by `runKey` (so N concurrent runs of the same `workflowKey` coexist), runs the full claim → getStatus → confirm flow internally, and returns a `WorkflowApplyContext` carrying the output:
+Register a per-`workflowKey` handler with `define(_:onApply:)`. When a `workflowStatus` event arrives with `needsApply == true` for that key, the client automatically claims the lease, fetches the output via `getStatus`, runs your handler, then confirms — releasing the claim if the handler throws:
 
 ```swift
-let ctx = try await client.workflows.runAndApply(
-    workflowKey: "ocr-content",
-    input: ["attachments": [["data": image.base64EncodedString(), "type": "image/jpeg"]]],
-    options: StartWorkflowOptions(contextDocId: documentId),
-    timeout: 120                          // default 120s; raise for slow LLM workflows
-)
-let output = ctx.output                   // Any? — cast to the final step's JSON shape
-// Terminal non-success throws WorkflowRunError.terminalFailure(status:message:);
-// missing output within the window throws .timedOut; task cancellation propagates.
+client.workflows.define("my-workflow-key") { ctx in
+    // Runs on exactly one connected client, after the lease is claimed.
+    // ctx.output, ctx.workflowKey, ctx.runKey, ctx.runId,
+    // ctx.contextDocId, ctx.startedByUserId, ctx.meta
+    // Write ctx.output into the contextDocId document here.
+}
 ```
 
-Use the lower-level `define` + `start` pair when you need a long-lived per-`workflowKey` handler rather than a per-call awaiter. When you do, the mandatory guards are: **register `define(...)` before `start(...)`** (else the apply may deliver before you subscribe); **guard the handler on a matching `runKey`** (a `.workflowStatus` event from a prior app session can otherwise resolve a fresh continuation); and a **`resolved` flag** (server retries can fire the handler more than once, and a `CheckedContinuation` traps on double-resume). If the device was offline when the server finished the run, call `client.workflows.deliverPendingApplies(contextDocId:)` after reconnect to drive the queued apply.
+Register the handler before starting runs, so an apply that lands quickly isn't missed. If the device was offline when the server finished the run, call `getPendingApplies(contextDocId:)` after reconnect to recover the parked applies.
 
 Manual flow if you need it: `claimApply` → run logic → `confirmApply` (success) or `releaseApply` (failure). 30s lease timeout for crashed clients.
 {{/lang}}

@@ -23,7 +23,7 @@ func manageMyProfile(client: JsBaoClient, avatar: Data) async throws {
   )
 
   // Upload an image directly; the server hosts it and returns a URL.
-  let uploaded = try await client.me.uploadAvatar(imageData: avatar, contentType: "image/png")
+  let uploaded = try await client.me.uploadAvatar(imageData: avatar, contentType: .png)
   let avatarUrl = uploaded.avatarUrl
 
   // update() and uploadAvatar() clear the cache automatically; reach for

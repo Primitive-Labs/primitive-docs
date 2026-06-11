@@ -153,29 +153,30 @@ await client.invitations.create({ email, role: "member" });
 {{#lang swift}}
 ```swift
 // Admins/owners: any role
-_ = try await client.invitations.create(params: [
-  "email": "alice@example.com",
-  "role": "member",  // or "admin" / "owner" (admin/owner only)
-])
+_ = try await client.invitations.create(
+  params: CreateInvitationParams(email: "alice@example.com", role: "member")  // or "admin" / "owner" (admin/owner only)
+)
 
 // Full options
-_ = try await client.invitations.create(params: [
-  "email": "alice@example.com",
-  "role": "member",
-  "expiresAt": ISO8601DateFormatter().string(from: Date().addingTimeInterval(7 * 86400)),
-  "source": "team-onboarding-flow",
-  "note": "Backend hire — Q2 cohort",
-  "sendEmail": true,
-])
+_ = try await client.invitations.create(
+  params: CreateInvitationParams(
+    email: "alice@example.com",
+    role: "member",
+    expiresAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(7 * 86400)),
+    source: "team-onboarding-flow",
+    note: "Backend hire — Q2 cohort",
+    sendEmail: true
+  )
+)
 
 // Members: gate on quota first
 let quota = try await client.invitations.quota()
-let unlimited = quota["unlimited"] as? Bool ?? false
-let remaining = quota["remaining"] as? Int ?? 0
-if !unlimited && remaining <= 0 {
+if !quota.unlimited && quota.remaining <= 0 {
   return showQuotaExhausted()
 }
-_ = try await client.invitations.create(params: ["email": email, "role": "member"])
+_ = try await client.invitations.create(
+  params: CreateInvitationParams(email: email, role: "member")
+)
 ```
 {{/lang}}
 
@@ -240,10 +241,9 @@ await myEmailService.send({ to: inv.email, link: acceptUrl });
 {{#lang swift}}
 ```swift
 let inv = try await client.invitations.get(invitationId: invitationId)
-let inviteToken = inv["inviteToken"] as? String ?? ""
-let email = inv["email"] as? String ?? ""
+let inviteToken = inv.inviteToken ?? ""
 let acceptUrl = "\(myApp.baseURL)/invite/accept?inviteToken=\(inviteToken)"
-try await myEmailService.send(to: email, link: acceptUrl)
+try await myEmailService.send(to: inv.email, link: acceptUrl)
 ```
 {{/lang}}
 
@@ -307,9 +307,11 @@ const { grants, nextCursor } = await client.invitations.listDeferredGrants({
 {{/lang}}
 {{#lang swift}}
 ```swift
-let (grants, nextCursor) = try await client.invitations.listDeferredGrants(
+let result = try await client.invitations.listDeferredGrants(
   email: "alice@example.com"
 )
+let grants = result.grants        // [DeferredGrant]
+let nextCursor = result.nextCursor
 ```
 {{/lang}}
 
@@ -345,21 +347,21 @@ async function onboardTeammate(email: string, projectDocId: string) {
 ```swift
 func onboardTeammate(email: String, projectDocId: String) async throws {
   let quota = try await client.invitations.quota()
-  let unlimited = quota["unlimited"] as? Bool ?? false
-  let remaining = quota["remaining"] as? Int ?? 0
-  if !unlimited && remaining <= 0 {
+  if !quota.unlimited && quota.remaining <= 0 {
     throw OnboardingError.quotaExhausted
   }
 
-  _ = try await client.invitations.create(params: ["email": email, "role": "member"])
+  _ = try await client.invitations.create(
+    params: CreateInvitationParams(email: email, role: "member")
+  )
 
   _ = try await client.documents.updatePermissions(
     documentId: projectDocId,
-    params: ["permissions": [["email": email, "permission": "read-write"]]]
+    params: .email(email, permission: "read-write")
   )
 
   _ = try await client.groups.addMember(
-    groupType: "team", groupId: "engineering", params: ["email": email]
+    groupType: "team", groupId: "engineering", params: .email(email)
   )
 }
 ```
@@ -387,13 +389,15 @@ client.on("invitation", (event) => {
 {{/lang}}
 {{#lang swift}}
 ```swift
-client.events.on(.invitation) { event in
-  switch event.action {
+client.events.onAny(.invitation) { payload in
+  guard let event = payload as? [String: Any],
+        let action = event["action"] as? String else { return }
+  switch action {
   case "created":   break  // invitee only
   case "updated":   break  // invitee only
   case "cancelled": break  // invitee only
   case "declined":  break  // both invitee and inviter
-  case "accepted":  break  // inviter only — event.acceptedBy carries the userId
+  case "accepted":  break  // inviter only — event["acceptedBy"] carries the userId
   default:          break  // future-proof: no-op, don't throw
   }
 }
