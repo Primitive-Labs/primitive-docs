@@ -2,18 +2,18 @@
 #
 # Receives the `submodule-update` repository_dispatch that the library repos
 # (js-bao-wss, primitive-app-dev) fire on every push to their main branch, and
-# runs the project's docs-next-sync skill with Claude Code to true the docs on
-# the `next` branch against the library main tips. The result is opened as a
-# pull request into `next` for human review — this workflow never merges.
+# runs the project's docs-next-sync skill with the Claude Code CLI to true the
+# docs on the `next` branch against the library main tips. The result is opened
+# as a pull request into `next` for human review — this workflow never merges.
 #
 # NOTE: repository_dispatch only triggers workflows that live on the default
 # branch (main), so this file must stay on main even though the work it does
 # targets `next`.
 #
 # Secrets used (already configured in this repo):
-#   ANTHROPIC_API_KEY — Claude Code Action
-#   DOCS_REPO_PAT     — checkout + private submodule auth + opening the PR
-#   GITHUB_TOKEN      — Claude Code Action github_token
+#   ANTHROPIC_API_KEY — Claude Code CLI auth
+#   DOCS_REPO_PAT     — checkout + private submodule auth + `gh` (skill triage) + opening the PR
+#   GITHUB_TOKEN      — fallback token
 
 name: Docs Next-Sync (agent)
 
@@ -33,6 +33,11 @@ on:
           - js-bao-wss
           - primitive-app-dev
           - swift-primitive-app-dev
+      force:
+        description: 'Run the agent even if the scan finds no new commits (testing)'
+        required: false
+        type: boolean
+        default: false
 
 # One truing pass at a time: the skill moves submodule pins and restamps, so
 # concurrent runs would clobber each other. Queue rather than cancel.
@@ -43,7 +48,6 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
-  id-token: write
 
 jobs:
   next-sync:
@@ -88,91 +92,139 @@ jobs:
           P_REF: ${{ github.event.client_payload.ref }}
           P_CHANGED: ${{ github.event.client_payload.changed_files }}
           P_COMMITS: ${{ github.event.client_payload.commit_messages }}
-          P_COMPARE: ${{ github.event.client_payload.compare_url }}
           I_SUBMODULE: ${{ github.event.inputs.submodule }}
         run: |
           if [ "$EVENT_NAME" = "repository_dispatch" ]; then
-            SUBMODULE="$P_SUBMODULE"; REF="$P_REF"; CHANGED="$P_CHANGED"
-            COMMITS="$P_COMMITS"; COMPARE="$P_COMPARE"
+            SUBMODULE="$P_SUBMODULE"; REF="$P_REF"; CHANGED="$P_CHANGED"; COMMITS="$P_COMMITS"
           else
-            SUBMODULE="$I_SUBMODULE"; REF="main"; CHANGED="(manual run)"
-            COMMITS="(manual run)"; COMPARE=""
+            SUBMODULE="$I_SUBMODULE"; REF="main"; CHANGED="(manual run)"; COMMITS="(manual run)"
           fi
           {
             echo "submodule=$SUBMODULE"
             echo "ref=$REF"
-            echo "compare=$COMPARE"
             echo "changed<<EOF"; echo "$CHANGED"; echo "EOF"
             echo "commits<<EOF"; echo "$COMMITS"; echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Run docs-next-sync with Claude
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Tunable: bump to a larger model for higher-stakes batches.
-          claude_args: |
-            --model claude-sonnet-4-6
-            --max-turns 200
-          prompt: |
-            You are running UNATTENDED in CI. True the documentation on the
-            current `next` branch against the library main tips by running the
-            project skill. Invoke it now:
+      - name: Scan for documentable changes since the last stamp
+        # Cheap, deterministic gate: only pay for a Claude run when the library
+        # tips actually moved past what the docs were last trued against. Keeps
+        # no-op dispatches (and manual re-tests) to seconds instead of minutes.
+        id: scan
+        run: |
+          git submodule foreach 'git fetch -q origin || true' || true
+          node scripts/stamp-sources.mjs --changes | tee /tmp/scan.txt || true
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            echo "Forced run — exercising the agent path regardless of the scan." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "has_work=true" >> "$GITHUB_OUTPUT"
+          elif grep -qE '\([1-9][0-9]* commit' /tmp/scan.txt; then
+            echo "has_work=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_work=false" >> "$GITHUB_OUTPUT"
+            echo "No library commits since the last stamp — nothing to true." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-            /docs-next-sync
+      - name: Run docs-next-sync with Claude Code CLI
+        if: steps.scan.outputs.has_work == 'true'
+        id: claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # The skill's triage runs `gh pr view/diff` against the (private)
+          # library repos; gh reads GH_TOKEN.
+          GH_TOKEN: ${{ secrets.DOCS_REPO_PAT }}
+          SUBMODULE: ${{ steps.ctx.outputs.submodule }}
+          LIB_REF: ${{ steps.ctx.outputs.ref }}
+          CHANGED: ${{ steps.ctx.outputs.changed }}
+          COMMITS: ${{ steps.ctx.outputs.commits }}
+        run: |
+          npm install -g @anthropic-ai/claude-code
 
-            Supplementary context from the push that triggered this run (the
-            skill re-derives the authoritative diff itself — treat this as a hint
-            only):
-            - Submodule: ${{ steps.ctx.outputs.submodule }}
-            - Library commit: ${{ steps.ctx.outputs.ref }}
-            - Changed files:
-            ${{ steps.ctx.outputs.changed }}
-            - Commit messages:
-            ${{ steps.ctx.outputs.commits }}
+          # Static instructions (quoted heredoc → no shell interpolation).
+          cat > /tmp/prompt.txt <<'PROMPT'
+          You are running UNATTENDED in CI on the `next` branch of primitive-docs.
 
-            CRITICAL unattended-run rules:
-            - This is non-interactive. NEVER ask a question or wait for input.
-              For any decision the skill would normally escalate (creating a
-              brand-new page, splitting a large batch, an ambiguous editorial
-              call), make the CONSERVATIVE choice: apply only well-verified
-              factual updates to EXISTING pages and their matching agent guides,
-              and leave anything needing human judgment or a new page undone —
-              listing it prominently in your report for a human to follow up.
-            - Do the full truing the skill specifies: triage every changed
-              commit, VERIFY each fact against the submodule source (do not trust
-              PR summaries), update human docs AND the matching agent guides,
-              run `pnpm render:guides`, restamp, and run the gates
-              (`pnpm check:examples`, `npx vitepress build docs`). Fix whatever
-              the gates flag before finishing.
-            - Do NOT run `git commit`, `git push`, `git checkout -b`,
-              `git merge`, or `gh pr create`/`gh pr merge`. Leave every change in
-              the working tree; this workflow opens the pull request.
-            - Do NOT file GitHub issues. If you find a Swift/JS parity gap or
-              another library bug you would normally file, describe it in the
-              report instead.
-            - Finish by writing your complete Step 4 disposition report (the
-              per-commit table plus any deferred/held items and parity gaps) to
-              `.docs-next-sync-report.md` at the repo root. If the pass made no
-              doc changes, say so there and reset the submodules so the working
-              tree is clean.
+          Your job: use the project's docs-next-sync skill to true the
+          documentation against the library main tips, then leave the result for
+          a human-reviewed pull request. Begin now by invoking the
+          docs-next-sync skill (the `/docs-next-sync` command) and carry it to
+          completion under the rules below.
+
+          CRITICAL unattended-run rules:
+          - Non-interactive: NEVER ask a question or wait for input. For any
+            decision the skill would normally escalate (a brand-new page,
+            splitting a large batch, an ambiguous editorial call), make the
+            CONSERVATIVE choice: apply only well-verified factual updates to
+            EXISTING pages and their matching agent guides, and leave anything
+            needing human judgment or a new page undone — listing it prominently
+            in your report.
+          - Do the full truing: triage every changed commit, VERIFY each fact
+            against the submodule source (never trust PR summaries), update human
+            docs AND the matching agent guides, run `pnpm render:guides`,
+            restamp, and run the gates (`pnpm check:examples`,
+            `npx vitepress build docs`). Fix whatever the gates flag.
+          - Do NOT run `git commit`, `git push`, `git checkout -b`, `git merge`,
+            or `gh pr create`/`gh pr merge`. Leave every change in the working
+            tree; the workflow opens the pull request.
+          - Do NOT file GitHub issues. If you find a Swift/JS parity gap or other
+            library bug you would normally file, describe it in the report.
+          - Finish by writing your complete disposition report (the per-commit
+            table plus any deferred/held items and parity gaps) to
+            `.docs-next-sync-report.md` at the repo root. If the pass made no doc
+            changes, say so there and reset the submodules so the tree is clean.
+          PROMPT
+
+          # Append the (untrusted) payload context as plain data.
+          {
+            echo
+            echo "Triggering push context (a hint only; the skill re-derives the authoritative diff):"
+            echo "- Submodule: ${SUBMODULE:-unknown}"
+            echo "- Library commit: ${LIB_REF:-unknown}"
+            echo "- Changed files:"
+            echo "${CHANGED:-(none)}"
+            echo "- Commit messages:"
+            echo "${COMMITS:-(none)}"
+          } >> /tmp/prompt.txt
+
+          set +e
+          timeout 50m claude -p "$(cat /tmp/prompt.txt)" \
+            --model sonnet \
+            --permission-mode bypassPermissions \
+            --output-format json \
+            > /tmp/claude_out.json 2> /tmp/claude_err.log
+          code=$?
+          set -e
+
+          echo "claude exit code: $code"
+          echo "----- stderr (tail) -----"; tail -40 /tmp/claude_err.log || true
+          if jq -e . /tmp/claude_out.json >/dev/null 2>&1; then
+            echo "----- run stats -----"
+            jq -r '"is_error=\(.is_error)  num_turns=\(.num_turns)  cost_usd=\(.total_cost_usd)"' /tmp/claude_out.json || true
+          else
+            echo "----- raw stdout (tail) -----"; tail -40 /tmp/claude_out.json || true
+          fi
+
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Claude Code CLI exited $code"
+            exit "$code"
+          fi
+          if jq -e '.is_error == true' /tmp/claude_out.json >/dev/null 2>&1; then
+            echo "::error::Claude reported is_error=true"
+            exit 1
+          fi
 
       - name: Read agent report
+        if: steps.scan.outputs.has_work == 'true'
         id: report
         run: |
           if [ -f .docs-next-sync-report.md ]; then
-            {
-              echo "body<<REPORT_EOF"
-              cat .docs-next-sync-report.md
-              echo "REPORT_EOF"
-            } >> "$GITHUB_OUTPUT"
+            { echo "body<<REPORT_EOF"; cat .docs-next-sync-report.md; echo "REPORT_EOF"; } >> "$GITHUB_OUTPUT"
             rm -f .docs-next-sync-report.md
           else
-            echo "body=The agent did not produce a report file. Review the run logs." >> "$GITHUB_OUTPUT"
+            echo "body=The agent produced no report file. Review the run logs." >> "$GITHUB_OUTPUT"
           fi
 
       - name: Detect changes
+        if: steps.scan.outputs.has_work == 'true'
         id: diff
         run: |
           git add -A
@@ -183,7 +235,7 @@ jobs:
           fi
 
       - name: Open pull request into next
-        if: steps.diff.outputs.changed == 'true'
+        if: steps.scan.outputs.has_work == 'true' && steps.diff.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.DOCS_REPO_PAT }}
@@ -201,14 +253,15 @@ jobs:
             ---
             Review the doc changes and the disposition above, then merge into `next`. Publishing to `main` happens separately at a production release.
 
-            > Generated unattended by Claude Code. Verify facts against source before merging.
+            > Generated unattended by the Claude Code CLI. Verify facts against source before merging.
 
       - name: Run summary
         if: always()
         run: |
-          if [ "${{ steps.diff.outputs.changed }}" = "true" ]; then
+          if [ "${{ steps.scan.outputs.has_work }}" != "true" ]; then
+            echo "## docs-next-sync: nothing to do (no new library commits)" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ steps.diff.outputs.changed }}" = "true" ]; then
             echo "## docs-next-sync opened a PR into \`next\`" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "## docs-next-sync: no doc changes needed" >> "$GITHUB_STEP_SUMMARY"
-            echo "All triggering commits were internal / already documented." >> "$GITHUB_STEP_SUMMARY"
+            echo "## docs-next-sync: triaged changes, no doc edits needed" >> "$GITHUB_STEP_SUMMARY"
           fi
