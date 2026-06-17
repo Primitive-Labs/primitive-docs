@@ -198,7 +198,10 @@ jobs:
           echo "----- stderr (tail) -----"; tail -40 /tmp/claude_err.log || true
           if jq -e . /tmp/claude_out.json >/dev/null 2>&1; then
             echo "----- run stats -----"
-            jq -r '"is_error=\(.is_error)  num_turns=\(.num_turns)  cost_usd=\(.total_cost_usd)"' /tmp/claude_out.json || true
+            jq -r '"is_error=\(.is_error)  num_turns=\(.num_turns)  cost_usd=\(.total_cost_usd)  duration_ms=\(.duration_ms)"' /tmp/claude_out.json || true
+            echo "::group::Agent final message (.result)"
+            jq -r '.result // "(no result field)"' /tmp/claude_out.json || true
+            echo "::endgroup::"
           else
             echo "----- raw stdout (tail) -----"; tail -40 /tmp/claude_out.json || true
           fi
@@ -217,10 +220,14 @@ jobs:
         id: report
         run: |
           if [ -f .docs-next-sync-report.md ]; then
+            echo "::group::Disposition report (.docs-next-sync-report.md)"
+            cat .docs-next-sync-report.md
+            echo "::endgroup::"
             { echo "body<<REPORT_EOF"; cat .docs-next-sync-report.md; echo "REPORT_EOF"; } >> "$GITHUB_OUTPUT"
             rm -f .docs-next-sync-report.md
           else
-            echo "body=The agent produced no report file. Review the run logs." >> "$GITHUB_OUTPUT"
+            echo "No .docs-next-sync-report.md was written by the agent — see the agent final message above."
+            echo "body=The agent produced no report file. Review the run logs (agent final message)." >> "$GITHUB_OUTPUT"
           fi
 
       - name: Detect changes
