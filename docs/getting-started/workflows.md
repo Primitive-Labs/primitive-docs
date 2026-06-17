@@ -381,6 +381,7 @@ Every step has an `id` (unique within the workflow) and a `kind` (the step type)
 | `integration.call` | Call an external API via a configured integration |
 | `database.query` / `mutate` / `count` / `aggregate` / `pipeline` / `applyToQuery` | Run registered database operations |
 | `document.query` / `queryOne` / `count` / `save` / `patch` / `delete` | Read and write records in a document's models |
+| `document.resolveAlias` | Resolve a document alias to its id (or null) for conditional branching |
 | `group.addMember` / `removeMember` / `checkMembership` / `listMembers` / `listUserMemberships` | Group membership operations |
 | `collect` | Auto-paginate any step that returns `{ items, cursor }` |
 | `workflow.call` | Run a child workflow synchronously, inline (use `forEach` to fan out) |
@@ -668,6 +669,34 @@ status = "paid"
 `document.save` creates or replaces the record at `recordId`; `document.patch` merges its `data` fields into it. Step results: `document.query` returns `{ data, hasMore, nextCursor }` (pageable with `collect`), `document.queryOne` returns `{ record }` (`null` when nothing matches), `document.count` returns `{ count }`, the writes return `{ record }`, and `document.delete` returns `{ deleted, id }`.
 
 Writes are durable when the step completes and reach connected clients like any other document change — use document steps when the workflow owns the write. When the result should instead land in data only clients write, leave the writing to [client apply](#applying-results-to-local-data-client-apply).
+
+**Caller-mode access.** In a [caller workflow](#system-workflows) (the default), document steps act with the **starting user's** own document permissions, checked per operation: the reads (`query`, `queryOne`, `count`) need `reader` on the target document, `save` and `patch` need `read-write`, and `delete` needs `owner`. A step that reaches past what the caller may do fails the run — so a templated or user-supplied `documentId` can't be used to touch a document the caller couldn't open themselves. A [system workflow](#system-workflows) runs with the app's privileges and skips these per-caller checks.
+
+**Targeting a document by alias.** Instead of a fixed `documentId`, a step can name a document by its [alias](./working-with-documents.md#ensuring-exactly-one-document-with-aliases) — convenient for the one-document-per-user pattern, where each caller has their own:
+
+```toml
+[[steps]]
+id = "load"
+kind = "document.query"
+modelName = "Habit"
+saveAs = "habits"
+[steps.documentAlias]
+scope = "user"          # the caller's own alias (or "app" for an app-shared one)
+aliasKey = "tracker"
+```
+
+Give a step either `documentId` or `documentAlias`, not both. A `user`-scoped alias always resolves to the caller's own document; an `app`-scoped alias resolves only when the caller has access to it. If the alias doesn't resolve, the step fails the same way a missing `documentId` would.
+
+**Branching on whether an alias exists.** When you'd rather check than fail — "has this user set up their tracker yet?" — use `document.resolveAlias`. It returns `{ documentId }`, or `{ documentId: null }` when there's nothing to resolve, so a later step can `runIf` on the result instead of erroring:
+
+```toml
+[[steps]]
+id = "find-tracker"
+kind = "document.resolveAlias"
+scope = "user"
+aliasKey = "tracker"
+saveAs = "tracker"
+```
 
 ### Group Steps
 
