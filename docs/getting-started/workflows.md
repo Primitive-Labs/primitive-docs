@@ -278,6 +278,42 @@ With no rule, any signed-in member of the app can start the workflow; admins and
 
 Push the rule with `primitive sync push` like any other workflow config, or change it in place with `primitive workflows update <id> --access-rule "<CEL>"`. For the rule language and the identity context available to it (`hasRole`, `isMemberOf`, `memberGroups`), see [Access Control](./access-control.md).
 
+## System Workflows
+
+By default a workflow runs **as the user who started it** (`runAs = "caller"`): every step acts with that member's own permissions — it touches only documents they can access, and its group and data operations are checked against their roles. This is the safe default, and most workflows want it.
+
+Set `runAs = "system"` to run a workflow as the **app itself** instead of as any one user:
+
+```toml
+[workflow]
+key = "nightly-digest"
+name = "Nightly Digest"
+runAs = "system"
+```
+
+A system run executes with the app's own privileges — which is what lets a scheduled job read and write across every user's data. Because it acts on no one's behalf, who may start one is tightly held:
+
+- **Only admins and owners can start a system workflow.** A regular member who tries is refused with a `403` — never silently downgraded to a caller run.
+- **Cron triggers and inbound webhooks can only fire system workflows.** A trigger has no human principal to borrow, so it refuses to start a `caller` workflow. (Member-initiated runs are what caller workflows are for.)
+
+Runs are attributed to the app's system principal, and every system run records who set it off — the admin who started it, or the trigger that fired it — for the audit trail.
+
+### Sensitive capabilities
+
+A system run can always read and write the app's documents and data. Anything beyond that baseline is **opt-in**: declare it in `capabilities` so a privileged workflow does only what you intend.
+
+```toml
+[workflow]
+key = "sync-team-roster"
+name = "Sync Team Roster"
+runAs = "system"
+capabilities = ["membership"]
+```
+
+`membership` lets the workflow change group membership — the `group.addMember` and `group.removeMember` steps. Without the grant, those steps in a system workflow are refused. Read-only group checks never need it.
+
+[`iterate-users`](#iterate-users) is system-only — it fans out across the entire user roster, which no single caller has the standing to do. A workflow that uses it must set `runAs = "system"`, or the server rejects it when you push.
+
 ## Testing and Debugging Workflows
 
 **Test cases** live alongside the workflow and run against the real engine:
@@ -418,7 +454,7 @@ Workflows pin script bodies when they're pushed or published: each workflow snap
 
 ### `iterate-users`
 
-Fans another workflow out across **every user in the app**, once per user, as a restartable singleton — built for big per-user batch jobs (backfills, digests) that must survive restarts without re-processing completed users:
+Fans another workflow out across **every user in the app**, once per user, as a restartable singleton — built for big per-user batch jobs (backfills, digests) that must survive restarts without re-processing completed users. It's a [system-only](#system-workflows) step: the workflow must set `runAs = "system"`.
 
 ```toml
 [[steps]]

@@ -13,6 +13,8 @@ name = "My Workflow"              # required
 description = "..."               # optional
 status = "draft"                  # draft | active | archived
 accessRule = "hasRole('admin')"  # optional CEL
+runAs = "caller"                  # caller (default) | system — see Execution identity
+capabilities = ["membership"]    # system-only opt-in grants
 perUserMaxRunning = 4             # default 4
 perUserMaxQueued = 100            # default 100
 dequeueOrder = "fifo"             # fifo | lifo (default fifo)
@@ -28,7 +30,7 @@ greeting = "Hello {{ input.name }}"
 ```
 
 Workflow-level fields the engine actually reads:
-`perUserMaxRunning`, `perUserMaxQueued`, `perAppMaxRunning` (default 25), `perAppMaxQueued` (default 10000), `queueTtlSeconds` (default 43200), `dequeueOrder`, `accessRule`, `inputSchema`, `outputSchema`, `requiresClientApply` (default `true` — see "Client apply" below), `syncCallable` (default `false` — see "Synchronous invocation" below). Sync pushes the schema fields, access rule, queue settings, step list, `requiresClientApply`, and `syncCallable`.
+`perUserMaxRunning`, `perUserMaxQueued`, `perAppMaxRunning` (default 25), `perAppMaxQueued` (default 10000), `queueTtlSeconds` (default 43200), `dequeueOrder`, `accessRule`, `runAs` (default `caller` — see "Execution identity" below), `capabilities` (system-only grants), `inputSchema`, `outputSchema`, `requiresClientApply` (default `true` — see "Client apply" below), `syncCallable` (default `false` — see "Synchronous invocation" below). Sync pushes the schema fields, access rule, `runAs`/`capabilities`, queue settings, step list, `requiresClientApply`, and `syncCallable`.
 
 ### Per-step common fields
 
@@ -502,7 +504,7 @@ Given `steps.fetch.body = { "items": [{ "sku": "a1", "qty": 2, "price": 5.0 }, {
 
 ### `iterate-users`
 
-Fans a child workflow out across **every user in the app**, once per user, as a restartable singleton. Built for large per-user batch jobs (backfills, per-user digests, recomputations) that must survive restarts without re-processing completed users or holding the whole user set in memory.
+Fans a child workflow out across **every user in the app**, once per user, as a restartable singleton. Built for large per-user batch jobs (backfills, per-user digests, recomputations) that must survive restarts without re-processing completed users or holding the whole user set in memory. **System-only** — the workflow must set `runAs = "system"` (see [Execution identity](#execution-identity-runas-system-workflows)), else it's rejected at save time.
 
 ```toml
 [[steps]]
@@ -804,6 +806,37 @@ Behavior:
 - Otherwise, evaluate against `user.userId`, `user.role`, plus `hasRole(role)`, `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`.
 
 Set `accessRule` once in the `[workflow]` TOML block and it sticks: `primitive sync push` and `primitive workflows create --from-file` both apply it (an absent/empty rule is sent as "no rule" rather than dropped). To change it later without re-pushing the file, `primitive workflows update <id> --access-rule "<CEL>"` sets it (pass `--access-rule ""` to clear; omitting the flag leaves the existing rule untouched).
+
+## Execution identity (`runAs`, system workflows)
+
+`runAs` declares the principal a run executes as. Top-level `[workflow]` field, round-tripped by `primitive sync push`, validated at save time (`runAs` must be `caller` | `system`; absent → `caller`).
+
+- `runAs = "caller"` (default) — the run executes as the invoking user. Every step acts with that member's permissions: `document.*` steps enforce the caller's per-document ACL, group/data ops are checked against their roles. `accessRule` gates who may start it.
+- `runAs = "system"` — the run executes as the app's synthetic per-app principal (`sys:<appId>`, also the `WorkflowRun` partition key). App-privileged: the data baseline (document/database read/write/delete/manage) is unconditional.
+
+The invocation gate is enforced once at top-level start (HTTP start/run-sync, cron, webhook, admin test) — never silently downgraded:
+
+| invoker | `runAs:"caller"` | `runAs:"system"` |
+|---|---|---|
+| member | runs as the member | **403** "Members cannot run system workflows" |
+| admin/owner | runs as the admin | runs as system |
+| cron | **403** (cron may only run system workflows) | runs as system |
+| webhook | **403** | runs as system |
+
+Nested/child runs (`workflow.call`, durable `forEach` batches) never re-resolve identity — they inherit the parent's verbatim. Every system run records attribution (`initiatedByUserId` + `initiatorKind` of `admin`/`cron`/`webhook`/`test`) for audit; it is not a security control.
+
+**Sensitive capabilities.** A system run gets the data baseline unconditionally. Sensitive operations are opt-in via `capabilities` (StringSet, allowlist-validated at save time):
+
+```toml
+[workflow]
+key = "sync-roster"
+runAs = "system"
+capabilities = ["membership"]
+```
+
+`membership` gates the `group.addMember` / `group.removeMember` steps in a **system** run — without the grant they reject (`group.addMember requires the 'membership' capability`). Read-only group steps (`checkMembership`, `listMembers`, `listUserMemberships`) are never gated, and caller runs are governed by access rules, not capabilities, so the gate never applies to them.
+
+**`iterate-users` is system-only.** A workflow containing an `iterate-users` step must set `runAs = "system"` — otherwise it's rejected at save time (`'iterate-users' is system-only and may appear only in a runAs:"system" workflow`).
 
 ## Inbound webhooks
 
