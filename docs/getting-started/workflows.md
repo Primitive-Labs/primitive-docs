@@ -223,7 +223,7 @@ primitive cron-triggers delete <trigger-id>
 
 :::
 
-Two limits: 50 cron triggers per app (consolidate with a single trigger fanning out via `workflow.start`), and 1-minute minimum granularity.
+Two limits: 50 cron triggers per app (consolidate with a single trigger that fans out — `iterate-users`, or a `forEach` over `workflow.call`), and 1-minute minimum granularity.
 
 Cron-fired runs are persistent workflow runs like any other — `meta.triggerId` identifies the trigger that fired them. Remember `requiresClientApply = false` for cron workflows (above).
 
@@ -347,12 +347,13 @@ Every step has an `id` (unique within the workflow) and a `kind` (the step type)
 | `document.query` / `queryOne` / `count` / `save` / `patch` / `delete` | Read and write records in a document's models |
 | `group.addMember` / `removeMember` / `checkMembership` / `listMembers` / `listUserMemberships` | Group membership operations |
 | `collect` | Auto-paginate any step that returns `{ items, cursor }` |
-| `workflow.call` | Run a child workflow synchronously, inline |
-| `workflow.start` + `workflow.await` | Fan out child workflows in parallel, then wait |
+| `workflow.call` | Run a child workflow synchronously, inline (use `forEach` to fan out) |
 | `email.send` | Send an email (template-based or inline) |
 | `blob.upload` / `blob.download` / `blob.signedUrl` | Read, write, or sign blob URLs |
 | `analytics.write` / `analytics.query` | Emit analytics events or query server-side aggregates |
 | `noop` | Return `{ message, payload }`; useful as a placeholder |
+
+Steps that reach across the network — `llm.chat`, `gemini.generate`, the `database.*` steps, and `email.send` — are bounded by a timeout: 120 seconds for the LLM and Gemini steps, 30 seconds for database and email. Override it per step with a `timeout` field (in milliseconds). A step that exceeds its timeout fails without retrying, recording a failed step-run rather than hanging the run.
 
 ### `transform`
 
@@ -434,7 +435,18 @@ workflowKey = "process-one-user"   # the workflow to run once per user
 reason = "preferences backfill"    # static input merged into each child run
 ```
 
-`source` selects which users to iterate — `mode = "app"` walks the app's full user roster, fetched in pages of `pageSize`. For each user, the step starts a child run of the workflow named by `perUser.workflowKey` (a separate workflow you define), passing the user's id plus anything in `perUser.input` as that run's input, with up to `concurrency` child runs in flight per page. Prefer this over a hand-rolled `forEach` when the fan-out is app-wide and long-running.
+`source` selects which users to iterate — `mode = "app"` walks the app's full user roster, fetched in pages of `pageSize`. For each user, the step starts a child run of the workflow named by `perUser.workflowKey` (a separate workflow you define), with up to `concurrency` child runs in flight per page. Prefer this over a hand-rolled `forEach` when the fan-out is app-wide and long-running.
+
+Each child run receives the iterated user's id as `input.userId` automatically — a child that needs nothing else can read <span v-pre>`{{ input.userId }}`</span> with no `perUser.input` block at all. When you do supply `perUser.input`, its values are rendered per user against a `user` binding — the iterated user's row, with `user.userId` and `user.role` — and full template syntax works, including fallbacks and filters:
+
+```toml novalidate
+[steps.perUser.input]
+greetingName = "{{ user.userId | upper }}"
+tier = "{{ user.role || 'member' }}"
+reason = "preferences backfill"        # static values pass through unchanged
+```
+
+A key you set in `perUser.input` wins over the injected default, so <span v-pre>`userId = "{{ user.userId }}"`</span> is redundant but harmless.
 
 ### `switch`
 
@@ -668,28 +680,7 @@ workflowKey = "onboard-user"
 userId = "{{ input.userId }}"
 ```
 
-### `workflow.start` + `workflow.await`
-
-Fan-out: start child workflows in parallel (typically with `forEach`), then wait for them all:
-
-```toml
-[[steps]]
-id = "start-all"
-kind = "workflow.start"
-forEach = "steps.get-users.data"
-as = "user"
-workflowKey = "process-item"
-[steps.input]
-userId = "{{ user.id }}"
-
-[[steps]]
-id = "results"
-kind = "workflow.await"
-runs = "steps.start-all"
-onPartialFailure = "fail"       # fail (default) | continue
-```
-
-`workflow.await` returns `{ completed, failed, allSucceeded }`.
+Add `forEach` to fan out — the child runs once per item, and the step returns the array of child results. For app-wide, restartable fan-out over your entire user roster, use [`iterate-users`](#iterate-users) instead.
 
 ### `email.send`
 

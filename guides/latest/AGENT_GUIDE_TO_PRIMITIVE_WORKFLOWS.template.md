@@ -63,6 +63,8 @@ A run threads one JSON context through every step:
 
 Every kind below is registered in `src/workflows/runner/default-registry.ts`. If a kind isn't listed here, it doesn't exist.
 
+The network-reaching kinds are bounded by a per-step timeout: `llm.chat` and `gemini.generate` default to 120000 ms, the `database.*` steps and `email.send` to 30000 ms. Override per step with a `timeout` field (milliseconds). A step that exceeds its timeout fails non-retryably and records a failed step-run instead of hanging the run.
+
 ### `transform`
 
 Returns the templated `output` field. Use this for shaping the workflow's final output.
@@ -353,28 +355,7 @@ userId = "{{ item.userId }}"
 # Output: { output: <child's outputs.output or full outputs>, childStepResults: [...] }
 ```
 
-### `workflow.start` + `workflow.await`
-
-Fan-out: start child workflows in parallel, then wait. Use with `forEach`.
-
-```toml
-[[steps]]
-id = "start-all"
-kind = "workflow.start"
-forEach = "steps.get-users.data"
-as = "user"
-workflowKey = "process-item"
-[steps.input]
-userId = "{{ user.id }}"
-
-[[steps]]
-id = "results"
-kind = "workflow.await"
-runs = "steps.start-all"        # path to forEach output ({items: [...]} accepted)
-timeout = 600000                # ms, default 600000 (10 min)
-onPartialFailure = "fail"       # fail (default) | continue
-# Output: { completed: [...], failed: [...], allSucceeded }
-```
+Add `forEach` to fan out: the child runs once per item (use `concurrency` for parallel lanes) and the step returns the array of child results. For app-wide, restartable fan-out over the whole user roster, use `iterate-users` instead.
 
 ### `email.send`
 
@@ -543,7 +524,8 @@ reason = "preferences backfill"
 
 - **Bounded memory**: users are paged (`pageSize`) rather than loaded all at once, so the step scales to large user counts.
 - **Singleton per app**: a per-app lock (`iterationName` keys it) guarantees only one iteration runs at a time and tracks aggregate progress, so a restarted run resumes where it left off instead of starting over. `onConflict` decides whether a second start `skip`s or `refuse`s while one is live.
-- Each user is processed by the `perUser.workflowKey` child workflow (the user id plus any `perUser.input` is passed as its input). `onPartialFailure` controls whether per-user failures stop the whole iteration or are tallied and skipped.
+- Each user is processed by the `perUser.workflowKey` child workflow. The iterated user's id is injected into the child as `input.userId` automatically, so a child with no `perUser.input` block still reads `{{ input.userId }}`. `onPartialFailure` controls whether per-user failures stop the whole iteration or are tallied and skipped.
+- `perUser.input` values are rendered per user against a `user` binding (`user.userId`, `user.role`) with full template syntax — filters and fallbacks included (`{{ user.userId | upper }}`, `{{ user.role || 'member' }}`). A key set in `perUser.input` overrides the injected `userId` default (author-wins).
 - Prefer `iterate-users` over a hand-rolled `forEach` across a `users.list` query when the fan-out is app-wide and long-running; `forEach` is better for bounded, in-run collections.
 
 ## Templating
@@ -694,7 +676,7 @@ subject = "Update"
 htmlBody = "<p>Hi {{ member.name }}</p>"
 ```
 
-When `concurrency = 1` (the default), iterations are sequential. When `concurrency > 1`, the engine fans them out in parallel batches — in durable mode each batch runs as a child workflow so restarts don't re-run completed items. For very large fan-outs, `workflow.start` + `workflow.await` gives finer control.
+When `concurrency = 1` (the default), iterations are sequential. When `concurrency > 1`, the engine fans them out in parallel batches — in durable mode each batch runs as a child workflow so restarts don't re-run completed items. For app-wide, restartable fan-out that must survive restarts without re-processing completed users, use `iterate-users`.
 
 When a parallel `forEach` batch's combined output exceeds the inline size limit (~1 MB), the engine automatically offloads the batch result to managed object storage and rehydrates it transparently for the next step. Large per-iteration outputs are handled for you, but the offload adds a storage round-trip — keep per-iteration outputs lean when you can.
 
@@ -1051,7 +1033,7 @@ Opt a workflow into synchronous invocation by setting `syncCallable = true` in t
 
 Server-side constraints on a `syncCallable` workflow:
 
-- **Step kinds are restricted.** The server validates step kinds against a sync-compatible list when the flag is set (or when steps are pushed against a sync-callable workflow). Long-running or suspending kinds (`event.wait`, `workflow.await`, `delay` over the timeout) reject at save time with `Workflow contains sync-incompatible steps`.
+- **Step kinds are restricted.** The server validates step kinds against a sync-compatible list when the flag is set (or when steps are pushed against a sync-callable workflow). Long-running or suspending kinds (`event.wait`, `delay` over the timeout) reject at save time with `Workflow contains sync-incompatible steps`.
 - **Timeout.** The invocation timeout defaults to 5s and is capped server-side at 30s (the server CPU budget per request). Exceeding it resolves with `status: "timeout"`.
 - **Apply still applies.** A sync-callable workflow may still have `requiresClientApply = true`, in which case the synchronous call resolves with `status: "apply_pending"` and the normal `claimApply`/`confirmApply` flow takes over. Most sync-callable workflows want `requiresClientApply = false`.
 
@@ -1298,7 +1280,7 @@ filename = "{{ now }}.pdf"
 
 ### Wrong: re-running an idempotent step inside a retry loop
 
-`continueOnError = true` does not retry — it captures the error and moves on. To retry, the workflow has to re-invoke the step explicitly (e.g., another workflow run, or a `workflow.start` fan-out with retries). The engine already retries transient errors per step automatically; don't add a second layer.
+`continueOnError = true` does not retry — it captures the error and moves on. To retry, the workflow has to re-invoke the step explicitly (e.g., another workflow run, or a `forEach` fan-out that re-dispatches failed items). The engine already retries transient errors per step automatically; don't add a second layer.
 
 ### Wrong: leaking secrets/PII via `saveAs`
 
