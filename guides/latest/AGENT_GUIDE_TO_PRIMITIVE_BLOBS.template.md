@@ -105,27 +105,9 @@ Uploading the same `blobId` twice with **identical** `sha256` and `size` returns
 
 ## Listing
 
-See **List / metadata / delete** above for the basic call.
+See **List / metadata / delete** above for the basic call. Each item carries `blobId`, `filename`, `contentType`, `numBytes`, `sha256`, and `createdAt`. `cursor` is an opaque pagination token; only present when more results exist — follow it to page through results.
 
-{{#lang ts}}
-To page through results, follow the cursor:
-
-```typescript
-const page1 = await blobs.list({ limit: 50 });
-for (const b of page1.items) {
-  console.log(b.blobId, b.filename, b.contentType, b.numBytes, b.sha256, b.createdAt);
-}
-if (page1.cursor) {
-  const page2 = await blobs.list({ cursor: page1.cursor });
-}
-```
-
-`cursor` is an opaque pagination token; only present when more results exist.
-{{/lang}}
-
-{{#lang swift}}
-`list(limit:)` returns the items array directly. Each item carries `blobId`, `filename`, `contentType`, `numBytes`, `sha256`, and `createdAt`.
-{{/lang}}
+{{ example: blobs/doc-blob-list-paginate }}
 
 ---
 
@@ -153,49 +135,18 @@ let meta = try await blobs.get(blobId: blobId)
 
 ### Download URL (authenticated)
 
-The basic call is shown in **List / URL / read** above. The URL is authenticated via the user's session against the API origin.
+The basic call is shown in **List / URL / read** above. `downloadUrl` is synchronous and returns a string, authenticated via the user's session against the API origin — it works in an `<a href download>` or `window.location`.
 
-{{#lang ts}}
-```typescript
-const url = blobs.downloadUrl(blobId, {
-  disposition: "attachment",        // or "inline"
-  attachmentFilename: "report.pdf", // optional override (RFC 5987-encoded)
-});
-// Synchronous; returns a string. Authenticated via the user's session/cookie
-// against the API origin. Works in <a href={url} download> or window.location.
-```
-{{/lang}}
-
-{{#lang swift}}
-```swift
-let url = blobs.downloadUrl(blobId: blobId, disposition: .attachment) // or .inline
-```
-{{/lang}}
+{{ example: blobs/doc-blob-download-url }}
 
 ### Read content into memory
 
-`read` is shown in **List / URL / read** above.
+`read` is shown in **List / URL / read** above. It checks the cache first; on a miss it fetches from the server and writes the response into the cache.
+
+{{ example: blobs/doc-blob-read-formats }}
 
 {{#lang ts}}
-The return format is selectable via `{ as }`:
-
-```typescript
-const text  = await blobs.read(blobId, { as: "text" });
-const buf   = await blobs.read(blobId, { as: "arrayBuffer" });
-const blob  = await blobs.read(blobId, { as: "blob" });
-const bytes = await blobs.read(blobId, { as: "uint8array" }); // default
-
-// Bypass the local Cache API + IndexedDB cache and re-fetch from the server.
-const fresh = await blobs.read(blobId, { as: "text", forceRedownload: true });
-```
-
-`read` checks the cache first; on a miss it fetches from the server and writes the response into the cache. When offline (`networkMode === "offline"`) and the cache is empty, it throws `"Blob cache unavailable while offline"`.
-{{/lang}}
-
-{{#lang swift}}
-```swift
-let data = try await blobs.read(blobId: blobId) // Data
-```
+`{ as: "blob" }` is also available and returns a `Blob`. When offline (`networkMode === "offline"`) and the cache is empty, `read` throws `"Blob cache unavailable while offline"`.
 {{/lang}}
 
 ### Range requests and conditional GETs
@@ -227,102 +178,39 @@ let result = try await blobs.delete(blobId: blobId) // BlobDeleteResult: .delete
 
 Deleting also cancels any in-flight upload for the same `blobId` and clears local bytes.
 
-{{#lang ts}}
 ---
 
 ## Offline & the upload queue
 
-The upload queue is keyed by user identity. It hydrates from IndexedDB on sign-in, retries with exponential backoff (2s base, 60s max), and persists across page reloads.
+The upload queue is keyed by user identity, retries with exponential backoff (2s base, 60s max), and persists across reloads. While offline, bytes are written to the local cache immediately and queued; `upload()` resolves without waiting for the network (`bytesTransferred: 0`). Reads are served from the cache for blobs previously uploaded or downloaded on this device/user, and `prefetch` warms the cache — its per-blob errors are logged and swallowed, so it resolves once all attempts complete regardless of individual failures. Coming back online resumes queue processing automatically, draining the queue in the background.
 
-### Upload while offline
-
-```typescript
-await client.setNetworkMode("offline");
-
-// Bytes are written to the local Cache API immediately and queued.
-// upload() resolves without waiting for the network (the result includes
-// bytesTransferred: 0 to indicate nothing was transferred yet).
-const { blobId } = await blobs.upload(data, {
-  filename: "draft.txt",
-  contentType: "text/plain",
-});
-```
-
-### Read cached blobs offline
-
-```typescript
-// Works for blobs that were previously uploaded or downloaded on this device/user.
-const text = await blobs.read(blobId, { as: "text" });
-```
-
-### Prefetch into the cache
-
-```typescript
-await blobs.prefetch([blobId1, blobId2, blobId3], {
-  concurrency: 4,        // default 2, capped at blobIds.length
-  forceRedownload: false,
-});
-```
-
-Errors per blob are logged and swallowed — `prefetch` resolves once all attempts complete, regardless of individual failures. Don't rely on it to surface errors.
-
-### Coming back online
-
-```typescript
-await client.setNetworkMode("online");
-// Queue processing resumes automatically. Listen for "blobs:queue-drained" to know when done.
-```
+{{ example: blobs/doc-blob-offline }}
 
 ---
 
 ## Queue management
 
-```typescript
-// Inspect what's queued for this document
-const tasks = blobs.uploads();
-// Each task: { queueId, blobId, filename, contentType, numBytes,
-//              status: "pending" | "uploading" | "uploaded" | "paused",
-//              attempts, nextAttemptAt, retainLocal?, lastError?, updatedAt }
+Inspect and control the per-document upload queue, and set the client-wide upload concurrency (applies to all documents). The `queueId` is the `blobId` for document uploads.
 
-// Pause/resume by blobId (the queueId is the blobId for document uploads)
-blobs.pauseUpload(blobId);
-blobs.resumeUpload(blobId);
-
-blobs.pauseAll();
-blobs.resumeAll();
-
-// Concurrency is set on the client (global, all documents)
-client.setBlobUploadConcurrency(5); // min 1; default 2
-client.getBlobUploadConcurrency();
-```
+{{ example: blobs/doc-blob-queue }}
 
 ---
 
 ## Events
 
-```typescript
-// status here is one of: "queued" | "uploading" | "pending" | "paused"
-client.on("blobs:upload-progress", (e) => {
-  console.log(e.queueId, e.blobId, e.status, e.numBytes, e.attempts);
-});
+The upload queue emits lifecycle events. `upload-progress` is *not* a byte-level progress event — it fires on status transitions. There is no per-byte progress callback. `delete` issued mid-upload cancels the in-flight transfer and evicts the cached bytes.
 
-client.on("blobs:upload-completed", (e) => {
-  console.log("done", e.blobId, e.queueId);
-});
+{{ example: blobs/doc-blob-events }}
 
-client.on("blobs:upload-failed", (e) => {
-  console.log("failed", e.blobId, e.lastError, "retry?", e.willRetry);
-});
+{{#lang swift}}
+A typed `read(blobId:as:)` overload also JSON-decodes a blob into any `Decodable` type:
 
-client.on("blobs:queue-drained", () => {
-  console.log("all uploads finished");
-});
-
-// Also available: "blobs:upload-paused", "blobs:upload-resumed"
+```swift
+let payload = try await blobs.read(blobId: blobId, as: MyCodable.self)
 ```
+{{/lang}}
 
-`upload-progress` is *not* a byte-level progress event — it fires on status transitions. There is no per-byte progress callback.
-
+{{#lang ts}}
 ---
 
 ## Service worker proxy (for `<img>` / `<video>`)
@@ -344,43 +232,6 @@ if (blobs.hasServiceWorkerControl()) {
 ```
 
 `proxyUrl` returns the same URL as `downloadUrl`; it just signals intent to be intercepted by the service worker. See the js-bao-wss-client README for a service-worker implementation.
-{{/lang}}
-
-{{#lang swift}}
----
-
-## Upload queue, prefetch, and events
-
-Failed uploads retry with exponential backoff (2s base, 60s max). Inspect and control the queue through the document blob context, and read/prefetch cached bytes with the typed `read` overloads:
-
-```swift
-let blobs = client.documents.blobs(documentId: documentId)
-
-// Inspect what's queued — each BlobUploadStatus carries queueId, blobId,
-// filename, contentType, numBytes, status, attempts, nextAttemptAt, lastError
-let tasks = blobs.uploads()
-
-// Pause/resume by blobId (the queueId is the blobId for document uploads)
-_ = blobs.pauseUpload(blobId: blobId)
-_ = blobs.resumeUpload(blobId: blobId)
-
-blobs.pauseAll()
-blobs.resumeAll()
-
-// Concurrency is set on the client (global, all documents)
-client.setBlobUploadConcurrency(5) // min 1; default 2
-_ = client.getBlobUploadConcurrency()
-
-// Warm the local cache; per-blob errors are logged and swallowed
-await blobs.prefetch(blobIds: [blobId1, blobId2], concurrency: 4)
-
-// Cached-first reads; pass force: true to bypass the cache
-let bytes = try await blobs.read(blobId: blobId)              // Data
-let text = try await blobs.read(blobId: blobId, as: String.self)
-let payload = try await blobs.read(blobId: blobId, as: MyCodable.self)
-```
-
-Queue lifecycle events arrive on `client.events`: `.blobsUploadQueued`, `.blobsUploadProgress` (status transitions, not per-byte progress), `.blobsUploadCompleted`, `.blobsUploadFailed`, `.blobsUploadPaused`, `.blobsUploadResumed`, and `.blobsQueueDrained` once the queue empties. `delete(blobId:)` issued mid-upload cancels the in-flight transfer, evicts the cached bytes, and fires `.blobsQueueDrained` when the queue empties.
 {{/lang}}
 
 ---

@@ -46,24 +46,11 @@ For app-specific user data (preferences, settings, profile fields beyond name/em
 
 **Do this:**
 
-{{#lang ts}}
-```typescript
-// Store additional user data in a document, keyed by the platform userId
-const userProfile = new UserProfile();
-userProfile.userId = platformUserId; // reference the platform user
-userProfile.bio = "Software engineer";
-userProfile.theme = "dark";
-await userProfile.save({ targetDocument: userDocumentId });
-
-// Or in a database via registered operation
-await client.databases.executeOperation(dbId, "updateProfile", {
-  params: { bio: "Software engineer", theme: "dark" },
-  // The operation uses $user.userId server-side — no need to pass userId
-});
-```
+{{ example: users-and-groups/supplement-user-data }}
 
 **Don't do this:**
 
+{{#lang ts}}
 ```typescript
 // DON'T create a separate user model that duplicates platform fields
 const user = new AppUser();
@@ -73,23 +60,6 @@ user.id = generateNewId();        // Use platform userId instead
 ```
 {{/lang}}
 {{#lang swift}}
-```swift
-// Store additional user data in a document, keyed by the platform userId
-var userProfile = UserProfile()
-userProfile.userId = platformUserId  // reference the platform user
-userProfile.bio = "Software engineer"
-userProfile.theme = "dark"
-try await userProfile.save(targetDocument: userDocumentId)
-
-// Or in a database via registered operation
-try await client.databases.executeOperation(dbId, "updateProfile", params: [
-  "bio": "Software engineer", "theme": "dark"
-  // The operation uses $user.userId server-side — no need to pass userId
-])
-```
-
-**Don't do this:**
-
 ```swift
 // DON'T create a separate user model that duplicates platform fields
 var user = AppUser()
@@ -592,92 +562,17 @@ autoAddCreator = true
 
 **Runtime** (in app code):
 
-{{#lang ts}}
-```typescript
-// User creates a team
-await client.groups.create({
-  groupType: "team",
-  groupId: "alpha-team",
-  name: "Alpha Team",
-});
+{{ example: users-and-groups/team-workspace }}
 
-// Share a document with the team
-await client.documents.grantGroupPermission(docId, {
-  groupType: "team",
-  groupId: "alpha-team",
-  permission: "read-write",
-});
-
-// Database operations gated by team membership
-// access: "isMemberOf('team', database.metadata.teamId)"
-```
-{{/lang}}
-{{#lang swift}}
-```swift
-// User creates a team
-try await client.groups.create(
-  groupType: "team",
-  groupId: "alpha-team",
-  name: "Alpha Team"
-)
-
-// Share a document with the team
-try await client.documents.grantGroupPermission(
-  docId,
-  groupType: "team",
-  groupId: "alpha-team",
-  permission: "read-write"
-)
-
-// Database operations gated by team membership
-// access: "isMemberOf('team', database.metadata.teamId)"
-```
-{{/lang}}
+Gate the team's database operations on membership in CEL: `access: "isMemberOf('team', database.metadata.teamId)"`.
 
 ### Role-based access (reviewer, editor, viewer)
 
 Use group types as roles within a context.
 
-{{#lang ts}}
-```typescript
-// Create role groups for a project
-await client.groups.create({ groupType: "editor", groupId: "project-1", name: "Project 1 Editors" });
-await client.groups.create({ groupType: "viewer", groupId: "project-1", name: "Project 1 Viewers" });
+{{ example: users-and-groups/role-groups }}
 
-// Grant different document permissions
-await client.documents.grantGroupPermission(docId, {
-  groupType: "editor", groupId: "project-1", permission: "read-write",
-});
-await client.documents.grantGroupPermission(docId, {
-  groupType: "viewer", groupId: "project-1", permission: "reader",
-});
-
-// Database operations with role checks
-// Editors can modify:
-// access: "isMemberOf('editor', params.projectId)"
-// Viewers can read:
-// access: "isMemberOf('viewer', params.projectId) || isMemberOf('editor', params.projectId)"
-```
-{{/lang}}
-{{#lang swift}}
-```swift
-// Create role groups for a project
-try await client.groups.create(groupType: "editor", groupId: "project-1", name: "Project 1 Editors")
-try await client.groups.create(groupType: "viewer", groupId: "project-1", name: "Project 1 Viewers")
-
-// Grant different document permissions
-try await client.documents.grantGroupPermission(
-  docId, groupType: "editor", groupId: "project-1", permission: "read-write")
-try await client.documents.grantGroupPermission(
-  docId, groupType: "viewer", groupId: "project-1", permission: "reader")
-
-// Database operations with role checks
-// Editors can modify:
-// access: "isMemberOf('editor', params.projectId)"
-// Viewers can read:
-// access: "isMemberOf('viewer', params.projectId) || isMemberOf('editor', params.projectId)"
-```
-{{/lang}}
+Gate the operations on role membership in CEL — editors can modify (`access: "isMemberOf('editor', params.projectId)"`); viewers can read (`access: "isMemberOf('viewer', params.projectId) || isMemberOf('editor', params.projectId)"`).
 
 ### Relationship modeling (parent-child, mentor-mentee)
 
@@ -701,88 +596,15 @@ The per-parameter `access` expression ensures parents can only view their own ch
 
 **Runtime** (in app code):
 
-{{#lang ts}}
-```typescript
-// A "parent-of" group per student
-await client.groups.create({
-  groupType: "parent-of",
-  groupId: "student-123",
-  name: "Parents of Student 123",
-});
-await client.groups.addMember("parent-of", "student-123", { userId: parentUserId });
-
-// Parent queries their child's grades — server enforces access
-const grades = await client.databases.executeOperation(dbId, "viewGrades", {
-  params: { studentId: "student-123" },
-});
-```
-{{/lang}}
-{{#lang swift}}
-```swift
-// A "parent-of" group per student
-try await client.groups.create(
-  groupType: "parent-of",
-  groupId: "student-123",
-  name: "Parents of Student 123"
-)
-try await client.groups.addMember("parent-of", "student-123", userId: parentUserId)
-
-// Parent queries their child's grades — server enforces access
-let grades = try await client.databases.executeOperation(
-  dbId, "viewGrades", params: ["studentId": "student-123"])
-```
-{{/lang}}
+{{ example: users-and-groups/relationship-groups }}
 
 ### Organization hierarchy
 
 Model nested organizational structure with multiple group types.
 
-{{#lang ts}}
-```typescript
-// Organization-level groups
-await client.groups.create({ groupType: "org", groupId: "acme-corp", name: "Acme Corp" });
+{{ example: users-and-groups/org-hierarchy }}
 
-// Department-level groups
-await client.groups.create({ groupType: "dept", groupId: "engineering", name: "Engineering" });
-await client.groups.create({ groupType: "dept", groupId: "marketing", name: "Marketing" });
-
-// Team-level groups
-await client.groups.create({ groupType: "team", groupId: "backend", name: "Backend Team" });
-
-// A user can be in multiple groups at different levels
-await client.groups.addMember("org", "acme-corp", { userId });
-await client.groups.addMember("dept", "engineering", { userId });
-await client.groups.addMember("team", "backend", { userId });
-
-// CEL can check any level:
-// "isMemberOf('org', database.metadata.orgId)"
-// "isMemberOf('dept', params.deptId)"
-// "isMemberOf('team', database.metadata.teamId)"
-```
-{{/lang}}
-{{#lang swift}}
-```swift
-// Organization-level groups
-try await client.groups.create(groupType: "org", groupId: "acme-corp", name: "Acme Corp")
-
-// Department-level groups
-try await client.groups.create(groupType: "dept", groupId: "engineering", name: "Engineering")
-try await client.groups.create(groupType: "dept", groupId: "marketing", name: "Marketing")
-
-// Team-level groups
-try await client.groups.create(groupType: "team", groupId: "backend", name: "Backend Team")
-
-// A user can be in multiple groups at different levels
-try await client.groups.addMember("org", "acme-corp", userId: userId)
-try await client.groups.addMember("dept", "engineering", userId: userId)
-try await client.groups.addMember("team", "backend", userId: userId)
-
-// CEL can check any level:
-// "isMemberOf('org', database.metadata.orgId)"
-// "isMemberOf('dept', params.deptId)"
-// "isMemberOf('team', database.metadata.teamId)"
-```
-{{/lang}}
+CEL can check any level: `"isMemberOf('org', database.metadata.orgId)"`, `"isMemberOf('dept', params.deptId)"`, `"isMemberOf('team', database.metadata.teamId)"`.
 
 ## Best Practices
 

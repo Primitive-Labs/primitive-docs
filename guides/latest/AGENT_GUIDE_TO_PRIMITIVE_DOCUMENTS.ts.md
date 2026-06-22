@@ -376,14 +376,14 @@ List with `me.ownedDocuments()` and `open()` the selected document; create a new
 All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `me.ownedDocuments({ tag })` (and `me.sharedDocuments({ tag })` if the user can also be a non-owner), open each, and track per-document readiness yourself. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over local tracking.
 
 ```typescript
-// Open every document with a given tag
-const channels = await jsBaoClient.me.ownedDocuments({ tag: "channel" });
-await Promise.all(
-  channels.map((ch) => jsBaoClient.documents.open(ch.documentId))
-);
+  // Open every document with a given tag
+  const channels = await client.me.ownedDocuments({ tag: "channel" });
+  await Promise.all(
+    channels.map((ch) => client.documents.open(ch.documentId))
+  );
 
-// Query runs across all open documents by default
-const messages = await Message.query({});
+  // Query runs across all open documents by default
+  const messages = await Message.query({});
 ```
 
 The template does not ship a built-in "multi-document" Pinia store. A minimal store for "all documents tagged `channel`":
@@ -1374,14 +1374,14 @@ Repeated email-based calls are idempotent: a second `updatePermissions(documentI
 **There is no `permission: null` to remove.** Removal is a separate call (`removePermission` by userId or by email; `transferOwnership` to hand a document to a new owner):
 
 ```typescript
-// Remove a current member by userId:
-await client.documents.removePermission(documentId, "user-abc");
-await client.documents.removePermission(documentId, { userId: "user-abc" });
+  // Remove a current member by userId:
+  await client.documents.removePermission(documentId, "user-abc");
+  await client.documents.removePermission(documentId, { userId: "user-abc" });
 
-// Cancel a pending email-based invite, OR remove a current member matched by email:
-await client.documents.removePermission(documentId, { email: "alice@example.com" });
+  // Cancel a pending email-based invite, OR remove a current member matched by email:
+  await client.documents.removePermission(documentId, { email: "alice@example.com" });
 
-await client.documents.transferOwnership(documentId, newOwnerId);
+  await client.documents.transferOwnership(documentId, newOwnerId);
 ```
 
 **Don't do this** (silent no-op for someone with a higher group permission, and there is no `null` form):
@@ -1430,15 +1430,15 @@ Lowering a user's direct permission while they still have a higher one via a gro
 The method is **`grantGroupPermission`** (no `setGroupPermission`). Member changes inside the group propagate automatically — no per-membership permission calls.
 
 ```typescript
-await client.documents.grantGroupPermission(documentId, {
-  groupType: "team",
-  groupId: "engineering",
-  permission: "read-write",       // owner | read-write | reader
-});
+  await client.documents.grantGroupPermission(documentId, {
+    groupType: "team",
+    groupId: "engineering",
+    permission: "read-write", // owner | read-write | reader
+  });
 
-// Listing / revoking
-await client.documents.listGroupPermissions(documentId);
-await client.documents.revokeGroupPermission(documentId, "team", "engineering");
+  // Listing / revoking
+  await client.documents.listGroupPermissions(documentId);
+  await client.documents.revokeGroupPermission(documentId, "team", "engineering");
 ```
 
 #### Looking up users

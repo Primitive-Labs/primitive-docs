@@ -1339,12 +1339,15 @@ The step records carry `{ stepRunId, runId, stepKind, status, input, output, err
 Requires an active WebSocket (e.g., from `client.documents.open(docId)`).
 
 ```typescript
-client.on("workflowStarted", (e) => { /* { workflowKey, runId, runKey, instanceId, contextDocId?, meta? } */ });
+  client.on("workflowStarted", (e) => {
+    // { workflowKey, runId, runKey, instanceId, contextDocId?, meta? }
+  });
 
-client.on("workflowStatus", (e) => {
-  // e.status: "completed" | "failed" | "terminated"  (NOTE: "completed" here, with the "d")
-  // e.needsApply: true if requiresClientApply and not yet applied
-});
+  client.on("workflowStatus", (e) => {
+    // e.status: "completed" | "failed" | "terminated"
+    //   (NOTE: "completed" here, with the "d" — getStatus returns "complete")
+    // e.needsApply: true if requiresClientApply and not yet applied
+  });
 ```
 
 The `workflowStatus` event uses `"completed"`. The `getStatus` method returns `"complete"`. These differ in the SDK — handle both if your code shares logic.
@@ -1355,17 +1358,20 @@ The `workflowStatus` event uses `"completed"`. The `getStatus` method returns `"
 For workflows with `requiresClientApply = true`, register an apply handler so a client deterministically runs follow-up logic exactly once.
 
 ```typescript
-client.workflows.define("my-workflow-key", {
-  onApply: async ({ output, workflowKey, runKey, runId, contextDocId, startedByUserId, meta }) => {
-    // Runs on exactly one connected client.
-    const { doc } = await client.documents.open(contextDocId);
-    doc.getMap("data").set("result", output);
-  },
-});
+  client.workflows.define("my-workflow-key", {
+    onApply: async ({ output, workflowKey, runKey, runId, contextDocId, startedByUserId, meta }) => {
+      // Runs on exactly one connected client.
+      if (!contextDocId) return;
+      const { doc } = await client.documents.open(contextDocId);
+      doc?.getMap("data").set("result", output);
+    },
+  });
 ```
 
-Manual flow if you need it: `claimApply` → run logic → `confirmApply` (success) or `releaseApply` (failure). 30s lease timeout for crashed clients.
+Register `define(...)` before `start(...)` so the apply can't arrive before the handler is in place.
 
+
+Manual flow if you need it: `claimApply` → run logic → `confirmApply` (success) or `releaseApply` (failure). 30s lease timeout for crashed clients.
 
 ## Footguns and don't-do-this
 

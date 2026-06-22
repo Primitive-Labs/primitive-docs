@@ -86,18 +86,20 @@ For app-specific user data (preferences, settings, profile fields beyond name/em
 **Do this:**
 
 ```swift
-// Store additional user data in a document, keyed by the platform userId
-var userProfile = UserProfile()
-userProfile.userId = platformUserId  // reference the platform user
-userProfile.bio = "Software engineer"
-userProfile.theme = "dark"
-try await userProfile.save(targetDocument: userDocumentId)
+  // Store additional user data in a document, keyed by the platform userId.
+  let profile = AppUser(
+    id: platformUserId, // reference the platform user
+    email: "alice@example.com",
+    name: "Software engineer"
+  )
+  try profile.save(in: userDocumentId)
 
-// Or in a database via registered operation
-try await client.databases.executeOperation(dbId, "updateProfile", params: [
-  "bio": "Software engineer", "theme": "dark"
-  // The operation uses $user.userId server-side — no need to pass userId
-])
+  // Or in a database via a registered operation. The operation uses
+  // $user.userId server-side — no need to pass the userId yourself.
+  _ = try await client.databases.executeOperation(
+    databaseId: dbId, name: "updateProfile",
+    options: ExecuteOperationOptions(params: ["bio": "Software engineer", "theme": "dark"])
+  )
 ```
 
 **Don't do this:**
@@ -756,46 +758,49 @@ autoAddCreator = true
 **Runtime** (in app code):
 
 ```swift
-// User creates a team
-try await client.groups.create(
-  groupType: "team",
-  groupId: "alpha-team",
-  name: "Alpha Team"
-)
+  // User creates a team.
+  _ = try await client.groups.create(params: CreateGroupParams(
+    groupType: "team",
+    groupId: "alpha-team",
+    name: "Alpha Team"
+  ))
 
-// Share a document with the team
-try await client.documents.grantGroupPermission(
-  docId,
-  groupType: "team",
-  groupId: "alpha-team",
-  permission: "read-write"
-)
-
-// Database operations gated by team membership
-// access: "isMemberOf('team', database.metadata.teamId)"
+  // Share a document with the team — every member inherits read-write.
+  _ = try await client.documents.grantGroupPermission(
+    documentId: docId,
+    params: GrantGroupPermissionParams(
+      groupType: "team",
+      groupId: "alpha-team",
+      permission: "read-write"
+    )
+  )
 ```
+
+Gate the team's database operations on membership in CEL: `access: "isMemberOf('team', database.metadata.teamId)"`.
 
 ### Role-based access (reviewer, editor, viewer)
 
 Use group types as roles within a context.
 
 ```swift
-// Create role groups for a project
-try await client.groups.create(groupType: "editor", groupId: "project-1", name: "Project 1 Editors")
-try await client.groups.create(groupType: "viewer", groupId: "project-1", name: "Project 1 Viewers")
+  // Create role groups for a project.
+  _ = try await client.groups.create(params: CreateGroupParams(
+    groupType: "editor", groupId: "project-1", name: "Project 1 Editors"))
+  _ = try await client.groups.create(params: CreateGroupParams(
+    groupType: "viewer", groupId: "project-1", name: "Project 1 Viewers"))
 
-// Grant different document permissions
-try await client.documents.grantGroupPermission(
-  docId, groupType: "editor", groupId: "project-1", permission: "read-write")
-try await client.documents.grantGroupPermission(
-  docId, groupType: "viewer", groupId: "project-1", permission: "reader")
-
-// Database operations with role checks
-// Editors can modify:
-// access: "isMemberOf('editor', params.projectId)"
-// Viewers can read:
-// access: "isMemberOf('viewer', params.projectId) || isMemberOf('editor', params.projectId)"
+  // Grant different document permissions per role.
+  _ = try await client.documents.grantGroupPermission(
+    documentId: docId,
+    params: GrantGroupPermissionParams(
+      groupType: "editor", groupId: "project-1", permission: "read-write"))
+  _ = try await client.documents.grantGroupPermission(
+    documentId: docId,
+    params: GrantGroupPermissionParams(
+      groupType: "viewer", groupId: "project-1", permission: "reader"))
 ```
+
+Gate the operations on role membership in CEL — editors can modify (`access: "isMemberOf('editor', params.projectId)"`); viewers can read (`access: "isMemberOf('viewer', params.projectId) || isMemberOf('editor', params.projectId)"`).
 
 ### Relationship modeling (parent-child, mentor-mentee)
 
@@ -820,17 +825,23 @@ The per-parameter `access` expression ensures parents can only view their own ch
 **Runtime** (in app code):
 
 ```swift
-// A "parent-of" group per student
-try await client.groups.create(
-  groupType: "parent-of",
-  groupId: "student-123",
-  name: "Parents of Student 123"
-)
-try await client.groups.addMember("parent-of", "student-123", userId: parentUserId)
+  // A "parent-of" group per student.
+  _ = try await client.groups.create(params: CreateGroupParams(
+    groupType: "parent-of",
+    groupId: "student-123",
+    name: "Parents of Student 123"
+  ))
+  _ = try await client.groups.addMember(
+    groupType: "parent-of", groupId: "student-123",
+    params: .userId(parentUserId)
+  )
 
-// Parent queries their child's grades — server enforces access
-let grades = try await client.databases.executeOperation(
-  dbId, "viewGrades", params: ["studentId": "student-123"])
+  // Parent queries their child's grades — server enforces access.
+  let grades = try await client.databases.executeOperation(
+    databaseId: dbId, name: "viewGrades",
+    options: ExecuteOperationOptions(params: ["studentId": "student-123"])
+  )
+  _ = grades
 ```
 
 ### Organization hierarchy
@@ -838,26 +849,30 @@ let grades = try await client.databases.executeOperation(
 Model nested organizational structure with multiple group types.
 
 ```swift
-// Organization-level groups
-try await client.groups.create(groupType: "org", groupId: "acme-corp", name: "Acme Corp")
+  // Organization-level group.
+  _ = try await client.groups.create(params: CreateGroupParams(
+    groupType: "org", groupId: "acme-corp", name: "Acme Corp"))
 
-// Department-level groups
-try await client.groups.create(groupType: "dept", groupId: "engineering", name: "Engineering")
-try await client.groups.create(groupType: "dept", groupId: "marketing", name: "Marketing")
+  // Department-level groups.
+  _ = try await client.groups.create(params: CreateGroupParams(
+    groupType: "dept", groupId: "engineering", name: "Engineering"))
+  _ = try await client.groups.create(params: CreateGroupParams(
+    groupType: "dept", groupId: "marketing", name: "Marketing"))
 
-// Team-level groups
-try await client.groups.create(groupType: "team", groupId: "backend", name: "Backend Team")
+  // Team-level group.
+  _ = try await client.groups.create(params: CreateGroupParams(
+    groupType: "team", groupId: "backend", name: "Backend Team"))
 
-// A user can be in multiple groups at different levels
-try await client.groups.addMember("org", "acme-corp", userId: userId)
-try await client.groups.addMember("dept", "engineering", userId: userId)
-try await client.groups.addMember("team", "backend", userId: userId)
-
-// CEL can check any level:
-// "isMemberOf('org', database.metadata.orgId)"
-// "isMemberOf('dept', params.deptId)"
-// "isMemberOf('team', database.metadata.teamId)"
+  // A user can be in multiple groups at different levels.
+  _ = try await client.groups.addMember(
+    groupType: "org", groupId: "acme-corp", params: .userId(userId))
+  _ = try await client.groups.addMember(
+    groupType: "dept", groupId: "engineering", params: .userId(userId))
+  _ = try await client.groups.addMember(
+    groupType: "team", groupId: "backend", params: .userId(userId))
 ```
+
+CEL can check any level: `"isMemberOf('org', database.metadata.orgId)"`, `"isMemberOf('dept', params.deptId)"`, `"isMemberOf('team', database.metadata.teamId)"`.
 
 ## Best Practices
 
