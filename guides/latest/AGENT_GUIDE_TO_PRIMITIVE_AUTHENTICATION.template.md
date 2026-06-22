@@ -57,7 +57,7 @@ Server-side app settings must align with the origin the client app is served fro
 | Server field | Contract | Set via |
 |---|---|---|
 | `corsAllowedOrigins` | Must contain the exact serving origin (scheme+host+port). `corsMode` defaults to `custom` — an empty list blocks every cross-origin request. | `[cors]` (`mode`, `allowedOrigins`, `allowCredentials`) in `app.toml` → `sync push`; `--cors-origins "<o1>,<o2>"` for a one-off |
-| `redirectUris` | OAuth callbacks are validated against this whitelist — a non-listed callback URL returns 400 `Invalid redirect URI`. | Admin Console only — not in `app.toml`, no CLI flag |
+| `redirectUris` | OAuth callbacks are validated against this whitelist — a non-listed callback URL returns 400 `Invalid redirect URI`. | Not in `app.toml` — `primitive apps update --redirect-uris "<uri1>,<uri2>"` (non-localhost must be https) or the Admin Console |
 | `baseUrl` | Used for links in auth emails / redirects. | `[app].baseUrl` in `app.toml` → `sync push`; `--base-url <url>` for a one-off |
 {{#lang ts}}
 | Provider toggles | What `getAuthConfig()` reports. | `[auth]` in `app.toml` (`googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled` + `[auth.passkeys]`) → `sync push`. `otp` has no TOML key — set it with `--otp <bool>` only. |
@@ -70,7 +70,7 @@ Server-side app settings must align with the origin the client app is served fro
 **CORS misconfiguration blocks bootstrap.** When the serving origin is missing from `corsAllowedOrigins`, the browser blocks the client's bootstrap refresh (`POST …/api/auth/refresh` → 403, no `access-control-allow-origin`): `initializeClient` throws `initializeClient refresh failed (network)` before `getAuthConfig()` is reached, and the template app's login surfaces the error. Fix by adding the serving origin (`primitive apps update --cors-origins`; inspect with `primitive apps get`). Common triggers: serving on a non-default port, or a newly deployed domain.
 {{/lang}}
 
-Dev → prod checklist: add the production origin to `[cors].allowedOrigins` and set `[app].baseUrl` in `app.toml`, `primitive sync push`, add the production OAuth callback to `redirectUris` (Admin Console — not synced), and re-check `getAuthConfig()` reports the expected methods.
+Dev → prod checklist: add the production origin to `[cors].allowedOrigins` and set `[app].baseUrl` in `app.toml`, `primitive sync push`, add the production OAuth callback to `redirectUris` (`primitive apps update --redirect-uris` or Admin Console — not in `app.toml`), and re-check `getAuthConfig()` reports the expected methods.
 
 ---
 

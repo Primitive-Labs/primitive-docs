@@ -55,7 +55,7 @@ App-level settings sync from `app.toml`; editing the TOML and `sync push` is the
 - `[auth]` — `googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled`, `[auth.passkeys]` relying-party config
 - `[cors]` (serialized only when `mode = "custom"`) — `allowedOrigins`, `allowCredentials`, `allowedMethods`, `maxAge`
 
-Not in `app.toml` (see [What sync does NOT carry](#what-sync-does-not-carry)): `otp` (set via `--otp <bool>` only) and `redirectUris` (Admin Console only — no TOML key, no CLI flag).
+Not in `app.toml` (see [What sync does NOT carry](#what-sync-does-not-carry)): `otp` (set via `--otp <bool>` only) and `redirectUris` (set via `--redirect-uris "<uri1>,<uri2>"` or the Admin Console — no TOML key).
 
 ## Environment resolution
 
@@ -75,7 +75,7 @@ primitive workflows update <id> --sync-callable true
 primitive apps update --otp true                                          # no TOML key
 primitive apps update --member-invitations-enabled true --member-invitation-limit 5
 primitive apps update --test-account-bases alice@example.com
-# redirectUris: Admin Console only — no TOML key, no CLI flag
+primitive apps update --redirect-uris "https://app.example.com/auth/callback"  # no TOML key
 ```
 
 ## Secrets

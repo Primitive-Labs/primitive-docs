@@ -14,7 +14,7 @@ Authentication runs against server-side **app settings** that must line up with 
 | Setting | What it does | Where it lives |
 |---|---|---|
 | **CORS allowed origins** | The whitelist of origins allowed to call the Primitive API from a browser. Your serving origin (scheme + host + port) must be listed. | `[cors].allowedOrigins` in `app.toml` |
-| **Redirect URIs** | The whitelist of OAuth callback URLs. The callback your app uses must match exactly, or the OAuth callback fails with `Invalid redirect URI`. | Admin Console only (not in `app.toml`) |
+| **Redirect URIs** | The whitelist of OAuth callback URLs. The callback your app uses must match exactly, or the OAuth callback fails with `Invalid redirect URI`. | `primitive apps update --redirect-uris` or Admin Console (not in `app.toml`) |
 | **Base URL** | Where the app is served — used for links in auth emails and redirects. | `[app].baseUrl` in `app.toml` |
 
 Inspect all three anytime with `primitive apps get`.
@@ -88,7 +88,7 @@ When deploying to production, add your production domain to these settings along
 
 ### 2. Configure in Primitive
 
-Enter your **Client ID** and **Client Secret** in the [Admin Console](https://admin.primitiveapi.com/login) under your app's Google OAuth settings, then enable the provider and allow your dev origin (see [Server App Settings](#server-app-settings-must-match-your-apps-origin) — the OAuth callback URL must also be in the app's **Redirect URIs**, set in the Admin Console). Set the provider toggle and origin in `app.toml` and push:
+Enter your **Client ID** and **Client Secret** in the [Admin Console](https://admin.primitiveapi.com/login) under your app's Google OAuth settings, then enable the provider and allow your dev origin (see [Server App Settings](#server-app-settings-must-match-your-apps-origin) — the OAuth callback URL must also be in the app's **Redirect URIs** — set via `primitive apps update --redirect-uris` or the Admin Console). Set the provider toggle and origin in `app.toml` and push:
 
 ```toml
 # config/app.toml

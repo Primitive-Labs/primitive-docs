@@ -225,6 +225,12 @@ primitive sync push
 
 The equivalent `primitive apps update --google-oauth true` / `--cors-origins "…"` flags set the same values imperatively for a quick one-off — but they mutate the server without touching `app.toml`, so the next `sync push` reverts them unless you mirror the change back. See [Configuration Sync](#configuration-sync) for which app settings are TOML-syncable.
 
+OAuth **redirect URIs** are not TOML-syncable — set the callback whitelist with the flag (non-localhost entries must be https; pass `''` to clear) or in the Admin Console:
+
+```bash
+primitive apps update --redirect-uris "https://myapp.com/auth/callback,http://localhost:5173/auth/callback"
+```
+
 ### Accessing Guides
 
 The CLI includes built-in guides for various Primitive features:
@@ -299,7 +305,7 @@ This creates a directory structure like:
 - `[auth]` — `googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled`, and `[auth.passkeys]` relying-party config
 - `[cors]` (when `mode = "custom"`) — `allowedOrigins`, `allowCredentials`, `allowedMethods`, `maxAge`
 
-Two app settings are not part of `app.toml`: **OTP** is toggled with `primitive apps update --otp <bool>` only, and **redirect URIs** are managed in the [Admin Console](https://admin.primitiveapi.com/login) (no TOML key and no CLI flag). For everything else, edit `app.toml` and `primitive sync push`.
+Two app settings are not part of `app.toml`: **OTP** is toggled with `primitive apps update --otp <bool>` only, and **redirect URIs** are set with `primitive apps update --redirect-uris "<uri1>,<uri2>"` or in the [Admin Console](https://admin.primitiveapi.com/login) (no TOML key). For everything else, edit `app.toml` and `primitive sync push`.
 
 ### When `sync push` fails
 
