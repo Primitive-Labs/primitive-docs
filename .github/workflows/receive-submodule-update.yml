@@ -55,7 +55,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout primitive-docs (next)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: next
           token: ${{ secrets.DOCS_REPO_PAT }}
@@ -73,10 +73,10 @@ jobs:
         run: git submodule update --init --recursive
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -243,7 +243,7 @@ jobs:
 
       - name: Open pull request into next
         if: steps.scan.outputs.has_work == 'true' && steps.diff.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.DOCS_REPO_PAT }}
           base: next
