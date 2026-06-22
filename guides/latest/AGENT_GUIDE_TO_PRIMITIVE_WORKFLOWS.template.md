@@ -507,6 +507,7 @@ id = "normalize"
 kind = "script"
 ref = "normalize-order"     # required — the Script name (unique per app)
 saveAs = "order"
+# configId = "..."          # optional — pin a specific ScriptConfig for determinism
 [steps.with]                # input context passed to the script (templated by the engine)
 raw = "{{ steps.fetch.body }}"
 currency = "{{ input.currency }}"
@@ -530,7 +531,7 @@ Given `steps.fetch.body = { "items": [{ "sku": "a1", "qty": 2, "price": 5.0 }, {
 - `ref` (required) names a `Script` — a stored Rhai body, unique per app. Script bodies live in `transforms/<name>.rhai` in your sync directory and are mirrored to the server by `primitive sync push` (and pulled back by `primitive sync pull`); the `<name>` is the filename without `.rhai`. There is no separate `transforms` CLI command — scripts ride the normal sync flow.
 - `with` is the JSON context handed to the script. Inside the script the whole table is exposed as **`input.*`** (with `ctx.*` as an alias) — NOT as bare top-level variables. `let x = payload;` fails with `Variable not found: payload`; write `input.payload`. Also, `with` itself is a reserved Rhai keyword — a script can't declare a variable named `with`.
 - **Result nesting.** A script step's return value lands under `steps.<id>.output.*` (alongside `scriptMetrics` and the engine's `ok`) — unlike `transform`, whose result is the templated table directly (`steps.<id>.<field>`). Wire downstream templates/`runIf` as `{{ steps.normalize.output.total }}`, not `{{ steps.normalize.total }}`.
-- **Script bodies are pinned at publish.** The referencing workflow's published snapshot freezes each script body (by content) at workflow publish/save; the run path does no lookup. Pushing a changed `.rhai` alone does NOT change runtime behavior — republish the referencing workflow (e.g. touch + `sync push` it) to pick up the new body. `sync push` warns when a script update leaves referencing workflows on the previous body, naming each one.
+- **Script bodies resolve live at run time.** The runner looks up the script's active config body on each execution; there is no publish-time snapshot. Pushing a changed `.rhai` file (`primitive sync push`) creates a new config and activates it — referencing workflows pick up the new body on their next run with no re-publish step. Pin a specific config with `configId = "..."` on the step to bypass the active-config lookup when determinism is required.
 - Handy patterns: `parse_json(input.someJsonString)` for JSON-string fields (e.g. payload columns stored as strings); missing keys read as `()` (test with `h.symbol != ()`); `NaN`/`Infinity` can't survive JSON output — they serialize as `null`, so return a sentinel instead.
 - `limits` (optional) lets a step lower the per-run ceilings (`maxOperations`, `wallMsHint`, `maxOutputBytes`, `maxArrayLength`, `maxObjectKeys`, `maxNestingDepth`, `maxStringSize`, `maxCallDepth`, `maxLogBytes`); requested values are clamped at the app ceiling, never raised.
 - Deterministic failures (parse / compile / runtime / limit / validation) come back as a non-retryable step error so durable retries don't re-run a guaranteed failure; transient/transport errors throw and retry normally. The runtime fails closed — it never silently passes input through.

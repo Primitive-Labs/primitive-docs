@@ -1,9 +1,9 @@
 {
   "channel": "next",
-  "stampedAt": "2026-06-17",
+  "stampedAt": "2026-06-22",
   "libraries": {
     "js-bao-wss": {
-      "commit": "ba8d5052f8547b3a86ade6e126a709c598f7bf3a",
+      "commit": "e5dbf431613a946a54d604805ef8fae5ea7781bd",
       "npm": {
         "js-bao-wss-client": "2.0.1",
         "js-bao": "0.5.1",
@@ -17,7 +17,7 @@
       }
     },
     "swift-primitive-app-dev": {
-      "commit": "b2fd73d12d2803bac14e3c289e5bd6270467660e"
+      "commit": "634dc60c32a0b8712705e7991ab187b1650181eb"
     }
   }
 }
