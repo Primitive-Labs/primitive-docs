@@ -54,17 +54,17 @@ In the starter template this wiring is owned for you by `PrimitiveAppState.initi
 
 ## Server App Settings ↔ Client Contract
 
-Server-side app settings must align with the origin the client app is served from. Inspect with `primitive apps get`; the relevant fields:
+Server-side app settings must align with the origin the client app is served from. These settings live in `config/app.toml` and sync with `primitive sync push` — **edit the TOML and push as the default path** so the server stays in lockstep with what's checked in. The `primitive apps update --flag` calls below are a quick imperative escape hatch; a flag change mutates the server but leaves `app.toml` stale, so the next `primitive sync push` silently reverts it unless you mirror the change back into the TOML. Inspect the live values with `primitive apps get`; the relevant fields:
 
 | Server field | Contract | Set via |
 |---|---|---|
-| `corsAllowedOrigins` | Must contain the exact serving origin (scheme+host+port). `corsMode` defaults to `custom` — an empty list blocks every cross-origin request. | `primitive apps update --cors-origins "<o1>,<o2>"` |
-| `redirectUris` | OAuth callbacks are validated against this whitelist — a non-listed callback URL returns 400 `Invalid redirect URI`. | Admin Console only (no CLI flag) |
-| `baseUrl` | Used for links in auth emails / redirects. | `primitive apps update --base-url <url>` |
-| Provider toggles | `--google-oauth`/`--magic-link`/`--otp <bool>` — what `getAuthConfig()` reports. | `primitive apps update` |
+| `corsAllowedOrigins` | Must contain the exact serving origin (scheme+host+port). `corsMode` defaults to `custom` — an empty list blocks every cross-origin request. | `[cors]` (`mode`, `allowedOrigins`, `allowCredentials`) in `app.toml` → `sync push`; `--cors-origins "<o1>,<o2>"` for a one-off |
+| `redirectUris` | OAuth callbacks are validated against this whitelist — a non-listed callback URL returns 400 `Invalid redirect URI`. | Admin Console only — not in `app.toml`, no CLI flag |
+| `baseUrl` | Used for links in auth emails / redirects. | `[app].baseUrl` in `app.toml` → `sync push`; `--base-url <url>` for a one-off |
+| Provider toggles | What `getAuthConfig()` reports. | `[auth]` in `app.toml` (`googleOAuthEnabled`, `magicLinkEnabled`) → `sync push`. `otp` has no TOML key — set it with `--otp <bool>` only. |
 
 
-Dev → prod checklist: add the production origin to `corsAllowedOrigins`, add the production OAuth callback to `redirectUris` (Admin Console), update `baseUrl`, and re-check `getAuthConfig()` reports the expected methods.
+Dev → prod checklist: add the production origin to `[cors].allowedOrigins` and set `[app].baseUrl` in `app.toml`, `primitive sync push`, add the production OAuth callback to `redirectUris` (Admin Console — not synced), and re-check `getAuthConfig()` reports the expected methods.
 
 ---
 

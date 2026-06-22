@@ -47,6 +47,16 @@ config/
   collection-type-configs/*.toml  # Collection type configs
 ```
 
+## App settings (`app.toml`)
+
+App-level settings sync from `app.toml`; editing the TOML and `sync push` is the default path. The equivalent `primitive apps update --flag` calls mutate the server imperatively and drift from the checked-in TOML — the next `sync push` reverts them unless mirrored back. TOML-syncable settings:
+
+- `[app]` — `name`, `mode`, `waitlistEnabled`, `baseUrl`
+- `[auth]` — `googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled`, `[auth.passkeys]` relying-party config
+- `[cors]` (serialized only when `mode = "custom"`) — `allowedOrigins`, `allowCredentials`, `allowedMethods`, `maxAge`
+
+Not in `app.toml` (see [What sync does NOT carry](#what-sync-does-not-carry)): `otp` (set via `--otp <bool>` only) and `redirectUris` (Admin Console only — no TOML key, no CLI flag).
+
 ## Environment resolution
 
 Every command resolves its target environment in order: `--env <name>` flag → `PRIMITIVE_ENV` env var → `defaultEnvironment` in `.primitive/config.json` → the only defined environment → error. Manage environments with `primitive env add|list|show|use|remove`. Tokens are stored per-environment in `.primitive/credentials.json` (gitignored); `.primitive/config.json` is committed.
@@ -57,14 +67,15 @@ Every command resolves its target environment in order: `--env <name>` flag → 
 
 ## What sync does NOT carry
 
-Some flags are set with dedicated update commands rather than TOML:
+Some settings are set with dedicated update commands rather than TOML (app-level settings that *do* sync are listed under [App settings](#app-settings-app-toml)):
 
 ```bash
 primitive workflows update <id> --requires-client-apply false
 primitive workflows update <id> --sync-callable true
-primitive apps update --cors-origins "..." --base-url "..." --google-oauth true
+primitive apps update --otp true                                          # no TOML key
 primitive apps update --member-invitations-enabled true --member-invitation-limit 5
 primitive apps update --test-account-bases alice@example.com
+# redirectUris: Admin Console only — no TOML key, no CLI flag
 ```
 
 ## Secrets

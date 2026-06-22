@@ -9,15 +9,17 @@ The two things you may want to configure are:
 
 ## Server App Settings Must Match Your App's Origin
 
-Authentication runs against server-side **app settings** that must line up with where your client app is actually served. Three settings matter, and a mismatch in the first one fails in a particularly confusing way:
+Authentication runs against server-side **app settings** that must line up with where your client app is actually served. These settings live in your synced `app.toml` — edit the TOML and run `primitive sync push` so the server matches what's checked into your repo. Three settings matter, and a mismatch in the first one fails in a particularly confusing way:
 
-| Setting | What it does | How to set |
+| Setting | What it does | Where it lives |
 |---|---|---|
-| **CORS allowed origins** | The whitelist of origins allowed to call the Primitive API from a browser. Your serving origin (scheme + host + port) must be listed. | `primitive apps update --cors-origins "http://localhost:5173,https://myapp.com"` or Admin Console |
-| **Redirect URIs** | The whitelist of OAuth callback URLs. The callback your app uses must match exactly, or the OAuth callback fails with `Invalid redirect URI`. | Admin Console |
-| **Base URL** | Where the app is served — used for links in auth emails and redirects. | `primitive apps update --base-url "https://myapp.com"` |
+| **CORS allowed origins** | The whitelist of origins allowed to call the Primitive API from a browser. Your serving origin (scheme + host + port) must be listed. | `[cors].allowedOrigins` in `app.toml` |
+| **Redirect URIs** | The whitelist of OAuth callback URLs. The callback your app uses must match exactly, or the OAuth callback fails with `Invalid redirect URI`. | Admin Console only (not in `app.toml`) |
+| **Base URL** | Where the app is served — used for links in auth emails and redirects. | `[app].baseUrl` in `app.toml` |
 
 Inspect all three anytime with `primitive apps get`.
+
+The `primitive apps update --cors-origins …` / `--base-url …` flags set the same values imperatively — useful for a quick one-off, but a flag change mutates the server without touching `app.toml`, so the next `primitive sync push` reverts it unless you mirror the change back into the TOML. Prefer editing `app.toml` and pushing.
 
 ## The Template Login
 
@@ -86,11 +88,20 @@ When deploying to production, add your production domain to these settings along
 
 ### 2. Configure in Primitive
 
-Enter your **Client ID** and **Client Secret** in the [Admin Console](https://admin.primitiveapi.com/login) under your app's Google OAuth settings, then enable the provider and allow your dev origin (see [Server App Settings](#server-app-settings-must-match-your-apps-origin) — the OAuth callback URL must also be in the app's **Redirect URIs**, set in the Admin Console):
+Enter your **Client ID** and **Client Secret** in the [Admin Console](https://admin.primitiveapi.com/login) under your app's Google OAuth settings, then enable the provider and allow your dev origin (see [Server App Settings](#server-app-settings-must-match-your-apps-origin) — the OAuth callback URL must also be in the app's **Redirect URIs**, set in the Admin Console). Set the provider toggle and origin in `app.toml` and push:
+
+```toml
+# config/app.toml
+[auth]
+googleOAuthEnabled = true
+
+[cors]
+mode = "custom"
+allowedOrigins = ["http://localhost:5173"]
+```
 
 ```bash
-primitive apps update --google-oauth true
-primitive apps update --cors-origins "http://localhost:5173"
+primitive sync push
 ```
 
 That's it — the template's login component automatically shows a "Sign in with Google" button when Google OAuth is configured.

@@ -207,15 +207,23 @@ primitive users admin-invitations delete <invitation-id>
 
 ### OAuth Configuration
 
-Configure OAuth providers for your app (client credentials are entered in the [Admin Console](https://admin.primitiveapi.com/login) under the app's Google OAuth settings):
+Configure OAuth providers for your app (client credentials are entered in the [Admin Console](https://admin.primitiveapi.com/login) under the app's Google OAuth settings). The provider toggle and CORS origins are app settings synced from `app.toml`, so the drift-free path is to edit the TOML and push:
+
+```toml
+# config/app.toml
+[auth]
+googleOAuthEnabled = true
+
+[cors]
+mode = "custom"
+allowedOrigins = ["http://localhost:5173", "https://myapp.com"]
+```
 
 ```bash
-# Enable Google OAuth as a sign-in method
-primitive apps update --google-oauth true
-
-# Set allowed origins (for CORS; comma-separated list)
-primitive apps update --cors-origins "http://localhost:5173,https://myapp.com"
+primitive sync push
 ```
+
+The equivalent `primitive apps update --google-oauth true` / `--cors-origins "…"` flags set the same values imperatively for a quick one-off — but they mutate the server without touching `app.toml`, so the next `sync push` reverts them unless you mirror the change back. See [Configuration Sync](#configuration-sync) for which app settings are TOML-syncable.
 
 ### Accessing Guides
 
@@ -284,6 +292,14 @@ This creates a directory structure like:
 ```
 
 `workflow-fragments/<name>.toml` lets several workflows share a common run of `[[steps]]`. Reference them from a workflow file with `include = ["<name>"]`; the CLI expands fragments client-side before push (the server only stores the canonical flattened step list). Use `primitive workflows expand <workflow.toml>` to inspect the expanded result.
+
+`app.toml` holds the app-level settings, and pushing it is the preferred way to change them — the imperative `primitive apps update --flag` calls mutate the server directly and drift from the checked-in TOML, so a later `sync push` reverts them. The TOML-syncable settings are:
+
+- `[app]` — `name`, `mode`, `waitlistEnabled`, `baseUrl`
+- `[auth]` — `googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled`, and `[auth.passkeys]` relying-party config
+- `[cors]` (when `mode = "custom"`) — `allowedOrigins`, `allowCredentials`, `allowedMethods`, `maxAge`
+
+Two app settings are not part of `app.toml`: **OTP** is toggled with `primitive apps update --otp <bool>` only, and **redirect URIs** are managed in the [Admin Console](https://admin.primitiveapi.com/login) (no TOML key and no CLI flag). For everything else, edit `app.toml` and `primitive sync push`.
 
 ### When `sync push` fails
 
