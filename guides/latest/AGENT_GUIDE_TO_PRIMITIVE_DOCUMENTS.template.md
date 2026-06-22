@@ -410,18 +410,7 @@ Use tags to categorize documents by type. Pass `tags` to `create()`, filter the 
 
 You can also create a tagged document and filter locally:
 
-{{#lang ts}}
-```typescript
-const { metadata } = await jsBaoClient.documents.create({
-  title: "My List",
-  tags: ["todolist"],
-});
-
-// Filter locally
-const owned = await jsBaoClient.me.ownedDocuments();
-const todoListsLocal = owned.filter((doc) => doc.tags?.includes("todolist"));
-```
-{{/lang}}
+{{ example: documents/tag-filter-local }}
 
 ## Defining Models
 
@@ -657,41 +646,15 @@ fields = ["name", "parentId"]
 unique_constraints = [["name", "parentId"]]
 ```
 
-{{#lang ts}}
 ### Working with StringSets
 
-```typescript
-// Add/remove tags
-task.tags.add("urgent");
-task.tags.remove("low-priority");
-
-// Check membership
-if (task.tags.has("urgent")) { ... }
-
-// Convert to array for display
-const tagList = task.tags.toArray();
-```
+{{ example: documents/stringset-ops }}
 
 ### Working with Dates
 
 Dates are stored as ISO-8601 strings. Convert for comparisons:
 
-```typescript
-// Store
-task.dueDate = new Date().toISOString();
-
-// Compare
-const due = new Date(task.dueDate);
-if (due < new Date()) {
-  console.log("Overdue!");
-}
-
-// Query with date comparison
-const result = await Task.query({
-  dueDate: { $lt: new Date().toISOString() },
-});
-```
-{{/lang}}
+{{ example: documents/date-handling }}
 
 ## Querying Data
 
@@ -746,7 +709,7 @@ items.map(...);  // TypeError: items.map is not a function
 const result = await Task.query({
   completed: false,
   priority: { $gte: 3 },
-  tags: { $in: ["work", "urgent"] },
+  category: { $in: ["work", "urgent"] },
 });
 ```
 

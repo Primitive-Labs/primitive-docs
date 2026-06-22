@@ -456,6 +456,15 @@ Use tags to categorize documents by type. Pass `tags` to `create()`, filter the 
 
 You can also create a tagged document and filter locally:
 
+```swift
+  let result = try await client.documents.create(
+    options: CreateDocumentOptions(title: "My List", tags: ["todolist"])
+  )
+
+  // Filter locally
+  let owned = try await client.me.ownedDocuments()
+  let todoLists = owned.filter { $0.tags?.contains("todolist") == true }
+```
 
 ## Defining Models
 
@@ -609,6 +618,44 @@ fields = ["name", "parentId"]
 unique_constraints = [["name", "parentId"]]
 ```
 
+### Working with StringSets
+
+```swift
+  if var task = Task.find(taskId) {
+    // Add/remove tags
+    task.tags?.insert("urgent")
+    task.tags?.remove("low-priority")
+
+    // Check membership
+    if task.tags?.contains("urgent") == true {
+      // ...
+    }
+
+    try task.save(in: documentId)
+  }
+```
+
+### Working with Dates
+
+Dates are stored as ISO-8601 strings. Convert for comparisons:
+
+```swift
+  let now = ISO8601DateFormatter().string(from: Date())
+
+  // Store
+  if var task = Task.find(taskId) {
+    task.dueDate = now
+    try task.save(in: documentId)
+
+    // Compare
+    if let dueDate = task.dueDate, dueDate < now {
+      // overdue
+    }
+  }
+
+  // Query with date comparison
+  let overdue = Task.query(["dueDate": ["$lt": now]])
+```
 
 ## Querying Data
 

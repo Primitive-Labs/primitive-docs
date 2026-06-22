@@ -475,14 +475,14 @@ Use tags to categorize documents by type. Pass `tags` to `create()`, filter the 
 You can also create a tagged document and filter locally:
 
 ```typescript
-const { metadata } = await jsBaoClient.documents.create({
-  title: "My List",
-  tags: ["todolist"],
-});
+  const { metadata } = await client.documents.create({
+    title: "My List",
+    tags: ["todolist"],
+  });
 
-// Filter locally
-const owned = await jsBaoClient.me.ownedDocuments();
-const todoListsLocal = owned.filter((doc) => doc.tags?.includes("todolist"));
+  // Filter locally
+  const owned = await client.me.ownedDocuments();
+  const todoLists = owned.filter((doc) => doc.tags?.includes("todolist"));
 ```
 
 ## Defining Models
@@ -645,15 +645,17 @@ unique_constraints = [["name", "parentId"]]
 ### Working with StringSets
 
 ```typescript
-// Add/remove tags
-task.tags.add("urgent");
-task.tags.remove("low-priority");
+  // Add/remove tags
+  task.tags?.add("urgent");
+  task.tags?.remove("low-priority");
 
-// Check membership
-if (task.tags.has("urgent")) { ... }
+  // Check membership
+  if (task.tags?.has("urgent")) {
+    // ...
+  }
 
-// Convert to array for display
-const tagList = task.tags.toArray();
+  // Convert to array for display
+  const tagList = task.tags?.toArray() ?? [];
 ```
 
 ### Working with Dates
@@ -661,19 +663,19 @@ const tagList = task.tags.toArray();
 Dates are stored as ISO-8601 strings. Convert for comparisons:
 
 ```typescript
-// Store
-task.dueDate = new Date().toISOString();
+  // Store
+  task.dueDate = new Date().toISOString();
 
-// Compare
-const due = new Date(task.dueDate);
-if (due < new Date()) {
-  console.log("Overdue!");
-}
+  // Compare
+  const due = new Date(task.dueDate);
+  if (due < new Date()) {
+    // overdue
+  }
 
-// Query with date comparison
-const result = await Task.query({
-  dueDate: { $lt: new Date().toISOString() },
-});
+  // Query with date comparison
+  const overdue = await Task.query({
+    dueDate: { $lt: new Date().toISOString() },
+  });
 ```
 
 ## Querying Data
@@ -728,7 +730,7 @@ items.map(...);  // TypeError: items.map is not a function
 const result = await Task.query({
   completed: false,
   priority: { $gte: 3 },
-  tags: { $in: ["work", "urgent"] },
+  category: { $in: ["work", "urgent"] },
 });
 ```
 
