@@ -1,10 +1,15 @@
 # Docs next-sync (agent automation)
 #
-# Receives the `submodule-update` repository_dispatch that the library repos
-# (js-bao-wss, primitive-app-dev) fire on every push to their main branch, and
-# runs the project's docs-next-sync skill with the Claude Code CLI to true the
-# docs on the `next` branch against the library main tips. The result is opened
-# as a pull request into `next` for human review — this workflow never merges.
+# Receives the `nightly-release` repository_dispatch that the library repos
+# (js-bao-wss, …) fire once per night, and runs the project's docs-next-sync
+# skill with the Claude Code CLI to true the docs on the `next` branch against
+# the library main tips. The result is opened as a pull request into `next` for
+# human review — this workflow never merges.
+#
+# The nightly cadence deliberately supersedes the old per-commit trigger: the
+# skill batches a whole day of library commits into one truing pass rather than
+# firing on every push. Production releases are a separate tier — they trigger
+# `docs-publish-release` via receive-production-release.yml, not this workflow.
 #
 # NOTE: repository_dispatch only triggers workflows that live on the default
 # branch (main), so this file must stay on main even though the work it does
@@ -19,7 +24,7 @@ name: Docs Next-Sync (agent)
 
 on:
   repository_dispatch:
-    types: [submodule-update]
+    types: [nightly-release]
 
   # Manual trigger for testing / on-demand runs.
   workflow_dispatch:
@@ -85,25 +90,29 @@ jobs:
         run: pnpm install
 
       - name: Build context from dispatch payload
+        # The dispatch is fired by js-bao-wss's notify-docs-on-release.yml when a
+        # `release:nightly` issue is marked `status:deployed`. It forwards that
+        # issue's number/url/body — the body's "What shipped" PR list is a useful
+        # hint, but the scan below re-derives the authoritative diff regardless.
         id: ctx
         env:
           EVENT_NAME: ${{ github.event_name }}
           P_SUBMODULE: ${{ github.event.client_payload.submodule }}
-          P_REF: ${{ github.event.client_payload.ref }}
-          P_CHANGED: ${{ github.event.client_payload.changed_files }}
-          P_COMMITS: ${{ github.event.client_payload.commit_messages }}
+          P_ISSUE: ${{ github.event.client_payload.source_issue }}
+          P_URL: ${{ github.event.client_payload.source_url }}
+          P_NOTES: ${{ github.event.client_payload.release_notes }}
           I_SUBMODULE: ${{ github.event.inputs.submodule }}
         run: |
           if [ "$EVENT_NAME" = "repository_dispatch" ]; then
-            SUBMODULE="$P_SUBMODULE"; REF="$P_REF"; CHANGED="$P_CHANGED"; COMMITS="$P_COMMITS"
+            SUBMODULE="${P_SUBMODULE:-js-bao-wss}"; ISSUE="$P_ISSUE"; URL="$P_URL"; NOTES="$P_NOTES"
           else
-            SUBMODULE="$I_SUBMODULE"; REF="main"; CHANGED="(manual run)"; COMMITS="(manual run)"
+            SUBMODULE="$I_SUBMODULE"; ISSUE="(manual run)"; URL=""; NOTES="(manual run)"
           fi
           {
             echo "submodule=$SUBMODULE"
-            echo "ref=$REF"
-            echo "changed<<EOF"; echo "$CHANGED"; echo "EOF"
-            echo "commits<<EOF"; echo "$COMMITS"; echo "EOF"
+            echo "issue=$ISSUE"
+            echo "url=$URL"
+            echo "notes<<EOF"; echo "$NOTES"; echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
       - name: Scan for documentable changes since the last stamp
@@ -133,9 +142,9 @@ jobs:
           # library repos; gh reads GH_TOKEN.
           GH_TOKEN: ${{ secrets.DOCS_REPO_PAT }}
           SUBMODULE: ${{ steps.ctx.outputs.submodule }}
-          LIB_REF: ${{ steps.ctx.outputs.ref }}
-          CHANGED: ${{ steps.ctx.outputs.changed }}
-          COMMITS: ${{ steps.ctx.outputs.commits }}
+          ISSUE: ${{ steps.ctx.outputs.issue }}
+          URL: ${{ steps.ctx.outputs.url }}
+          NOTES: ${{ steps.ctx.outputs.notes }}
         run: |
           npm install -g @anthropic-ai/claude-code
 
@@ -176,13 +185,11 @@ jobs:
           # Append the (untrusted) payload context as plain data.
           {
             echo
-            echo "Triggering push context (a hint only; the skill re-derives the authoritative diff):"
-            echo "- Submodule: ${SUBMODULE:-unknown}"
-            echo "- Library commit: ${LIB_REF:-unknown}"
-            echo "- Changed files:"
-            echo "${CHANGED:-(none)}"
-            echo "- Commit messages:"
-            echo "${COMMITS:-(none)}"
+            echo "Triggering nightly-release context (a hint only; the skill re-derives the authoritative diff):"
+            echo "- Submodule: ${SUBMODULE:-js-bao-wss}"
+            echo "- Source release issue: ${SUBMODULE:-js-bao-wss}#${ISSUE:-unknown} ${URL:-}"
+            echo "- Release report (\"What shipped\" etc.):"
+            echo "${NOTES:-(none)}"
           } >> /tmp/prompt.txt
 
           set +e
@@ -253,7 +260,7 @@ jobs:
             docs-next-sync: true next against ${{ steps.ctx.outputs.submodule }} (automated)
           title: "docs-next-sync: ${{ steps.ctx.outputs.submodule }} changes (automated)"
           body: |
-            Automated `docs-next-sync` pass against the library main tips, triggered by changes in **${{ steps.ctx.outputs.submodule }}** (`${{ steps.ctx.outputs.ref }}`).
+            Automated `docs-next-sync` pass against the library main tips, triggered by the nightly release ${{ steps.ctx.outputs.submodule }}#${{ steps.ctx.outputs.issue }}.
 
             ${{ steps.report.outputs.body }}
 
