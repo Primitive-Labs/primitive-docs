@@ -307,6 +307,23 @@ This creates a directory structure like:
 
 Two app settings are not part of `app.toml`: **OTP** is toggled with `primitive apps update --otp <bool>` only, and **redirect URIs** are set with `primitive apps update --redirect-uris "<uri1>,<uri2>"` or in the [Admin Console](https://admin.primitiveapi.com/login) (no TOML key). For everything else, edit `app.toml` and `primitive sync push`.
 
+### Previewing a push
+
+Two commands preview a push without touching the server:
+
+```bash
+primitive sync diff             # entities that would be created, changed, or removed
+primitive sync push --dry-run   # the full push, reported but not applied
+```
+
+Both run the **same** validate-first gate a real `sync push` runs — file validation followed by the server-side checks — so the preview is faithful: what it reports is what the push will do. Schema-validation rejections in particular surface identically, before any change is applied:
+
+- an operation whose database type has no schema set,
+- a `$params.X` or other reference that doesn't resolve,
+- a schema change that would break an existing registered operation.
+
+A previewed (or genuinely blocked) entity records no sync state, so it stays visible as pending on the next `sync diff` rather than being marked "in sync" — a rejected change can't quietly disappear from the diff. Pipe `primitive sync diff --json | jq` for machine-readable output.
+
 ### When `sync push` fails
 
 `sync push` validates every TOML file before applying anything — a validation error in any file aborts the whole push with no changes applied, so a typo in one workflow can't leave a half-pushed configuration behind:
