@@ -130,15 +130,7 @@ primitive email-templates test magic-link
 
 ## Invitations and Pending Shares
 
-Any sign-in method resolves pending invitations and email-based shares automatically:
-
-- If an invitation exists for the user's email, it's consumed and the user joins the app.
-- Any pending document shares, group adds, or collection adds addressed to their email are applied atomically after the account is created — documents are shared, group and collection memberships are granted.
-- Domain-mode apps re-validate the email domain at resolution time. A pending share for `alice@outside.com` won't land in an app restricted to `@mycompany.com`.
-
-From the end-user's perspective: they sign in for the first time, and the things other people invited them into are already there. No manual "accept invitation" step.
-
-See [Invitations](./invitations.md) and [Sharing Documents](./working-with-documents.md#sharing-documents) for how to create these shares.
+Signing in is what resolves anything waiting on a user's email — a pending app invitation, plus any document shares, group adds, or collection adds addressed to them. On first sign-in, with any method, it's all applied automatically; there's no manual "accept invitation" step, so the things other people invited them into are already there. See [Invitations](./invitations.md) for how those shares are created and the full resolution rules.
 
 ## Disabling a User Per App
 
