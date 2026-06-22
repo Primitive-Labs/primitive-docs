@@ -34,6 +34,7 @@ config/
   workflows/*.toml                # Workflow definitions
   workflows/{key}.tests/*.toml    # Workflow test cases
   workflow-fragments/*.toml       # Reusable [[steps]] blocks (include = ["<name>"])
+  transforms/*.rhai               # Rhai scripts for workflow script steps
   prompts/*.toml                  # Managed prompts
   prompts/{key}.tests/*.toml      # Prompt test cases
   integrations/*.toml             # External API integrations

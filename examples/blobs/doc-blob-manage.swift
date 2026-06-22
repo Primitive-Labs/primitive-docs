@@ -15,3 +15,16 @@ func manageDocumentBlobs(
   // #endregion example
   _ = (list, meta)
 }
+
+// Warm the local cache by prefetching blobs before they're needed.
+func prefetchDocumentBlobs(
+  client: JsBaoClient,
+  documentId: String,
+  blobId1: String,
+  blobId2: String
+) async {
+  // #region prefetch
+  let blobs = client.documents.blobs(documentId: documentId)
+  await blobs.prefetch(blobIds: [blobId1, blobId2], concurrency: 4)
+  // #endregion prefetch
+}

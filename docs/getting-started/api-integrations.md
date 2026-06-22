@@ -32,19 +32,16 @@ X-API-Key = "{{secrets.WEATHER_API_KEY}}"
 - **`requestConfig.defaultHeaders`** — Headers sent on every request; use <code>&#123;&#123; secrets.KEY &#125;&#125;</code> for credentials
 - **`requestConfig.staticQuery`** — Query parameters appended to every request
 
-## Managing Secrets
+## Referencing Secrets in Integrations
 
-Credentials live in your app's secrets store and are referenced from the integration config with <code>&#123;&#123; secrets.KEY &#125;&#125;</code>:
+Credentials live in your app's secrets store. Reference one from the integration config with <code>&#123;&#123; secrets.KEY &#125;&#125;</code> — for example, an API key in a default header:
 
-```bash
-# Set the secret value
-primitive secrets set WEATHER_API_KEY --value "sk-..." --summary "Weather API key"
-
-# List app secrets
-primitive secrets list
+```toml
+[requestConfig.defaultHeaders]
+Authorization = "Bearer {{ secrets.WEATHER_API_KEY }}"
 ```
 
-Secrets are resolved server-side when the request is proxied and are never exposed to your client code. Secrets are a shared platform service — workflows and database rules can reference them too. See [App Secrets](./app-secrets.md).
+The value resolves server-side when the request is proxied and is never exposed to your client code. Set and manage the value with `primitive secrets set` — see [App Secrets](./app-secrets.md) for the full management workflow.
 
 ## Syncing Configuration
 

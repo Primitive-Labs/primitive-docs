@@ -284,18 +284,7 @@ primitive sync pull --dir ./config
 primitive sync push --dir ./config
 ```
 
-This creates a directory structure like:
-
-```
-.primitive/sync/<env>/<appId>/
-  app.toml                    # App settings
-  integrations/*.toml         # Integration configs
-  prompts/*.toml              # Prompt configs
-  workflows/*.toml            # Workflow definitions
-  workflow-fragments/*.toml   # Reusable [[steps]] blocks for workflows
-  database-types/*.toml       # Database type configs + operations
-  email-templates/*.toml      # Email template overrides
-```
+This creates one subdirectory per kind of configuration, rooted at the auto-resolved `.primitive/sync/<env>/<appId>/` (or the `--dir` path you pass). See [Configuring Primitive Services](./configuring-primitive-services.md#what-lives-in-the-config-directory) for the full directory layout.
 
 `workflow-fragments/<name>.toml` lets several workflows share a common run of `[[steps]]`. Reference them from a workflow file with `include = ["<name>"]`; the CLI expands fragments client-side before push (the server only stores the canonical flattened step list). Use `primitive workflows expand <workflow.toml>` to inspect the expanded result.
 

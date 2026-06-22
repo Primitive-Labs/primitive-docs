@@ -19,3 +19,16 @@ export async function accessRequests(
   // #endregion example
   return requests;
 }
+
+// Deny a request instead, optionally pointing the requester at the doc's URL.
+export async function denyRequest(
+  client: JsBaoClient,
+  documentId: string,
+  requestId: string,
+) {
+  // #region deny
+  await client.documents.denyAccessRequest(documentId, requestId, {
+    documentUrl: "https://myapp.example/docs/sales-handbook",
+  });
+  // #endregion deny
+}

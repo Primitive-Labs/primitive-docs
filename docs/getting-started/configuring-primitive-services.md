@@ -44,6 +44,7 @@ config/
   app.toml                        # App settings
   workflows/*.toml                # Workflow definitions
   workflow-fragments/*.toml       # Reusable step blocks
+  transforms/*.rhai               # Rhai scripts for workflow script steps
   prompts/*.toml                  # Managed prompts
   integrations/*.toml             # External API integrations
   database-types/*.toml           # Database operations, triggers, subscriptions
