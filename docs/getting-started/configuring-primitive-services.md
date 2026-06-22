@@ -1,6 +1,6 @@
-# Configuring Your Backend
+# Configuring Primitive Services
 
-Everything your app's backend *does* — which sign-in methods are enabled, what workflows exist, which external APIs can be called, what database operations clients may run — is **configuration that lives on the Primitive servers**. Your client code doesn't define backend behavior; it invokes behavior that configuration declares.
+Everything Primitive does for your app — which sign-in methods are enabled, what workflows exist, which external APIs can be called, what database operations clients may run — is **configuration of Primitive's services, stored on the Primitive servers**. Your client code doesn't define that behavior; it invokes what configuration declares.
 
 There are two equivalent ways to manage that configuration:
 
@@ -60,7 +60,7 @@ Credentials never go in these files: config that needs an API key references it 
 
 ## Environments
 
-A project usually targets more than one backend — a development app for day-to-day coding, a production app for your customers. The CLI's named environments bind a server and app together so every command (including `sync`) knows which backend it's talking to, and each environment gets its own isolated sync directory. See [Project Configuration and Environments](./primitive-cli.md#project-configuration-and-environments).
+A project usually targets more than one app — a development app for day-to-day coding, a production app for your customers. The CLI's named environments bind a server and app together so every command (including `sync`) knows which app it's talking to, and each environment gets its own isolated sync directory. See [Project Configuration and Environments](./primitive-cli.md#project-configuration-and-environments).
 
 ## Console or Code?
 
