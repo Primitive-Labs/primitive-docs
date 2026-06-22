@@ -36,7 +36,7 @@ Validation gates (run before declaring doc work done):
 - `npx vitepress build docs` — dead links fail the build
 - `node scripts/check-example-parity.mjs` — inventory of inline code fences and their language-parity classification
 
-Project skills under `.claude/skills/` automate the editorial loop: `docs-editorial` (writing standards), `docs-page-review` (per-page review), `docs-sync-check` (docs↔guides sync), `docs-set-audit` (whole-set audit), `docs-next-sync` (true the next branch against library main), `docs-publish-release` (merge next→main at a production release).
+Project skills under `.claude/skills/` automate the editorial loop: `docs-editorial` (writing standards), `docs-page-review` (per-page review), `docs-sync-check` (docs↔guides sync), `docs-set-audit` (whole-set audit), `docs-next-sync` (true the next branch against library main), `docs-pr-sweep` (validate, fix, and merge every open next-targeted PR, then audit the set), `docs-publish-release` (merge next→main at a production release).
 
 ## Guide Sync Rule
 
