@@ -152,13 +152,13 @@ select = ["id", "title", "priority", "updatedAt"]  # optional projection
 Subscribe from the client and pair it with an operation call for the initial state:
 
 ```typescript
-const initial = await client.databases.executeOperation(dbId, "listMyTickets", {});
-const unsub = client.databases.subscribe(dbId, "my-open-tickets", {
-  onChange: (event) => {
-    if (event.isOrigin) return;        // this tab wrote it
-    applyChanges(event.changes);
-  },
-});
+  const initial = await client.databases.executeOperation(dbId, "listMyTickets", {});
+  const unsub = client.databases.subscribe(dbId, "my-open-tickets", {
+    onChange: (event) => {
+      if (event.isOrigin) return; // this tab wrote it
+      applyChanges(event.changes);
+    },
+  });
 ```
 
 Subscriptions deliver deltas only — always pair with an operation call for the initial state, and use semantically equivalent filters. See the Databases guide for the full frame shape (`originConnectionId`, `originUserId`, `isOrigin`, `isOriginUser`, `changeType`).

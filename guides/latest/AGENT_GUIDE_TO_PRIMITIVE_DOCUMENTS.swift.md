@@ -343,6 +343,17 @@ List with `me.ownedDocuments()` and `open()` the selected document; create a new
 
 All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `me.ownedDocuments({ tag })` (and `me.sharedDocuments({ tag })` if the user can also be a non-owner), open each, and track per-document readiness yourself. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over local tracking.
 
+```swift
+  // Open every document with a given tag
+  let channels = try await client.me.ownedDocuments(tag: "channel")
+  for channel in channels {
+    _ = try await client.documents.open(channel.documentId)
+  }
+
+  // Query runs across all open documents by default
+  let messages = Message.query([:])
+```
+
 
 The most common multi-doc shape is one ambient library/index document plus N per-item documents (each shareable independently); see [Index doc + per-item docs](#index-doc--per-item-docs-keying-tombstones-reconcile) below for keying, tombstones, and the reconcile pass. Open auxiliary docs with `appState.openAuxiliaryDoc(_:)` and close them with `appState.closeAuxiliaryDoc(_:)`.
 
@@ -863,13 +874,13 @@ Repeated email-based calls are idempotent: a second `updatePermissions(documentI
 **There is no `permission: null` to remove.** Removal is a separate call (`removePermission` by userId or by email; `transferOwnership` to hand a document to a new owner):
 
 ```swift
-// Remove a current member by userId (a bare string literal also works):
-try await client.documents.removePermission(documentId: documentId, .userId("user-abc"))
+  // Remove a current member by userId (a bare string literal also works):
+  try await client.documents.removePermission(documentId: documentId, .userId("user-abc"))
 
-// Cancel a pending email-based invite, OR remove a current member matched by email:
-try await client.documents.removePermission(documentId: documentId, .email("alice@example.com"))
+  // Cancel a pending email-based invite, OR remove a current member matched by email:
+  try await client.documents.removePermission(documentId: documentId, .email("alice@example.com"))
 
-try await client.documents.transferOwnership(documentId: documentId, newOwnerId: newOwnerId)
+  try await client.documents.transferOwnership(documentId: documentId, newOwnerId: newOwnerId)
 ```
 
 There is no `setPermissions`, and `updatePermissions` with a lower permission does **not** lower a higher group-derived permission — the user keeps access via the group.
@@ -885,6 +896,16 @@ Lowering a user's direct permission while they still have a higher one via a gro
 
 The method is **`grantGroupPermission`** (no `setGroupPermission`). Member changes inside the group propagate automatically — no per-membership permission calls.
 
+```swift
+  _ = try await client.documents.grantGroupPermission(
+    documentId: documentId,
+    params: GrantGroupPermissionParams(groupType: "team", groupId: "engineering", permission: "read-write")
+  )
+
+  // Listing / revoking
+  _ = try await client.documents.listGroupPermissions(documentId: documentId)
+  _ = try await client.documents.revokeGroupPermission(documentId: documentId, groupType: "team", groupId: "engineering")
+```
 
 #### Looking up users
 

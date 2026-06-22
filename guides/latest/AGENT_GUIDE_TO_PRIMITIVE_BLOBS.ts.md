@@ -111,22 +111,20 @@ Uploading the same `blobId` twice with **identical** `sha256` and `size` returns
 
 ## Listing
 
-See **List / metadata / delete** above for the basic call.
-
-To page through results, follow the cursor:
+See **List / metadata / delete** above for the basic call. Each item carries `blobId`, `filename`, `contentType`, `numBytes`, `sha256`, and `createdAt`. `cursor` is an opaque pagination token; only present when more results exist — follow it to page through results.
 
 ```typescript
-const page1 = await blobs.list({ limit: 50 });
-for (const b of page1.items) {
-  console.log(b.blobId, b.filename, b.contentType, b.numBytes, b.sha256, b.createdAt);
-}
-if (page1.cursor) {
-  const page2 = await blobs.list({ cursor: page1.cursor });
-}
+  const page1 = await blobs.list({ limit: 50 });
+  for (const b of page1.items) {
+    console.log(b.blobId, b.filename, b.contentType, b.numBytes, b.sha256, b.createdAt);
+  }
+
+  // `cursor` is an opaque token; only present when more results remain.
+  if (page1.cursor) {
+    const page2 = await blobs.list({ cursor: page1.cursor });
+    return page2.items;
+  }
 ```
-
-`cursor` is an opaque pagination token; only present when more results exist.
-
 
 ---
 
@@ -146,36 +144,29 @@ const meta = await blobs.get(blobId);
 
 ### Download URL (authenticated)
 
-The basic call is shown in **List / URL / read** above. The URL is authenticated via the user's session against the API origin.
+The basic call is shown in **List / URL / read** above. `downloadUrl` is synchronous and returns a string, authenticated via the user's session against the API origin — it works in an `<a href download>` or `window.location`.
 
 ```typescript
-const url = blobs.downloadUrl(blobId, {
-  disposition: "attachment",        // or "inline"
-  attachmentFilename: "report.pdf", // optional override (RFC 5987-encoded)
-});
-// Synchronous; returns a string. Authenticated via the user's session/cookie
-// against the API origin. Works in <a href={url} download> or window.location.
+  const url = blobs.downloadUrl(blobId, {
+    disposition: "attachment",        // or "inline"
+    attachmentFilename: "report.pdf", // optional override (RFC 5987-encoded)
+  });
 ```
-
 
 ### Read content into memory
 
-`read` is shown in **List / URL / read** above.
-
-The return format is selectable via `{ as }`:
+`read` is shown in **List / URL / read** above. It checks the cache first; on a miss it fetches from the server and writes the response into the cache.
 
 ```typescript
-const text  = await blobs.read(blobId, { as: "text" });
-const buf   = await blobs.read(blobId, { as: "arrayBuffer" });
-const blob  = await blobs.read(blobId, { as: "blob" });
-const bytes = await blobs.read(blobId, { as: "uint8array" }); // default
+  const text = await blobs.read(blobId, { as: "text" });
+  const buf = await blobs.read(blobId, { as: "arrayBuffer" });
+  const bytes = await blobs.read(blobId, { as: "uint8array" }); // default
 
-// Bypass the local Cache API + IndexedDB cache and re-fetch from the server.
-const fresh = await blobs.read(blobId, { as: "text", forceRedownload: true });
+  // Bypass the local cache and re-fetch from the server.
+  const fresh = await blobs.read(blobId, { as: "text", forceRedownload: true });
 ```
 
-`read` checks the cache first; on a miss it fetches from the server and writes the response into the cache. When offline (`networkMode === "offline"`) and the cache is empty, it throws `"Blob cache unavailable while offline"`.
-
+`{ as: "blob" }` is also available and returns a `Blob`. When offline (`networkMode === "offline"`) and the cache is empty, `read` throws `"Blob cache unavailable while offline"`.
 
 ### Range requests and conditional GETs
 
@@ -203,96 +194,72 @@ Deleting also cancels any in-flight upload for the same `blobId` and clears loca
 
 ## Offline & the upload queue
 
-The upload queue is keyed by user identity. It hydrates from IndexedDB on sign-in, retries with exponential backoff (2s base, 60s max), and persists across page reloads.
-
-### Upload while offline
+The upload queue is keyed by user identity, retries with exponential backoff (2s base, 60s max), and persists across reloads. While offline, bytes are written to the local cache immediately and queued; `upload()` resolves without waiting for the network (`bytesTransferred: 0`). Reads are served from the cache for blobs previously uploaded or downloaded on this device/user, and `prefetch` warms the cache — its per-blob errors are logged and swallowed, so it resolves once all attempts complete regardless of individual failures. Coming back online resumes queue processing automatically, draining the queue in the background.
 
 ```typescript
-await client.setNetworkMode("offline");
+  await client.setNetworkMode("offline");
 
-// Bytes are written to the local Cache API immediately and queued.
-// upload() resolves without waiting for the network (the result includes
-// bytesTransferred: 0 to indicate nothing was transferred yet).
-const { blobId } = await blobs.upload(data, {
-  filename: "draft.txt",
-  contentType: "text/plain",
-});
-```
+  // Bytes are written to the local cache immediately and queued. upload()
+  // resolves without waiting for the network (bytesTransferred is 0).
+  const { blobId } = await blobs.upload(data, {
+    filename: "draft.txt",
+    contentType: "text/plain",
+  });
 
-### Read cached blobs offline
+  // Reads served from cache for blobs uploaded or downloaded on this device.
+  const text = await blobs.read(blobId, { as: "text" });
 
-```typescript
-// Works for blobs that were previously uploaded or downloaded on this device/user.
-const text = await blobs.read(blobId, { as: "text" });
-```
+  // Warm the cache; per-blob errors are logged and swallowed.
+  await blobs.prefetch(blobIds, { concurrency: 4 });
 
-### Prefetch into the cache
-
-```typescript
-await blobs.prefetch([blobId1, blobId2, blobId3], {
-  concurrency: 4,        // default 2, capped at blobIds.length
-  forceRedownload: false,
-});
-```
-
-Errors per blob are logged and swallowed — `prefetch` resolves once all attempts complete, regardless of individual failures. Don't rely on it to surface errors.
-
-### Coming back online
-
-```typescript
-await client.setNetworkMode("online");
-// Queue processing resumes automatically. Listen for "blobs:queue-drained" to know when done.
+  // Queued uploads resume automatically once back online.
+  await client.setNetworkMode("online");
 ```
 
 ---
 
 ## Queue management
 
+Inspect and control the per-document upload queue, and set the client-wide upload concurrency (applies to all documents). The `queueId` is the `blobId` for document uploads.
+
 ```typescript
-// Inspect what's queued for this document
-const tasks = blobs.uploads();
-// Each task: { queueId, blobId, filename, contentType, numBytes,
-//              status: "pending" | "uploading" | "uploaded" | "paused",
-//              attempts, nextAttemptAt, retainLocal?, lastError?, updatedAt }
+  // Inspect what's queued for this document. Each task carries queueId, blobId,
+  // filename, contentType, numBytes, status, attempts, nextAttemptAt, lastError.
+  const tasks = blobs.uploads();
 
-// Pause/resume by blobId (the queueId is the blobId for document uploads)
-blobs.pauseUpload(blobId);
-blobs.resumeUpload(blobId);
+  // Pause/resume by blobId (the queueId is the blobId for document uploads).
+  blobs.pauseUpload(blobId);
+  blobs.resumeUpload(blobId);
 
-blobs.pauseAll();
-blobs.resumeAll();
+  blobs.pauseAll();
+  blobs.resumeAll();
 
-// Concurrency is set on the client (global, all documents)
-client.setBlobUploadConcurrency(5); // min 1; default 2
-client.getBlobUploadConcurrency();
+  // Concurrency is set on the client (global, all documents).
+  client.setBlobUploadConcurrency(5); // min 1; default 2
+  const concurrency = client.getBlobUploadConcurrency();
 ```
 
 ---
 
 ## Events
 
+The upload queue emits lifecycle events. `upload-progress` is *not* a byte-level progress event — it fires on status transitions. There is no per-byte progress callback. `delete` issued mid-upload cancels the in-flight transfer and evicts the cached bytes.
+
 ```typescript
-// status here is one of: "queued" | "uploading" | "pending" | "paused"
-client.on("blobs:upload-progress", (e) => {
-  console.log(e.queueId, e.blobId, e.status, e.numBytes, e.attempts);
-});
+  // status is one of: "queued" | "uploading" | "pending" | "paused"
+  client.on("blobs:upload-progress", (e) => {
+    console.log(e.queueId, e.blobId, e.status, e.numBytes, e.attempts);
+  });
 
-client.on("blobs:upload-completed", (e) => {
-  console.log("done", e.blobId, e.queueId);
-});
+  client.on("blobs:upload-completed", (e) => {
+    console.log("done", e.blobId, e.queueId);
+  });
 
-client.on("blobs:upload-failed", (e) => {
-  console.log("failed", e.blobId, e.lastError, "retry?", e.willRetry);
-});
-
-client.on("blobs:queue-drained", () => {
-  console.log("all uploads finished");
-});
-
-// Also available: "blobs:upload-paused", "blobs:upload-resumed"
+  client.on("blobs:upload-failed", (e) => {
+    console.log("failed", e.blobId, e.lastError, "retry?", e.willRetry);
+  });
 ```
 
-`upload-progress` is *not* a byte-level progress event — it fires on status transitions. There is no per-byte progress callback.
 
 ---
 
@@ -315,7 +282,6 @@ if (blobs.hasServiceWorkerControl()) {
 ```
 
 `proxyUrl` returns the same URL as `downloadUrl`; it just signals intent to be intercepted by the service worker. See the js-bao-wss-client README for a service-worker implementation.
-
 
 ---
 

@@ -63,11 +63,10 @@ Admin/owner only. Deleting a bucket cascades to every blob inside it.
 **Blob buckets** — general-purpose storage outside any document context. Each bucket has its own access preset, TTL tier, and supports time-limited signed URLs. **Cap: 100 MB per blob.**
 
 ```typescript
-// There is NO bucket() context object. The bucket key/ID is a positional arg.
-await client.blobBuckets.upload("avatars", { filename, contentType, data });
-await client.blobBuckets.getSignedUrl("avatars", blobId, 3600);
+  // The bucket key/ID is a positional arg — there is no bucket() context object.
+  await client.blobBuckets.upload("avatars", { filename, contentType, data });
+  await client.blobBuckets.getSignedUrl("avatars", blobId, 3600);
 ```
-
 
 **Decision rule:** use document-scoped blobs when the file's lifetime and access naturally match a document's. Use a bucket for avatars, workflow outputs, public assets, anonymous reads via signed URLs, or anything that should live outside any specific document. Document-scoped blobs (10 MB cap, permission inheritance, offline caching) are covered in the [Blobs guide](AGENT_GUIDE_TO_PRIMITIVE_BLOBS.md).
 
