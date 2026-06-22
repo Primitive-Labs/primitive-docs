@@ -169,6 +169,13 @@ let tasks = blobs.uploads()
 _ = blobs.pauseUpload(blobId: blobId)
 _ = blobs.resumeUpload(blobId: blobId)
 
+blobs.pauseAll()
+blobs.resumeAll()
+
+// Concurrency is set on the client (global, all documents)
+client.setBlobUploadConcurrency(5) // min 1; default 2
+_ = client.getBlobUploadConcurrency()
+
 // Warm the local cache; per-blob errors are logged and swallowed
 await blobs.prefetch(blobIds: [blobId1, blobId2], concurrency: 4)
 

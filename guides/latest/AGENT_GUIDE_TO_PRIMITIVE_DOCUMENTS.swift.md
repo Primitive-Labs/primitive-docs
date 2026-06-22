@@ -65,7 +65,7 @@ Documents are ready to be queried once the `.open()` call finishes. Applications
 Open only the documents you need to query or want real-time updates from — every open document syncs continuously. Don't open documents you don't need, and close ones you're done with (see [Closing Documents](#closing-documents)).
 
 
-The document-open lifecycle is owned by `PrimitiveAppState` (see [The `PrimitiveAppState` document lifecycle](#the-primitiveappstate-document-lifecycle) below). Subclass it, drive doc setup from `connectClient()`, and bind `TypedModel`s in `onDocumentOpened(doc:documentId:)`. For session-scoped documents (small bounded set), open once at launch; for transient per-item docs, open on view appear and close on disappear.
+The document-open lifecycle is owned by `PrimitiveAppState` (see [The `PrimitiveAppState` document lifecycle](#the-primitiveappstate-document-lifecycle) below). Subclass it and drive doc setup from `connectClient()`; reads and writes go through the codegen'd model facade (`TaskRecord.query(...)`, `record.save(in:)`), so there is no per-document binding step. For session-scoped documents (small bounded set), open once at launch; for transient per-item docs, open on view appear and close on disappear. Stray opens widen query scope — facade queries span every open document by default.
 
 ### 2. Finding documents a user can access
 
@@ -228,7 +228,22 @@ The generated model statics route through the process-wide default client — ca
     sort: AggregateSort(field: "count", direction: -1),
     limit: 10
   ))
+
+  // Grouping by a stringset field counts per member value (facet):
+  let tagCounts = Task.aggregate(AggregateOptions(
+    groupBy: ["tags"],
+    operations: [AggregateOperation(type: .count)]
+  ))
+
+  // Group by whether the set contains a value (membership) — rows carry
+  // a "has_tags_urgent" key of "true" / "false":
+  let urgentSplit = Task.aggregate(AggregateOptions(
+    groupBy: [.stringSetMembership(field: "tags", contains: "urgent")],
+    operations: [AggregateOperation(type: .count)]
+  ))
 ```
+
+Grouping by a `stringset` field counts per member value (facet); a membership `groupBy` entry groups by whether the set contains one specific value. Only one stringset facet field is allowed per aggregation, and a facet can't be mixed with other `groupBy` entries — unsupported mixes degrade (the facet is dropped or the result is empty) rather than throw.
 
 ### Subscribe to changes
 
@@ -329,22 +344,24 @@ List with `me.ownedDocuments()` and `open()` the selected document; create a new
 All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `me.ownedDocuments({ tag })` (and `me.sharedDocuments({ tag })` if the user can also be a non-owner), open each, and track per-document readiness yourself. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over local tracking.
 
 
-The most common multi-doc shape is one ambient library/index document plus N per-item documents (each shareable independently); see [Index doc + per-item docs](#index-doc--per-item-docs-keying-tombstones-reconcile) below for keying, tombstones, and the reconcile pass. Open auxiliary docs with `appState.openAuxiliaryDoc(_:modelType:)` and close them with `appState.closeAuxiliaryDoc(_:)`.
+The most common multi-doc shape is one ambient library/index document plus N per-item documents (each shareable independently); see [Index doc + per-item docs](#index-doc--per-item-docs-keying-tombstones-reconcile) below for keying, tombstones, and the reconcile pass. Open auxiliary docs with `appState.openAuxiliaryDoc(_:)` and close them with `appState.closeAuxiliaryDoc(_:)`.
 
 ### The `PrimitiveAppState` document lifecycle
 
-The document-open lifecycle is owned by `PrimitiveAppState`. Subclass it for app-specific state, override `connectClient()` to drive doc setup after connect, and override `onDocumentOpened(doc:documentId:)` to bind `TypedModel`s — the base class opens the doc once and hands you the live `YDocument`, so don't call `openDocument(...)` again just to get one.
+The document-open lifecycle is owned by `PrimitiveAppState`. Subclass it for app-specific state and override `connectClient()` to drive doc setup after connect. Models need no per-document binding — the codegen'd facade statics read from every open document, backed by the process-wide default client (`JsBaoClient.configureDefault`, wired for you during `initialize()`).
 
 ```swift
 @MainActor
 final class MyAppState: PrimitiveAppState {
-    @Published private(set) var todos: TypedModel<TodoItem>?
-
     // connectClient is `open` — call super first (it connects and fetches
     // /me + the document list), then run app-specific setup. Don't reach
     // for a Combine sink on `$isConnected`; this override is the path.
     override func connectClient() async {
         await super.connectClient()
+        // Optional but recommended: pre-register models so every open
+        // document is mirrored into the client's shared store immediately
+        // (the facade also lazily registers on first read).
+        client?.registerModels([TodoItem.self])
         await openLibraryDoc()
     }
 
@@ -358,39 +375,35 @@ final class MyAppState: PrimitiveAppState {
                 alias: DocumentAlias(scope: .user, aliasKey: "library"),
                 title: "Library"
             )
-            // selectDocumentAwaiting opens the doc, routes the base class's
-            // sync hooks at it, and fires onDocumentOpened below.
+            // selectDocumentAwaiting opens the doc and routes the base
+            // class's sync hooks at it; facade reads see it immediately.
             await selectDocumentAwaiting(result.documentId)
         } catch {
             errorMessage = "Failed to open library: \(error.localizedDescription)"
         }
     }
-
-    override func onDocumentOpened(doc: YDocument, documentId: String) async {
-        todos = makeTypedModel(doc: doc, documentId: documentId)
-    }
 }
 ```
 
+For per-document setup beyond models, override the `onDocumentOpened(doc:documentId:)` hook — the base class opens the doc once and hands you the live `YDocument`, so don't call `openDocument(...)` again just to get one.
+
 For a **fresh doc you'll write immediately**, use `client.createDocument(options:)` — it returns `(documentId, doc: YDocument?)` and the returned `YDocument` is writable at once (local-first). Re-opening a freshly-created empty doc with `waitForLoad: .network` parks ~15s waiting for a sync event that never has anything to deliver.
 
-**Multi-doc apps (one ambient library doc + N per-item docs).** `selectDocumentAwaiting(_:)` is the *single*-selected-doc lifecycle — it closes the previously selected doc first, so using it for a per-item detail view closes your library/index doc. For one ambient doc plus transient detail docs, use `appState.openAuxiliaryDoc(_:modelType:)` from the detail view's `.task` and `appState.closeAuxiliaryDoc(_:)` from `.onDisappear`. These register the doc for sync and the inspector picks up the `TypedModel`, but they don't touch `selectedDocId` or fire `onDocumentOpened`:
+**Multi-doc apps (one ambient library doc + N per-item docs).** `selectDocumentAwaiting(_:)` is the *single*-selected-doc lifecycle — it closes the previously selected doc first, so using it for a per-item detail view closes your library/index doc. For one ambient doc plus transient detail docs, use `appState.openAuxiliaryDoc(_:)` from the detail view's `.task` and `appState.closeAuxiliaryDoc(_:)` from `.onDisappear`. These register the doc for sync, but they don't touch `selectedDocId` or fire `onDocumentOpened`. Once open, read the doc's records through the facade scoped to that document:
 
 ```swift
 struct ItemDetailView: View {
     let documentId: String
     @EnvironmentObject var appState: MyAppState
-    @State private var todos: TypedModel<TodoItem>?
+    @State private var todos: [TodoItem]?
 
     var body: some View {
         Group {
             if let todos { /* render */ } else { ProgressView() }
         }
         .task {
-            let (_, model) = try? await appState.openAuxiliaryDoc(
-                documentId, modelType: TodoItem.self
-            )
-            todos = model
+            _ = try? await appState.openAuxiliaryDoc(documentId)
+            todos = TodoItem.query([:], options: QueryOptions(documents: [documentId]))
         }
         .onDisappear { Task { await appState.closeAuxiliaryDoc(documentId) } }
     }
@@ -449,9 +462,9 @@ You can also create a tagged document and filter locally:
 Models are declared in a TOML schema and the client model types are generated from it by codegen. The field types and options are the same across platforms; the schema file, codegen command, and generated artifacts differ.
 
 
-### `schema.toml` + codegen + `TypedModel<T>`
+### `schema.toml` + codegen + the model facade
 
-Define models in `Sources/MyApp/Models/schema.toml`; `swift-bao-codegen` emits one `PrimitiveModel` struct per `[models.X]` block into a gitignored `Models/Generated/`; bind a generated type to an open document with `TypedModel<T>` and do all CRUD/queries through that instance.
+Define models in `Sources/MyApp/Models/schema.toml`; `swift-bao-codegen` emits one `PrimitiveModel` struct per `[models.X]` block into a gitignored `Models/Generated/`. The generated type IS the API: static reads across all open documents (`TodoItem.query(...)`, `find`, `findAll`, `count`, `aggregate`, `subscribe`), instance writes targeting one document (`try record.save(in: documentId)`, `try record.delete(in: documentId)`), backed by the process-wide default client.
 
 ```toml
 [models.todos]
@@ -515,9 +528,9 @@ public extension TodoItem {
 - **No `nil` in CRDT-backed fields** — the CRDT layer doesn't model `nil`. Use `""` for absent strings, `0` for absent numbers, sentinel timestamps for "never", and check those values explicitly.
 - **Wire field names are forever.** TOML keys are the wire field names; renaming a key after data is on disk orphans every existing record (Swift *and* JS clients reading the same doc). **snake_case is the cross-client convention** when web/Node and Swift read the same doc; **camelCase is fine for Swift-only docs**. The tool preserves whatever you write — add camelCase aliases in the companion if snake_case wire keys read awkwardly.
 - **IDs are `String`** — supply `UUID().uuidString` (or a ULID) when not provided.
-- Bind via `appState.makeTypedModel(doc:documentId:)`, not `TypedModel<T>(doc:)` directly, so the model registers with the in-app debug inspector. One `TypedModel` per record type per document.
+- Register models with `client.registerModels([TodoItem.self])` at connect time (or rely on the facade's lazy registration on first read) — registered models are mirrored into the client's shared store and listed in the in-app debug inspector automatically.
 
-CRUD through the bound `TypedModel<T>` is local-first (applied to the CRDT immediately, synced in the background). `create` is the only method that throws — it validates the new record against the schema; `update`/`delete` operate on already-validated records (a misspelled key in an `update` payload is dropped silently, not thrown). Reads (`find`, `findAll`, `query(["completed": false], options: QueryOptions(sort: ["sortOrder": 1], limit: 50))`, `count`) are synchronous against the local CRDT and `@MainActor`-isolated. Predicate operators: equality, `$gt`/`$gte`/`$lt`/`$lte`, `$containsText`, `$or`/`$and`/`$not`.
+CRUD through the facade is local-first (applied to the CRDT immediately, synced in the background). Writes throw — `try record.save(in: documentId)` inserts or updates in place and returns `self`; `save(in:upsertOn:)` matches on a single-field unique constraint instead of `id`; `try record.delete(in: documentId)`; all three throw if the target document isn't open. Reads (`find`, `findAll`, `queryOne`, `query(["completed": false], options: QueryOptions(sort: ["sortOrder": 1], limit: 50))`, `count`) are synchronous, span every open document by default (scope with `QueryOptions(documents: [...])`), and are `@MainActor`-isolated. Predicate operators: equality, `$gt`/`$gte`/`$lt`/`$lte`, `$containsText`, `$or`/`$and`/`$not`.
 
 > **SourceKit footgun, first time only.** Editing the companion before codegen has ever run shows a red `No such module 'PrimitiveApp'` underline. The real cause is that the generated type doesn't exist yet — run `swift build` once (or the `run-ios.sh` codegen step) and it clears. Only the very first scaffold hits this.
 
@@ -620,27 +633,27 @@ struct TodoListView: View {
             case .loaded(let todos): List(todos) { /* row */ }
             }
         }
-        // `.task(id:)`, NOT a bare `.task`. `appState.todos` is bound
-        // asynchronously in `onDocumentOpened` (after connect + doc open),
-        // so it's nil on first appearance. A bare `.task { guard let … else
-        // { return } }` runs once, sees nil, bails, and never binds — the
-        // screen sticks on its spinner. Keying the task on readiness re-runs
-        // it the instant the model arrives. (Or gate the subtree behind
-        // `ReadyGate(appState.todos) { _ in … }` and use a plain `.task`.)
-        .task(id: appState.todos == nil) {
-            guard let todos = appState.todos else { return }
+        // Bind once, from a plain `.task`. Don't conditionally bind on
+        // doc readiness — set `loader.documentReady` instead: the loader
+        // fires its initial load when it flips to true, and resets
+        // `initialDataLoaded` if the doc closes.
+        .task {
+            loader.documentReady = appState.selectedDocId != nil
             loader.bind(
                 client: appState.client,
-                subscribeTo: [.onModelChange(todos)]
+                subscribeTo: [.onModel(subscribe: TodoItem.subscribe)]
             ) { _ in
-                todos.findAll().sorted { $0.sortOrder < $1.sortOrder }
+                TodoItem.findAll().sorted { $0.sortOrder < $1.sortOrder }
             }
+        }
+        .onChange(of: appState.selectedDocId) { _, id in
+            loader.documentReady = id != nil
         }
     }
 }
 ```
 
-`.onModelChange(model)` fires on **any** add/update/delete on that model — local writes (synchronous) and remote writes (observer drain) both — so `reloadNow()` after a write is unneeded; call it only when the `load` closure reads something the loader can't subscribe to (a REST resource). Other triggers (`LoaderTrigger`): `.onSync`, `.onRemoteUpdate`, `.onDocumentEvents`, `.onConnect`, and `.custom((client, reload) -> EventSubscription?)`.
+`.onModel(subscribe: TodoItem.subscribe)` fires on **any** add/update/delete recorded in that model's shared store — local writes and remote writes both — so `reloadNow()` after a write is unneeded; call it only when the `load` closure reads something the loader can't subscribe to (a REST resource). Other triggers (`LoaderTrigger`): `.onSync`, `.onRemoteUpdate`, `.onDocumentEvents`, `.onConnect`, `.onModelChange(_:)` for a hand-built runtime-schema `DynamicModel`, and `.custom((client, reload) -> EventSubscription?)`.
 
 `loader.phase` is a trinary: `.loading` (first load not complete), `.empty` (first load complete, data conforms to `LoaderEmptiness` and is empty), `.loaded(Data)`. `[T]`, `String`, and `Optional` get `LoaderEmptiness` out of the box.
 
@@ -654,7 +667,7 @@ struct TodoListView: View {
 
 ## Saving Data
 
-Writes go through the bound `TypedModel<T>` and are local-first — applied to the CRDT immediately and synced in the background (see [`schema.toml` + codegen + `TypedModel<T>`](#schematoml--codegen--typedmodelt) for the create/update/delete contract). `save()` uses merge semantics: only the fields you set are written; unset fields are preserved.
+Writes go through record instances and are local-first — applied to the CRDT immediately and synced in the background (see [`schema.toml` + codegen + the model facade](#schematoml--codegen--the-model-facade) for the save/delete contract). `try record.save(in: documentId)` uses merge semantics: `nil` optional fields are not written, so fields you didn't set are preserved on update.
 
 
 ## Design Patterns
@@ -849,6 +862,17 @@ Repeated email-based calls are idempotent: a second `updatePermissions(documentI
 
 **There is no `permission: null` to remove.** Removal is a separate call (`removePermission` by userId or by email; `transferOwnership` to hand a document to a new owner):
 
+```swift
+// Remove a current member by userId (a bare string literal also works):
+try await client.documents.removePermission(documentId: documentId, .userId("user-abc"))
+
+// Cancel a pending email-based invite, OR remove a current member matched by email:
+try await client.documents.removePermission(documentId: documentId, .email("alice@example.com"))
+
+try await client.documents.transferOwnership(documentId: documentId, newOwnerId: newOwnerId)
+```
+
+There is no `setPermissions`, and `updatePermissions` with a lower permission does **not** lower a higher group-derived permission — the user keeps access via the group.
 
 Lowering a user's direct permission while they still have a higher one via a group is a no-op — the group wins (effective = MAX). To actually lower it, also lower or revoke the group permission.
 
@@ -1014,7 +1038,7 @@ The canonical sharing panel: people with access + people invited but not yet sig
 
 `accessibleDocumentSummaries` does the merged owned + shared set in one call.
 
-For **writes**, use the typed params factories — `documents.updatePermissions(documentId:params: .email("…", permission: "read-write", sendEmail: false, documentUrl: …))` (or `.user(…)` / `.batch([…])`) and `collections.addMember(collectionId:params: .email("…", permission: .readWrite))` (or `.user(…)`). To cancel a pending email invite, read the row's `deferredId` via `pendingInvitationSummaries(...)`, then `client.invitations.revokeDeferredGrant(deferredId:type:)` (`.document` for a per-doc invite, `.group` for a collection one).
+For **writes**, use the typed params factories — `documents.updatePermissions(documentId:params: .email("…", permission: "read-write", sendEmail: false, documentUrl: …))` (or `.user(…)` / `.batch([…])`) and `collections.addMember(collectionId:params: .email("…", permission: .readWrite))` (or `.user(…)`). To cancel a pending email invite on a document, call `documents.removePermission(documentId:, .email("…"))`; alternatively, read the row's `deferredId` via `pendingInvitationSummaries(...)` and call `client.invitations.revokeDeferredGrant(deferredId:type:)` (`.document` for a per-doc invite, `.group` for a collection one).
 
 ### Sharing Discovery Cheat Sheet
 

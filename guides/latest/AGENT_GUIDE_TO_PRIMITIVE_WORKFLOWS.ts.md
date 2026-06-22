@@ -13,6 +13,8 @@ name = "My Workflow"              # required
 description = "..."               # optional
 status = "draft"                  # draft | active | archived
 accessRule = "hasRole('admin')"  # optional CEL
+runAs = "caller"                  # caller (default) | system — see Execution identity
+capabilities = ["membership"]    # system-only opt-in grants
 perUserMaxRunning = 4             # default 4
 perUserMaxQueued = 100            # default 100
 dequeueOrder = "fifo"             # fifo | lifo (default fifo)
@@ -28,7 +30,7 @@ greeting = "Hello {{ input.name }}"
 ```
 
 Workflow-level fields the engine actually reads:
-`perUserMaxRunning`, `perUserMaxQueued`, `perAppMaxRunning` (default 25), `perAppMaxQueued` (default 10000), `queueTtlSeconds` (default 43200), `dequeueOrder`, `accessRule`, `inputSchema`, `outputSchema`, `requiresClientApply` (default `true` — see "Client apply" below), `syncCallable` (default `false` — see "Synchronous invocation" below). Sync pushes the schema fields, access rule, queue settings, step list, `requiresClientApply`, and `syncCallable`.
+`perUserMaxRunning`, `perUserMaxQueued`, `perAppMaxRunning` (default 25), `perAppMaxQueued` (default 10000), `queueTtlSeconds` (default 43200), `dequeueOrder`, `accessRule`, `runAs` (default `caller` — see "Execution identity" below), `capabilities` (system-only grants), `inputSchema`, `outputSchema`, `requiresClientApply` (default `true` — see "Client apply" below), `syncCallable` (default `false` — see "Synchronous invocation" below). Sync pushes the schema fields, access rule, `runAs`/`capabilities`, queue settings, step list, `requiresClientApply`, and `syncCallable`.
 
 ### Per-step common fields
 
@@ -62,6 +64,8 @@ A run threads one JSON context through every step:
 ## Step types
 
 Every kind below is registered in `src/workflows/runner/default-registry.ts`. If a kind isn't listed here, it doesn't exist.
+
+The network-reaching kinds are bounded by a per-step timeout: `llm.chat` and `gemini.generate` default to 120000 ms, the `database.*` steps and `email.send` to 30000 ms. Override per step with a `timeout` field (milliseconds). A step that exceeds its timeout fails non-retryably and records a failed step-run instead of hanging the run.
 
 ### `transform`
 
@@ -174,6 +178,8 @@ text = "Summarize: {{ input.content }}"
 ```
 
 `prompt` may be an object (forwarded as the body) or an array of messages. `gemini.generateRaw` is the same shape, forwarded as a raw API payload. `gemini.countTokens` returns a token count.
+
+The effective model — `prompt.model` when `prompt` is an object, otherwise the top-level `model` — is validated against the server's Gemini model allow-list **at save time**: a disallowed model rejects the workflow save (the error names the step index and lists the allowed models) instead of failing at run time. A model containing template syntax resolves at run time and is validated then.
 
 ### `prompt.execute`
 
@@ -301,6 +307,40 @@ status = "paid"
 
 A missing `documentId`/`modelName` (or `recordId` on a write), or a `documentId` that doesn't resolve to a document, fails the step non-retryably.
 
+**Caller-mode ACL.** When the run is `runAs: "caller"` (the default — see [Execution identity](#execution-identity-runas-system-workflows)), every op enforces the caller's per-document permission: `query`/`queryOne`/`count` need `reader`, `save`/`patch` need `read-write`, `delete` needs `owner`. A `null`/insufficient permission throws `DocumentAccessDeniedError` (non-retryable) — a templated/user-supplied `documentId` can't bypass the ACL. `runAs: "system"` runs app-privileged (no per-caller check).
+
+**Targeting by alias.** Supply a `documentAlias { scope, aliasKey }` block instead of `documentId` (exactly one of the two). `scope = "user"` resolves the caller's own alias (forces `userId = caller`; requires `runAs: "caller"`); `scope = "app"` resolves an app-scoped alias after checking the caller's effective permission. A non-resolving alias fails the step like a bad `documentId` (Option A — hard fail).
+
+```toml
+[[steps]]
+id = "load"
+kind = "document.query"
+modelName = "Habit"
+saveAs = "habits"
+[steps.documentAlias]
+scope = "user"
+aliasKey = "tracker"
+```
+
+### `document.resolveAlias`
+
+Resolve an alias to its id for conditional branching, without failing on a miss (Option B). Top-level `scope` (`"app"` | `"user"`) + `aliasKey`. Output `{ documentId }`, or `{ documentId: null }` when the alias doesn't resolve (or the caller lacks access — never leaks existence). Caller-mode only.
+
+```toml
+[[steps]]
+id = "find-tracker"
+kind = "document.resolveAlias"
+scope = "user"
+aliasKey = "tracker"
+saveAs = "tracker"
+
+[[steps]]
+id = "seed"
+kind = "document.save"
+runIf = "outputs.tracker.documentId == null"
+# ... create the user's tracker document
+```
+
 ### `group.addMember` / `removeMember` / `checkMembership` / `listMembers` / `listUserMemberships`
 
 ```toml
@@ -351,28 +391,7 @@ userId = "{{ item.userId }}"
 # Output: { output: <child's outputs.output or full outputs>, childStepResults: [...] }
 ```
 
-### `workflow.start` + `workflow.await`
-
-Fan-out: start child workflows in parallel, then wait. Use with `forEach`.
-
-```toml
-[[steps]]
-id = "start-all"
-kind = "workflow.start"
-forEach = "steps.get-users.data"
-as = "user"
-workflowKey = "process-item"
-[steps.input]
-userId = "{{ user.id }}"
-
-[[steps]]
-id = "results"
-kind = "workflow.await"
-runs = "steps.start-all"        # path to forEach output ({items: [...]} accepted)
-timeout = 600000                # ms, default 600000 (10 min)
-onPartialFailure = "fail"       # fail (default) | continue
-# Output: { completed: [...], failed: [...], allSucceeded }
-```
+Add `forEach` to fan out: the child runs once per item (use `concurrency` for parallel lanes) and the step returns the array of child results. For app-wide, restartable fan-out over the whole user roster, use `iterate-users` instead.
 
 ### `email.send`
 
@@ -488,6 +507,7 @@ id = "normalize"
 kind = "script"
 ref = "normalize-order"     # required — the Script name (unique per app)
 saveAs = "order"
+# configId = "..."          # optional — pin a specific ScriptConfig for determinism
 [steps.with]                # input context passed to the script (templated by the engine)
 raw = "{{ steps.fetch.body }}"
 currency = "{{ input.currency }}"
@@ -511,7 +531,7 @@ Given `steps.fetch.body = { "items": [{ "sku": "a1", "qty": 2, "price": 5.0 }, {
 - `ref` (required) names a `Script` — a stored Rhai body, unique per app. Script bodies live in `transforms/<name>.rhai` in your sync directory and are mirrored to the server by `primitive sync push` (and pulled back by `primitive sync pull`); the `<name>` is the filename without `.rhai`. There is no separate `transforms` CLI command — scripts ride the normal sync flow.
 - `with` is the JSON context handed to the script. Inside the script the whole table is exposed as **`input.*`** (with `ctx.*` as an alias) — NOT as bare top-level variables. `let x = payload;` fails with `Variable not found: payload`; write `input.payload`. Also, `with` itself is a reserved Rhai keyword — a script can't declare a variable named `with`.
 - **Result nesting.** A script step's return value lands under `steps.<id>.output.*` (alongside `scriptMetrics` and the engine's `ok`) — unlike `transform`, whose result is the templated table directly (`steps.<id>.<field>`). Wire downstream templates/`runIf` as `{{ steps.normalize.output.total }}`, not `{{ steps.normalize.total }}`.
-- **Script bodies are pinned at publish.** The referencing workflow's published snapshot freezes each script body (by content) at workflow publish/save; the run path does no lookup. Pushing a changed `.rhai` alone does NOT change runtime behavior — republish the referencing workflow (e.g. touch + `sync push` it) to pick up the new body. `sync push` warns when a script update leaves referencing workflows on the previous body, naming each one.
+- **Script bodies resolve live at run time.** The runner looks up the script's active config body on each execution; there is no publish-time snapshot. Pushing a changed `.rhai` file (`primitive sync push`) creates a new config and activates it — referencing workflows pick up the new body on their next run with no re-publish step. Pin a specific config with `configId = "..."` on the step to bypass the active-config lookup when determinism is required.
 - Handy patterns: `parse_json(input.someJsonString)` for JSON-string fields (e.g. payload columns stored as strings); missing keys read as `()` (test with `h.symbol != ()`); `NaN`/`Infinity` can't survive JSON output — they serialize as `null`, so return a sentinel instead.
 - `limits` (optional) lets a step lower the per-run ceilings (`maxOperations`, `wallMsHint`, `maxOutputBytes`, `maxArrayLength`, `maxObjectKeys`, `maxNestingDepth`, `maxStringSize`, `maxCallDepth`, `maxLogBytes`); requested values are clamped at the app ceiling, never raised.
 - Deterministic failures (parse / compile / runtime / limit / validation) come back as a non-retryable step error so durable retries don't re-run a guaranteed failure; transient/transport errors throw and retry normally. The runtime fails closed — it never silently passes input through.
@@ -519,7 +539,7 @@ Given `steps.fetch.body = { "items": [{ "sku": "a1", "qty": 2, "price": 5.0 }, {
 
 ### `iterate-users`
 
-Fans a child workflow out across **every user in the app**, once per user, as a restartable singleton. Built for large per-user batch jobs (backfills, per-user digests, recomputations) that must survive restarts without re-processing completed users or holding the whole user set in memory.
+Fans a child workflow out across **every user in the app**, once per user, as a restartable singleton. Built for large per-user batch jobs (backfills, per-user digests, recomputations) that must survive restarts without re-processing completed users or holding the whole user set in memory. **System-only** — the workflow must set `runAs = "system"` (see [Execution identity](#execution-identity-runas-system-workflows)), else it's rejected at save time.
 
 ```toml
 [[steps]]
@@ -541,7 +561,8 @@ reason = "preferences backfill"
 
 - **Bounded memory**: users are paged (`pageSize`) rather than loaded all at once, so the step scales to large user counts.
 - **Singleton per app**: a per-app lock (`iterationName` keys it) guarantees only one iteration runs at a time and tracks aggregate progress, so a restarted run resumes where it left off instead of starting over. `onConflict` decides whether a second start `skip`s or `refuse`s while one is live.
-- Each user is processed by the `perUser.workflowKey` child workflow (the user id plus any `perUser.input` is passed as its input). `onPartialFailure` controls whether per-user failures stop the whole iteration or are tallied and skipped.
+- Each user is processed by the `perUser.workflowKey` child workflow. The iterated user's id is injected into the child as `input.userId` automatically, so a child with no `perUser.input` block still reads `{{ input.userId }}`. `onPartialFailure` controls whether per-user failures stop the whole iteration or are tallied and skipped.
+- `perUser.input` values are rendered per user against a `user` binding (`user.userId`, `user.role`) with full template syntax — filters and fallbacks included (`{{ user.userId | upper }}`, `{{ user.role || 'member' }}`). A key set in `perUser.input` overrides the injected `userId` default (author-wins).
 - Prefer `iterate-users` over a hand-rolled `forEach` across a `users.list` query when the fan-out is app-wide and long-running; `forEach` is better for bounded, in-run collections.
 
 ## Templating
@@ -692,7 +713,7 @@ subject = "Update"
 htmlBody = "<p>Hi {{ member.name }}</p>"
 ```
 
-When `concurrency = 1` (the default), iterations are sequential. When `concurrency > 1`, the engine fans them out in parallel batches — in durable mode each batch runs as a child workflow so restarts don't re-run completed items. For very large fan-outs, `workflow.start` + `workflow.await` gives finer control.
+When `concurrency = 1` (the default), iterations are sequential. When `concurrency > 1`, the engine fans them out in parallel batches — in durable mode each batch runs as a child workflow so restarts don't re-run completed items. For app-wide, restartable fan-out that must survive restarts without re-processing completed users, use `iterate-users`.
 
 When a parallel `forEach` batch's combined output exceeds the inline size limit (~1 MB), the engine automatically offloads the batch result to managed object storage and rehydrates it transparently for the next step. Large per-iteration outputs are handled for you, but the offload adds a storage round-trip — keep per-iteration outputs lean when you can.
 
@@ -820,6 +841,37 @@ Behavior:
 - Otherwise, evaluate against `user.userId`, `user.role`, plus `hasRole(role)`, `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`.
 
 Set `accessRule` once in the `[workflow]` TOML block and it sticks: `primitive sync push` and `primitive workflows create --from-file` both apply it (an absent/empty rule is sent as "no rule" rather than dropped). To change it later without re-pushing the file, `primitive workflows update <id> --access-rule "<CEL>"` sets it (pass `--access-rule ""` to clear; omitting the flag leaves the existing rule untouched).
+
+## Execution identity (`runAs`, system workflows)
+
+`runAs` declares the principal a run executes as. Top-level `[workflow]` field, round-tripped by `primitive sync push`, validated at save time (`runAs` must be `caller` | `system`; absent → `caller`).
+
+- `runAs = "caller"` (default) — the run executes as the invoking user. Every step acts with that member's permissions: `document.*` steps enforce the caller's per-document ACL, group/data ops are checked against their roles. `accessRule` gates who may start it.
+- `runAs = "system"` — the run executes as the app's synthetic per-app principal (`sys:<appId>`, also the `WorkflowRun` partition key). App-privileged: the data baseline (document/database read/write/delete/manage) is unconditional.
+
+The invocation gate is enforced once at top-level start (HTTP start/run-sync, cron, webhook, admin test) — never silently downgraded:
+
+| invoker | `runAs:"caller"` | `runAs:"system"` |
+|---|---|---|
+| member | runs as the member | **403** "Members cannot run system workflows" |
+| admin/owner | runs as the admin | runs as system |
+| cron | **403** (cron may only run system workflows) | runs as system |
+| webhook | **403** | runs as system |
+
+Nested/child runs (`workflow.call`, durable `forEach` batches) never re-resolve identity — they inherit the parent's verbatim. Every system run records attribution (`initiatedByUserId` + `initiatorKind` of `admin`/`cron`/`webhook`/`test`) for audit; it is not a security control.
+
+**Sensitive capabilities.** A system run gets the data baseline unconditionally. Sensitive operations are opt-in via `capabilities` (StringSet, allowlist-validated at save time):
+
+```toml
+[workflow]
+key = "sync-roster"
+runAs = "system"
+capabilities = ["membership"]
+```
+
+`membership` gates the `group.addMember` / `group.removeMember` steps in a **system** run — without the grant they reject (`group.addMember requires the 'membership' capability`). Read-only group steps (`checkMembership`, `listMembers`, `listUserMemberships`) are never gated, and caller runs are governed by access rules, not capabilities, so the gate never applies to them.
+
+**`iterate-users` is system-only.** A workflow containing an `iterate-users` step must set `runAs = "system"` — otherwise it's rejected at save time (`'iterate-users' is system-only and may appear only in a runAs:"system" workflow`).
 
 ## Inbound webhooks
 
@@ -1077,7 +1129,7 @@ Opt a workflow into synchronous invocation by setting `syncCallable = true` in t
 
 Server-side constraints on a `syncCallable` workflow:
 
-- **Step kinds are restricted.** The server validates step kinds against a sync-compatible list when the flag is set (or when steps are pushed against a sync-callable workflow). Long-running or suspending kinds (`event.wait`, `workflow.await`, `delay` over the timeout) reject at save time with `Workflow contains sync-incompatible steps`.
+- **Step kinds are restricted.** The server validates step kinds against a sync-compatible list when the flag is set (or when steps are pushed against a sync-callable workflow). Long-running or suspending kinds (`event.wait`, `delay` over the timeout) reject at save time with `Workflow contains sync-incompatible steps`.
 - **Timeout.** The invocation timeout defaults to 5s and is capped server-side at 30s (the server CPU budget per request). Exceeding it resolves with `status: "timeout"`.
 - **Apply still applies.** A sync-callable workflow may still have `requiresClientApply = true`, in which case the synchronous call resolves with `status: "apply_pending"` and the normal `claimApply`/`confirmApply` flow takes over. Most sync-callable workflows want `requiresClientApply = false`.
 
@@ -1350,7 +1402,7 @@ filename = "{{ now }}.pdf"
 
 ### Wrong: re-running an idempotent step inside a retry loop
 
-`continueOnError = true` does not retry — it captures the error and moves on. To retry, the workflow has to re-invoke the step explicitly (e.g., another workflow run, or a `workflow.start` fan-out with retries). The engine already retries transient errors per step automatically; don't add a second layer.
+`continueOnError = true` does not retry — it captures the error and moves on. To retry, the workflow has to re-invoke the step explicitly (e.g., another workflow run, or a `forEach` fan-out that re-dispatches failed items). The engine already retries transient errors per step automatically; don't add a second layer.
 
 ### Wrong: leaking secrets/PII via `saveAs`
 

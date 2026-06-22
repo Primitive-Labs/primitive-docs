@@ -8,6 +8,7 @@ Guidelines for AI agents writing access rules. Server-evaluated authorization ac
 |---|---|
 | `user.userId` | Caller's user ID (`''` when unauthenticated) |
 | `user.role` | Caller's app role |
+| `isAnonymous()` | True when the caller has no account (unauthenticated request); `!isAnonymous()` ⇒ any signed-in member. Matters where anonymous access is reachable, e.g. a `public` blob bucket |
 | `hasRole(role)` | App role check: `"owner"` \| `"admin"` \| `"member"` |
 | `isMemberOf(groupType, groupId)` | Exact group membership (two args, strict) |
 | `memberGroups(groupType)` | List of groupIds of that type the caller belongs to |
@@ -37,7 +38,7 @@ primitive rule-sets create "team-management" \
   }'
 ```
 
-Bind via the type config: `config/group-type-configs/<type>.toml` / `config/collection-type-configs/<type>.toml` (synced), or `client.groupTypeConfigs.create({ groupType, ruleSetId })` / `client.collectionTypeConfigs.create(...)`.
+Bind via the type config: `config/group-type-configs/<type>.toml` / `config/collection-type-configs/<type>.toml` (synced), or `client.groupTypeConfigs.create({ groupType, ruleSetId })` / `client.collectionTypeConfigs.create(...)`. A **blob bucket** attaches a rule set directly via its `ruleSetId` (TOML, or `--rule-set-id` on `primitive blob-buckets create`), where it governs member-level reads/writes — see the Blob Buckets guide for precedence semantics.
 
 Semantics:
 - **App owners/admins bypass rule sets entirely**; rules apply to regular members.

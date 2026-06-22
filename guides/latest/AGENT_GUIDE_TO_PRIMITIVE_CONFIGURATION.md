@@ -13,6 +13,19 @@ primitive sync push --dir ./config    # apply local TOML to the server
 
 With project-scoped environments (`.primitive/config.json`), omit `--dir` and the sync directory auto-resolves to `.primitive/sync/<env>/<appId>/` — one isolated slot per environment, so a `pull --env staging` never touches production state.
 
+## Pull snapshots and revert
+
+Every `sync pull` snapshots the sync directory before writing anything; if the snapshot can't be written, the pull aborts with no files changed. Snapshots older than 28 days are pruned automatically. Location follows the sync-dir resolution: in project mode `<projectRoot>/.primitive/sync-backups/<env>/<appId>/` (gitignored local state); with an explicit `--dir`, `<dir>/.snapshots/`.
+
+```bash
+primitive sync revert --list            # enumerate snapshots, newest first
+primitive sync revert                   # restore the most recent
+primitive sync revert --snapshot <id>   # timestamp dirname, or a unique >=8-char prefix
+primitive sync revert -y                # skip the confirmation prompt
+```
+
+`revert` replaces the entire sync directory with the snapshot, including `.primitive-sync.json` (the local sync state). It warns when the config directory has uncommitted git changes (the restore overwrites them), and refuses to restore a partial/corrupted snapshot. After reverting, run `primitive sync diff` to inspect the restored state versus the server.
+
 ## Directory map
 
 ```

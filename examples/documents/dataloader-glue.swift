@@ -14,12 +14,15 @@ struct TaskListView: View {
       Text(task.title)
     }
     .task {
-      guard let tasks = appState.tasks else { return } // TypedModel<TaskRecord>
-      loader.bind(client: appState.client, subscribeTo: [.onModelChange(tasks)]) { _ in
-        tasks.findAll()
+      loader.documentReady = appState.selectedDocId != nil
+      loader.bind(client: appState.client, subscribeTo: [.onModel(subscribe: TaskRecord.subscribe)]) { _ in
+        TaskRecord.findAll()
           .filter { !$0.completed }
           .sorted { $0.priority > $1.priority }
       }
+    }
+    .onChange(of: appState.selectedDocId) { _, id in
+      loader.documentReady = id != nil
     }
   }
   // #endregion example

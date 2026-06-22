@@ -14,6 +14,19 @@ func taskStats() {
     sort: AggregateSort(field: "count", direction: -1),
     limit: 10
   ))
+
+  // Grouping by a stringset field counts per member value (facet):
+  let tagCounts = Task.aggregate(AggregateOptions(
+    groupBy: ["tags"],
+    operations: [AggregateOperation(type: .count)]
+  ))
+
+  // Group by whether the set contains a value (membership) — rows carry
+  // a "has_tags_urgent" key of "true" / "false":
+  let urgentSplit = Task.aggregate(AggregateOptions(
+    groupBy: [.stringSetMembership(field: "tags", contains: "urgent")],
+    operations: [AggregateOperation(type: .count)]
+  ))
   // #endregion example
-  _ = stats
+  _ = (stats, tagCounts, urgentSplit)
 }

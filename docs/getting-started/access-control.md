@@ -24,6 +24,7 @@ Every CEL evaluation sees the authenticated caller:
 |---|---|
 | `user.userId` | The caller's user ID (empty string when unauthenticated) |
 | `user.role` | The caller's app role |
+| `isAnonymous()` | True when the caller has no account at all (an unauthenticated request). Write `!isAnonymous()` to require any signed-in member; relevant where anonymous access is possible, such as a `public` [blob bucket](./blobs-and-files.md#access-presets) |
 | `hasRole(role)` | True if the caller's app role is `"owner"`, `"admin"`, or `"member"` as given |
 | `isMemberOf(groupType, groupId)` | True if the caller belongs to that exact group |
 | `memberGroups(groupType)` | The list of group IDs of that type the caller belongs to |
@@ -41,6 +42,7 @@ Each place a rule appears adds its own context on top — operation `params.*`, 
 | Database subscriptions (`accessRule` + `filter`) | Who can subscribe, and which changes they receive | [Real-Time Subscriptions](./working-with-databases.md#real-time-subscriptions) |
 | Workflows (`accessRule`) | Who can start a run directly from a client | [Controlling Access to Workflows](./workflows.md#controlling-access-to-workflows) |
 | Server-stamped fields (trigger `when` conditions) | Whether a computed field applies to this write | [Server-Stamped Fields](./working-with-databases.md#server-stamped-fields) |
+| Blob buckets (`ruleSetId`) | Member-level access to a bucket's blobs, per operation | [Blobs and Files](./blobs-and-files.md#access-presets) |
 | Rule sets | Who can perform **management operations** on groups and collections | below |
 
 ## Rule Sets: Governing Management Operations
@@ -56,7 +58,7 @@ primitive rule-sets create "team-management" \
   }'
 ```
 
-Bind a rule set to a **group type** or **collection type** via its type config — in TOML (`config/group-type-configs/<type>.toml`, `config/collection-type-configs/<type>.toml`) or from the client (`client.groupTypeConfigs.create({ groupType, ruleSetId })`).
+Bind a rule set to a **group type** or **collection type** via its type config — in TOML (`config/group-type-configs/<type>.toml`, `config/collection-type-configs/<type>.toml`) or from the client (`client.groupTypeConfigs.create({ groupType, ruleSetId })`). A **blob bucket** attaches one directly via its `ruleSetId`, where it governs member access per operation — see [Blobs and Files](./blobs-and-files.md#access-presets).
 
 Two behaviors to know:
 
