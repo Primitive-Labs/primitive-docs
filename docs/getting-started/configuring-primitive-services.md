@@ -23,6 +23,8 @@ primitive sync push --dir ./config    # apply your changes to the server
 
 The files live in your repo, so configuration changes ride the same workflow as code: branches, diffs, reviews, rollbacks. `sync push` validates every file before applying anything — a validation error aborts the push with no changes applied — and reports the file and entity behind any failure.
 
+**Preview before you push.** `primitive sync diff` shows which entities would be created, changed, or removed; `primitive sync push --dry-run` walks the full push and reports the same outcome without writing anything. Both run the identical validation a real push runs, so a rejection — an operation whose database type has no schema, an unresolved reference, a schema change that would break an existing operation — surfaces in the preview exactly as it would on push. The preview is faithful: what it reports is what `sync push` will do. And a blocked entity records no sync state, so it stays visible as pending on the next `diff` instead of quietly reading as "in sync."
+
 Every `sync pull` snapshots the sync directory before writing, so a pull that overwrites local edits is recoverable:
 
 ```bash
