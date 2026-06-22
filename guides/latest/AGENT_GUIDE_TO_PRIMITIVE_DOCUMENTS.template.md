@@ -303,40 +303,7 @@ The most common multi-doc shape is one ambient library/index document plus N per
 
 The document-open lifecycle is owned by `PrimitiveAppState`. Subclass it for app-specific state and override `connectClient()` to drive doc setup after connect. Models need no per-document binding — the codegen'd facade statics read from every open document, backed by the process-wide default client (`JsBaoClient.configureDefault`, wired for you during `initialize()`).
 
-```swift
-@MainActor
-final class MyAppState: PrimitiveAppState {
-    // connectClient is `open` — call super first (it connects and fetches
-    // /me + the document list), then run app-specific setup. Don't reach
-    // for a Combine sink on `$isConnected`; this override is the path.
-    override func connectClient() async {
-        await super.connectClient()
-        // Optional but recommended: pre-register models so every open
-        // document is mirrored into the client's shared store immediately
-        // (the facade also lazily registers on first read).
-        client?.registerModels([TodoItem.self])
-        await openLibraryDoc()
-    }
-
-    private func openLibraryDoc() async {
-        guard let client else { return }
-        do {
-            // Atomic resolve-or-create. Don't split into aliases.resolve +
-            // createWithAlias — that has a TOCTOU window where two clients
-            // onboarding at once both create and one doc is lost.
-            let result = try await client.documents.getOrCreateWithAlias(
-                alias: DocumentAlias(scope: .user, aliasKey: "library"),
-                title: "Library"
-            )
-            // selectDocumentAwaiting opens the doc and routes the base
-            // class's sync hooks at it; facade reads see it immediately.
-            await selectDocumentAwaiting(result.documentId)
-        } catch {
-            errorMessage = "Failed to open library: \(error.localizedDescription)"
-        }
-    }
-}
-```
+{{ example: documents/app-state-lifecycle }}
 
 For per-document setup beyond models, override the `onDocumentOpened(doc:documentId:)` hook — the base class opens the doc once and hands you the live `YDocument`, so don't call `openDocument(...)` again just to get one.
 
@@ -344,24 +311,7 @@ For a **fresh doc you'll write immediately**, use `client.createDocument(options
 
 **Multi-doc apps (one ambient library doc + N per-item docs).** `selectDocumentAwaiting(_:)` is the *single*-selected-doc lifecycle — it closes the previously selected doc first, so using it for a per-item detail view closes your library/index doc. For one ambient doc plus transient detail docs, use `appState.openAuxiliaryDoc(_:)` from the detail view's `.task` and `appState.closeAuxiliaryDoc(_:)` from `.onDisappear`. These register the doc for sync, but they don't touch `selectedDocId` or fire `onDocumentOpened`. Once open, read the doc's records through the facade scoped to that document:
 
-```swift
-struct ItemDetailView: View {
-    let documentId: String
-    @EnvironmentObject var appState: MyAppState
-    @State private var todos: [TodoItem]?
-
-    var body: some View {
-        Group {
-            if let todos { /* render */ } else { ProgressView() }
-        }
-        .task {
-            _ = try? await appState.openAuxiliaryDoc(documentId)
-            todos = TodoItem.query([:], options: QueryOptions(documents: [documentId]))
-        }
-        .onDisappear { Task { await appState.closeAuxiliaryDoc(documentId) } }
-    }
-}
-```
+{{ example: documents/app-state-auxiliary-doc }}
 
 **Watch for access loss in detail views.** When a peer revokes your access or hard-deletes a doc you have open, the server collapses both to the same wire shape. The client emits a derived `.documentDeleted` (typed `DocumentDeletedEvent`) — subscribe to it (not `.documentMetadataChanged` filtered on `action == "deleted"`) and dismiss the view on either signal. Retain the returned `EventSubscription` on a property and `[weak self]` the closure, or the handler is dropped:
 
@@ -873,23 +823,9 @@ It handles four key concerns:
 - Push filtering logic into js-bao `.query()` calls rather than fetching everything and filtering in JavaScript
 - Always pass `documentReady` - typically a ref that becomes true after your document opening logic completes
 
-```typescript
-const {
-  data: todos,
-  initialDataLoaded,
-  reload,
-} = useJsBaoDataLoader<{ items: TodoItem[]; total: number }>({
-  subscribeTo: [TodoItem],
-  queryParams: computed(() => ({ listId: props.listId, showCompleted })),
-  documentReady,
-  async loadData(queryParams) {
-    const { listId, showCompleted } = queryParams ?? {};
-    const query = showCompleted ? { listId } : { listId, completed: false };
-    const result = await TodoItem.query(query, { sort: { order: 1 } });
-    return { items: result.data, total: result.data.length };
-  },
-});
-```
+Under the hood it wraps the same compiled client calls documented above — `Model.subscribe` ([Subscribe to changes](#subscribe-to-changes)) to react to changes and `Model.query` to load — so this section is just the Vue-composable binding around them:
+
+{{ example: documents/dataloader-glue }}
 
 **Rules:**
 
@@ -908,35 +844,7 @@ const {
 
 `Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle (see [Subscribe to changes](#subscribe-to-changes) above for the compiled call). It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). Wire it up directly in the store's `setup()` and keep the unsubscribe handle so you can tear it down:
 
-```typescript
-// stores/tasksStore.ts
-import { defineStore } from "pinia";
-import { ref } from "vue";
-import { Task } from "@/models";
-
-export const useTasksStore = defineStore("tasks", () => {
-  const tasks = ref<Task[]>([]);
-  let unsubscribe: (() => void) | null = null;
-
-  async function reload() {
-    const result = await Task.query({ completed: false }, { sort: { priority: -1 } });
-    tasks.value = result.data as Task[];
-  }
-
-  function start() {
-    if (unsubscribe) return;            // idempotent — don't double-subscribe
-    unsubscribe = Task.subscribe(reload); // fires on every Task change, in any context
-    void reload();                        // initial load
-  }
-
-  function stop() {
-    unsubscribe?.();
-    unsubscribe = null;
-  }
-
-  return { tasks, reload, start, stop };
-});
-```
+{{ example: documents/subscribe-store }}
 
 Call `start()` once when the store first comes into use (e.g. after login / first document open) and `stop()` when tearing down (e.g. on logout) to release the listener.
 
@@ -955,41 +863,7 @@ This is the same `Model.subscribe()` that `useJsBaoDataLoader` calls internally 
 
 Bind a `BaoDataLoader<[T]>` rather than subscribing to `client.events.on(...)` directly or rolling a `@Published var items` + manual `refresh()`. The loader owns its subscription lifecycle (cancelled on deinit), debounces bursts (~50ms), runs the first load immediately, and re-runs a synchronous `load` closure on every trigger.
 
-```swift
-struct TodoListView: View {
-    @EnvironmentObject var appState: MyAppState
-    @StateObject private var loader = BaoDataLoader<[TodoItem]>()
-
-    var body: some View {
-        Group {
-            // Render through `loader.phase`, not `loader.data ?? []`.
-            // `?? []` collapses "not yet loaded" with "loaded, empty",
-            // flashing the empty state for ~50ms on every appearance.
-            switch loader.phase {
-            case .loading:           ProgressView()
-            case .empty:             Text("No todos yet")
-            case .loaded(let todos): List(todos) { /* row */ }
-            }
-        }
-        // Bind once, from a plain `.task`. Don't conditionally bind on
-        // doc readiness — set `loader.documentReady` instead: the loader
-        // fires its initial load when it flips to true, and resets
-        // `initialDataLoaded` if the doc closes.
-        .task {
-            loader.documentReady = appState.selectedDocId != nil
-            loader.bind(
-                client: appState.client,
-                subscribeTo: [.onModel(subscribe: TodoItem.subscribe)]
-            ) { _ in
-                TodoItem.findAll().sorted { $0.sortOrder < $1.sortOrder }
-            }
-        }
-        .onChange(of: appState.selectedDocId) { _, id in
-            loader.documentReady = id != nil
-        }
-    }
-}
-```
+{{ example: documents/dataloader-glue }}
 
 `.onModel(subscribe: TodoItem.subscribe)` fires on **any** add/update/delete recorded in that model's shared store — local writes and remote writes both — so `reloadNow()` after a write is unneeded; call it only when the `load` closure reads something the loader can't subscribe to (a REST resource). Other triggers (`LoaderTrigger`): `.onSync`, `.onRemoteUpdate`, `.onDocumentEvents`, `.onConnect`, `.onModelChange(_:)` for a hand-built runtime-schema `DynamicModel`, and `.custom((client, reload) -> EventSubscription?)`.
 

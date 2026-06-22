@@ -3,27 +3,38 @@
 import SwiftUI
 import PrimitiveApp
 
-struct TaskListView: View {
-  @EnvironmentObject var appState: MyAppState
+// #region example
+struct TodoListView: View {
+    @EnvironmentObject var appState: MyAppState
+    @StateObject private var loader = BaoDataLoader<[TodoItem]>()
 
-  // #region example
-  @StateObject private var loader = BaoDataLoader<[TaskRecord]>()
-
-  var body: some View {
-    List(loader.data ?? [], id: \.id) { task in
-      Text(task.title)
+    var body: some View {
+        Group {
+            // Render through `loader.phase`, not `loader.data ?? []`.
+            // `?? []` collapses "not yet loaded" with "loaded, empty",
+            // flashing the empty state for ~50ms on every appearance.
+            switch loader.phase {
+            case .loading:           ProgressView()
+            case .empty:             Text("No todos yet")
+            case .loaded(let todos): List(todos) { /* row */ }
+            }
+        }
+        // Bind once, from a plain `.task`. Don't conditionally bind on
+        // doc readiness — set `loader.documentReady` instead: the loader
+        // fires its initial load when it flips to true, and resets
+        // `initialDataLoaded` if the doc closes.
+        .task {
+            loader.documentReady = appState.selectedDocId != nil
+            loader.bind(
+                client: appState.client,
+                subscribeTo: [.onModel(subscribe: TodoItem.subscribe)]
+            ) { _ in
+                TodoItem.findAll().sorted { $0.sortOrder < $1.sortOrder }
+            }
+        }
+        .onChange(of: appState.selectedDocId) { _, id in
+            loader.documentReady = id != nil
+        }
     }
-    .task {
-      loader.documentReady = appState.selectedDocId != nil
-      loader.bind(client: appState.client, subscribeTo: [.onModel(subscribe: TaskRecord.subscribe)]) { _ in
-        TaskRecord.findAll()
-          .filter { !$0.completed }
-          .sorted { $0.priority > $1.priority }
-      }
-    }
-    .onChange(of: appState.selectedDocId) { _, id in
-      loader.documentReady = id != nil
-    }
-  }
-  // #endregion example
 }
+// #endregion example
