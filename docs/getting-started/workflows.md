@@ -451,7 +451,7 @@ Given `steps.fetch.body` of `{ "items": [ { "sku": "a1", "qty": 2, "price": 5.0 
 
 One wiring detail: a script's return value lands under `steps.<id>.output.*` — later steps read <span v-pre>`{{ steps.normalize.output.total }}`</span>, not <span v-pre>`{{ steps.normalize.total }}`</span> (unlike `transform`, whose result is the table directly).
 
-Workflows pin script bodies when they're pushed or published: each workflow snapshots the current body of every script it references, and runs execute that snapshot — not the live script. Pushing a changed `.rhai` file alone doesn't change a deployed workflow's behavior; re-push the referencing workflow to pick up the new body. `sync push` warns when a script update leaves referencing workflows on the previous body, naming each one.
+Pushing a changed `.rhai` file (`primitive sync push`) creates a new script version and activates it — every workflow that references the script by name picks up the new body on its next run, with no re-publish step needed.
 
 ### `iterate-users`
 
