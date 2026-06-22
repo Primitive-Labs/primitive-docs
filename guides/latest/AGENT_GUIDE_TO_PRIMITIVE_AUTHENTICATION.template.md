@@ -157,16 +157,7 @@ The callback URL may also carry `?purpose=login-add-passkey`. The server appends
 
 To accept an invitation server-side at verify time (so the deferred grant resolves to the signing-in user even when emails differ), pass `inviteToken`:
 
-{{#lang ts}}
-```typescript
-await client.magicLinkVerify(magicToken, { inviteToken: inviteTokenFromUrl });
-```
-{{/lang}}
-{{#lang swift}}
-```swift
-let result = try await client.auth.magicLinkVerify(token: magicToken, inviteToken: inviteTokenFromUrl)
-```
-{{/lang}}
+{{ example: auth/magic-link-invite }}
 
 ---
 

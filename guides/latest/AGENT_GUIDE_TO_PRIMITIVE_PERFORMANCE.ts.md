@@ -126,18 +126,15 @@ definition = '{"filter":{},"sort":{"groupId":1},"limit":1000}'
 
 Call it once, then group client-side:
 
-```ts
-const all = await db.executeOperation("listAllTargets");
-const byGroup = new Map<string, Target[]>();
-for (const t of all.data) {
-  const list = byGroup.get(t.groupId) ?? [];
-  list.push(t);
-  byGroup.set(t.groupId, list);
-}
-for (const group of groups) {
-  const targets = byGroup.get(group.id) ?? [];
-  // ...
-}
+```typescript
+  const all = await client.databases.executeOperation(databaseId, "listAllTasks");
+  const byCategory = new Map<string, TaskAttrs[]>();
+  for (const task of all.data as TaskAttrs[]) {
+    const key = task.category ?? "uncategorized";
+    const list = byCategory.get(key) ?? [];
+    list.push(task);
+    byCategory.set(key, list);
+  }
 ```
 
 If you can fold the bulk op into a pipeline (Pattern 1), do that instead — same round-trip count, fewer named ops to maintain.

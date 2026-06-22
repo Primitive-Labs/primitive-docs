@@ -1248,70 +1248,27 @@ The step records carry `{ stepRunId, runId, stepKind, status, input, output, err
 
 Requires an active WebSocket (e.g., from `client.documents.open(docId)`).
 
-{{#lang ts}}
-```typescript
-client.on("workflowStarted", (e) => { /* { workflowKey, runId, runKey, instanceId, contextDocId?, meta? } */ });
-
-client.on("workflowStatus", (e) => {
-  // e.status: "completed" | "failed" | "terminated"  (NOTE: "completed" here, with the "d")
-  // e.needsApply: true if requiresClientApply and not yet applied
-});
-```
+{{ example: workflows/workflow-events }}
 
 The `workflowStatus` event uses `"completed"`. The `getStatus` method returns `"complete"`. These differ in the SDK — handle both if your code shares logic.
-{{/lang}}
 
 {{#lang swift}}
-Subscribe through `client.events.on(_:)` with the typed event payload; hold the returned `EventSubscription` for as long as you want the handler live.
-
-```swift
-let started = client.events.on(.workflowStarted) { (e: WorkflowStartedEvent) in
-    // e.workflowKey, e.runId, e.runKey?, e.instanceId?, e.contextDocId?, e.meta?
-}
-
-let sub = client.events.on(.workflowStatus) { (e: WorkflowStatusEvent) in
-    // e.status: "completed" | "failed" | "terminated"
-    // e.needsApply == true if requiresClientApply and not yet applied
-    // also: e.runKey, e.runId, e.output, e.error, e.contextDocId, e.meta
-}
-```
-
-The `workflowStatus` event uses `"completed"`; `getStatus` returns `"complete"`. These differ in the SDK — handle both if your code shares logic.
+Subscribe through `client.events.on(_:)`; hold the returned `EventSubscription` for as long as you want the handler live.
 {{/lang}}
 
 ## Apply pattern
 
 For workflows with `requiresClientApply = true`, register an apply handler so a client deterministically runs follow-up logic exactly once.
 
-{{#lang ts}}
-```typescript
-client.workflows.define("my-workflow-key", {
-  onApply: async ({ output, workflowKey, runKey, runId, contextDocId, startedByUserId, meta }) => {
-    // Runs on exactly one connected client.
-    const { doc } = await client.documents.open(contextDocId);
-    doc.getMap("data").set("result", output);
-  },
-});
-```
+{{ example: workflows/workflow-apply }}
 
-Manual flow if you need it: `claimApply` → run logic → `confirmApply` (success) or `releaseApply` (failure). 30s lease timeout for crashed clients.
-{{/lang}}
+Register `define(...)` before `start(...)` so the apply can't arrive before the handler is in place.
 
 {{#lang swift}}
-```swift
-client.workflows.define("my-workflow-key") { ctx in
-    // Runs on exactly one connected client: the client claims the lease,
-    // fetches the run output, calls this handler, then confirms the apply.
-    // A thrown error releases the claim so another client (or a retry)
-    // can pick it up.
-    // ctx: workflowKey, runKey, runId, contextDocId?, output, startedByUserId?, meta?
-}
-```
-
-Register `define(...)` before `start(...)` so the apply can't arrive before the handler is in place. After an offline gap, `getPendingApplies(contextDocId:)` lists runs still awaiting apply.
+After an offline gap, `getPendingApplies(contextDocId:)` lists runs still awaiting apply.
+{{/lang}}
 
 Manual flow if you need it: `claimApply` → run logic → `confirmApply` (success) or `releaseApply` (failure). 30s lease timeout for crashed clients.
-{{/lang}}
 
 ## Footguns and don't-do-this
 

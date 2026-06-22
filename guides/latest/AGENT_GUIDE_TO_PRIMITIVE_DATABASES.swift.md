@@ -855,6 +855,221 @@ primitive databases cel-context update <database-id> --data '{"teamId":"team-alp
 primitive databases cel-context get <database-id>
 ```
 
+## Direct Record Operations
+
+Direct record operations require owner or manager permission. For most apps, use registered operations instead.
+
+`connect()` returns a `DoDb` handle. Save (upsert), patch (partial update), find a single record, delete, and count all run against it. A `save` is an upsert; pass `ifNotExists` for insert-only, `condition` for a conditional write, and `stringSets` to seed StringSet fields:
+
+```swift
+  let db = client.databases.connect(databaseId: databaseId)
+
+  // Save (upsert) — data must carry an "id" (or use upsertOn).
+  _ = try await db.save(modelName: "tasks", data: ["id": "task-1", "title": "Ship v1"])
+
+  // Insert only — fails if the record already exists.
+  _ = try await db.save(
+    modelName: "tasks", data: ["id": "task-3", "title": "Draft"],
+    options: DoDbSaveOptions(ifNotExists: true)
+  )
+
+  // Conditional write — only proceeds if the existing record matches.
+  _ = try await db.save(
+    modelName: "tasks", data: ["id": "task-3", "title": "Draft"],
+    options: DoDbSaveOptions(condition: ["completed": false])
+  )
+
+  // Seed StringSet fields on the write.
+  _ = try await db.save(
+    modelName: "tasks", data: ["id": "task-4", "title": "Tagged"],
+    options: DoDbSaveOptions(stringSets: ["tags": ["featured", "sale"]])
+  )
+
+  // Patch (partial update) — only the provided fields change.
+  _ = try await db.patch(modelName: "tasks", id: "task-1", data: ["priority": 5])
+  _ = try await db.patch(
+    modelName: "tasks", id: "task-1", data: ["priority": 7],
+    options: DoDbPatchOptions(condition: ["completed": false])
+  )
+
+  // Find a single record by id (or nil).
+  let task = try await db.find(modelName: "tasks", id: "task-1")
+
+  // Delete — true if a record existed.
+  let deleted = try await db.delete(modelName: "tasks", id: "task-2")
+
+  // Count, optionally filtered.
+  let total = try await db.count(modelName: "tasks")
+  let open = try await db.count(modelName: "tasks", filter: ["completed": false])
+```
+
+### Query
+
+The handle queries with the full filter operator grammar, sort + cursor pagination, projection, and related-data `include`:
+
+```swift
+  // Filter operators: exact match, comparisons, set membership, text, $or/$and.
+  let result = try await db.query(modelName: "tasks", filter: [
+    "completed": false,
+    "priority": ["$gte": 5],
+    "category": ["$in": ["work", "urgent"]],
+    "title": ["$startsWith": "Ship"],
+    "tags": ["$contains": "featured"],
+    "$or": [["category": "work"], ["priority": ["$gte": 8]]],
+  ])
+
+  // Multiple fields on the same object are ANDed; use explicit $and to put
+  // two conditions on one field.
+  let priced = try await db.query(modelName: "tasks", filter: [
+    "$and": [["priority": ["$gte": 1]], ["priority": ["$lte": 5]]],
+  ])
+
+  // Sort, limit, and cursor pagination.
+  let page1 = try await db.query(
+    modelName: "tasks", filter: [:],
+    options: DoDbQueryOptions(sort: DoDbSort("priority", .descending), limit: 20)
+  )
+  var page2: DoDbQueryResult?
+  if page1.hasMore {
+    page2 = try await db.query(
+      modelName: "tasks", filter: [:],
+      options: DoDbQueryOptions(sort: DoDbSort("priority", .descending), limit: 20, uniqueStartKey: page1.nextCursor)
+    )
+  }
+
+  // Projection — return only the named fields.
+  let titles = try await db.query(
+    modelName: "tasks", filter: [:],
+    options: DoDbQueryOptions(projection: DoDbProjection([("title", .include), ("completed", .include)]))
+  )
+
+  // Include related records — they land under _related on each parent.
+  let withCategory = try await db.query(
+    modelName: "tasks", filter: [:],
+    options: DoDbQueryOptions(include: [
+      DoDbInclude(model: "categories", type: .refersTo, sourceField: "category", alias: "categoryInfo")
+    ])
+  )
+```
+
+### Filter operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| *(exact match)* | Equals a value (shorthand for `$eq`) | `{ status: "active" }` |
+| `$eq` | Explicit equality | `{ status: { $eq: "active" } }` |
+| `$ne` | Not equal | `{ status: { $ne: "archived" } }` |
+| `$gt` | Greater than | `{ price: { $gt: 10 } }` |
+| `$gte` | Greater than or equal | `{ price: { $gte: 10 } }` |
+| `$lt` | Less than | `{ price: { $lt: 50 } }` |
+| `$lte` | Less than or equal | `{ price: { $lte: 50 } }` |
+| `$in` | Matches any value in array | `{ category: { $in: ["books", "music"] } }` |
+| `$nin` | Matches none of the values in array | `{ status: { $nin: ["archived", "deleted"] } }` |
+| `$startsWith` | String prefix match | `{ name: { $startsWith: "Pro" } }` |
+| `$endsWith` | String suffix match | `{ filename: { $endsWith: ".pdf" } }` |
+| `$containsText` | Full-text search | `{ name: { $containsText: "deluxe" } }` |
+| `$exists` | Field exists (true) or is null/missing (false) | `{ avatar: { $exists: true } }` |
+| `$contains` | StringSet contains a value | `{ tags: { $contains: "featured" } }` |
+| `$all` | StringSet contains all values | `{ tags: { $all: ["featured", "sale"] } }` |
+| `$size` | StringSet element count (number or comparison) | `{ tags: { $size: 3 } }` or `{ tags: { $size: { $gte: 1 } } }` |
+| `$or` | Matches any of the conditions | `{ $or: [{ status: "active" }, { priority: { $gte: 5 } }] }` |
+| `$and` | Matches all conditions (useful when multiple conditions target the same field) | `{ $and: [{ price: { $gte: 10 } }, { price: { $lte: 50 } }] }` |
+
+`$startsWith`, `$endsWith`, and `$containsText` are mutually exclusive on the same field — only one substring operator per field per query.
+
+Multiple filters on different fields are implicitly combined with AND. Use an explicit `$and` only when you need two conditions on the *same* field (e.g. a range), and combine `$or` with other top-level fields freely.
+
+Include types: `refersTo` (FK to one record), `hasMany` (target FK to this record), `refersToMany` (StringSet to multiple records). The loaded records land under `_related` on each parent (e.g. `result.data[0]._related.customer`).
+
+## Atomic Operations
+
+Increment/decrement numeric fields (returns the post-increment values) and add/remove StringSet members atomically — no read-modify-write round trip:
+
+```swift
+  // Increment/decrement numeric fields; returns the post-increment values.
+  let newValues = try await db.increment(
+    modelName: "tasks", id: "task-1",
+    fields: ["priority": 1, "estimatedHours": -2]
+  )
+
+  // Atomically add/remove StringSet members.
+  try await db.addToSet(modelName: "tasks", id: "task-1", sets: ["tags": ["featured"]])
+  try await db.removeFromSet(modelName: "tasks", id: "task-1", sets: ["tags": ["sale"]])
+```
+
+## Batch Writes (direct)
+
+`db.batch` executes multiple writes atomically at the storage layer. It returns one `BatchOperationResult` per input op (`{success, id, error?, values?}` — `values` for increment ops); a per-item failure does NOT throw, so check `.success` on each result.
+
+```swift
+  let results = try await db.batch([
+    DoDbBatchOperation(op: .save, modelName: "tasks", id: "t-1", data: ["title": "A"]),
+    DoDbBatchOperation(op: .patch, modelName: "tasks", id: "t-2", data: ["completed": true]),
+    DoDbBatchOperation(op: .delete, modelName: "tasks", id: "t-3"),
+    DoDbBatchOperation(op: .increment, modelName: "tasks", id: "t-4", fields: ["priority": 1]),
+    DoDbBatchOperation(op: .addToSet, modelName: "tasks", id: "t-5", stringSets: ["tags": ["urgent"]]),
+  ])
+
+  for r in results where !r.success {
+    print("op failed:", r.id, r.error ?? "")
+  }
+```
+
+### Aggregation (direct)
+
+Group by one or more fields and compute `count`/`sum`/`avg`/`min`/`max`, with an optional filter, sort, and limit:
+
+```swift
+  let result = try await db.aggregate(modelName: "tasks", options: DoDbAggregationOptions(
+    groupBy: [.field("category")],
+    operations: [
+      DoDbAggregationOperation(type: .count),
+      DoDbAggregationOperation(type: .sum, field: "estimatedHours"),
+      DoDbAggregationOperation(type: .avg, field: "estimatedHours"),
+      DoDbAggregationOperation(type: .min, field: "priority"),
+      DoDbAggregationOperation(type: .max, field: "priority"),
+    ],
+    filter: ["completed": false],
+    limit: 10,
+    sort: DoDbAggregationSort(field: "count", direction: .descending)
+  ))
+```
+
+
+Database field types: `id` (primary key, use `auto_assign = true` for ULIDs), `string`, `number`, `boolean`, `date`, `stringset` (set-of-strings field — use with `addToSet`/`removeFromSet`). There is no object/JSON field type — store structured payloads as JSON strings and parse on read.
+
+### Indexes
+
+Add an index to every field you filter or sort on; without one the engine scans all records of that model. Register them manually, declare composite unique constraints, list and drop them, or sync a model's declared index state at once:
+
+```swift
+  // Sync the desired index state for one or more models (additive — the
+  // server registers only what's missing).
+  _ = try await db.syncIndexes(models: [
+    DoDbModelSyncState(
+      modelName: "tasks",
+      indexes: [
+        DoDbModelSyncState.Index(fieldName: "category"),
+        DoDbModelSyncState.Index(fieldName: "priority", fieldType: "number"),
+      ]
+    )
+  ])
+
+  // Or register indexes manually.
+  try await db.registerIndex(modelName: "tasks", fieldName: "category", fieldType: "string")
+  try await db.registerIndex(modelName: "tasks", fieldName: "priority", fieldType: "number")
+  try await db.registerIndex(modelName: "appUsers", fieldName: "email", fieldType: "string", unique: true)
+
+  // Composite unique constraint across multiple fields.
+  try await db.registerUniqueConstraint(modelName: "categories", constraintName: "name_parentId", fields: ["name", "parentId"])
+
+  // List and drop.
+  let indexes = try await db.listIndexes(modelName: "tasks")
+  try await db.dropIndex(modelName: "tasks", fieldName: "category")
+
+  let constraints = try await db.listUniqueConstraints(modelName: "categories")
+  try await db.dropUniqueConstraint(modelName: "categories", constraintName: "name_parentId")
+```
 
 ## Permissions
 
@@ -933,8 +1148,16 @@ For a unified "all DBs I can access" view, combine `databases.list()` with `grou
 
 Databases are schemaless — the system tracks fields and inferred types as records are written.
 
-List the models (collections) in a database via the raw records endpoint `GET /app/<appId>/api/databases/<databaseId>/records/models` (returns `{ models: ["contacts", "orders", "products"] }`).
+List the models (collections) in a database via the raw records endpoint `GET /app/<appId>/api/databases/<databaseId>/records/models` (returns `{ models: ["contacts", "orders", "products"] }`):
 
+```swift
+  let result = try await client.makeRequest(
+    "GET",
+    "/databases/\(databaseId)/records/models"
+  )
+  let models = (result as? [String: Any])?["models"] as? [String]
+  // models: ["contacts", "orders", "products"]
+```
 
 Describe a model's observed fields:
 

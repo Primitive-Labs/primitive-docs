@@ -162,7 +162,12 @@ The callback delivers the token as a `magic_token` value — **not** `token`, `m
 To accept an invitation server-side at verify time (so the deferred grant resolves to the signing-in user even when emails differ), pass `inviteToken`:
 
 ```swift
-let result = try await client.auth.magicLinkVerify(token: magicToken, inviteToken: inviteTokenFromUrl)
+  let result = try await client.auth.magicLinkVerify(
+    token: magicToken,
+    inviteToken: inviteTokenFromUrl
+  )
+  let user = result.user
+  let isNewUser = result.isNewUser ?? false
 ```
 
 ---
