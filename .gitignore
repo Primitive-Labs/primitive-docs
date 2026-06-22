@@ -17,3 +17,6 @@ examples/_harness/swift/.build/
 examples/_harness/swift/Package.resolved
 examples/_harness/swift/Sources/
 scripts/.build/
+
+# Harness runtime lock — per-session, must not be tracked
+.claude/scheduled_tasks.lock
