@@ -1059,6 +1059,9 @@ A collection's members + pending invites in one call:
 
 ```swift
   let access = try await client.collections.getAccess(collectionId: collectionId)
+
+  // Or fetch just the pending (not-yet-signed-up) invitations:
+  let pending = try await client.collections.listPendingInvitations(collectionId: collectionId)
 ```
 
 Additional collection calls:

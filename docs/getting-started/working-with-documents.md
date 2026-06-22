@@ -558,11 +558,6 @@ Collections sit between single-document shares and groups: share a *document* wh
 
 :::
 
-```typescript
-const pending = await client.collections.listPendingInvitations(collectionId);
-// [{ email, permission, invitationId, ... }]
-```
-
 ## Finding Documents a User Can Access
 
 There is no single "my documents" list. A user reaches documents through **four distinct paths**, and you query each one separately — combine them in your UI as needed:
@@ -683,9 +678,13 @@ Blob storage tolerates flaky connections:
 - **Downloaded files cache** locally, so repeat reads are instant
 - **Prefetch files** proactively to warm the cache:
 
-```typescript
-await blobs.prefetch([blobId1, blobId2], { concurrency: 4 });
-```
+::: code-group
+
+<<< ../../examples/blobs/doc-blob-manage.ts#prefetch{ts} [JavaScript]
+
+<<< ../../examples/blobs/doc-blob-manage.swift#prefetch{swift} [Swift]
+
+:::
 
 Use the **Blob Explorer** in the [dev tools](./devtools.md) overlay to browse, upload, and manage blobs during development.
 
@@ -731,17 +730,15 @@ The full flow — submit a request (`permission` is required), then an owner lis
 
 Owners can also deny, optionally pointing the requester at the document's canonical URL:
 
-```typescript
-await client.documents.denyAccessRequest(documentId, requestId, {
-  documentUrl: "https://myapp.example/docs/sales-handbook",
-});
-```
+::: code-group
 
-The requester gets an email with the outcome either way. To show pending requests in an owner's UI, fetch them when the view opens:
+<<< ../../examples/sharing/request-access.ts#deny{ts} [JavaScript]
 
-```typescript
-const requests = await client.documents.listAccessRequests(documentId);
-```
+<<< ../../examples/sharing/request-access.swift#deny{swift} [Swift]
+
+:::
+
+The requester gets an email with the outcome either way. To show pending requests in an owner's UI, call `listAccessRequests` (shown in the flow above) when the view opens.
 
 Behavior worth knowing: requests expire after 30 days, a requester can't re-submit while a request for the same document is pending, and a resolved request can't be re-resolved.
 
