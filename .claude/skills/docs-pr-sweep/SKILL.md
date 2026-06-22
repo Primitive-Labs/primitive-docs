@@ -1,13 +1,15 @@
 ---
 name: docs-pr-sweep
-description: Sweep every open pull request targeting the next branch — validate each against the repo's editorial standards and validation gates, fix failures in place, merge the passing set into next, then run a whole-set audit over next. Use this skill whenever asked to "sweep the open PRs", "review and merge the doc PRs", "validate the open PRs", "clear the PR queue", "merge the open pull requests", "process the PR backlog", or any request to batch-review, triage, or land the open pull requests in primitive-docs. This skill only ever merges into next — publishing to main is docs-publish-release's job, never this one.
+description: Sweep every open pull request targeting the next branch — validate each against the repo's editorial standards and validation gates, fix failures in place, merge the passing set into next, then run a whole-set audit over next. This includes the automated docs-next-sync PRs (the submodule-moving truing PRs): review and merge them in concert with the rest of the queue. Use this skill whenever asked to "sweep the open PRs", "review and merge the doc PRs", "validate the open PRs", "clear the PR queue", "merge the open pull requests", "process the PR backlog", or any request to batch-review, triage, or land the open pull requests in primitive-docs. This skill only ever merges into next — never to main, not even for an automated production push; publishing to main is docs-publish-release's job.
 ---
 
 # Sweeping the Open PRs into `next`
 
 Open pull requests based on `next` are doc work awaiting review and merge: fixes from `docs-issue-sweep`, truing changes from `docs-next-sync`, one-off edits. This skill takes that queue to zero — validating each PR against the same standards we'd apply to fresh writing, fixing what's fixable on the PR's own branch, merging the passing set into `next`, and then revalidating the whole documentation set with `docs-set-audit`. The end state: every open `next`-targeted PR is correct, editorially consistent, and merged, and the full set is re-audited.
 
-The non-negotiable boundary: **this skill never merges to `main`.** Merging to `main` publishes the site and is `docs-publish-release`'s sole responsibility. PRs based on `main` (hotfixes) are out of scope here — list them in the report and leave them untouched.
+**The automated `docs-next-sync` PRs are in scope.** These are the truing PRs the `docs-next-sync` workflow opens automatically — titled `docs-next-sync: <library> changes (automated)`, they move a submodule pointer in `library_repos/`, re-stamp `docs-sources.json`, and update the affected pages/guides. Earlier versions of this skill held them; that was wrong. Review them in concert with the rest of the queue and merge them into `next` like any other PR (they get extra handling in Step 2 because they move submodules — see "Handling `docs-next-sync` PRs"). They merge into `next` only — never to `main`.
+
+The non-negotiable boundary: **this skill never merges to `main`.** Merging to `main` publishes the site and is `docs-publish-release`'s sole responsibility — even an automated production-push PR is out of scope here. PRs based on `main` (hotfixes, production pushes) are never touched: list them in the report and leave them be.
 
 ## Step 0 — Scope and channel discipline
 
@@ -19,7 +21,7 @@ node -p "require('./docs-sources.json').channel"   # must print "next"
 pnpm build:source-packages                          # next-channel gates read built submodule source
 ```
 
-Do **not** move the submodules (`pnpm submodules:update`) — that is `docs-next-sync`'s job and breaks the source-stamp gate. This skill validates each PR against the sources as currently stamped.
+Do **not** globally bump the submodules to library `main` (`pnpm submodules:update`) — chasing the live tips is `docs-next-sync`'s job and would break the source-stamp gate. Validate ordinary PRs against the sources as currently stamped. The one exception is a `docs-next-sync` PR under review: it legitimately carries a submodule move, so you check out the submodule **at that PR's pinned commit** (not library `main`) to validate it — see "Handling `docs-next-sync` PRs" in Step 2.
 
 ## Step 1 — Enumerate the queue
 
@@ -28,6 +30,8 @@ gh pr list --base next --state open --json number,title,headRefName,author,isDra
 ```
 
 Skip drafts unless the user names them. For any PR whose `headRefName` lives in a fork (push access not guaranteed), note it — the fix-in-place step in Step 3 can't push there, so it falls back to comment-and-hold. Flag PRs that touch the **same files** as each other up front: they will conflict on merge, so they need an order (Step 4).
+
+Identify the **`docs-next-sync` PRs** in the queue (head branch `docs-next-sync/auto-*`, title `docs-next-sync: … (automated)`, diff touches `library_repos/*` + `docs-sources.json`). They are in scope and merge into `next`, but they move submodules, so they take the extra validation in "Handling `docs-next-sync` PRs" below — and two of them almost always conflict (both touch `docs-sources.json` and the same submodule), so they need ordering in Step 4.
 
 Also surface — but do not act on — any open PRs with `--base main`; they belong to `docs-publish-release`.
 
@@ -58,6 +62,28 @@ Each reviewer returns one of three verdicts, with the specific findings (file, l
 - **needs-judgment** — a finding with no single obvious fix: a structural/scope question, a STYLE.md conflict, a one-platform capability that may need a parity bug filed instead of documenting, an ambiguous factual claim source can't settle. Capture it as a precise, answerable **question** plus the options you see.
 
 The goal of this skill is an empty `next` queue, so `needs-judgment` is **not** a terminal state — it is a question to get answered (Step 3), not a reason to leave a PR unmerged.
+
+### Handling `docs-next-sync` PRs
+
+A `docs-next-sync` PR carries a submodule move, so it needs source-of-truth handling an ordinary PR doesn't — and because these PRs are opened automatically and can sit for a while, they are frequently **stale relative to each other, to the current `next` tip, and to library `main`**. Before validating its prose, establish the lay of the land:
+
+```bash
+# the PR's pinned target commit (from its docs-sources.json / submodule diff)
+gh pr diff <NN> | grep -A1 'library_repos/<lib>'
+# current next's pin, and the live library main tip
+node -p "require('./docs-sources.json').libraries['<lib>'].commit"
+git -C library_repos/<lib> fetch origin main && git -C library_repos/<lib> rev-parse origin/main
+```
+
+Then resolve, in this order:
+
+1. **Ancestry — never regress.** Confirm the PR's target commit is a descendant of `next`'s current pin (`git -C library_repos/<lib> merge-base --is-ancestor <next-pin> <pr-target>`). A PR whose target is **behind** the current pin would move the submodule backward — don't merge it as-is; it's stale. (Two queued sync PRs are usually linear: the older one's target is an ancestor of the newer's.)
+2. **Superseded check — is the change already in `next`?** A sync PR's prose may already have landed (a later sync, a hand edit, or a one-off PR got there first). Grep `next` for the specific fact the PR changes. If it's already present (often in fuller wording), the PR is **superseded** — close it with a comment pointing at where the content already lives, and let a newer sync PR carry the submodule bump. Don't merge a no-op-with-conflicts.
+3. **Validate the surviving facts at the PR's pinned commit.** Check the submodule out at the target (`git -C library_repos/<lib> checkout <pr-target>`) and `pnpm build:source-packages`, so the TS-compile and CLI gates judge the PR against the source it claims to document. Re-verify each factual claim there per STYLE.md's source map (a new CLI flag, a changed default, a removed API).
+4. **Reconcile against concurrently-merged PRs.** A sync PR is written against the `next` it branched from. If this sweep already merged a PR that rewrote the same section (e.g. one reframed the auth settings around `app.toml` while the sync PR edits the old imperative-flag table), the sync PR's diff is stale framing. Don't merge it verbatim and regress the section — re-apply the *fact* (the part the library actually changed) on top of the current `next` wording, fixing every place that states it (the sync rule cuts both ways). The mechanics for landing this through the PR are in Step 4.
+5. **Pin and re-stamp.** With the submodule at the validated target, `pnpm render:guides` (if templates changed) and `pnpm stamp:sources` so `docs-sources.json` + `guides.json` match the new HEAD, then run the full Step 2 gates — the source-stamp and CLI gates only pass when the pin, the working-tree submodule, and the docs agree.
+
+If truing all the way to library `main` (a target newer than any open PR pins) would pull in **other** library changes the open PRs don't cover, that broader true-up is `docs-next-sync`'s job, not this sweep's — surface it as a `needs-judgment` question (true-up-to-main now, or merge only what the PRs target and leave the rest for a `docs-next-sync` run) and report whatever you leave behind.
 
 ## Step 3 — Resolve judgment calls, then fix in place
 
@@ -90,7 +116,11 @@ test "$(gh pr view <NN> --json baseRefName -q .baseRefName)" = "next" || { echo 
 gh pr merge <NN> --squash --delete-branch
 ```
 
-Merge the flagged same-file PRs **one at a time**, newest-validated first or in whatever order minimizes rework; after each merge, rebase the next conflicting PR on the updated `next` and re-run its Step 2 gates before merging it — a clean validation against a stale base isn't a clean merge. Keep `next` green at every step: the source-stamp gate must still pass after each merge (PRs into `next` shouldn't move submodules; if one did, that's a `docs-next-sync` concern — hold it).
+Merge the flagged same-file PRs **one at a time**, newest-validated first or in whatever order minimizes rework; after each merge, rebase the next conflicting PR on the updated `next` and re-run its Step 2 gates before merging it — a clean validation against a stale base isn't a clean merge. Keep `next` green at every step: the source-stamp gate must still pass after each merge. A `docs-next-sync` PR moving a submodule is expected (that is the whole point of it) — its bundled `docs-sources.json` re-stamp keeps the gate green; what must never happen is a submodule move *backward* (Step 2 ancestry check) or a stamp that disagrees with the pinned HEAD.
+
+**Order the `docs-next-sync` PRs last**, after the ordinary editorial PRs they overlap have landed — that way you reconcile their facts onto the final `next` wording, not onto a base you're about to overwrite. Merge them oldest-target-first so the submodule only ever moves forward.
+
+**Landing a reconciled sync PR.** When Step 2 had you re-apply a fact on top of current `next` (rather than the PR's stale diff), put that reconciled state through the PR so it still counts as merged, not committed straight to `next`: branch from `next`, make the reconciled edits + submodule checkout + `stamp:sources`, commit, and force-push to the PR's head branch (`git push --force origin <reconcile-branch>:<pr-head-ref>`). Confirm the PR's diff vs `next` is now exactly your reconciliation, then merge with the base-assert below. A superseded sync PR is **closed**, not merged (Step 2), with a comment pointing at where its content already lives.
 
 ## Step 5 — Revalidate the whole set
 
@@ -111,7 +141,12 @@ Final report covering **every** open PR enumerated in Step 1 — silence must be
 | #NN | merged into next |
 | #NN | fixed in place (editorial: <what>), merged into next |
 | #NN | judgment call resolved (<question → your answer>), fixed, merged into next |
+| #NN | docs-next-sync: validated at pinned <sha>, re-stamped, merged into next |
+| #NN | docs-next-sync: fact reconciled onto current next (<what>), re-stamped, merged into next |
+| #NN | docs-next-sync: CLOSED — superseded (content already in next at <where>) |
 | #NN | NOT merged — fork branch without push access; findings posted for the author |
-| #NN | skipped — based on main (docs-publish-release's domain) |
+| #NN | skipped — based on main (docs-publish-release's domain, incl. production pushes) |
+
+For a `docs-next-sync` PR, also record the submodule pin `next` ended on and anything deliberately **not** trued (library changes newer than the merged pins, deferred to a `docs-next-sync` run) — silent truncation reads as "fully current" when it isn't.
 
 Close with the `docs-set-audit` result: clean bill, or the cross-page findings and which were fixed vs. proposed to the user.
