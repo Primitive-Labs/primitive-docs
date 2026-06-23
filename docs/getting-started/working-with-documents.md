@@ -199,39 +199,6 @@ const firstPost = posts.data[0];
 const backRef = await firstPost.author();  // Author | null
 ```
 
-| Relationship type | Returns                            | Required options                            |
-| ----------------- | ---------------------------------- | ------------------------------------------- |
-| `hasMany`         | `Promise<PaginatedResult<T>>`      | `model`, `related_id_field`                 |
-| `refersTo`        | `Promise<T \| null>`               | `model`, `related_id_field`                 |
-| `refersToMany`    | `Promise<T[]>`                     | `model`, `source_field` (an array of IDs)   |
-
-Optional ordering: `order_by_field` and `order_direction = "ASC" | "DESC"` apply to `hasMany` and `refersToMany`.
-
-### Using Generated Models
-
-Always import from the barrel, never directly from a `*.generated.ts` file:
-
-```typescript
-import { Todo, Author, Post } from "@/models";
-
-// Create
-const todo = new Todo({ title: "Review PR", priority: 2 });
-await todo.save();
-
-// Query
-const open = await Todo.query({ completed: false });
-```
-
-The barrel runs `attachAndRegisterModel` for every model exactly once — that's why importing from `@/models` is essential. Importing directly from `Todo.generated.ts` skips registration, which fails at runtime with "Model not properly initialized" on the first save or query.
-
-On iOS, codegen emits value-type `PrimitiveModel` structs (`Codable`, `Equatable`, `Hashable`) — set `class_name = "TaskRecord"` on the model block to control the Swift type name. Each struct carries its API directly: static reads (`TaskRecord.query(...)`, `find`, `findAll`, `count`) and instance writes (`save(in: documentId)`, `delete(in: documentId)`). The statics route through the app's default client — call `JsBaoClient.configureDefault(client)` once at startup, before the first read or write. A few Swift conventions worth knowing:
-
-- **IDs are `String`** — generate with `UUID().uuidString` when the caller doesn't supply one.
-- **`type = "number"` codegens a `Double`** — cast to `Int` on read if you need to.
-- **No nulls** — the CRDT layer doesn't model `nil`. Use `""` / `0` for absent values and check them explicitly.
-- **Dates round-trip as ISO-8601 `String`s** — there's no native date type on the wire.
-- **Wire keys are forever** — renaming a TOML key orphans existing records on every platform. Keep wire keys snake_case so they round-trip cleanly between web and iOS, and add camelCase aliases in a `+Extensions.swift` companion if the Swift call sites read awkwardly.
-
 ### Iterating on the Schema
 
 You're free to evolve the schema as the app grows. A few rules of thumb:
