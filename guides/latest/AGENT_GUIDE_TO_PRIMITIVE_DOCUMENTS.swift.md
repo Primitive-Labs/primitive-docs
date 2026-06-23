@@ -122,7 +122,7 @@ Each shared document in the result extends the base `DocumentInfo` (`title`, `cr
 
 Every example below is compiled against the real client as part of the docs build. The [Querying Data](#querying-data) and [Saving Data](#saving-data) sections below go deeper on projections, includes, and save options.
 
-The generated model statics route through the process-wide default client — call `JsBaoClient.configureDefault(client)` once at startup, before the first read or write. Reads are synchronous against the local CRDT and span every open document by default (scope with `QueryOptions(documents: [docId])`); writes target one document — `save(in:)` inserts or updates in place and throws (it validates the write and requires the document to be open), `delete(in:)` throws only if the document isn't open.
+The generated model statics route through the process-wide default client — call `JsBaoClient.configureDefault(client)` once at startup, before the first read or write. `query`, `queryOne`, `count`, and `aggregate` are synchronous against the local CRDT; `find` and `findAll` are `async throws` (use `try await`). All reads span every open document by default (scope with `QueryOptions(documents: [docId])`); writes target one document — `save(in:)` inserts or updates in place and throws (it validates the write and requires the document to be open), `delete(in:)` throws only if the document isn't open.
 
 ### Create
 
@@ -631,7 +631,7 @@ unique_constraints = [["name", "parentId"]]
 ### Working with StringSets
 
 ```swift
-  if var task = Task.find(taskId) {
+  if var task = try await Task.find(taskId) {
     // Add/remove tags
     task.tags?.insert("urgent")
     task.tags?.remove("low-priority")
@@ -653,7 +653,7 @@ Dates are stored as ISO-8601 strings. Convert for comparisons:
   let now = ISO8601DateFormatter().string(from: Date())
 
   // Store
-  if var task = Task.find(taskId) {
+  if var task = try await Task.find(taskId) {
     task.dueDate = now
     try task.save(in: documentId)
 
