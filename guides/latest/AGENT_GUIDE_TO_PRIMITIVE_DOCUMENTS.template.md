@@ -305,7 +305,9 @@ The most common multi-doc shape is one ambient library/index document plus N per
 
 ### The `PrimitiveAppState` document lifecycle
 
-The document-open lifecycle is owned by `PrimitiveAppState`. Subclass it for app-specific state and override `connectClient()` to drive doc setup after connect. Models need no per-document binding — the codegen'd facade statics read from every open document, backed by the process-wide default client (`JsBaoClient.configureDefault`, wired for you during `initialize()`).
+The neutral lifecycle is: resolve-or-create the doc (`client.documents.getOrCreateWithAlias` — see [Resolve-or-create a singleton document](#resolve-or-create-a-singleton-document)), open it, then read through the codegen'd facade scoped to it (see [Read](#read-find--query--first--count)). Models need no per-document binding — the facade statics read from every open document, backed by the process-wide default client (`JsBaoClient.configureDefault`).
+
+`PrimitiveAppState` is the **SwiftUI app-state glue** (PrimitiveApp package) that owns that lifecycle: subclass it for app-specific state and override `connectClient()` to drive doc setup after connect (`configureDefault` is wired for you during `initialize()`). The subclass below is framework glue; the Primitive call in it is the `getOrCreateWithAlias` resolve-or-create:
 
 ```swift
 @MainActor
@@ -346,7 +348,7 @@ For per-document setup beyond models, override the `onDocumentOpened(doc:documen
 
 For a **fresh doc you'll write immediately**, use `client.createDocument(options:)` — it returns a `CreateDocumentResult` with `metadata: JSONValue?`; extract `metadata?["documentId"]?.stringValue` to get the new document's id. Re-opening a freshly-created empty doc with `waitForLoad: .network` parks ~15s waiting for a sync event that never has anything to deliver.
 
-**Multi-doc apps (one ambient library doc + N per-item docs).** `selectDocumentAwaiting(_:)` is the *single*-selected-doc lifecycle — it closes the previously selected doc first, so using it for a per-item detail view closes your library/index doc. For one ambient doc plus transient detail docs, use `appState.openAuxiliaryDoc(_:)` from the detail view's `.task` and `appState.closeAuxiliaryDoc(_:)` from `.onDisappear`. These register the doc for sync, but they don't touch `selectedDocId` or fire `onDocumentOpened`. Once open, read the doc's records through the facade scoped to that document:
+**Multi-doc apps (one ambient library doc + N per-item docs).** `selectDocumentAwaiting(_:)` is the *single*-selected-doc lifecycle — it closes the previously selected doc first, so using it for a per-item detail view closes your library/index doc. For one ambient doc plus transient detail docs, use `appState.openAuxiliaryDoc(_:)` from the detail view's `.task` and `appState.closeAuxiliaryDoc(_:)` from `.onDisappear`. These register the doc for sync, but they don't touch `selectedDocId` or fire `onDocumentOpened`. Once open, read the doc's records through the facade scoped to that document — the same scoped query as [Open Documents Before Querying](#1-open-documents-before-querying). The view is framework glue around `openAuxiliaryDoc` + that scoped query:
 
 ```swift
 struct ItemDetailView: View {
@@ -820,7 +822,9 @@ Only one stringset facet field is allowed per aggregation. To check membership o
 
 ### useJsBaoDataLoader Pattern
 
-`useJsBaoDataLoader` is the Vue composable for centralized component data loading, provided by the primitive library. **It is component-only**: it registers its model subscriptions and document-event listeners inside `onMounted`, which fires only for mounted Vue components. Calling it from a Pinia store's `setup()`, a router guard, or any other non-component context will load data once but **never react to subsequent changes** — the `onMounted` callback never runs there, so no subscriptions are registered. For those contexts, subscribe directly (see [Subscribing Outside a Component](#subscribing-outside-a-component) below).
+The data a component renders is a plain `Model.query` (see [Read](#read-find--query--first--count) for the compiled call) that you re-run whenever the underlying records change. `useJsBaoDataLoader` is the **web template's** Vue composable that wires that re-run for you — it is framework glue around the same query, not a different API.
+
+**It is component-only**: it registers its model subscriptions and document-event listeners inside `onMounted`, which fires only for mounted Vue components. Calling it from a Pinia store's `setup()`, a router guard, or any other non-component context will load data once but **never react to subsequent changes** — the `onMounted` callback never runs there, so no subscriptions are registered. For those contexts, subscribe directly (see [Subscribing Outside a Component](#subscribing-outside-a-component) below).
 
 It handles four key concerns:
 
@@ -839,6 +843,8 @@ It handles four key concerns:
 - Centralize all data loading for a component in a single `useJsBaoDataLoader` call
 - Push filtering logic into js-bao `.query()` calls rather than fetching everything and filtering in JavaScript
 - Always pass `documentReady` - typically a ref that becomes true after your document opening logic completes
+
+The composable call below is **web-template glue** (Vue + the template's `useJsBaoDataLoader`); the only Primitive call in it is the `TodoItem.query(...)` inside `loadData`, identical to the compiled [Read](#read-find--query--first--count) example:
 
 ```typescript
 const {
@@ -873,7 +879,7 @@ const {
 
 `useJsBaoDataLoader` is the right tool inside a component. Outside one — a **Pinia store**, a singleton service, a router guard — do not reach for it: its `onMounted`-based subscriptions never register there, so reactive updates silently never fire.
 
-`Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle (see [Subscribe to changes](#subscribe-to-changes) above for the compiled call). It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). Wire it up directly in the store's `setup()` and keep the unsubscribe handle so you can tear it down:
+`Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle (see [Subscribe to changes](#subscribe-to-changes) above for the compiled call). It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). The neutral pattern is just `subscribe` + re-`query`; everything below is **web-template glue** (Pinia) showing where to hang that wiring:
 
 ```typescript
 // stores/tasksStore.ts
@@ -920,7 +926,9 @@ This is the same `Model.subscribe()` that `useJsBaoDataLoader` calls internally 
 {{#lang swift}}
 ### View-data binding with `BaoDataLoader`
 
-Bind a `BaoDataLoader<[T]>` rather than subscribing to `client.events.on(...)` directly or rolling a `@Published var items` + manual `refresh()`. The loader owns its subscription lifecycle (cancelled on deinit), debounces bursts (~50ms), runs the first load immediately, and re-runs a synchronous `load` closure on every trigger.
+The data a view renders is a plain facade query — `TodoItem.findAll()` / `TodoItem.query(...)` (see [Read](#read-find--query--first--count)) — re-run whenever the records change, which you observe with `TodoItem.subscribe` (see [Subscribe to changes](#subscribe-to-changes)). `BaoDataLoader<[T]>` is the **SwiftUI glue** (PrimitiveApp package) that wires that re-run into a view: bind it rather than subscribing to `client.events.on(...)` directly or rolling a `@Published var items` + manual `refresh()`. The loader owns its subscription lifecycle (cancelled on deinit), debounces bursts (~50ms), runs the first load immediately, and re-runs a synchronous `load` closure on every trigger.
+
+The view below is framework glue; the only Primitive calls in it are the `findAll()` query and the `TodoItem.subscribe` trigger:
 
 ```swift
 struct TodoListView: View {
