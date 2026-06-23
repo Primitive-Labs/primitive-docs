@@ -17,7 +17,10 @@
 #
 # Secrets used (already configured in this repo):
 #   ANTHROPIC_API_KEY — Claude Code CLI auth
-#   DOCS_REPO_PAT     — checkout + private submodule auth + `gh` (skill triage) + opening the PR
+#   DOCS_REPO_PAT     — checkout + private submodule auth + `gh` (skill triage,
+#                       and filing parity-gap issues in the library repos) +
+#                       opening the PR. For issue filing the PAT must carry
+#                       issues:write on the library repos (e.g. js-bao-wss).
 #   GITHUB_TOKEN      — fallback token
 
 name: Docs Next-Sync (agent)
@@ -159,27 +162,38 @@ jobs:
           completion under the rules below.
 
           CRITICAL unattended-run rules:
-          - Non-interactive: NEVER ask a question or wait for input. For any
-            decision the skill would normally escalate (a brand-new page,
-            splitting a large batch, an ambiguous editorial call), make the
-            CONSERVATIVE choice: apply only well-verified factual updates to
-            EXISTING pages and their matching agent guides, and leave anything
-            needing human judgment or a new page undone — listing it prominently
-            in your report.
-          - Do the full truing: triage every changed commit, VERIFY each fact
-            against the submodule source (never trust PR summaries), update human
-            docs AND the matching agent guides, run `pnpm render:guides`,
-            restamp, and run the gates (`pnpm check:examples`,
-            `npx vitepress build docs`). Fix whatever the gates flag.
+          - Non-interactive: NEVER ask a question or wait for input. The skill's
+            posture is to DRAFT changes, not defer them — when it would normally
+            escalate, make the change and FLAG it in your report rather than
+            skipping it:
+              * New capability/section: draft it, strongly preferring an existing
+                page/guide section; only add a new page if it genuinely won't fit.
+                Call out any larger change (new page, big restructure, content
+                removal) prominently in the report for human review.
+              * A genuinely ambiguous editorial call with no defensible answer:
+                pick the most conservative reasonable option and note it.
+            Every drafted change must still be source-true: verify each fact
+            against the submodule source first (never trust PR summaries).
+          - Do the full truing: triage every changed commit AND the open docs
+            issue tracker, update human docs AND the matching agent guides, run
+            `pnpm render:guides`, restamp, and run the gates (`pnpm check:examples`,
+            `npx vitepress build docs`). Drive the gates to GREEN — a failing
+            compile gate is a stale callsite to fix, not a result to report.
+          - FILE issues for parity/platform gaps and library bugs, per
+            `.claude/ISSUE_FILING.md` (which repo, the `ios` label for Swift-client
+            gaps, no assignee). Record each filed issue number in your report — do
+            NOT merely describe a gap and move on. (Filing uses `gh`, which reads
+            GH_TOKEN below; that token must have issues:write on the target repo.)
           - Do NOT run `git commit`, `git push`, `git checkout -b`, `git merge`,
             or `gh pr create`/`gh pr merge`. Leave every change in the working
-            tree; the workflow opens the pull request.
-          - Do NOT file GitHub issues. If you find a Swift/JS parity gap or other
-            library bug you would normally file, describe it in the report.
+            tree; the workflow opens the pull request. This also means you do NOT
+            perform the skill's Step 0.5 main→next drain — that step is
+            interactive-only and is a direct push; here you only open a PR.
           - Finish by writing your complete disposition report (the per-commit
-            table plus any deferred/held items and parity gaps) to
-            `.docs-next-sync-report.md` at the repo root. If the pass made no doc
-            changes, say so there and reset the submodules so the tree is clean.
+            table plus any drafted larger-change items and the parity issues you
+            filed) to `.docs-next-sync-report.md` at the repo root. If the pass
+            made no doc changes, say so there and reset the submodules so the tree
+            is clean.
           PROMPT
 
           # Append the (untrusted) payload context as plain data.
