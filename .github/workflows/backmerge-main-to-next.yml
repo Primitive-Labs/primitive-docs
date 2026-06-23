@@ -1,0 +1,143 @@
+# Back-merge main into next (post-publish)
+#
+# Completes the publish loop. When a publish PR (head `publish/**`) merges into
+# `main`, this re-establishes the `next ⊇ main` invariant by merging `main` back
+# into `next` — the skill's Step 7.2, automated. It is channel-preserving: it
+# takes `main`'s new doc CONTENT but keeps `next`'s channel, stamp, and submodule
+# pins, so the production restamp never leaks onto `next`.
+#
+# `next` is unprotected, so this pushes directly — the same direct push the
+# interactive skill does by hand (this is the one CI path that writes to `next`
+# without a PR; the nightly truing still only ever opens PRs).
+#
+# Safety: it auto-resolves ONLY the channel/stamp/pin files (docs-sources.json,
+# guides.json, library_repos/*) to next's side; a conflict in any other file is a
+# real content conflict it will not guess at — it aborts the merge and fails the
+# run for a human. It also runs the next-channel gates before pushing, so a bad
+# back-merge never lands on `next`.
+#
+# Triggers on publish PRs whether opened by receive-production-release.yml
+# (automated) or by a human running docs-publish-release — so the skill's manual
+# Step 7.2 is redundant once this is live.
+#
+# NOTE: a `pull_request` workflow runs the version of this file on the PR's base
+# branch (main), so it must live on main.
+
+name: Back-merge main into next
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+  # Manual re-run: point it at an already-merged publish (or just to drain main).
+  workflow_dispatch: {}
+
+concurrency:
+  group: backmerge-main-to-next
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  backmerge:
+    # Only when a publish PR actually merged (skip mere closes and other PRs).
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       startsWith(github.event.pull_request.head.ref, 'publish/'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout next
+        uses: actions/checkout@v5
+        with:
+          ref: next
+          token: ${{ secrets.DOCS_REPO_PAT }}
+          fetch-depth: 0
+
+      - name: Configure git auth and identity
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.DOCS_REPO_PAT }}@github.com/".insteadOf "https://github.com/"
+          git config --global user.email "docs-bot@primitivelabs.com"
+          git config --global user.name "primitive-docs-bot"
+
+      - name: Initialize submodules at next's pinned SHAs
+        run: git submodule update --init --recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Back-merge main into next (channel-preserving)
+        id: merge
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+        run: |
+          git fetch -q origin main
+
+          # No-ff, no-commit so we can force next's channel/pins before committing.
+          set +e
+          git merge --no-ff --no-commit origin/main
+          set -e
+
+          if ! git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+            echo "noop=true" >> "$GITHUB_OUTPUT"
+            echo "\`next\` already contains \`main\` — nothing to back-merge." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Abort on any conflict outside the channel/stamp/pin surface — those are
+          # real content conflicts a human must resolve.
+          CONFLICTS="$(git diff --name-only --diff-filter=U || true)"
+          UNEXPECTED="$(printf '%s\n' "$CONFLICTS" \
+            | grep -vE '^(docs-sources\.json|guides/latest/guides\.json|library_repos/)' \
+            | grep -v '^$' || true)"
+          if [ -n "$UNEXPECTED" ]; then
+            echo "::error::Back-merge hit content conflicts it won't auto-resolve — resolve by hand (skill Step 7.2):"
+            printf '%s\n' "$UNEXPECTED"
+            git merge --abort
+            exit 1
+          fi
+
+          # Force next's channel + pins, whether they conflicted or were cleanly
+          # taken from main. HEAD is next's pre-merge tip during the merge, so this
+          # restores next's docs-sources.json/guides.json and submodule gitlinks —
+          # keeping next on the next channel at its own (release-or-newer) pins.
+          git checkout HEAD -- docs-sources.json guides/latest/guides.json library_repos
+          git submodule update --init --recursive
+
+          # The merge may have brought main's package.json/lock (e.g. release pin
+          # bumps or infra dep changes) — re-sync node_modules before building.
+          pnpm install
+
+          # Rebuild the next source surface and re-stamp so the stamp matches the
+          # restored pins + installed packages (check:examples asserts this).
+          pnpm build:source-packages
+          pnpm stamp:sources --channel next
+
+          git add -A
+          git commit -m "Back-merge main into next after publishing ${HEAD_REF:-main} (#${PR_NUM:-manual}) — channel preserved"
+          echo "noop=false" >> "$GITHUB_OUTPUT"
+
+      - name: Validate next after back-merge
+        if: steps.merge.outputs.noop == 'false'
+        run: |
+          pnpm check:examples
+          npx vitepress build docs
+
+      - name: Push next
+        if: steps.merge.outputs.noop == 'false'
+        run: |
+          git push origin HEAD:next
+          echo "Back-merged \`main\` into \`next\` and pushed." >> "$GITHUB_STEP_SUMMARY"
