@@ -1,6 +1,6 @@
 # App Secrets
 
-Your backend configuration needs credentials — API keys for LLM providers, tokens for external services, signing secrets. **App secrets** are the platform's server-side store for them: set a value once with the CLI, reference it from server-side config as <span v-pre>`{{ secrets.KEY }}`</span>, and the value resolves on the server. Secrets never appear in your repo, your client code, or anything shipped to users.
+Your app's server-side configuration needs credentials — API keys for LLM providers, tokens for external services, signing secrets. **App secrets** are the platform's server-side store for them: set a value once with the CLI, reference it from server-side config as <span v-pre>`{{ secrets.KEY }}`</span>, and the value resolves on the server. Secrets never appear in your repo, your client code, or anything shipped to users.
 
 ## Managing Secrets
 
@@ -49,4 +49,4 @@ The point of the store is that secret values only ever exist where the server re
 
 - **[API Integrations](./api-integrations.md)** — The most common secret consumer: authenticated calls to external APIs
 - **[Workflows](./workflows.md)** — Reference secrets from step templates
-- **[Configuring Your Backend](./configuring-your-backend.md)** — The sync loop your secret-referencing config travels through
+- **[Configuring Primitive Services](./configuring-primitive-services.md)** — The sync loop your secret-referencing config travels through

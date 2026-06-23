@@ -9,15 +9,17 @@ The two things you may want to configure are:
 
 ## Server App Settings Must Match Your App's Origin
 
-Authentication runs against server-side **app settings** that must line up with where your client app is actually served. Three settings matter, and a mismatch in the first one fails in a particularly confusing way:
+Authentication runs against server-side **app settings** that must line up with where your client app is actually served. These settings live in your synced `app.toml` — edit the TOML and run `primitive sync push` so the server matches what's checked into your repo. Three settings matter, and a mismatch in the first one fails in a particularly confusing way:
 
-| Setting | What it does | How to set |
+| Setting | What it does | Where it lives |
 |---|---|---|
-| **CORS allowed origins** | The whitelist of origins allowed to call the Primitive API from a browser. Your serving origin (scheme + host + port) must be listed. | `primitive apps update --cors-origins "http://localhost:5173,https://myapp.com"` or Admin Console |
-| **Redirect URIs** | The whitelist of OAuth callback URLs. The callback your app uses must match exactly, or the OAuth callback fails with `Invalid redirect URI`. | Admin Console |
-| **Base URL** | Where the app is served — used for links in auth emails and redirects. | `primitive apps update --base-url "https://myapp.com"` |
+| **CORS allowed origins** | The whitelist of origins allowed to call the Primitive API from a browser. Your serving origin (scheme + host + port) must be listed. | `[cors].allowedOrigins` in `app.toml` |
+| **Redirect URIs** | The whitelist of OAuth callback URLs. The callback your app uses must match exactly, or the OAuth callback fails with `Invalid redirect URI`. | `primitive apps update --redirect-uris` or Admin Console (not in `app.toml`) |
+| **Base URL** | Where the app is served — used for links in auth emails and redirects. | `[app].baseUrl` in `app.toml` |
 
 Inspect all three anytime with `primitive apps get`.
+
+The `primitive apps update --cors-origins …` / `--base-url …` flags set the same values imperatively — useful for a quick one-off, but a flag change mutates the server without touching `app.toml`, so the next `primitive sync push` reverts it unless you mirror the change back into the TOML. Prefer editing `app.toml` and pushing.
 
 ## The Template Login
 
@@ -51,7 +53,7 @@ AuthGateView(
 |---|---|---|
 | Component | `PrimitiveLogin` | `PrimitiveLoginView`, wrapped by `AuthGateView` |
 | Email sign-in | `emailAuthMethod`: `"magic_link"` (default) or `"one_time_code"` | One-time code |
-| Google OAuth | Button appears automatically when configured | Pass `showGoogleOAuth: true` (runs in an `ASWebAuthenticationSession` sheet) |
+| Social sign-in | Google button appears automatically when configured | Google and Sign in with Apple buttons appear automatically when configured (Google runs in an `ASWebAuthenticationSession` sheet) |
 | After sign-in | Navigates to `defaultContinueRoute` | Renders the `AuthGateView` content closure |
 
 ### Choosing Your Email Sign-In Method (Web)
@@ -86,11 +88,20 @@ When deploying to production, add your production domain to these settings along
 
 ### 2. Configure in Primitive
 
-Enter your **Client ID** and **Client Secret** in the [Admin Console](https://admin.primitiveapi.com/login) under your app's Google OAuth settings, then enable the provider and allow your dev origin (see [Server App Settings](#server-app-settings-must-match-your-apps-origin) — the OAuth callback URL must also be in the app's **Redirect URIs**, set in the Admin Console):
+Enter your **Client ID** and **Client Secret** in the [Admin Console](https://admin.primitiveapi.com/login) under your app's Google OAuth settings, then enable the provider and allow your dev origin (see [Server App Settings](#server-app-settings-must-match-your-apps-origin) — the OAuth callback URL must also be in the app's **Redirect URIs** — set via `primitive apps update --redirect-uris` or the Admin Console). Set the provider toggle and origin in `app.toml` and push:
+
+```toml
+# config/app.toml
+[auth]
+googleOAuthEnabled = true
+
+[cors]
+mode = "custom"
+allowedOrigins = ["http://localhost:5173"]
+```
 
 ```bash
-primitive apps update --google-oauth true
-primitive apps update --cors-origins "http://localhost:5173"
+primitive sync push
 ```
 
 That's it — the template's login component automatically shows a "Sign in with Google" button when Google OAuth is configured.
@@ -119,15 +130,7 @@ primitive email-templates test magic-link
 
 ## Invitations and Pending Shares
 
-Any sign-in method resolves pending invitations and email-based shares automatically:
-
-- If an invitation exists for the user's email, it's consumed and the user joins the app.
-- Any pending document shares, group adds, or collection adds addressed to their email are applied atomically after the account is created — documents are shared, group and collection memberships are granted.
-- Domain-mode apps re-validate the email domain at resolution time. A pending share for `alice@outside.com` won't land in an app restricted to `@mycompany.com`.
-
-From the end-user's perspective: they sign in for the first time, and the things other people invited them into are already there. No manual "accept invitation" step.
-
-See [Invitations](./invitations.md) and [Sharing Documents](./working-with-documents.md#sharing-documents) for how to create these shares.
+Signing in is what resolves anything waiting on a user's email — a pending app invitation, plus any document shares, group adds, or collection adds addressed to them. On first sign-in, with any method, it's all applied automatically; there's no manual "accept invitation" step, so the things other people invited them into are already there. See [Invitations](./invitations.md) for how those shares are created and the full resolution rules.
 
 ## Disabling a User Per App
 
@@ -181,6 +184,16 @@ Discover which sign-in methods are enabled before rendering any UI:
 <<< ../../examples/auth/oauth.swift#example{swift} [Swift]
 
 :::
+
+On iOS, `signInWithGoogle` and `signInWithApple` wrap the whole flow in a single call — they present the system auth sheet, run the redirect and code exchange, apply the session token, and reconnect the WebSocket. Each returns the signed-in `userId` and an `isNewUser` flag. Google derives its redirect URI from the bundled `GoogleService-Info.plist` (or pass `redirectUri:` explicitly); Apple uses the app's "Sign in with Apple" entitlement and the server's configured Apple audiences. Read `hasApple` from the auth config to decide whether to show the Apple button.
+
+```swift
+let google = try await client.signInWithGoogle()
+// google.userId, google.isNewUser
+
+let apple = try await client.signInWithApple()
+// apple.userId, apple.isNewUser
+```
 
 **Magic Link** — request a link, then verify the token your callback page receives:
 

@@ -1,6 +1,6 @@
 # Agent Guide to Primitive Configuration
 
-Guidelines for AI agents managing Primitive backend configuration. All backend behavior — auth settings, workflows, prompts, integrations, database types/operations, webhooks, cron triggers, blob buckets, email templates, rule sets — is server-side configuration with two equivalent interfaces: the web Admin Console (interactive) and **TOML files synced via the CLI** (configuration as code). Agents should use the TOML + CLI path.
+Guidelines for AI agents configuring Primitive services. Everything Primitive does for an app — auth settings, workflows, prompts, integrations, database types/operations, webhooks, cron triggers, blob buckets, email templates, rule sets — is server-side configuration with two equivalent interfaces: the web Admin Console (interactive) and **TOML files synced via the CLI** (configuration as code). Agents should use the TOML + CLI path.
 
 ## The sync loop
 
@@ -34,6 +34,7 @@ config/
   workflows/*.toml                # Workflow definitions
   workflows/{key}.tests/*.toml    # Workflow test cases
   workflow-fragments/*.toml       # Reusable [[steps]] blocks (include = ["<name>"])
+  transforms/*.rhai               # Rhai scripts for workflow script steps
   prompts/*.toml                  # Managed prompts
   prompts/{key}.tests/*.toml      # Prompt test cases
   integrations/*.toml             # External API integrations
@@ -47,9 +48,23 @@ config/
   collection-type-configs/*.toml  # Collection type configs
 ```
 
+## App settings (`app.toml`)
+
+App-level settings sync from `app.toml`; editing the TOML and `sync push` is the default path. The equivalent `primitive apps update --flag` calls mutate the server imperatively and drift from the checked-in TOML — the next `sync push` reverts them unless mirrored back. TOML-syncable settings:
+
+- `[app]` — `name`, `mode`, `waitlistEnabled`, `baseUrl`
+- `[auth]` — `googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled`, `[auth.passkeys]` relying-party config
+- `[cors]` (serialized only when `mode = "custom"`) — `allowedOrigins`, `allowCredentials`, `allowedMethods`, `maxAge`
+
+Not in `app.toml` (see [What sync does NOT carry](#what-sync-does-not-carry)): `otp` (set via `--otp <bool>` only) and `redirectUris` (set via `--redirect-uris "<uri1>,<uri2>"` or the Admin Console — no TOML key).
+
 ## Environment resolution
 
 Every command resolves its target environment in order: `--env <name>` flag → `PRIMITIVE_ENV` env var → `defaultEnvironment` in `.primitive/config.json` → the only defined environment → error. Manage environments with `primitive env add|list|show|use|remove`. Tokens are stored per-environment in `.primitive/credentials.json` (gitignored); `.primitive/config.json` is committed.
+
+## Previewing a push
+
+`primitive sync diff` lists entities that would be created, changed, or removed; `primitive sync push --dry-run` reports the full push without applying it. Both run the **same** validate-first gate as a real push — local TOML validation followed by the server-side checks via the validate-first pass — so the preview is faithful: what it reports is what the push applies. Schema-gate rejections surface identically in the preview and in a real push: an operation whose database type has no schema set, an unresolved `$params.X`/reference, or a schema change that would break an existing registered operation. A previewed or blocked entity records no content hash in sync state, so it stays pending on the next `sync diff` rather than reading "in sync" — a server-rejected change cannot silently disappear from the diff. `primitive sync diff --json` emits machine-readable output on stdout.
 
 ## Push failures
 
@@ -57,14 +72,15 @@ Every command resolves its target environment in order: `--env <name>` flag → 
 
 ## What sync does NOT carry
 
-Some flags are set with dedicated update commands rather than TOML:
+Some settings are set with dedicated update commands rather than TOML (app-level settings that *do* sync are listed under [App settings](#app-settings-app-toml)):
 
 ```bash
 primitive workflows update <id> --requires-client-apply false
 primitive workflows update <id> --sync-callable true
-primitive apps update --cors-origins "..." --base-url "..." --google-oauth true
+primitive apps update --otp true                                          # no TOML key
 primitive apps update --member-invitations-enabled true --member-invitation-limit 5
 primitive apps update --test-account-bases alice@example.com
+primitive apps update --redirect-uris "https://app.example.com/auth/callback"  # no TOML key
 ```
 
 ## Secrets

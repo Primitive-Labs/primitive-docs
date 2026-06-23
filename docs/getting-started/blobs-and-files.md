@@ -3,7 +3,7 @@
 Primitive has two kinds of blob storage:
 
 1. **Document-scoped blobs** — files attached to a specific document. Permissions follow the document. Covered in [Document-Scoped Blobs](./working-with-documents.md#document-scoped-blobs).
-2. **Blob buckets** — general-purpose binary storage that isn't tied to a document. Each bucket has its own access policy and retention tier. Covered here.
+2. **Blob buckets** — general-purpose binary storage that isn't tied to a document. Each bucket has its own access preset and retention tier. Covered here.
 
 Use buckets when you need file storage that doesn't map cleanly onto a document:
 
@@ -22,7 +22,7 @@ Use buckets when you need file storage that doesn't map cleanly onto a document:
 [bucket]
 key = "avatars"
 name = "User avatars"
-accessPolicy = "authenticated"
+preset = "authenticated"
 ttlTier = "permanent"
 ```
 
@@ -38,7 +38,7 @@ Or via the CLI:
 primitive blob-buckets create \
   --key avatars \
   --name "User avatars" \
-  --access authenticated \
+  --preset authenticated \
   --ttl permanent
 ```
 
@@ -64,19 +64,29 @@ Uploads take optional `tags` for organizing and filtering blobs within a bucket.
 
 :::
 
-## Access Policies
+## Access Presets
 
-A bucket's **access policy** decides who can read and write its blobs. App admins and owners always have full access; the policy governs everyone else:
+A bucket's **preset** decides who can use its blobs. App admins and owners always have full access; the preset governs everyone else:
 
-| Policy | Read | Write | Use case |
-|---|---|---|---|
-| `public-read` | Anyone | Admins only | Brand assets, marketing images |
-| `authenticated` | Any signed-in user | Any signed-in user | User avatars, app-wide shared assets |
-| `owner-only` | Admins only | Admins only | Internal artifacts, workflow outputs your app serves out selectively via signed URLs |
+| Preset | Access for everyone else | Use case |
+|---|---|---|
+| `public` | Anyone — including visitors with no account — can read and list. Only admins write. | Logos, brand images, assets served without auth |
+| `authenticated` | Any signed-in member can read, write, list, delete, and share | User avatars, app-wide shared assets |
+| `admin-only` | No one but admins and owners | Internal artifacts, workflow outputs you serve out selectively via signed URLs |
+| `personal-uploads` | Any member uploads; each member reads, deletes, and shares **only their own** blobs (the bucket isn't enumerable) | User file uploads where everyone keeps their own |
 
-Pick the simplest policy that fits.
+Pick the simplest preset that fits. A `public` bucket is the one case where reads don't require a signed-in user — an unauthenticated request can fetch its blobs directly.
 
-For member access that the three policies can't express, attach a [rule set](./access-control.md#rule-sets-governing-management-operations) to the bucket — set `ruleSetId` in the bucket's TOML, or pass `--rule-set-id` to `primitive blob-buckets create`. An attached rule set becomes the authority for member-level access: admins and owners are always allowed, unauthenticated callers are rejected, and every other read or write is decided by the rule set's CEL rules.
+Each preset governs blob operations at the granularity of **read** (download and metadata), **write** (upload), **list** (enumerate the bucket), **delete**, and **share** (mint a signed URL).
+
+### Custom access
+
+When no preset fits, attach a **rule set** to the bucket — set `ruleSetId` in the bucket's TOML, or pass `--rule-set-id` to `primitive blob-buckets create`. The rule set becomes the authority for member access: admins and owners are always allowed, and each operation (read, write, list, delete, share) is decided by a CEL rule. Two values make bucket rules expressive:
+
+- `isAnonymous()` — true when the caller has no account, so `!isAnonymous()` means "any signed-in member."
+- `record.blobCreatedBy` — the id of the member who uploaded the blob, for owner-scoped rules like `record.blobCreatedBy == user.userId`.
+
+See [Access Control](./access-control.md#rule-sets-governing-management-operations) for the rule-set model. To change a bucket's preset or attached rule set later, edit its TOML and run `primitive sync push` again.
 
 ## TTL Tiers
 
@@ -98,7 +108,7 @@ Signed URLs:
 
 - Are safe to put in `<img>` tags or hand to clients that can't attach auth headers
 - Expire after the time you specify — from 30 seconds up to 24 hours (default 5 minutes)
-- Respect the bucket's access policy at generation time — if the user can't read, the call fails
+- Respect the bucket's preset at generation time — if the user can't read, the call fails
 - Don't require the recipient to be authenticated during the valid window
 
 Use a short expiry for user-facing URLs and regenerate as needed.

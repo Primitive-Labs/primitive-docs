@@ -162,7 +162,7 @@ indexed = true
 
 ```toml
 [[models.categories.unique_constraints]]
-name = "name_parent_unique"
+name = "name_parentId"
 fields = ["name", "parentId"]
 ```
 
@@ -190,47 +190,13 @@ related_id_field = "authorId"
 
 After `pnpm codegen`, the generated interfaces include typed traversal methods:
 
-```typescript
-import { Author, Post } from "@/models";
+::: code-group
 
-const author = await Author.queryOne({ id: authorId });
-const posts = await author.posts();        // PaginatedResult<Post>
-const firstPost = posts.data[0];
-const backRef = await firstPost.author();  // Author | null
-```
+<<< ../../examples/documents/relationships.ts#example{ts} [JavaScript]
 
-| Relationship type | Returns                            | Required options                            |
-| ----------------- | ---------------------------------- | ------------------------------------------- |
-| `hasMany`         | `Promise<PaginatedResult<T>>`      | `model`, `related_id_field`                 |
-| `refersTo`        | `Promise<T \| null>`               | `model`, `related_id_field`                 |
-| `refersToMany`    | `Promise<T[]>`                     | `model`, `source_field` (an array of IDs)   |
+<<< ../../examples/documents/relationships.swift#example{swift} [Swift]
 
-Optional ordering: `order_by_field` and `order_direction = "ASC" | "DESC"` apply to `hasMany` and `refersToMany`.
-
-### Using Generated Models
-
-Always import from the barrel, never directly from a `*.generated.ts` file:
-
-```typescript
-import { Todo, Author, Post } from "@/models";
-
-// Create
-const todo = new Todo({ title: "Review PR", priority: 2 });
-await todo.save();
-
-// Query
-const open = await Todo.query({ completed: false });
-```
-
-The barrel runs `attachAndRegisterModel` for every model exactly once — that's why importing from `@/models` is essential. Importing directly from `Todo.generated.ts` skips registration, which fails at runtime with "Model not properly initialized" on the first save or query.
-
-On iOS, codegen emits value-type `PrimitiveModel` structs (`Codable`, `Equatable`, `Hashable`) — set `class_name = "TaskRecord"` on the model block to control the Swift type name. Each struct carries its API directly: static reads (`TaskRecord.query(...)`, `find`, `findAll`, `count`) and instance writes (`save(in: documentId)`, `delete(in: documentId)`). The statics route through the app's default client — call `JsBaoClient.configureDefault(client)` once at startup, before the first read or write. A few Swift conventions worth knowing:
-
-- **IDs are `String`** — generate with `UUID().uuidString` when the caller doesn't supply one.
-- **`type = "number"` codegens a `Double`** — cast to `Int` on read if you need to.
-- **No nulls** — the CRDT layer doesn't model `nil`. Use `""` / `0` for absent values and check them explicitly.
-- **Dates round-trip as ISO-8601 `String`s** — there's no native date type on the wire.
-- **Wire keys are forever** — renaming a TOML key orphans existing records on every platform. Keep wire keys snake_case so they round-trip cleanly between web and iOS, and add camelCase aliases in a `+Extensions.swift` companion if the Swift call sites read awkwardly.
+:::
 
 ### Iterating on the Schema
 
@@ -307,10 +273,20 @@ Save-or-update by a unique field (such as `email`) without knowing the existing 
 
 :::
 
-For composite keys, use `upsertByUnique(constraintName, …)` — see [Unique Constraints](#unique-constraints) above.
+### Upsert by Named Unique Constraint
+
+Save-or-update by a **named** constraint — single- or multi-field — declared with `[[models.<name>.unique_constraints]]`. Use this for composite keys, or any time you match by a constraint other than a single `unique = true` field. The match values come from the record's constraint fields, so every constraint field must be set; pass `targetDocument` so a new record has a home if none matches.
+
+::: code-group
+
+<<< ../../examples/documents/upsert-by-unique.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/upsert-by-unique.swift#example{swift} [Swift]
+
+:::
 
 ::: tip iOS semantics
-Model reads are **synchronous** against the local CRDT (`Task.findAll()`, `Task.query([...])` — no `await`) and span every open document by default; scope with `QueryOptions(documents: [docId])`. Writes target one document — `save(in:)` inserts or updates in place and `throws` (it validates the write and requires the document to be open); `delete(in:)` throws only if the document isn't open. Writes are local-first: visible to local reads on the next line, synced to peers in the background.
+`Task.query(...)`, `queryOne`, `count`, and `aggregate` are **synchronous** (no `await`) — they read the in-process CRDT and span every open document by default; scope with `QueryOptions(documents: [docId])`. `Task.find(_:)` and `Task.findAll()` are **`async throws`** — use `try await Task.find(id)`. Writes target one document — `save(in:)` inserts or updates in place and `throws`; `save(in:upsertOn:)` matches by unique field; `delete(in:)` throws only if the document isn't open. Writes are local-first: visible to local reads on the next line, synced to peers in the background.
 :::
 
 ## Querying
@@ -351,7 +327,7 @@ Pass a sort and a page size, then carry the cursor forward.
 
 :::
 
-In Swift, cursor pagination lives on the `.dynamic` layer (`queryPaged`); use `sortOrder` (an ordered list) so the cursor is stable across pages.
+In Swift, use `sortOrder` (an ordered list) so the cursor is stable across pages.
 
 ### Aggregations
 
@@ -365,7 +341,7 @@ Group-by with `count` / `avg` / `sum` / `min` / `max`, an optional pre-filter, s
 
 :::
 
-When you group by a `stringset` field (like `tags`), each member value becomes its own group — a tag-facet count.
+When you group by a `stringset` field (like `tags`), each member value becomes its own group — a tag-facet count. To split records by whether the set contains one specific value instead, use a membership `groupBy` entry (the `urgentSplit` call above). One stringset facet field is allowed per aggregation.
 
 ## Reacting to Changes
 
@@ -443,16 +419,17 @@ Splitting this into a resolve followed by a create looks fine but has a race: tw
 
 ### Opening Documents on iOS
 
-On iOS, the canonical place to open documents and bind models is your `PrimitiveAppState` subclass — open in `connectClient()`, bind in the `onDocumentOpened` hook:
+On iOS, the canonical place to open documents is your `PrimitiveAppState` subclass — open in `connectClient()`:
 
 ```swift
 @MainActor
 final class MyAppState: PrimitiveAppState {
-  @Published private(set) var tasks: TypedModel<TaskRecord>?
-
   override func connectClient() async {
     await super.connectClient()
     guard let client else { return }
+    // Pre-register models so every open document is mirrored into the
+    // client's shared store (and listed in the Debug Inspector).
+    client.registerModels([TaskRecord.self])
     let result = try? await client.documents.getOrCreateWithAlias(
       alias: DocumentAlias(scope: .user, aliasKey: "library"),
       title: "Library"
@@ -460,14 +437,10 @@ final class MyAppState: PrimitiveAppState {
     guard let id = result?.documentId else { return }
     await selectDocumentAwaiting(id)
   }
-
-  override func onDocumentOpened(doc: YDocument, documentId: String) async {
-    tasks = makeTypedModel(doc: doc, documentId: documentId)
-  }
 }
 ```
 
-One `TypedModel` per record type per document. Prefer `makeTypedModel(doc:documentId:)` over direct construction — it also registers the model with the in-app Debug Inspector.
+There is no per-document model binding: reads go through the model's statics (`TaskRecord.query(...)`, cross-document by default — scope to one document with `QueryOptions(documents: [documentId])`), and writes go through record instances (`try TaskRecord(...).save(in: documentId)`). `registerModels([...])` at connect time is optional but recommended — the facade also lazily registers a model on its first read. For per-document setup beyond models, override the `onDocumentOpened(doc:documentId:)` hook.
 
 ## Common Document Usage Patterns
 
@@ -560,11 +533,6 @@ Collections sit between single-document shares and groups: share a *document* wh
 <<< ../../examples/sharing/collection-access.swift#example{swift} [Swift]
 
 :::
-
-```typescript
-const pending = await client.collections.listPendingInvitations(collectionId);
-// [{ email, permission, invitationId, ... }]
-```
 
 ## Finding Documents a User Can Access
 
@@ -686,9 +654,13 @@ Blob storage tolerates flaky connections:
 - **Downloaded files cache** locally, so repeat reads are instant
 - **Prefetch files** proactively to warm the cache:
 
-```typescript
-await blobs.prefetch([blobId1, blobId2], { concurrency: 4 });
-```
+::: code-group
+
+<<< ../../examples/blobs/doc-blob-manage.ts#prefetch{ts} [JavaScript]
+
+<<< ../../examples/blobs/doc-blob-manage.swift#prefetch{swift} [Swift]
+
+:::
 
 Use the **Blob Explorer** in the [dev tools](./devtools.md) overlay to browse, upload, and manage blobs during development.
 
@@ -734,17 +706,15 @@ The full flow — submit a request (`permission` is required), then an owner lis
 
 Owners can also deny, optionally pointing the requester at the document's canonical URL:
 
-```typescript
-await client.documents.denyAccessRequest(documentId, requestId, {
-  documentUrl: "https://myapp.example/docs/sales-handbook",
-});
-```
+::: code-group
 
-The requester gets an email with the outcome either way. To show pending requests in an owner's UI, fetch them when the view opens:
+<<< ../../examples/sharing/request-access.ts#deny{ts} [JavaScript]
 
-```typescript
-const requests = await client.documents.listAccessRequests(documentId);
-```
+<<< ../../examples/sharing/request-access.swift#deny{swift} [Swift]
+
+:::
+
+The requester gets an email with the outcome either way. To show pending requests in an owner's UI, call `listAccessRequests` (shown in the flow above) when the view opens.
 
 Behavior worth knowing: requests expire after 30 days, a requester can't re-submit while a request for the same document is pending, and a resolved request can't be re-resolved.
 

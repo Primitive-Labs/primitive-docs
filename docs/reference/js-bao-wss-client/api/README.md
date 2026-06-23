@@ -21,7 +21,7 @@ A TypeScript/JavaScript client library for js-bao-wss that provides HTTP APIs an
 - **Token Management**: Proactive refresh in HTTP calls
 - **Analytics**: Buffered event logging API with optional automatic lifecycle events
 - **Blob Storage**: Upload/list/get/downloadUrl/delete per document with offline cache
-- **LLM**: Chat API and model listing
+- **LLM**: Chat API and model listing _(deprecated — use managed prompts (`client.prompts.execute`) or workflow LLM steps instead)_
 - **Workflows**: Server-side multi-step processes with LLM, delays, and transformations
 - **Workflow Apply**: Single-client claim/confirm flow for applying workflow results to Yjs documents
 - **Offline-first Open**: Non-blocking open with IndexedDB-backed cache
@@ -1711,6 +1711,8 @@ Use this to refresh invitation lists or badge counts without polling.
 
 ## Large Language Models (LLM)
 
+> **Deprecated.** The direct LLM client API (`client.llm.*`) is deprecated and will be removed in a future major release. Use managed prompts (`client.prompts.execute`) or a workflow `llm.chat` step instead.
+
 ```typescript
 // List available models
 const { models, defaultModel } = await client.llm.models();
@@ -1754,6 +1756,8 @@ console.log(imageReply.content);
 ```
 
 ## Gemini
+
+> **Deprecated.** The direct Gemini client API (`client.gemini.*`) is deprecated and will be removed in a future major release. Use managed prompts (`client.prompts.execute`) or a workflow `gemini.generate` step instead.
 
 ```typescript
 // Text generation with optional structured output
@@ -1957,9 +1961,9 @@ const status = await client.workflows.getStatus({
   runKey,
 });
 
-console.log("Status:", status.status); // "running" | "complete" | "failed" | "terminated"
+console.log("Status:", status.status); // "running" | "completed" | "failed" | "terminated"
 
-if (status.status === "complete") {
+if (status.status === "completed") {
   console.log("Output:", status.output);
 }
 
@@ -2088,7 +2092,7 @@ const oldestFirst = await client.workflows.listRuns({ forward: true });
 // Combine filters
 const combined = await client.workflows.listRuns({
   contextDocId: "doc-123",
-  status: "complete",
+  status: "completed",
   forward: true,
   limit: 20,
 });
@@ -2379,7 +2383,7 @@ async function waitForCompletion(
   while (Date.now() - startTime < timeoutMs) {
     const status = await client.workflows.getStatus({ workflowKey, runKey });
 
-    if (status.status === "complete") {
+    if (status.status === "completed") {
       return status.output;
     }
 

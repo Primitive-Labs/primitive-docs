@@ -60,6 +60,7 @@ Workflow and prompt events also record `duration_ms` and LLM token counts (`inpu
 
 Events are buffered on the device and persisted locally while offline; persisted events are flushed automatically when the WebSocket reconnects. A rate limiter caps emission at **300 events/minute with a 60-token burst** — events over the cap are dropped silently. No special code needed.
 
+The offline buffer is persisted with a **~1 MiB** cap; when it exceeds the cap the **oldest** events are dropped.
 
 ---
 
@@ -134,11 +135,11 @@ Events with no authenticated user are dropped. To log on pre-auth screens (landi
 
 Events are buffered and flushed automatically — including when the WebSocket reconnects — so you rarely need to flush manually. Call `flush` to force a send (e.g. before an explicit teardown).
 
-The queue auto-flushes every **100ms** (or earlier when batched). `client.destroy()` cancels the flush timer and triggers a final flush before storage closes, so you don't need a manual flush on teardown.
-
 ```swift
-client.analytics.flush()
+  client.analytics.flush()
 ```
+
+The queue auto-flushes every **100ms** (or earlier when batched). `client.destroy()` cancels the flush timer and triggers a final flush before storage closes, so you don't need a manual flush on teardown.
 
 ---
 
@@ -301,3 +302,53 @@ These fields are absent (or zero) when the event type doesn't produce them.
 4. **Don't log high-frequency events** — rate limiter caps at 300/min with burst 60. Design around meaningful actions, not continuous telemetry.
 5. **Use the override setters** instead of passing `plan` / `app_version` on every event.
 
+
+---
+
+## Complete Example: Feature Usage Tracking
+
+Configure auto events on the client, set the app-version override once, then log a per-feature action and a pre-auth landing event.
+
+```swift
+  let client = JsBaoClient(options: JsBaoClientOptions(
+    apiUrl: "https://primitiveapi.com",
+    wsUrl: "wss://primitiveapi.com",
+    appId: "YOUR_APP_ID",
+    analyticsAutoEvents: AnalyticsAutoEventsConfig(
+      blobUploadsStart: false,
+      blobUploadsSuccess: true,
+      blobUploadsFailure: true,
+      sessionEnd: true
+    )
+  ))
+
+  // Set version once after init (or after a deploy notification)
+  client.analytics.setAppVersionOverride("2.1.4")
+
+  func trackFeatureUsed(
+    _ userUlid: String,
+    feature: String,
+    action: String,
+    context: JSONValue? = nil
+  ) {
+    client.analytics.logEvent(AnalyticsEventInput(
+      action: action,
+      feature: feature,
+      user_ulid: userUlid,
+      context_json: context
+    ))
+  }
+
+  // Authenticated event
+  trackFeatureUsed(currentUserUlid, feature: "reports", action: "report_generated", context: [
+    "reportType": "quarterly",
+    "format": "pdf",
+  ])
+
+  // Pre-auth event (landing page)
+  client.analytics.logEvent(AnalyticsEventInput(
+    action: "landing_page_view",
+    feature: "onboarding",
+    user_ulid: AnalyticsEventInput.unauthenticatedUser
+  ))
+```

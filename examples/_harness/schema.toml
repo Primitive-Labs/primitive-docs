@@ -111,6 +111,37 @@ indexed = true
 [models.posts.fields.tagIds]
 type = "stringset"
 
+[models.posts.fields.createdAt]
+type = "date"
+indexed = true
+
+# Post refersTo Author (the back-reference traversed by post.author())
+[models.posts.relationships.author]
+type = "refersTo"
+model = "authors"
+related_id_field = "authorId"
+
+[models.authors]
+class_name = "Author"
+
+[models.authors.fields.id]
+type = "id"
+auto_assign = true
+indexed = true
+required = true
+
+[models.authors.fields.name]
+type = "string"
+required = true
+
+# Author hasMany Posts (traversed by author.posts(), newest first)
+[models.authors.relationships.posts]
+type = "hasMany"
+model = "posts"
+related_id_field = "authorId"
+order_by_field = "createdAt"
+order_direction = "DESC"
+
 [models.comments]
 class_name = "Comment"
 

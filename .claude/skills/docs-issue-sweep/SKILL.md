@@ -36,7 +36,7 @@ Read every issue body in full (`gh issue view <n>`) — they are usually precise
 | **Doc-content fix** | The ask is to change `docs/`, guide templates, or the examples corpus | Implement (Step 3). |
 | **Repo-tooling fix** | The ask is to change `scripts/`, gates, or `guides.json` machinery | Implement (Step 3) — same branch/PR discipline; validation still must pass end to end. |
 | **Upstream-blocked** | The ask is conditional on library work ("when js-bao-wss#NNN lands") | Check whether the blocker actually landed (`gh pr view <n> --repo Primitive-Labs/<repo>`, and confirm the change is in the *stamped* submodule SHA — landed on library main but not yet synced means it is still blocked for this pass). Landed → implement; not landed → skip with the blocker noted. |
-| **Moot** | Verification (Step 2) shows the reported problem no longer exists, or the docs already say the right thing | Propose closing with evidence; close only after the user's go-ahead. |
+| **Moot** | Verification (Step 2) shows the reported problem no longer exists, the docs already say the right thing, or the fix already landed via a merged PR that forgot its closing keyword (title said `(#NN)`, body had no `Fixes #NN`) | Propose closing with evidence (cite the merged PR / current doc state); close only after the user's go-ahead. |
 | **Needs user input** | Scope is ambiguous, asks for a judgment call (new page, structural change), or contradicts STYLE.md | Surface the question in the triage report; don't guess. |
 
 **Present the triage report before implementing anything**: a table of issue → class → planned change (specific pages/templates/scripts) or skip reason. Flag issues that touch the same pages — they may want a sequencing note or, with the user's sign-off, a combined PR. Wait for the go-ahead.
@@ -80,12 +80,25 @@ Then run **docs-page-review** on each touched page/guide and **docs-sync-check**
 One PR per issue, into `next`:
 
 ```bash
-gh pr create --base next --title "<imperative summary> (#<NN>)" --body "...
+gh pr create --base next --title "<imperative summary> (#<NN>)" --body "$(cat <<'EOF'
+...
 
-Fixes #<NN>"
+Fixes #<NN>
+EOF
+)"
 ```
 
-The PR body states: what the issue reported, what was verified against source, what changed (pages/templates/corpus), and the validation results. `Fixes #NN` auto-closes the issue on merge — don't close issues manually for implemented fixes.
+The PR body states: what the issue reported, what was verified against source, what changed (pages/templates/corpus), and the validation results.
+
+**The closing keyword is mandatory and goes in the body, not the title.** A bare `(#NN)` reference in the title does **not** close anything — only a `Fixes #NN` / `Closes #NN` / `Resolves #NN` line in the PR *body* auto-closes the issue on merge. Every implemented-fix PR must carry one such line per issue it resolves (e.g. `Fixes #84`, or `Fixes #84, fixes #85` for a combined PR — each issue needs its own keyword; a comma-joined `#84, #85` after one `Fixes` only closes the first). Don't close issues manually for implemented fixes — fix the PR body instead.
+
+**Verify the link before declaring the PR done.** GitHub records closing references only when the keyword is well-formed, so confirm it registered rather than trusting the wording:
+
+```bash
+gh pr view <MM> --json closingIssuesReferences --jq '[.closingIssuesReferences[].number]'   # must list every issue this PR fixes
+```
+
+If the list is missing an issue, the body is malformed — `gh pr edit <MM> --body` to add the `Fixes #NN` line, then re-check. An empty list on an implemented-fix PR means **nothing will close on merge**; that is a defect to fix now, not after.
 
 Final report, covering **every** issue scanned (silence must be a decision, not an oversight):
 

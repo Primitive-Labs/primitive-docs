@@ -1,12 +1,12 @@
 import JsBaoClient
 
 // Read records: by id, by filter, the first match, and a count.
-func readTasks() {
+func readTasks() async throws {
   // #region example
-  // Find one by id
-  let task = Task.find("task-id")
+  // Find one by id (async throws — find/findAll require await)
+  let task = try await Task.find("task-id")
 
-  // Query with filters
+  // Query with filters (synchronous — query/count/queryOne are synchronous)
   let urgent = Task.query(["priority": ["$gte": 2], "completed": false])
 
   // First match (with a sort)

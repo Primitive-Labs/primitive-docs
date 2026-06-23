@@ -1,6 +1,6 @@
 # Access Control
 
-Server API calls in Primitive are gated by access rules written in **[CEL](https://github.com/google/cel-spec)** — a one-line expression evaluated against the authenticated caller. Database operations, real-time subscriptions, workflow invocation, management of groups and collections: one expression language, one identity context. Learn it once and you can read and write the access rules anywhere they appear. (Documents are the exception — they use direct permission grants per user or group, covered in [Sharing Documents](./working-with-documents.md#sharing-documents).)
+Server API calls in Primitive are gated by access rules written in **[CEL](https://github.com/google/cel-spec)** — a one-line expression evaluated against the authenticated caller. Database operations, real-time subscriptions, workflow invocation, management of groups and collections: one expression language, one identity context. Learn it once and you can read and write the access rules anywhere they appear.
 
 ## CEL in Sixty Seconds
 
@@ -24,7 +24,8 @@ Every CEL evaluation sees the authenticated caller:
 |---|---|
 | `user.userId` | The caller's user ID (empty string when unauthenticated) |
 | `user.role` | The caller's app role |
-| `hasRole(role)` | True if the caller's app role is `"owner"`, `"admin"`, or `"member"` as given |
+| `isAnonymous()` | True when the caller has no account at all (an unauthenticated request). Write `!isAnonymous()` to require any signed-in member; relevant where anonymous access is possible, such as a `public` [blob bucket](./blobs-and-files.md#access-presets) |
+| `hasRole(role)` | True if the caller's app role is `"owner"`, `"admin"`, or `"member"` as given (app-level role — distinct from the document `owner` [permission](./working-with-documents.md#sharing-documents)) |
 | `isMemberOf(groupType, groupId)` | True if the caller belongs to that exact group |
 | `memberGroups(groupType)` | The list of group IDs of that type the caller belongs to |
 | `fromWorkflow()` / `fromWorkflow(key)` | True when the call comes from the internal workflow runner (optionally a specific workflow) — gate an operation to server-side automation only |
@@ -41,7 +42,7 @@ Each place a rule appears adds its own context on top — operation `params.*`, 
 | Database subscriptions (`accessRule` + `filter`) | Who can subscribe, and which changes they receive | [Real-Time Subscriptions](./working-with-databases.md#real-time-subscriptions) |
 | Workflows (`accessRule`) | Who can start a run directly from a client | [Controlling Access to Workflows](./workflows.md#controlling-access-to-workflows) |
 | Server-stamped fields (trigger `when` conditions) | Whether a computed field applies to this write | [Server-Stamped Fields](./working-with-databases.md#server-stamped-fields) |
-| Blob buckets (`ruleSetId`) | Member-level reads and writes of a bucket's blobs | [Blobs and Files](./blobs-and-files.md#access-policies) |
+| Blob buckets (`ruleSetId`) | Member-level access to a bucket's blobs, per operation | [Blobs and Files](./blobs-and-files.md#access-presets) |
 | Rule sets | Who can perform **management operations** on groups and collections | below |
 
 ## Rule Sets: Governing Management Operations
@@ -57,7 +58,7 @@ primitive rule-sets create "team-management" \
   }'
 ```
 
-Bind a rule set to a **group type** or **collection type** via its type config — in TOML (`config/group-type-configs/<type>.toml`, `config/collection-type-configs/<type>.toml`) or from the client (`client.groupTypeConfigs.create({ groupType, ruleSetId })`). A **blob bucket** attaches one directly via its `ruleSetId`, where it governs member reads and writes — see [Blobs and Files](./blobs-and-files.md#access-policies).
+Bind a rule set to a **group type** or **collection type** via its type config — in TOML (`config/group-type-configs/<type>.toml`, `config/collection-type-configs/<type>.toml`) or from the client (`client.groupTypeConfigs.create({ groupType, ruleSetId })`). A **blob bucket** attaches one directly via its `ruleSetId`, where it governs member access per operation — see [Blobs and Files](./blobs-and-files.md#access-presets).
 
 Two behaviors to know:
 

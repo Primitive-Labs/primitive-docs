@@ -95,29 +95,30 @@ Create a record by hand:
 
 ### Surfacing your models
 
-Models created with `makeTypedModel(doc:documentId:)` appear in the Records
-table automatically — the base `PrimitiveAppState` conforms to
-`InspectableModelHost`, and its default `inspectableModels` reads the registry
-that `makeTypedModel(...)` populates. The standard path needs no inspector glue.
+Models appear in the Records table automatically — the base `PrimitiveAppState`
+conforms to `InspectableModelHost`, and its default `inspectableModels` reads the
+client's shared cross-document store (one entry per model per open document). A
+model is listed as soon as it's registered (`client.registerModels([...])`) or
+read/written once through its codegen'd facade. The standard path needs no
+inspector glue.
 
-For models that don't go through `makeTypedModel` (a hand-built `BaoModel<T>`,
-a `DynamicModel`), `override` the `open var inspectableModels` and append:
+For a hand-built runtime-schema `DynamicModel` that doesn't go through the
+facade, `override` the `open var inspectableModels` and append:
 
 ```swift
 class MyAppState: PrimitiveAppState {
   override var inspectableModels: [InspectableModel] {
     guard let docId = modelsDocId else { return super.inspectableModels }
-    var out = super.inspectableModels        // keep the auto-registered models
-    if let m = legacyTaskModel { out.append(.from(m, documentId: docId)) }
+    var out = super.inspectableModels        // keep the auto-surfaced models
+    if let m = runtimeTaskModel { out.append(.from(m, documentId: docId)) }
     return out
   }
 }
 ```
 
-`InspectableModel.from(...)` picks the right factory by overload (`TypedModel<T>`,
-`DynamicModel`, or a typed `BaoModel<T>`) and wires `loadAll` / `deleteById` /
-`createWith` so the table, delete buttons, and create form all work with no extra
-code. Field descriptors come from the model's schema.
+`InspectableModel.from(...)` takes the `DynamicModel` and wires `loadAll` /
+`deleteById` / `createWith` so the table, delete buttons, and create form all
+work with no extra code. Field descriptors come from the model's schema.
 
 ## Tests
 

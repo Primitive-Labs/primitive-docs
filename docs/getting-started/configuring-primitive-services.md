@@ -1,6 +1,6 @@
-# Configuring Your Backend
+# Configuring Primitive Services
 
-Everything your app's backend *does* — which sign-in methods are enabled, what workflows exist, which external APIs can be called, what database operations clients may run — is **configuration that lives on the Primitive servers**. Your client code doesn't define backend behavior; it invokes behavior that configuration declares.
+Everything Primitive does for your app — which sign-in methods are enabled, what workflows exist, which external APIs can be called, what database operations clients may run — is **configuration of Primitive's services, stored on the Primitive servers**. Your client code doesn't define that behavior; it invokes what configuration declares.
 
 There are two equivalent ways to manage that configuration:
 
@@ -23,6 +23,8 @@ primitive sync push --dir ./config    # apply your changes to the server
 
 The files live in your repo, so configuration changes ride the same workflow as code: branches, diffs, reviews, rollbacks. `sync push` validates every file before applying anything — a validation error aborts the push with no changes applied — and reports the file and entity behind any failure.
 
+**Preview before you push.** `primitive sync diff` shows which entities would be created, changed, or removed; `primitive sync push --dry-run` walks the full push and reports the same outcome without writing anything. Both run the identical validation a real push runs, so a rejection — an operation whose database type has no schema, an unresolved reference, a schema change that would break an existing operation — surfaces in the preview exactly as it would on push. The preview is faithful: what it reports is what `sync push` will do. And a blocked entity records no sync state, so it stays visible as pending on the next `diff` instead of quietly reading as "in sync."
+
 Every `sync pull` snapshots the sync directory before writing, so a pull that overwrites local edits is recoverable:
 
 ```bash
@@ -42,6 +44,7 @@ config/
   app.toml                        # App settings
   workflows/*.toml                # Workflow definitions
   workflow-fragments/*.toml       # Reusable step blocks
+  transforms/*.rhai               # Rhai scripts for workflow script steps
   prompts/*.toml                  # Managed prompts
   integrations/*.toml             # External API integrations
   database-types/*.toml           # Database operations, triggers, subscriptions
@@ -60,7 +63,7 @@ Credentials never go in these files: config that needs an API key references it 
 
 ## Environments
 
-A project usually targets more than one backend — a development app for day-to-day coding, a production app for your customers. The CLI's named environments bind a server and app together so every command (including `sync`) knows which backend it's talking to, and each environment gets its own isolated sync directory. See [Project Configuration and Environments](./primitive-cli.md#project-configuration-and-environments).
+A project usually targets more than one app — a development app for day-to-day coding, a production app for your customers. The CLI's named environments bind a server and app together so every command (including `sync`) knows which app it's talking to, and each environment gets its own isolated sync directory. See [Project Configuration and Environments](./primitive-cli.md#project-configuration-and-environments).
 
 ## Console or Code?
 

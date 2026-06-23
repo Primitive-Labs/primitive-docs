@@ -8,7 +8,7 @@
 
 ## Methods
 
-### chat()
+### ~~chat()~~
 
 > **chat**(`options`): `Promise`\<\{ `annotations?`: `any`; `content`: `any`; `raw?`: `any`; `role`: `string`; \}\>
 
@@ -28,9 +28,15 @@ Configuration for the chat request
 
 The assistant message with `role`, `content`, optional `annotations`, and `raw` provider response
 
+#### Deprecated
+
+The direct LLM client API is deprecated and will be removed in a
+future major release. Use [client.prompts.execute](PromptsAPI.md#execute)
+(managed prompts) or a workflow `llm.chat` step instead.
+
 ***
 
-### models()
+### ~~models()~~
 
 > **models**(): `Promise`\<\{ `defaultModel`: `string`; `models`: `string`[]; \}\>
 
@@ -41,3 +47,9 @@ Lists available LLM models and returns the default model name.
 `Promise`\<\{ `defaultModel`: `string`; `models`: `string`[]; \}\>
 
 Object with `models` array and `defaultModel` name
+
+#### Deprecated
+
+The direct LLM client API is deprecated and will be removed in a
+future major release. Use [client.prompts.execute](PromptsAPI.md#execute)
+(managed prompts) or a workflow `llm.chat` step instead.

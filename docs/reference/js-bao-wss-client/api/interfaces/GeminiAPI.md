@@ -8,7 +8,7 @@
 
 ## Methods
 
-### countTokens()
+### ~~countTokens()~~
 
 > **countTokens**(`options`): `Promise`\<\{ `candidates?`: `number`; `promptTokens?`: `number`; `raw?`: `unknown`; `totalTokens`: `number`; \}\>
 
@@ -28,9 +28,15 @@ The prompt to measure (same shape as generate, but no response is produced)
 
 Object with `totalTokens` count and optional `promptTokens`, `candidates`, and `raw` response
 
+#### Deprecated
+
+The direct Gemini client API is deprecated and will be removed in
+a future major release. Use [client.prompts.execute](PromptsAPI.md#execute)
+(managed prompts) or a workflow `gemini.generate` step instead.
+
 ***
 
-### generate()
+### ~~generate()~~
 
 > **generate**(`options`): `Promise`\<[`GeminiGenerateResult`](GeminiGenerateResult.md)\>
 
@@ -48,9 +54,15 @@ Configuration for the generation request
 
 `Promise`\<[`GeminiGenerateResult`](GeminiGenerateResult.md)\>
 
+#### Deprecated
+
+The direct Gemini client API is deprecated and will be removed in
+a future major release. Use [client.prompts.execute](PromptsAPI.md#execute)
+(managed prompts) or a workflow `gemini.generate` step instead.
+
 ***
 
-### generateRaw()
+### ~~generateRaw()~~
 
 > **generateRaw**(`options`): `Promise`\<`any`\>
 
@@ -68,9 +80,15 @@ Raw request configuration
 
 `Promise`\<`any`\>
 
+#### Deprecated
+
+The direct Gemini client API is deprecated and will be removed in
+a future major release. Use [client.prompts.execute](PromptsAPI.md#execute)
+(managed prompts) or a workflow `gemini.generate` step instead.
+
 ***
 
-### models()
+### ~~models()~~
 
 > **models**(): `Promise`\<\{ `defaultModel`: `string`; `models`: `string`[]; \}\>
 
@@ -81,3 +99,9 @@ Lists available Gemini models and returns the default model name.
 `Promise`\<\{ `defaultModel`: `string`; `models`: `string`[]; \}\>
 
 Object with `models` array and `defaultModel` name
+
+#### Deprecated
+
+The direct Gemini client API is deprecated and will be removed in
+a future major release. Use [client.prompts.execute](PromptsAPI.md#execute)
+(managed prompts) or a workflow `gemini.generate` step instead.

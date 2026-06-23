@@ -853,71 +853,76 @@ primitive databases cel-context get <database-id>
 
 Direct record operations require owner or manager permission. For most apps, use registered operations instead.
 
-Connect to a database to get a `DoDb` handle:
+`connect()` returns a `DoDb` handle. Save (upsert), patch (partial update), find a single record, delete, and count all run against it. A `save` is an upsert; pass `ifNotExists` for insert-only, `condition` for a conditional write, and `stringSets` to seed StringSet fields:
 
 ```typescript
-const db = client.databases.connect(databaseId);
-```
+  const db = client.databases.connect(databaseId);
 
-The handle supports string-based or model-class-based access:
+  // Save (upsert).
+  await db.save("tasks", { id: "task-1", title: "Ship v1" });
 
-```typescript
-// String-based
-await db.save("tasks", { id: "task-1", title: "Ship v1" });
+  // Insert only — fails if the record already exists.
+  await db.save("tasks", { id: "task-3", title: "Draft" }, { ifNotExists: true });
 
-// Model-class-based (with js-bao models)
-import { Task } from "./models";
-await db.save(Task, { id: "task-1", title: "Ship v1" });
-```
+  // Conditional write — only proceeds if the existing record matches.
+  await db.save("tasks", { id: "task-3", title: "Draft" }, { condition: { completed: false } });
 
-### Save (upsert)
+  // Seed StringSet fields on the write.
+  await db.save("tasks", { id: "task-4", title: "Tagged" }, { stringSets: { tags: ["featured", "sale"] } });
 
-```typescript
-await db.save("products", { id: "prod-1", name: "Widget", price: 9.99 });
+  // Patch (partial update) — only the provided fields change.
+  await db.patch("tasks", "task-1", { priority: 5 });
+  await db.patch("tasks", "task-1", { priority: 7 }, { condition: { completed: false } });
 
-// Insert only — fails if record exists
-await db.save("products", data, { ifNotExists: true });
+  // Find a single record by id (or null).
+  const task = await db.find("tasks", "task-1");
 
-// Conditional write
-await db.save("products", data, { condition: { status: "draft" } });
+  // Delete — true if a record existed.
+  const deleted = await db.delete("tasks", "task-2");
 
-// With StringSet fields
-await db.save("products", data, { stringSets: { tags: ["featured", "sale"] } });
-```
-
-### Patch (partial update)
-
-```typescript
-await db.patch("products", "prod-1", { price: 7.99 });
-
-// Conditional patch
-await db.patch("products", "prod-1", { price: 7.99 }, { condition: { status: "draft" } });
-```
-
-### Find
-
-```typescript
-const product = await db.find("products", "prod-1"); // or null
-```
-
-### Delete
-
-```typescript
-const deleted = await db.delete("products", "prod-1"); // true if existed
-```
-
-### Count
-
-```typescript
-const total = await db.count("products");
-const saleCount = await db.count("products", { onSale: true });
+  // Count, optionally filtered.
+  const total = await db.count("tasks");
+  const open = await db.count("tasks", { completed: false });
 ```
 
 ### Query
 
+The handle queries with the full filter operator grammar, sort + cursor pagination, projection, and related-data `include`:
+
 ```typescript
-const result = await db.query("tasks", filter, options);
-// result: { data: T[], hasMore: boolean, nextCursor?: string, prevCursor?: string }
+  // Filter operators: exact match, comparisons, set membership, text, $or/$and.
+  const result = await db.query("tasks", {
+    completed: false,
+    priority: { $gte: 5 },
+    category: { $in: ["work", "urgent"] },
+    title: { $startsWith: "Ship" },
+    tags: { $contains: "featured" },
+    $or: [{ category: "work" }, { priority: { $gte: 8 } }],
+  });
+
+  // Multiple fields on the same object are ANDed; use explicit $and to put
+  // two conditions on one field.
+  const priced = await db.query("tasks", {
+    $and: [{ priority: { $gte: 1 } }, { priority: { $lte: 5 } }],
+  });
+
+  // Sort, limit, and cursor pagination.
+  const page1 = await db.query("tasks", {}, { sort: { priority: -1 }, limit: 20 });
+  const page2 = page1.hasMore
+    ? await db.query("tasks", {}, {
+        sort: { priority: -1 },
+        limit: 20,
+        uniqueStartKey: page1.nextCursor,
+      })
+    : undefined;
+
+  // Projection — return only the named fields.
+  const titles = await db.query("tasks", {}, { projection: { title: 1, completed: 1 } });
+
+  // Include related records — they land under _related on each parent.
+  const withCategory = await db.query("tasks", {}, {
+    include: [{ model: "categories", type: "refersTo", sourceField: "category", as: "categoryInfo" }],
+  });
 ```
 
 ### Filter operators
@@ -945,114 +950,62 @@ const result = await db.query("tasks", filter, options);
 
 `$startsWith`, `$endsWith`, and `$containsText` are mutually exclusive on the same field — only one substring operator per field per query.
 
-Multiple filters on different fields are implicitly combined with AND:
+Multiple filters on different fields are implicitly combined with AND. Use an explicit `$and` only when you need two conditions on the *same* field (e.g. a range), and combine `$or` with other top-level fields freely.
 
-```typescript
-// These two are equivalent:
-{ status: "active", priority: { $gte: 5 } }
-{ $and: [{ status: "active" }, { priority: { $gte: 5 } }] }
-
-// Use explicit $and when you need multiple conditions on the same field:
-{ $and: [{ price: { $gte: 10 } }, { price: { $lte: 50 } }] }
-
-// Combine $or with other filters:
-{ category: "electronics", $or: [{ onSale: true }, { price: { $lt: 20 } }] }
-```
-
-### Sort, limit, pagination
-
-```typescript
-const page1 = await db.query("tasks", {}, {
-  sort: { createdAt: -1 },
-  limit: 20,
-});
-
-if (page1.hasMore) {
-  const page2 = await db.query("tasks", {}, {
-    sort: { createdAt: -1 },
-    limit: 20,
-    uniqueStartKey: page1.nextCursor,
-  });
-}
-```
-
-### Projection
-
-```typescript
-const result = await db.query("tasks", {}, {
-  projection: { title: 1, status: 1 },
-});
-```
-
-### Includes (related data)
-
-```typescript
-const result = await db.query("orders", {}, {
-  include: [{
-    model: "customers",
-    type: "refersTo",
-    sourceField: "customerId",
-    as: "customer",
-  }],
-});
-// result.data[0]._related.customer = { id, name, ... }
-```
-
-Include types: `refersTo` (FK to one record), `hasMany` (target FK to this record), `refersToMany` (StringSet to multiple records).
+Include types: `refersTo` (FK to one record), `hasMany` (target FK to this record), `refersToMany` (StringSet to multiple records). The loaded records land under `_related` on each parent (e.g. `result.data[0]._related.customer`).
 
 ## Atomic Operations
 
-### Increment
+Increment/decrement numeric fields (returns the post-increment values) and add/remove StringSet members atomically — no read-modify-write round trip:
 
 ```typescript
-const newValues = await db.increment("products", "prod-1", {
-  viewCount: 1,
-  stock: -1,
-});
-// { viewCount: 43, stock: 11 }
-```
+  // Increment/decrement numeric fields; returns the post-increment values.
+  const newValues = await db.increment("tasks", "task-1", {
+    priority: 1,
+    estimatedHours: -2,
+  });
 
-### StringSet add/remove
-
-```typescript
-await db.addToSet("products", "prod-1", { tags: ["featured"] });
-await db.removeFromSet("products", "prod-1", { tags: ["sale"] });
+  // Atomically add/remove StringSet members.
+  await db.addToSet("tasks", "task-1", { tags: ["featured"] });
+  await db.removeFromSet("tasks", "task-1", { tags: ["sale"] });
 ```
 
 ## Batch Writes (direct)
 
-`db.batch` executes multiple writes atomically at the storage layer. Returns one `BatchOperationResult` per input op (`{success, id, error?, values?}` — `values` for increment ops); a per-item failure does NOT throw, so check `.success` on each result.
+`db.batch` executes multiple writes atomically at the storage layer. It returns one `BatchOperationResult` per input op (`{success, id, error?, values?}` — `values` for increment ops); a per-item failure does NOT throw, so check `.success` on each result.
 
 ```typescript
-const results = await db.batch([
-  { op: "save",      modelName: "tasks", id: "t-1", data: { title: "A" } },
-  { op: "patch",     modelName: "tasks", id: "t-2", data: { done: true } },
-  { op: "delete",    modelName: "tasks", id: "t-3" },
-  { op: "increment", modelName: "tasks", id: "t-4", fields: { priority: 1 } },
-  { op: "addToSet",  modelName: "tasks", id: "t-5", stringSets: { tags: ["urgent"] } },
-]);
+  const results = await db.batch([
+    { op: "save", modelName: "tasks", id: "t-1", data: { title: "A" } },
+    { op: "patch", modelName: "tasks", id: "t-2", data: { completed: true } },
+    { op: "delete", modelName: "tasks", id: "t-3" },
+    { op: "increment", modelName: "tasks", id: "t-4", fields: { priority: 1 } },
+    { op: "addToSet", modelName: "tasks", id: "t-5", stringSets: { tags: ["urgent"] } },
+  ]);
 
-for (const r of results) {
-  if (!r.success) console.warn("op failed:", r.id, r.error);
-}
+  for (const r of results) {
+    if (!r.success) console.warn("op failed:", r.id, r.error);
+  }
 ```
 
 ### Aggregation (direct)
 
+Group by one or more fields and compute `count`/`sum`/`avg`/`min`/`max`, with an optional filter, sort, and limit:
+
 ```typescript
-const result = await db.aggregate("orders", {
-  groupBy: ["status"],
-  operations: [
-    { type: "count" },
-    { type: "sum", field: "total" },
-    { type: "avg", field: "total" },
-    { type: "min", field: "total" },
-    { type: "max", field: "total" },
-  ],
-  filter: { createdAt: { $gte: "2025-01-01" } },
-  sort: { field: "count", direction: -1 },
-  limit: 10,
-});
+  const result = await db.aggregate("tasks", {
+    groupBy: ["category"],
+    operations: [
+      { type: "count" },
+      { type: "sum", field: "estimatedHours" },
+      { type: "avg", field: "estimatedHours" },
+      { type: "min", field: "priority" },
+      { type: "max", field: "priority" },
+    ],
+    filter: { completed: false },
+    sort: { field: "count", direction: -1 },
+    limit: 10,
+  });
 ```
 
 ## Client-Side Models (Direct Record Access Only)
@@ -1130,35 +1083,26 @@ Database field types: `id` (primary key, use `auto_assign = true` for ULIDs), `s
 
 ### Indexes
 
-Add `indexed: true` to fields you filter or sort on. Sync indexes after connecting:
+Add an index to every field you filter or sort on; without one the engine scans all records of that model. Register them manually, declare composite unique constraints, list and drop them, or sync a model's declared index state at once:
 
 ```typescript
-const db = client.databases.connect(databaseId);
-await db.syncIndexes(Task);
-```
+  // Register indexes (additive — never drops).
+  await db.registerIndex("tasks", "category", "string");
+  await db.registerIndex("tasks", "priority", "number");
+  await db.registerIndex("appUsers", "email", "string", true); // unique
 
-Or register indexes manually:
+  // Composite unique constraint across multiple fields.
+  await db.registerUniqueConstraint("categories", "name_parentId", ["name", "parentId"]);
 
-```typescript
-await db.registerIndex("tasks", "status", "string");
-await db.registerIndex("tasks", "priority", "number");
+  // List and drop.
+  const indexes = await db.listIndexes("tasks");
+  await db.dropIndex("tasks", "category");
 
-// Unique index
-await db.registerIndex("users", "email", "string", true);
+  const constraints = await db.listUniqueConstraints("categories");
+  await db.dropUniqueConstraint("categories", "name_parentId");
 
-// Composite unique constraint
-await db.registerUniqueConstraint("tasks", "unique_title_per_project", ["projectId", "title"]);
-
-// List and drop indexes
-const indexes = await db.listIndexes("tasks"); // or listIndexes() for all models
-await db.dropIndex("tasks", "status");
-
-// List and drop unique constraints
-const constraints = await db.listUniqueConstraints("tasks");
-await db.dropUniqueConstraint("tasks", "unique_title_per_project");
-
-// Sync indexes for all models passed in the models array at init
-await db.syncAllIndexes();
+  // Sync every model passed in the models array at init.
+  await db.syncAllIndexes();
 ```
 
 ## Permissions
@@ -1451,25 +1395,20 @@ On WS reconnect the local connection id rotates, so a frame for the writer's own
 ### Canonical Pattern: Load + Subscribe
 
 ```typescript
-async function liveTickets(databaseId: string) {
   // 1. Initial load — full current state.
   const { data: tickets } = await client.databases.executeOperation(
     databaseId,
     "list-my-open-tickets",
   );
-  const byId = new Map(tickets.map(t => [t.id, t]));
+  const byId = new Map<string, unknown>(tickets.map((t: { id: string }) => [t.id, t]));
   render(Array.from(byId.values()));
 
   // 2. Subscribe for delta updates.
   const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
     onChange: (event) => {
       for (const change of event.changes) {
-        if (change.op === "delete") {
-          byId.delete(change.id);
-        } else {
-          // save / patch / increment / addToSet / removeFromSet
-          byId.set(change.id, change.data);
-        }
+        if (change.op === "delete") byId.delete(change.id);
+        else byId.set(change.id, change.data); // save / patch / increment / addToSet / removeFromSet
       }
       render(Array.from(byId.values()));
     },
@@ -1477,7 +1416,6 @@ async function liveTickets(databaseId: string) {
 
   // 3. Return teardown — call this on unmount.
   return unsub;
-}
 ```
 
 Make the initial-load operation's filter and the subscription's `filter` semantically equivalent. If they diverge, the UI will flicker (records the operation returned but the subscription never updates, or vice versa).
@@ -1523,15 +1461,14 @@ For driving subscriptions from a scheduled write (a cron-triggered workflow muta
 
 Databases are schemaless — the system tracks fields and inferred types as records are written.
 
-List the models (collections) in a database via the raw records endpoint `GET /app/<appId>/api/databases/<databaseId>/records/models` (returns `{ models: ["contacts", "orders", "products"] }`).
+List the models (collections) in a database via the raw records endpoint `GET /app/<appId>/api/databases/<databaseId>/records/models` (returns `{ models: ["contacts", "orders", "products"] }`):
 
 ```typescript
-const response = await fetch(
-  `${apiUrl}/app/${appId}/api/databases/${databaseId}/records/models`,
-  { headers: { Authorization: `Bearer ${token}` } }
-);
-const { models } = await response.json();
-// ["contacts", "orders", "products"]
+  const { models } = await client.makeRequest(
+    "GET",
+    `/databases/${databaseId}/records/models`,
+  );
+  // models: ["contacts", "orders", "products"]
 ```
 
 Describe a model's observed fields:

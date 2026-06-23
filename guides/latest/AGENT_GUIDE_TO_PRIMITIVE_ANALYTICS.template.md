@@ -88,9 +88,7 @@ Every event (auto or custom) gets these populated automatically:
 
 Events are buffered on the device and persisted locally while offline; persisted events are flushed automatically when the WebSocket reconnects. A rate limiter caps emission at **300 events/minute with a 60-token burst** — events over the cap are dropped silently. No special code needed.
 
-{{#lang ts}}
-The offline buffer is persisted to IndexedDB with a **1 MiB** cap; when it exceeds the cap the **oldest** events are dropped.
-{{/lang}}
+The offline buffer is persisted with a **~1 MiB** cap; when it exceeds the cap the **oldest** events are dropped.
 
 ---
 
@@ -192,12 +190,10 @@ Events with no authenticated user are dropped. To log on pre-auth screens (landi
 
 Events are buffered and flushed automatically — including when the WebSocket reconnects — so you rarely need to flush manually. Call `flush` to force a send (e.g. before an explicit teardown).
 
+{{ example: analytics/manual-flush }}
+
 {{#lang ts}}
 The queue auto-flushes every **100ms** or when the buffer reaches **25 KiB**, and the client also flushes on `beforeunload`, on tab visibility hidden, and on reconnect.
-
-```typescript
-client.analytics.flush();
-```
 
 Pre-existing browser hooks (added by the client itself):
 - `beforeunload` → fires `session_end`, then flushes
@@ -209,10 +205,6 @@ So **don't** add your own `beforeunload → flush` listener — it's redundant a
 {{/lang}}
 {{#lang swift}}
 The queue auto-flushes every **100ms** (or earlier when batched). `client.destroy()` cancels the flush timer and triggers a final flush before storage closes, so you don't need a manual flush on teardown.
-
-```swift
-client.analytics.flush()
-```
 {{/lang}}
 
 ---
@@ -365,55 +357,12 @@ These fields are absent (or zero) when the event type doesn't produce them.
 
 {{#lang ts}}
 6. **Don't add your own `beforeunload` flush** — the client already does this.
+{{/lang}}
 
 ---
 
 ## Complete Example: Feature Usage Tracking
 
-```typescript
-import { JsBaoClient, ANALYTICS_UNAUTHENTICATED_USER } from "js-bao-wss-client";
+Configure auto events on the client, set the app-version override once, then log a per-feature action and a pre-auth landing event.
 
-const client = new JsBaoClient({
-  appId: "app-123",
-  apiUrl: "https://api.example.com",
-  wsUrl: "wss://ws.example.com",
-  analyticsAutoEvents: {
-    sessionEnd: true,
-    blobUploads: { start: false, success: true, failure: true },
-    llm: { start: false, success: true, failure: true },
-  },
-});
-
-// Set version once after init (or after deploy notification)
-client.analytics.setAppVersionOverride("2.1.4");
-
-function trackFeatureUsed(
-  userUlid: string,
-  feature: string,
-  action: string,
-  context?: Record<string, unknown>
-) {
-  client.analytics.logEvent({
-    action,
-    feature,
-    user_ulid: userUlid,
-    context_json: context,
-  });
-}
-
-// Authenticated event
-trackFeatureUsed(currentUserUlid, "reports", "report_generated", {
-  reportType: "quarterly",
-  format: "pdf",
-});
-
-// Pre-auth event (landing page)
-client.analytics.logEvent({
-  action: "landing_page_view",
-  feature: "onboarding",
-  user_ulid: ANALYTICS_UNAUTHENTICATED_USER,
-});
-
-// No need for a beforeunload flush — the client adds one automatically.
-```
-{{/lang}}
+{{ example: analytics/feature-usage-tracking }}

@@ -223,6 +223,20 @@ Every example below is compiled against the real client as part of the docs buil
   await user.save({ upsertOn: "email" });
 ```
 
+### Upsert by named unique constraint
+
+```typescript
+  // "name_parentId" is the named constraint declared in the schema
+  // ([[models.categories.unique_constraints]] name = "name_parentId",
+  //  fields = ["name", "parentId"]).
+  const category = await Category.upsertByUnique(
+    "name_parentId", // the constraint NAME — not the field list
+    ["Work", "root"], // lookup values, in the constraint's field order
+    { name: "Work", parentId: "root", color: "blue" },
+    { targetDocument: documentId }, // required if a new record is created
+  );
+```
+
 ### Logical query operators
 
 ```typescript
@@ -265,7 +279,21 @@ Every example below is compiled against the real client as part of the docs buil
     sort: { field: "count", direction: -1 },
     limit: 10,
   });
+
+  // Grouping by a stringset field counts per member value (facet):
+  const tagCounts = await Task.aggregate({
+    groupBy: ["tags"],
+    operations: [{ type: "count" }],
+  });
+
+  // Group by whether the set contains a value (membership):
+  const urgentSplit = await Task.aggregate({
+    groupBy: [{ field: "tags", contains: "urgent" }],
+    operations: [{ type: "count" }],
+  });
 ```
+
+Grouping by a `stringset` field counts per member value (facet); a membership `groupBy` entry groups by whether the set contains one specific value. Only one stringset facet field is allowed per aggregation, and a facet can't be mixed with other `groupBy` entries — unsupported mixes degrade (the facet is dropped or the result is empty) rather than throw.
 
 ### Subscribe to changes
 
@@ -362,14 +390,14 @@ List with `me.ownedDocuments()` and `open()` the selected document; create a new
 All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `me.ownedDocuments({ tag })` (and `me.sharedDocuments({ tag })` if the user can also be a non-owner), open each, and track per-document readiness yourself. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over local tracking.
 
 ```typescript
-// Open every document with a given tag
-const channels = await jsBaoClient.me.ownedDocuments({ tag: "channel" });
-await Promise.all(
-  channels.map((ch) => jsBaoClient.documents.open(ch.documentId))
-);
+  // Open every document with a given tag
+  const channels = await client.me.ownedDocuments({ tag: "channel" });
+  await Promise.all(
+    channels.map((ch) => client.documents.open(ch.documentId))
+  );
 
-// Query runs across all open documents by default
-const messages = await Message.query({});
+  // Query runs across all open documents by default
+  const messages = await Message.query({});
 ```
 
 The template does not ship a built-in "multi-document" Pinia store. A minimal store for "all documents tagged `channel`":
@@ -461,14 +489,14 @@ Use tags to categorize documents by type. Pass `tags` to `create()`, filter the 
 You can also create a tagged document and filter locally:
 
 ```typescript
-const { metadata } = await jsBaoClient.documents.create({
-  title: "My List",
-  tags: ["todolist"],
-});
+  const { metadata } = await client.documents.create({
+    title: "My List",
+    tags: ["todolist"],
+  });
 
-// Filter locally
-const owned = await jsBaoClient.me.ownedDocuments();
-const todoListsLocal = owned.filter((doc) => doc.tags?.includes("todolist"));
+  // Filter locally
+  const owned = await client.me.ownedDocuments();
+  const todoLists = owned.filter((doc) => doc.tags?.includes("todolist"));
 ```
 
 ## Defining Models
@@ -550,7 +578,7 @@ default = false
 
 ### Defining Relationships in models.toml
 
-Declare relationships in `models.toml` using `[models.X.relationships.Y]` sections. Codegen emits typed traversal methods on the generated interfaces.
+Declare relationships in `models.toml` using `[models.X.relationships.Y]` sections. Codegen emits typed traversal methods on the generated model types.
 
 ```toml
 # Author hasMany Posts
@@ -568,7 +596,7 @@ model = "authors"
 related_id_field = "authorId"
 ```
 
-After running `npx js-bao-codegen-v2`, the generated interfaces include typed traversal methods:
+After running codegen, the generated model types include typed traversal methods:
 
 ```typescript
 // Author.generated.ts
@@ -585,10 +613,15 @@ export interface Post extends PostAttrs, BaseModel {
 Use these at runtime:
 
 ```typescript
-const author = await Author.queryOne({ id: authorId });
-const posts = await author.posts(); // PaginatedResult<Post>
-const firstPost = posts.data[0];
-const backRef = await firstPost.author(); // Author | null
+  const author = await Author.find(authorId);
+  if (!author) return;
+
+  // hasMany: author.posts() returns a PaginatedResult — rows are on `.data`
+  const posts = await author.posts();
+  const firstPost = posts.data[0];
+
+  // refersTo: post.author() returns the parent record (or null)
+  const backRef = await firstPost.author();
 ```
 
 Relationship traversal uses the same engine as `Model.query(...)` with `include` specs — see [Loading Related Data](#loading-related-data-includes) for the lower-level query-level include syntax.
@@ -631,15 +664,17 @@ unique_constraints = [["name", "parentId"]]
 ### Working with StringSets
 
 ```typescript
-// Add/remove tags
-task.tags.add("urgent");
-task.tags.remove("low-priority");
+  // Add/remove tags
+  task.tags?.add("urgent");
+  task.tags?.remove("low-priority");
 
-// Check membership
-if (task.tags.has("urgent")) { ... }
+  // Check membership
+  if (task.tags?.has("urgent")) {
+    // ...
+  }
 
-// Convert to array for display
-const tagList = task.tags.toArray();
+  // Convert to array for display
+  const tagList = task.tags?.toArray() ?? [];
 ```
 
 ### Working with Dates
@@ -647,19 +682,19 @@ const tagList = task.tags.toArray();
 Dates are stored as ISO-8601 strings. Convert for comparisons:
 
 ```typescript
-// Store
-task.dueDate = new Date().toISOString();
+  // Store
+  task.dueDate = new Date().toISOString();
 
-// Compare
-const due = new Date(task.dueDate);
-if (due < new Date()) {
-  console.log("Overdue!");
-}
+  // Compare
+  const due = new Date(task.dueDate);
+  if (due < new Date()) {
+    // overdue
+  }
 
-// Query with date comparison
-const result = await Task.query({
-  dueDate: { $lt: new Date().toISOString() },
-});
+  // Query with date comparison
+  const overdue = await Task.query({
+    dueDate: { $lt: new Date().toISOString() },
+  });
 ```
 
 ## Querying Data
@@ -714,7 +749,7 @@ items.map(...);  // TypeError: items.map is not a function
 const result = await Task.query({
   completed: false,
   priority: { $gte: 3 },
-  tags: { $in: ["work", "urgent"] },
+  category: { $in: ["work", "urgent"] },
 });
 ```
 
@@ -830,7 +865,9 @@ Only one stringset facet field is allowed per aggregation. To check membership o
 
 ### useJsBaoDataLoader Pattern
 
-`useJsBaoDataLoader` is the Vue composable for centralized component data loading, provided by the primitive library. **It is component-only**: it registers its model subscriptions and document-event listeners inside `onMounted`, which fires only for mounted Vue components. Calling it from a Pinia store's `setup()`, a router guard, or any other non-component context will load data once but **never react to subsequent changes** — the `onMounted` callback never runs there, so no subscriptions are registered. For those contexts, subscribe directly (see [Subscribing Outside a Component](#subscribing-outside-a-component) below).
+The data a component renders is a plain `Model.query` (see [Read](#read-find--query--first--count) for the compiled call) that you re-run whenever the underlying records change. `useJsBaoDataLoader` is the **web template's** Vue composable that wires that re-run for you — it is framework glue around the same query, not a different API.
+
+**It is component-only**: it registers its model subscriptions and document-event listeners inside `onMounted`, which fires only for mounted Vue components. Calling it from a Pinia store's `setup()`, a router guard, or any other non-component context will load data once but **never react to subsequent changes** — the `onMounted` callback never runs there, so no subscriptions are registered. For those contexts, subscribe directly (see [Subscribing Outside a Component](#subscribing-outside-a-component) below).
 
 It handles four key concerns:
 
@@ -850,22 +887,24 @@ It handles four key concerns:
 - Push filtering logic into js-bao `.query()` calls rather than fetching everything and filtering in JavaScript
 - Always pass `documentReady` - typically a ref that becomes true after your document opening logic completes
 
+Under the hood it wraps the same compiled client calls documented above — `Model.subscribe` ([Subscribe to changes](#subscribe-to-changes)) to react to changes and `Model.query` to load — so this section is just the Vue-composable binding around them:
+
 ```typescript
-const {
-  data: todos,
-  initialDataLoaded,
-  reload,
-} = useJsBaoDataLoader<{ items: TodoItem[]; total: number }>({
-  subscribeTo: [TodoItem],
-  queryParams: computed(() => ({ listId: props.listId, showCompleted })),
-  documentReady,
-  async loadData(queryParams) {
-    const { listId, showCompleted } = queryParams ?? {};
-    const query = showCompleted ? { listId } : { listId, completed: false };
-    const result = await TodoItem.query(query, { sort: { order: 1 } });
-    return { items: result.data, total: result.data.length };
-  },
-});
+  const {
+    data: todos,
+    initialDataLoaded,
+    reload,
+  } = useJsBaoDataLoader<{ items: TodoItem[]; total: number }>({
+    subscribeTo: [TodoItem],
+    queryParams: computed(() => ({ listId: props.listId, showCompleted })),
+    documentReady,
+    async loadData(queryParams) {
+      const { listId, showCompleted } = queryParams ?? {};
+      const query = showCompleted ? { listId } : { listId, completed: false };
+      const result = await TodoItem.query(query, { sort: { order: 1 } });
+      return { items: result.data, total: result.data.length };
+    },
+  });
 ```
 
 **Rules:**
@@ -883,7 +922,7 @@ const {
 
 `useJsBaoDataLoader` is the right tool inside a component. Outside one — a **Pinia store**, a singleton service, a router guard — do not reach for it: its `onMounted`-based subscriptions never register there, so reactive updates silently never fire.
 
-`Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle (see [Subscribe to changes](#subscribe-to-changes) above for the compiled call). It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). Wire it up directly in the store's `setup()` and keep the unsubscribe handle so you can tear it down:
+`Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle (see [Subscribe to changes](#subscribe-to-changes) above for the compiled call). It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). The neutral pattern is just `subscribe` + re-`query`; everything below is **web-template glue** (Pinia) showing where to hang that wiring:
 
 ```typescript
 // stores/tasksStore.ts
@@ -1012,28 +1051,9 @@ Delete a record after finding it — see [Delete](#delete) above for the compile
 
 ### Upsert by Unique Constraint
 
-`upsertByUnique(constraintName, lookupValue(s), data, options?)` — finds an existing record by a named constraint and updates it, or creates one if none exists. The `data` object MUST include the same constraint field values as `lookupValue` (mismatch throws). When creating a new record, `targetDocument` is REQUIRED.
+`upsertByUnique(constraintName, lookupValue(s), data, options?)` finds an existing record by a named constraint and updates it, or creates one if none exists — see [Upsert by named unique constraint](#upsert-by-named-unique-constraint) above for the compiled call. The `data` object MUST include the same constraint field values as `lookupValue` (mismatch throws), and `targetDocument` is REQUIRED whenever a new record may be created. A single-field constraint takes a scalar lookup value instead of an array.
 
-```typescript
-// Composite-key example — uses the constraint name declared in models.toml above.
-await Category.upsertByUnique(
-  "name_parent_unique",                    // constraint name
-  ["Work", null],                          // values in field order
-  { name: "Work", parentId: null, color: "blue" },
-  { targetDocument: documentId }           // required if a new record is created
-);
-
-// Single-field example — value can be a scalar instead of an array.
-// Auto-generated constraint name uses the schema `name`, not the class name.
-await User.upsertByUnique(
-  "users_email_unique",                    // <schemaName>_<fieldName>_unique
-  "alice@example.com",
-  { email: "alice@example.com", name: "Alice" },
-  { targetDocument: documentId }
-);
-```
-
-Single-field constraints declared via `unique = true` in TOML get an auto-generated name of `<modelName>_<fieldName>_unique` (where `modelName` is the `[models.<name>]` block key). Use `[[models.X.unique_constraints]]` (model level — not under `options`) to control the name explicitly.
+Single-field constraints declared via `unique = true` in TOML get an auto-generated name of `<modelName>_<fieldName>_unique` (where `modelName` is the `[models.<name>]` block key, not the class name). Use `[[models.X.unique_constraints]]` (model level — not under `options`) to control the name explicitly.
 
 For single-field upserts where the value already lives on the instance, `save({ upsertOn })` is simpler than `upsertByUnique` — see [Upsert by natural key](#upsert-by-natural-key) above for the compiled call.
 
@@ -1044,11 +1064,11 @@ For single-field upserts where the value already lives on the instance, `save({ 
 await Category.upsertByUnique(["name", "parentId"], ...); // throws: constraint not found
 
 // DON'T: omit targetDocument when creating
-await Category.upsertByUnique("name_parent_unique", ["Work", null], { name: "Work", parentId: null });
+await Category.upsertByUnique("name_parentId", ["Work", "root"], { name: "Work", parentId: "root" });
 // throws: targetDocument is required when creating new records
 
 // DON'T: data values that don't match lookupValue
-await Category.upsertByUnique("name_parent_unique", ["Work", null], { name: "Home", parentId: null }, { targetDocument });
+await Category.upsertByUnique("name_parentId", ["Work", "root"], { name: "Home", parentId: "root" }, { targetDocument });
 // throws: Mismatch between dataToUpsert.'name' and uniqueLookupValue
 ```
 
@@ -1358,14 +1378,14 @@ Repeated email-based calls are idempotent: a second `updatePermissions(documentI
 **There is no `permission: null` to remove.** Removal is a separate call (`removePermission` by userId or by email; `transferOwnership` to hand a document to a new owner):
 
 ```typescript
-// Remove a current member by userId:
-await client.documents.removePermission(documentId, "user-abc");
-await client.documents.removePermission(documentId, { userId: "user-abc" });
+  // Remove a current member by userId:
+  await client.documents.removePermission(documentId, "user-abc");
+  await client.documents.removePermission(documentId, { userId: "user-abc" });
 
-// Cancel a pending email-based invite, OR remove a current member matched by email:
-await client.documents.removePermission(documentId, { email: "alice@example.com" });
+  // Cancel a pending email-based invite, OR remove a current member matched by email:
+  await client.documents.removePermission(documentId, { email: "alice@example.com" });
 
-await client.documents.transferOwnership(documentId, newOwnerId);
+  await client.documents.transferOwnership(documentId, newOwnerId);
 ```
 
 **Don't do this** (silent no-op for someone with a higher group permission, and there is no `null` form):
@@ -1414,15 +1434,15 @@ Lowering a user's direct permission while they still have a higher one via a gro
 The method is **`grantGroupPermission`** (no `setGroupPermission`). Member changes inside the group propagate automatically — no per-membership permission calls.
 
 ```typescript
-await client.documents.grantGroupPermission(documentId, {
-  groupType: "team",
-  groupId: "engineering",
-  permission: "read-write",       // owner | read-write | reader
-});
+  await client.documents.grantGroupPermission(documentId, {
+    groupType: "team",
+    groupId: "engineering",
+    permission: "read-write", // owner | read-write | reader
+  });
 
-// Listing / revoking
-await client.documents.listGroupPermissions(documentId);
-await client.documents.revokeGroupPermission(documentId, "team", "engineering");
+  // Listing / revoking
+  await client.documents.listGroupPermissions(documentId);
+  await client.documents.revokeGroupPermission(documentId, "team", "engineering");
 ```
 
 #### Looking up users
@@ -1580,6 +1600,9 @@ A collection's members + pending invites in one call:
 
 ```typescript
   const access = await client.collections.getAccess(collectionId);
+
+  // Or fetch just the pending (not-yet-signed-up) invitations:
+  const pending = await client.collections.listPendingInvitations(collectionId);
 ```
 
 Additional collection calls:

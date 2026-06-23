@@ -68,6 +68,15 @@ function extractRegion(file, region) {
 // id -> { base: Map<language, {file, code}>, overrides: Map<variantId, {file, code}> }
 const corpus = new Map();
 let overrideCount = 0;
+// Ids exempt from cross-language parity: a corpus file may carry a `// no-parity`
+// marker to declare it intentionally single-language — for framework glue that
+// only exists in one language (a Vue/Pinia store has no Swift twin; a
+// PrimitiveApp/SwiftUI view has no TS twin). Such a file is referenced from a
+// `{{#lang}}`-scoped section so it never renders into the other language's
+// build. (Almost always paired with `// nocompile`, which opts out of the
+// compile gate — see compile-examples.mjs.) Whenever both languages DO exist,
+// drop the marker so parity is enforced normally.
+const noParityIds = new Set();
 for (const file of walk(EXAMPLES_DIR)) {
   let parsed;
   try {
@@ -81,6 +90,7 @@ for (const file of walk(EXAMPLES_DIR)) {
   if (code === null) {
     problems.push(`✘ ${relative(ROOT, file)}: missing/unbalanced '#region ${REGION}'`);
   }
+  if (readFileSync(file, "utf-8").includes("// no-parity")) noParityIds.add(parsed.id);
   if (!corpus.has(parsed.id)) corpus.set(parsed.id, { base: new Map(), overrides: new Map() });
   const entry = corpus.get(parsed.id);
   if (parsed.platform === null) entry.base.set(parsed.language, { file, code });
@@ -88,6 +98,7 @@ for (const file of walk(EXAMPLES_DIR)) {
 }
 
 for (const [id, entry] of [...corpus].sort()) {
+  if (noParityIds.has(id)) continue; // intentionally single-language framework glue
   const missing = BASE_LANGUAGES.filter((l) => !entry.base.has(l));
   if (missing.length) problems.push(`✘ ${id}: missing language(s): ${missing.join(", ")}`);
 }
