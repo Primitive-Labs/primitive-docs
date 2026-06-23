@@ -609,6 +609,49 @@ type = "boolean"
 default = false
 ```
 
+### Defining Relationships in models.toml
+
+Declare relationships in `models.toml` using `[models.X.relationships.Y]` sections. Codegen emits typed traversal methods on the generated model types.
+
+```toml
+# Author hasMany Posts
+[models.authors.relationships.posts]
+type = "hasMany"
+model = "posts"
+related_id_field = "authorId"
+order_by_field = "createdAt"
+order_direction = "DESC"
+
+# Post refersTo Author
+[models.posts.relationships.author]
+type = "refersTo"
+model = "authors"
+related_id_field = "authorId"
+```
+
+After running codegen, the generated model types include typed traversal methods:
+
+```swift
+// Author.generated.swift — hasMany resolves a plain array, ordered per the TOML
+public func posts() async throws -> [Post]
+
+// Post.generated.swift — refersTo resolves the parent record (or nil)
+public func author() async throws -> Author?
+```
+
+Use these at runtime:
+
+```swift
+  guard let author = try await Author.find(authorId) else { return }
+
+  // hasMany: author.posts() returns a plain array, ordered per the relationship
+  let posts = try await author.posts()
+  guard let firstPost = posts.first else { return }
+
+  // refersTo: post.author() returns the parent record (or nil)
+  let backRef = try await firstPost.author()
+```
+
 
 ### Unique Constraints
 
@@ -729,7 +772,7 @@ struct TodoListView: View {
 }
 ```
 
-`.onModel(subscribe: TodoItem.subscribe)` fires on **any** add/update/delete recorded in that model's shared store — local writes and remote writes both — so `reloadNow()` after a write is unneeded; call it only when the `load` closure reads something the loader can't subscribe to (a REST resource). Other triggers (`LoaderTrigger`): `.onSync`, `.onRemoteUpdate`, `.onDocumentEvents`, `.onConnect`, `.onModelChange(_:)` for a hand-built runtime-schema `DynamicModel`, and `.custom((client, reload) -> EventSubscription?)`.
+`.onModel(subscribe: TodoItem.subscribe)` fires on **any** add/update/delete recorded in that model's shared store — local writes and remote writes both — so `reloadNow()` after a write is unneeded; call it only when the `load` closure reads something the loader can't subscribe to (a REST resource). Other triggers (`LoaderTrigger`): `.onSync`, `.onDocumentSyncStateChanged`, `.onDocumentEvents`, `.onConnect`, `.onModelChange(_:)` for a hand-built runtime-schema `DynamicModel`, and `.custom((client, reload) -> EventSubscription?)`.
 
 `loader.phase` is a trinary: `.loading` (first load not complete), `.empty` (first load complete, data conforms to `LoaderEmptiness` and is empty), `.loaded(Data)`. `[T]`, `String`, and `Optional` get `LoaderEmptiness` out of the box.
 
