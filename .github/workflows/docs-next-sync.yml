@@ -206,9 +206,12 @@ jobs:
             echo "${NOTES:-(none)}"
           } >> /tmp/prompt.txt
 
+          # Opus, not Sonnet: this pass does careful source-verification and
+          # drafts new doc/guide prose — capability matters more than the small
+          # per-run cost of a once-nightly job.
           set +e
           timeout 50m claude -p "$(cat /tmp/prompt.txt)" \
-            --model sonnet \
+            --model opus \
             --permission-mode bypassPermissions \
             --output-format json \
             > /tmp/claude_out.json 2> /tmp/claude_err.log
