@@ -33,6 +33,9 @@ In the starter template this wiring is owned for you by `PrimitiveAppState.initi
 {{ example: auth/get-auth-config }}
 
 `hasOAuth` is true when Google OAuth is enabled (the flag defaults to enabled when both `googleClientId` and the server-side `googleClientSecret` are configured). `magicLinkEnabled` and `otpEnabled` default to `true` unless explicitly disabled in the Admin Console.
+{{#lang swift}}
+`hasApple` reports Sign in with Apple availability (`appleSignInEnabled` plus configured Apple audiences); gate the native `signInWithApple` button on it.
+{{/lang}}
 {{#lang ts}}
 `hasPasskey` requires `passkeyEnabled` plus a non-empty `passkeyRpConfig` map.
 
@@ -52,25 +55,25 @@ In the starter template this wiring is owned for you by `PrimitiveAppState.initi
 
 ## Server App Settings ↔ Client Contract
 
-Server-side app settings must align with the origin the client app is served from. Inspect with `primitive apps get`; the relevant fields:
+Server-side app settings must align with the origin the client app is served from. These settings live in `config/app.toml` and sync with `primitive sync push` — **edit the TOML and push as the default path** so the server stays in lockstep with what's checked in. The `primitive apps update --flag` calls below are a quick imperative escape hatch; a flag change mutates the server but leaves `app.toml` stale, so the next `primitive sync push` silently reverts it unless you mirror the change back into the TOML. Inspect the live values with `primitive apps get`; the relevant fields:
 
 | Server field | Contract | Set via |
 |---|---|---|
-| `corsAllowedOrigins` | Must contain the exact serving origin (scheme+host+port). `corsMode` defaults to `custom` — an empty list blocks every cross-origin request. | `primitive apps update --cors-origins "<o1>,<o2>"` |
-| `redirectUris` | OAuth callbacks are validated against this whitelist — a non-listed callback URL returns 400 `Invalid redirect URI`. | Admin Console only (no CLI flag) |
-| `baseUrl` | Used for links in auth emails / redirects. | `primitive apps update --base-url <url>` |
+| `corsAllowedOrigins` | Must contain the exact serving origin (scheme+host+port). `corsMode` defaults to `custom` — an empty list blocks every cross-origin request. | `[cors]` (`mode`, `allowedOrigins`, `allowCredentials`) in `app.toml` → `sync push`; `--cors-origins "<o1>,<o2>"` for a one-off |
+| `redirectUris` | OAuth callbacks are validated against this whitelist — a non-listed callback URL returns 400 `Invalid redirect URI`. | Not in `app.toml` — `primitive apps update --redirect-uris "<uri1>,<uri2>"` (non-localhost must be https) or the Admin Console |
+| `baseUrl` | Used for links in auth emails / redirects. | `[app].baseUrl` in `app.toml` → `sync push`; `--base-url <url>` for a one-off |
 {{#lang ts}}
-| Provider toggles | `--google-oauth`/`--magic-link`/`--otp`/`--passkey <bool>` — what `getAuthConfig()` reports. | `primitive apps update` |
+| Provider toggles | What `getAuthConfig()` reports. | `[auth]` in `app.toml` (`googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled` + `[auth.passkeys]`) → `sync push`. `otp` has no TOML key — set it with `--otp <bool>` only. |
 {{/lang}}
 {{#lang swift}}
-| Provider toggles | `--google-oauth`/`--magic-link`/`--otp <bool>` — what `getAuthConfig()` reports. | `primitive apps update` |
+| Provider toggles | What `getAuthConfig()` reports. | `[auth]` in `app.toml` (`googleOAuthEnabled`, `magicLinkEnabled`) → `sync push`. `otp` has no TOML key — set it with `--otp <bool>` only. |
 {{/lang}}
 
 {{#lang ts}}
 **CORS misconfiguration blocks bootstrap.** When the serving origin is missing from `corsAllowedOrigins`, the browser blocks the client's bootstrap refresh (`POST …/api/auth/refresh` → 403, no `access-control-allow-origin`): `initializeClient` throws `initializeClient refresh failed (network)` before `getAuthConfig()` is reached, and the template app's login surfaces the error. Fix by adding the serving origin (`primitive apps update --cors-origins`; inspect with `primitive apps get`). Common triggers: serving on a non-default port, or a newly deployed domain.
 {{/lang}}
 
-Dev → prod checklist: add the production origin to `corsAllowedOrigins`, add the production OAuth callback to `redirectUris` (Admin Console), update `baseUrl`, and re-check `getAuthConfig()` reports the expected methods.
+Dev → prod checklist: add the production origin to `[cors].allowedOrigins` and set `[app].baseUrl` in `app.toml`, `primitive sync push`, add the production OAuth callback to `redirectUris` (`primitive apps update --redirect-uris` or Admin Console — not in `app.toml`), and re-check `getAuthConfig()` reports the expected methods.
 
 ---
 
@@ -96,6 +99,18 @@ await client.startOAuthFlow(continueUrl, {
 {{/lang}}
 {{#lang swift}}
 `startOAuthFlow(redirectUri:continueUrl:)` takes an explicit `redirectUri` and **returns** the authorization URL to open yourself (e.g. via `ASWebAuthenticationSession`). It throws `OAuth not configured` if OAuth is unavailable.
+
+It also accepts an optional `waitlist: OAuthWaitlist` (`source` / `note`, enrolls the user via the callback) and `inviteToken: String` (accepts the named invitation when the callback resolves):
+
+```swift
+let authUrl = try await client.startOAuthFlow(
+  redirectUri: redirectUri,
+  waitlist: OAuthWaitlist(source: "landing-page", note: "interested in beta"),
+  inviteToken: tokenFromEmail
+)
+```
+
+Both are threaded through `signInWithGoogle(...)` as well.
 {{/lang}}
 
 ### Handle the callback (instance method — preferred)
@@ -130,6 +145,22 @@ let token = try await client.handleOAuthCallback(code: code, state: state)
 ```
 {{/lang}}
 
+{{#lang swift}}
+### Native one-call sign-in (Google / Apple)
+
+`startOAuthFlow` + `handleOAuthCallback` are the raw building blocks. For the native experience use the one-call helpers — each presents the system auth sheet, runs the redirect + code exchange, applies the session token (cause `"google"` / `"apple"`, emitting `.authSuccess` / `.authState`), and re-authenticates the WebSocket. Both return the signed-in `userId` and the server's `isNewUser` flag:
+
+```swift
+let google = try await client.signInWithGoogle()   // GoogleSignInResult(userId, isNewUser)
+let apple = try await client.signInWithApple()      // AppleSignInResult(userId, isNewUser)
+```
+
+- `signInWithGoogle(presentationAnchor:redirectUri:)` — when `redirectUri` is nil it derives the URI from the bundled `GoogleService-Info.plist`; it throws if neither is available. Throws `OAuthSignInError.cancelled` when the user dismisses the sheet.
+- `signInWithApple(presentationAnchor:)` — uses the app's "Sign in with Apple" entitlement and the server's configured Apple audiences. Throws `AppleSignInError.cancelled` on dismissal, `.notConfigured` when the server has no Apple audiences.
+
+Gate the buttons on the auth config: `hasOAuth` for Google, `hasApple` for Apple (`AuthConfigInfo` also carries `appleSignInEnabled`). The starter template's `PrimitiveAuthManager` wraps both helpers and renders only the providers `availableProviders` reports.
+{{/lang}}
+
 ---
 
 ## Magic Link
@@ -142,7 +173,7 @@ let token = try await client.handleOAuthCallback(code: code, state: state)
 `magicLinkRequest` accepts an optional `redirectUri` (defaulting to the client's `oauthRedirectUri`) and throws `Error("Redirect URI not configured")` if neither is set.
 {{/lang}}
 {{#lang swift}}
-`auth.magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument. `auth.magicLinkVerify(token:)` returns a `MagicLinkVerifyResult` (`.user`, `.promptAddPasskey?`, `.isNewUser?`).
+`auth.magicLinkRequest(email:redirectUri:)` takes the `redirectUri` as a required argument. `auth.magicLinkVerify(token:inviteToken:)` returns a `MagicLinkVerifyResult` (`.user`, `.promptAddPasskey?`, `.isNewUser?`).
 {{/lang}}
 
 ### Reading the token (callback page)
@@ -153,13 +184,11 @@ The callback delivers the token as a `magic_token` value — **not** `token`, `m
 
 {{#lang ts}}
 The callback URL may also carry `?purpose=login-add-passkey`. The server appends this when the link was sent for an existing user the platform thinks should add a passkey (e.g. they signed in via OTP/magic-link but have no passkey on file). The `magicLinkVerify` call itself is unchanged — apps that read `purpose` from the URL can use it as a hint to route the user to passkey registration after sign-in instead of straight to the home screen.
+{{/lang}}
 
 To accept an invitation server-side at verify time (so the deferred grant resolves to the signing-in user even when emails differ), pass `inviteToken`:
 
-```typescript
-await client.magicLinkVerify(magicToken, { inviteToken: inviteTokenFromUrl });
-```
-{{/lang}}
+{{ example: auth/magic-link-invite }}
 
 ---
 
@@ -171,7 +200,7 @@ await client.magicLinkVerify(magicToken, { inviteToken: inviteTokenFromUrl });
 `otpVerify` also accepts an `{ inviteToken }` option to accept an invitation at verify time.
 {{/lang}}
 {{#lang swift}}
-`auth.otpVerify(email:code:)` returns an `OtpVerifyResult` (`.user`, `.isNewUser?`).
+`auth.otpVerify(email:code:)` returns an `OtpVerifyResult` (`.user`, `.isNewUser?`). To accept an invitation at verify time, pass the `inviteToken` parameter: `auth.otpVerify(email:code:inviteToken:)`.
 {{/lang}}
 
 ### Error handling
@@ -351,27 +380,12 @@ let doc = try await client.openDocument(id)  // before try await client.waitForA
 
 ## JWT Persistence
 
-Optional — persists the JWT so a relaunch doesn't require re-authentication.
+Optional — opt in through the client's `auth` options so a relaunch reuses the short-lived token while it's still within the refresh window, instead of forcing a fresh sign-in. `getAuthPersistenceInfo()` reports whether persistence is on.
+
+{{ example: auth/jwt-persistence }}
 
 {{#lang ts}}
-Opt in at `initializeClient` and the token is written to browser storage:
-
-```typescript
-import { initializeClient } from "js-bao-wss-client";
-
-const client = await initializeClient({
-  apiUrl, wsUrl, appId, oauthRedirectUri,
-  auth: {
-    persistJwtInStorage: true,
-    storageKeyPrefix: "my-app", // namespace; required for multi-tenant on same origin
-  },
-});
-
-const info = client.getAuthPersistenceInfo();
-// { mode: "memory" | "persisted", hydrated: boolean }
-```
-
-Persisted tokens within ~2 min of expiry are not reused. Tokens are cleared on logout and on `auth-failed`.
+The token is written to browser storage; `storageKeyPrefix` namespaces it (required for multiple clients on the same origin). `getAuthPersistenceInfo()` returns `{ mode: "memory" | "persisted", hydrated }` — `hydrated` is whether a cached token was restored this session. Persisted tokens within ~2 min of expiry are not reused; tokens are cleared on logout and on `auth-failed`.
 
 ---
 
@@ -393,7 +407,7 @@ const client = await initializeClient({
 `baseUrl` must be a same-origin worker that forwards `/auth/*` and `/oauth/callback` to `/app/:appId/api/auth/*`. When configured, `magicLinkVerify`, `otpVerify`, `handleOAuthCallback`, `logout`, and the OAuth-code static helper all route through the proxy.
 {{/lang}}
 {{#lang swift}}
-The client persists the token to the Keychain across app launches. `waitForAuthBootstrap()` restores any persisted session, so an authenticated user stays signed in on relaunch. Tokens within ~2 min of expiry are not reused, and are cleared on logout and on `authFailed`.
+The token is stored in the Keychain; `storageKeyPrefix` namespaces it. `waitForAuthBootstrap()` restores any persisted session, so an authenticated user stays signed in on relaunch. `getAuthPersistenceInfo()` returns `["mode": "persisted" | "memory", "prefix": <storageKeyPrefix>]`. Tokens within ~2 min of expiry are not reused, and are cleared on logout and on `authFailed`.
 {{/lang}}
 
 ---
@@ -418,17 +432,17 @@ await client.logout({
 Logout fires `auth:logout` immediately and `auth:logout:complete` when finished.
 {{/lang}}
 {{#lang swift}}
-`auth.logout(options:)` takes a `LogoutOptions` — `wipeLocal` (delete locally cached document data + KV cache), `revokeOffline` (also revoke any stored offline grant), `clearOfflineIdentity` (defaults `true`).
+`auth.logout(options:)` takes a `LogoutOptions` — `wipeLocal` (delete locally cached document data + KV cache), `revokeOffline` (also revoke any stored offline grant), `clearOfflineIdentity` (defaults `true`), `waitForDisconnect` (await WebSocket teardown before returning; defaults `false`). Logout fires `auth:logout` immediately and `auth:logout:complete` when finished — the same event names as JS.
 {{/lang}}
 
 ---
 
 ## Auth State in Apps
 
-Gate the app's main layout on auth state so child views can assume an authenticated user, and react to auth loss centrally. The starter template implements this gate; if you're not using it, replicate it.
+The neutral signal is the client's own auth state: `client.isAuthenticated()` is the live boolean, and `client.waitForAuthReady()` gates work until auth (and offline DBs) are ready — see [Token Inspection & Manual Token](#token-inspection--manual-token) for the compiled calls. Gate the app's main layout on that signal so child views can assume an authenticated user, and react to auth loss centrally. The patterns below are **framework wiring** around that flag — the starter template implements them; if you're not using it, replicate them.
 
 {{#lang ts}}
-The template ([primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template)) provides a `userStore` (Pinia) and `AppLayout`.
+The template ([primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template)) provides a `userStore` (Pinia) and `AppLayout` that mirror `client.isAuthenticated()` into a reactive `userStore.isAuthenticated`.
 
 ### Two key flags (template store)
 
@@ -436,6 +450,8 @@ The template ([primitive-app-template](https://github.com/Primitive-Labs/primiti
 - **`isAuthenticated`** — live reactive. Can flip in either direction at any time (token expiry, server invalidation, login).
 
 ### Layout gate (recommended default)
+
+Web-template glue (Vue) gating `<router-view>` on the auth flag:
 
 ```vue
 <template v-if="!userStore.isAuthenticated">
@@ -450,6 +466,8 @@ Components inside the gate **don't** need to null-check `currentUser` or watch `
 
 ### Reactive watchers (downstream stores)
 
+Web-template glue (Vue) reacting to auth-state transitions — initialize on sign-in, reset on sign-out:
+
 ```typescript
 watch(
   () => userStore.isAuthenticated,
@@ -462,11 +480,11 @@ watch(
 ```
 {{/lang}}
 {{#lang swift}}
-The template ([swift-primitive-app-dev](https://github.com/Primitive-Labs/swift-primitive-app-dev)) provides `PrimitiveAppState` + `PrimitiveAuthManager` (`@Published isAuthenticated`/`userId`/`loginState`) and `AuthGateView`.
+The template ([swift-primitive-app-dev](https://github.com/Primitive-Labs/swift-primitive-app-dev)) provides `PrimitiveAppState` + `PrimitiveAuthManager` (`@Published isAuthenticated`/`userId`/`loginState`) and `AuthGateView` — SwiftUI glue that mirrors `client.isAuthenticated()` into observable state.
 
 ### Layout gate (recommended default)
 
-`AuthGateView(appState:appName:authManager:) { content }` is the layout gate — it walks initializing → login (`PrimitiveLoginView`) → connecting → connected and only renders `content` when connected, so views inside never null-check the user:
+SwiftUI glue (PrimitiveApp package) — `AuthGateView(appState:appName:authManager:) { content }` is the layout gate; it walks initializing → login (`PrimitiveLoginView`) → connecting → connected and only renders `content` when connected, so views inside never null-check the user:
 
 ```swift
 AuthGateView(appState: appState, appName: "MyApp", authManager: authManager) {
@@ -476,7 +494,7 @@ AuthGateView(appState: appState, appName: "MyApp", authManager: authManager) {
 
 ### Reactive observers (downstream state)
 
-Subscribe to `authManager.$isAuthenticated` (Combine) to initialize or reset downstream state on transitions:
+SwiftUI/Combine glue reacting to auth-state transitions — subscribe to `authManager.$isAuthenticated` to initialize or reset downstream state:
 
 ```swift
 authManager.$isAuthenticated
@@ -515,9 +533,9 @@ See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-gra
 {{#lang ts}}
 ## Invite Token Persistence Across Auth Round-Trips (Template Pattern)
 
-When an invitation link carries an `inviteToken` query parameter and the recipient is not signed in, the token must survive the auth redirect so the server can resolve deferred grants atomically at verification time.
+The neutral contract is small: pass the `inviteToken` to the auth call that completes sign-in (`client.otpVerify(...)`, `magicLinkVerify`, or the OAuth flow) so the server resolves deferred grants atomically at verification time. The only hard part is that when the recipient isn't signed in, the token must **survive the auth redirect** — and that round-trip is web-template glue.
 
-The template implements this in `src/lib/inviteToken.ts`:
+The template implements the round-trip in `src/lib/inviteToken.ts` (sessionStorage); the one Primitive call below is `client.otpVerify(email, code, { inviteToken })`:
 
 ```typescript
 import {

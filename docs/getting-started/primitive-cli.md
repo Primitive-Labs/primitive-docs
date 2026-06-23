@@ -207,14 +207,28 @@ primitive users admin-invitations delete <invitation-id>
 
 ### OAuth Configuration
 
-Configure OAuth providers for your app (client credentials are entered in the [Admin Console](https://admin.primitiveapi.com/login) under the app's Google OAuth settings):
+Configure OAuth providers for your app (client credentials are entered in the [Admin Console](https://admin.primitiveapi.com/login) under the app's Google OAuth settings). The provider toggle and CORS origins are app settings synced from `app.toml`, so the drift-free path is to edit the TOML and push:
+
+```toml
+# config/app.toml
+[auth]
+googleOAuthEnabled = true
+
+[cors]
+mode = "custom"
+allowedOrigins = ["http://localhost:5173", "https://myapp.com"]
+```
 
 ```bash
-# Enable Google OAuth as a sign-in method
-primitive apps update --google-oauth true
+primitive sync push
+```
 
-# Set allowed origins (for CORS; comma-separated list)
-primitive apps update --cors-origins "http://localhost:5173,https://myapp.com"
+The equivalent `primitive apps update --google-oauth true` / `--cors-origins "…"` flags set the same values imperatively for a quick one-off — but they mutate the server without touching `app.toml`, so the next `sync push` reverts them unless you mirror the change back. See [Configuration Sync](#configuration-sync) for which app settings are TOML-syncable.
+
+OAuth **redirect URIs** are not TOML-syncable — set the callback whitelist with the flag (non-localhost entries must be https; pass `''` to clear) or in the Admin Console:
+
+```bash
+primitive apps update --redirect-uris "https://myapp.com/auth/callback,http://localhost:5173/auth/callback"
 ```
 
 ### Accessing Guides
@@ -270,20 +284,34 @@ primitive sync pull --dir ./config
 primitive sync push --dir ./config
 ```
 
-This creates a directory structure like:
-
-```
-.primitive/sync/<env>/<appId>/
-  app.toml                    # App settings
-  integrations/*.toml         # Integration configs
-  prompts/*.toml              # Prompt configs
-  workflows/*.toml            # Workflow definitions
-  workflow-fragments/*.toml   # Reusable [[steps]] blocks for workflows
-  database-types/*.toml       # Database type configs + operations
-  email-templates/*.toml      # Email template overrides
-```
+This creates one subdirectory per kind of configuration, rooted at the auto-resolved `.primitive/sync/<env>/<appId>/` (or the `--dir` path you pass). See [Configuring Primitive Services](./configuring-primitive-services.md#what-lives-in-the-config-directory) for the full directory layout.
 
 `workflow-fragments/<name>.toml` lets several workflows share a common run of `[[steps]]`. Reference them from a workflow file with `include = ["<name>"]`; the CLI expands fragments client-side before push (the server only stores the canonical flattened step list). Use `primitive workflows expand <workflow.toml>` to inspect the expanded result.
+
+`app.toml` holds the app-level settings, and pushing it is the preferred way to change them — the imperative `primitive apps update --flag` calls mutate the server directly and drift from the checked-in TOML, so a later `sync push` reverts them. The TOML-syncable settings are:
+
+- `[app]` — `name`, `mode`, `waitlistEnabled`, `baseUrl`
+- `[auth]` — `googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled`, and `[auth.passkeys]` relying-party config
+- `[cors]` (when `mode = "custom"`) — `allowedOrigins`, `allowCredentials`, `allowedMethods`, `maxAge`
+
+Two app settings are not part of `app.toml`: **OTP** is toggled with `primitive apps update --otp <bool>` only, and **redirect URIs** are set with `primitive apps update --redirect-uris "<uri1>,<uri2>"` or in the [Admin Console](https://admin.primitiveapi.com/login) (no TOML key). For everything else, edit `app.toml` and `primitive sync push`.
+
+### Previewing a push
+
+Two commands preview a push without touching the server:
+
+```bash
+primitive sync diff             # entities that would be created, changed, or removed
+primitive sync push --dry-run   # the full push, reported but not applied
+```
+
+Both run the **same** validate-first gate a real `sync push` runs — file validation followed by the server-side checks — so the preview is faithful: what it reports is what the push will do. Schema-validation rejections in particular surface identically, before any change is applied:
+
+- an operation whose database type has no schema set,
+- a `$params.X` or other reference that doesn't resolve,
+- a schema change that would break an existing registered operation.
+
+A previewed (or genuinely blocked) entity records no sync state, so it stays visible as pending on the next `sync diff` rather than being marked "in sync" — a rejected change can't quietly disappear from the diff. Pipe `primitive sync diff --json | jq` for machine-readable output.
 
 ### When `sync push` fails
 

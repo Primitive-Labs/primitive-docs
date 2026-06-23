@@ -93,7 +93,7 @@ const result = await TodoItem.query({});         // throws DocumentClosedError o
 {{/lang}}
 
 {{#lang swift}}
-The document-open lifecycle is owned by `PrimitiveAppState` (see [The `PrimitiveAppState` document lifecycle](#the-primitiveappstate-document-lifecycle) below). Subclass it, drive doc setup from `connectClient()`, and bind `TypedModel`s in `onDocumentOpened(doc:documentId:)`. For session-scoped documents (small bounded set), open once at launch; for transient per-item docs, open on view appear and close on disappear.
+The document-open lifecycle is owned by `PrimitiveAppState` (see [The `PrimitiveAppState` document lifecycle](#the-primitiveappstate-document-lifecycle) below). Subclass it and drive doc setup from `connectClient()`; reads and writes go through the codegen'd model facade (`TaskRecord.query(...)`, `record.save(in:)`), so there is no per-document binding step. For session-scoped documents (small bounded set), open once at launch; for transient per-item docs, open on view appear and close on disappear. Stray opens widen query scope — facade queries span every open document by default.
 {{/lang}}
 
 ### 2. Finding documents a user can access
@@ -145,7 +145,7 @@ const collections = await jsBaoClient.collections.list();
 Every example below is compiled against the real client as part of the docs build. The [Querying Data](#querying-data) and [Saving Data](#saving-data) sections below go deeper on projections, includes, and save options.
 
 {{#lang swift}}
-The generated model statics route through the process-wide default client — call `JsBaoClient.configureDefault(client)` once at startup, before the first read or write. Reads are synchronous against the local CRDT and span every open document by default (scope with `QueryOptions(documents: [docId])`); writes target one document — `save(in:)` inserts or updates in place and throws (it validates the write and requires the document to be open), `delete(in:)` throws only if the document isn't open.
+The generated model statics route through the process-wide default client — call `JsBaoClient.configureDefault(client)` once at startup, before the first read or write. `query`, `queryOne`, `count`, and `aggregate` are synchronous against the local CRDT; `find` and `findAll` are `async throws` (use `try await`). All reads span every open document by default (scope with `QueryOptions(documents: [docId])`); writes target one document — `save(in:)` inserts or updates in place and throws (it validates the write and requires the document to be open), `delete(in:)` throws only if the document isn't open.
 {{/lang}}
 
 ### Create
@@ -168,6 +168,10 @@ The generated model statics route through the process-wide default client — ca
 
 {{ example: documents/model-upsert }}
 
+### Upsert by named unique constraint
+
+{{ example: documents/upsert-by-unique }}
+
 ### Logical query operators
 
 {{ example: documents/query-logical }}
@@ -179,6 +183,8 @@ The generated model statics route through the process-wide default client — ca
 ### Aggregation
 
 {{ example: documents/aggregate }}
+
+Grouping by a `stringset` field counts per member value (facet); a membership `groupBy` entry groups by whether the set contains one specific value. Only one stringset facet field is allowed per aggregation, and a facet can't be mixed with other `groupBy` entries — unsupported mixes degrade (the facet is dropped or the result is empty) rather than throw.
 
 ### Subscribe to changes
 
@@ -234,18 +240,9 @@ List with `me.ownedDocuments()` and `open()` the selected document; create a new
 
 All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `me.ownedDocuments({ tag })` (and `me.sharedDocuments({ tag })` if the user can also be a non-owner), open each, and track per-document readiness yourself. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over local tracking.
 
+{{ example: documents/open-tagged-docs }}
+
 {{#lang ts}}
-```typescript
-// Open every document with a given tag
-const channels = await jsBaoClient.me.ownedDocuments({ tag: "channel" });
-await Promise.all(
-  channels.map((ch) => jsBaoClient.documents.open(ch.documentId))
-);
-
-// Query runs across all open documents by default
-const messages = await Message.query({});
-```
-
 The template does not ship a built-in "multi-document" Pinia store. A minimal store for "all documents tagged `channel`":
 
 ```typescript
@@ -304,73 +301,23 @@ The same pattern adapts to "the K most recent" or "channels the user belongs to"
 {{/lang}}
 
 {{#lang swift}}
-The most common multi-doc shape is one ambient library/index document plus N per-item documents (each shareable independently); see [Index doc + per-item docs](#index-doc--per-item-docs-keying-tombstones-reconcile) below for keying, tombstones, and the reconcile pass. Open auxiliary docs with `appState.openAuxiliaryDoc(_:modelType:)` and close them with `appState.closeAuxiliaryDoc(_:)`.
+The most common multi-doc shape is one ambient library/index document plus N per-item documents (each shareable independently); see [Index doc + per-item docs](#index-doc--per-item-docs-keying-tombstones-reconcile) below for keying, tombstones, and the reconcile pass. Open auxiliary docs with `appState.openAuxiliaryDoc(_:)` and close them with `appState.closeAuxiliaryDoc(_:)`.
 
 ### The `PrimitiveAppState` document lifecycle
 
-The document-open lifecycle is owned by `PrimitiveAppState`. Subclass it for app-specific state, override `connectClient()` to drive doc setup after connect, and override `onDocumentOpened(doc:documentId:)` to bind `TypedModel`s — the base class opens the doc once and hands you the live `YDocument`, so don't call `openDocument(...)` again just to get one.
+The neutral lifecycle is: resolve-or-create the doc (`client.documents.getOrCreateWithAlias` — see [Resolve-or-create a singleton document](#resolve-or-create-a-singleton-document)), open it, then read through the codegen'd facade scoped to it (see [Read](#read-find--query--first--count)). Models need no per-document binding — the facade statics read from every open document, backed by the process-wide default client (`JsBaoClient.configureDefault`).
 
-```swift
-@MainActor
-final class MyAppState: PrimitiveAppState {
-    @Published private(set) var todos: TypedModel<TodoItem>?
+`PrimitiveAppState` is the **SwiftUI app-state glue** (PrimitiveApp package) that owns that lifecycle: subclass it for app-specific state and override `connectClient()` to drive doc setup after connect (`configureDefault` is wired for you during `initialize()`). The subclass below is framework glue; the Primitive call in it is the `getOrCreateWithAlias` resolve-or-create:
 
-    // connectClient is `open` — call super first (it connects and fetches
-    // /me + the document list), then run app-specific setup. Don't reach
-    // for a Combine sink on `$isConnected`; this override is the path.
-    override func connectClient() async {
-        await super.connectClient()
-        await openLibraryDoc()
-    }
+{{ example: documents/app-state-lifecycle }}
 
-    private func openLibraryDoc() async {
-        guard let client else { return }
-        do {
-            // Atomic resolve-or-create. Don't split into aliases.resolve +
-            // createWithAlias — that has a TOCTOU window where two clients
-            // onboarding at once both create and one doc is lost.
-            let result = try await client.documents.getOrCreateWithAlias(
-                alias: DocumentAlias(scope: .user, aliasKey: "library"),
-                title: "Library"
-            )
-            // selectDocumentAwaiting opens the doc, routes the base class's
-            // sync hooks at it, and fires onDocumentOpened below.
-            await selectDocumentAwaiting(result.documentId)
-        } catch {
-            errorMessage = "Failed to open library: \(error.localizedDescription)"
-        }
-    }
+For per-document setup beyond models, override the `onDocumentOpened(doc:documentId:)` hook — the base class opens the doc once and hands you the live `YDocument`, so don't call `openDocument(...)` again just to get one.
 
-    override func onDocumentOpened(doc: YDocument, documentId: String) async {
-        todos = makeTypedModel(doc: doc, documentId: documentId)
-    }
-}
-```
+For a **fresh doc you'll write immediately**, use `client.createDocument(options:)` — it returns a `CreateDocumentResult` with `metadata: JSONValue?`; extract `metadata?["documentId"]?.stringValue` to get the new document's id. Re-opening a freshly-created empty doc with `waitForLoad: .network` parks ~15s waiting for a sync event that never has anything to deliver.
 
-For a **fresh doc you'll write immediately**, use `client.createDocument(options:)` — it returns `(documentId, doc: YDocument?)` and the returned `YDocument` is writable at once (local-first). Re-opening a freshly-created empty doc with `waitForLoad: .network` parks ~15s waiting for a sync event that never has anything to deliver.
+**Multi-doc apps (one ambient library doc + N per-item docs).** `selectDocumentAwaiting(_:)` is the *single*-selected-doc lifecycle — it closes the previously selected doc first, so using it for a per-item detail view closes your library/index doc. For one ambient doc plus transient detail docs, use `appState.openAuxiliaryDoc(_:)` from the detail view's `.task` and `appState.closeAuxiliaryDoc(_:)` from `.onDisappear`. These register the doc for sync, but they don't touch `selectedDocId` or fire `onDocumentOpened`. Once open, read the doc's records through the facade scoped to that document — the same scoped query as [Open Documents Before Querying](#1-open-documents-before-querying). The view is framework glue around `openAuxiliaryDoc` + that scoped query:
 
-**Multi-doc apps (one ambient library doc + N per-item docs).** `selectDocumentAwaiting(_:)` is the *single*-selected-doc lifecycle — it closes the previously selected doc first, so using it for a per-item detail view closes your library/index doc. For one ambient doc plus transient detail docs, use `appState.openAuxiliaryDoc(_:modelType:)` from the detail view's `.task` and `appState.closeAuxiliaryDoc(_:)` from `.onDisappear`. These register the doc for sync and the inspector picks up the `TypedModel`, but they don't touch `selectedDocId` or fire `onDocumentOpened`:
-
-```swift
-struct ItemDetailView: View {
-    let documentId: String
-    @EnvironmentObject var appState: MyAppState
-    @State private var todos: TypedModel<TodoItem>?
-
-    var body: some View {
-        Group {
-            if let todos { /* render */ } else { ProgressView() }
-        }
-        .task {
-            let (_, model) = try? await appState.openAuxiliaryDoc(
-                documentId, modelType: TodoItem.self
-            )
-            todos = model
-        }
-        .onDisappear { Task { await appState.closeAuxiliaryDoc(documentId) } }
-    }
-}
-```
+{{ example: documents/app-state-auxiliary-doc }}
 
 **Watch for access loss in detail views.** When a peer revokes your access or hard-deletes a doc you have open, the server collapses both to the same wire shape. The client emits a derived `.documentDeleted` (typed `DocumentDeletedEvent`) — subscribe to it (not `.documentMetadataChanged` filtered on `action == "deleted"`) and dismiss the view on either signal. Retain the returned `EventSubscription` on a property and `[weak self]` the closure, or the handler is dropped:
 
@@ -410,18 +357,7 @@ Use tags to categorize documents by type. Pass `tags` to `create()`, filter the 
 
 You can also create a tagged document and filter locally:
 
-{{#lang ts}}
-```typescript
-const { metadata } = await jsBaoClient.documents.create({
-  title: "My List",
-  tags: ["todolist"],
-});
-
-// Filter locally
-const owned = await jsBaoClient.me.ownedDocuments();
-const todoListsLocal = owned.filter((doc) => doc.tags?.includes("todolist"));
-```
-{{/lang}}
+{{ example: documents/tag-filter-local }}
 
 ## Defining Models
 
@@ -463,9 +399,9 @@ import { Todo } from "@/models";
 {{/lang}}
 
 {{#lang swift}}
-### `schema.toml` + codegen + `TypedModel<T>`
+### `schema.toml` + codegen + the model facade
 
-Define models in `Sources/MyApp/Models/schema.toml`; `swift-bao-codegen` emits one `PrimitiveModel` struct per `[models.X]` block into a gitignored `Models/Generated/`; bind a generated type to an open document with `TypedModel<T>` and do all CRUD/queries through that instance.
+Define models in `Sources/MyApp/Models/schema.toml`; `swift-bao-codegen` emits one `PrimitiveModel` struct per `[models.X]` block into a gitignored `Models/Generated/`. The generated type IS the API: static reads across all open documents (`TodoItem.query(...)`, `find`, `findAll`, `count`, `aggregate`, `subscribe`), instance writes targeting one document (`try record.save(in: documentId)`, `try record.delete(in: documentId)`), backed by the process-wide default client.
 
 ```toml
 [models.todos]
@@ -529,9 +465,9 @@ public extension TodoItem {
 - **No `nil` in CRDT-backed fields** — the CRDT layer doesn't model `nil`. Use `""` for absent strings, `0` for absent numbers, sentinel timestamps for "never", and check those values explicitly.
 - **Wire field names are forever.** TOML keys are the wire field names; renaming a key after data is on disk orphans every existing record (Swift *and* JS clients reading the same doc). **snake_case is the cross-client convention** when web/Node and Swift read the same doc; **camelCase is fine for Swift-only docs**. The tool preserves whatever you write — add camelCase aliases in the companion if snake_case wire keys read awkwardly.
 - **IDs are `String`** — supply `UUID().uuidString` (or a ULID) when not provided.
-- Bind via `appState.makeTypedModel(doc:documentId:)`, not `TypedModel<T>(doc:)` directly, so the model registers with the in-app debug inspector. One `TypedModel` per record type per document.
+- Register models with `client.registerModels([TodoItem.self])` at connect time (or rely on the facade's lazy registration on first read) — registered models are mirrored into the client's shared store and listed in the in-app debug inspector automatically.
 
-CRUD through the bound `TypedModel<T>` is local-first (applied to the CRDT immediately, synced in the background). `create` is the only method that throws — it validates the new record against the schema; `update`/`delete` operate on already-validated records (a misspelled key in an `update` payload is dropped silently, not thrown). Reads (`find`, `findAll`, `query(["completed": false], options: QueryOptions(sort: ["sortOrder": 1], limit: 50))`, `count`) are synchronous against the local CRDT and `@MainActor`-isolated. Predicate operators: equality, `$gt`/`$gte`/`$lt`/`$lte`, `$containsText`, `$or`/`$and`/`$not`.
+CRUD through the facade is local-first (applied to the CRDT immediately, synced in the background). Writes throw — `try record.save(in: documentId)` inserts or updates in place; `save(in:upsertOn:)` matches on a single-field unique constraint instead of `id` and returns the resolved record; `try record.delete(in: documentId)`; all three throw if the target document isn't open. Reads: `query(...)`, `queryOne`, `count`, and `aggregate` are **synchronous**, span every open document by default (scope with `QueryOptions(documents: [...])`), and are `@MainActor`-isolated. `find(_ id:)` and `findAll()` are **`async throws`** — use `try await TodoItem.find(id)`. Predicate operators: equality, `$gt`/`$gte`/`$lt`/`$lte`, `$containsText`, `$or`/`$and`/`$not`.
 
 > **SourceKit footgun, first time only.** Editing the companion before codegen has ever run shows a red `No such module 'PrimitiveApp'` underline. The real cause is that the generated type doesn't exist yet — run `swift build` once (or the `run-ios.sh` codegen step) and it clears. Only the very first scaffold hits this.
 {{/lang}}
@@ -575,10 +511,9 @@ type = "boolean"
 default = false
 ```
 
-{{#lang ts}}
 ### Defining Relationships in models.toml
 
-Declare relationships in `models.toml` using `[models.X.relationships.Y]` sections. Codegen emits typed traversal methods on the generated interfaces.
+Declare relationships in `models.toml` using `[models.X.relationships.Y]` sections. Codegen emits typed traversal methods on the generated model types.
 
 ```toml
 # Author hasMany Posts
@@ -596,8 +531,9 @@ model = "authors"
 related_id_field = "authorId"
 ```
 
-After running `npx js-bao-codegen-v2`, the generated interfaces include typed traversal methods:
+After running codegen, the generated model types include typed traversal methods:
 
+{{#lang ts}}
 ```typescript
 // Author.generated.ts
 export interface Author extends AuthorAttrs, BaseModel {
@@ -609,16 +545,22 @@ export interface Post extends PostAttrs, BaseModel {
   author(): Promise<Author | null>;
 }
 ```
+{{/lang}}
+{{#lang swift}}
+```swift
+// Author.generated.swift — hasMany resolves a plain array, ordered per the TOML
+public func posts() async throws -> [Post]
+
+// Post.generated.swift — refersTo resolves the parent record (or nil)
+public func author() async throws -> Author?
+```
+{{/lang}}
 
 Use these at runtime:
 
-```typescript
-const author = await Author.queryOne({ id: authorId });
-const posts = await author.posts(); // PaginatedResult<Post>
-const firstPost = posts.data[0];
-const backRef = await firstPost.author(); // Author | null
-```
+{{ example: documents/relationships }}
 
+{{#lang ts}}
 Relationship traversal uses the same engine as `Model.query(...)` with `include` specs — see [Loading Related Data](#loading-related-data-includes) for the lower-level query-level include syntax.
 {{/lang}}
 
@@ -657,41 +599,15 @@ fields = ["name", "parentId"]
 unique_constraints = [["name", "parentId"]]
 ```
 
-{{#lang ts}}
 ### Working with StringSets
 
-```typescript
-// Add/remove tags
-task.tags.add("urgent");
-task.tags.remove("low-priority");
-
-// Check membership
-if (task.tags.has("urgent")) { ... }
-
-// Convert to array for display
-const tagList = task.tags.toArray();
-```
+{{ example: documents/stringset-ops }}
 
 ### Working with Dates
 
 Dates are stored as ISO-8601 strings. Convert for comparisons:
 
-```typescript
-// Store
-task.dueDate = new Date().toISOString();
-
-// Compare
-const due = new Date(task.dueDate);
-if (due < new Date()) {
-  console.log("Overdue!");
-}
-
-// Query with date comparison
-const result = await Task.query({
-  dueDate: { $lt: new Date().toISOString() },
-});
-```
-{{/lang}}
+{{ example: documents/date-handling }}
 
 ## Querying Data
 
@@ -746,7 +662,7 @@ items.map(...);  // TypeError: items.map is not a function
 const result = await Task.query({
   completed: false,
   priority: { $gte: 3 },
-  tags: { $in: ["work", "urgent"] },
+  category: { $in: ["work", "urgent"] },
 });
 ```
 
@@ -862,7 +778,9 @@ Only one stringset facet field is allowed per aggregation. To check membership o
 
 ### useJsBaoDataLoader Pattern
 
-`useJsBaoDataLoader` is the Vue composable for centralized component data loading, provided by the primitive library. **It is component-only**: it registers its model subscriptions and document-event listeners inside `onMounted`, which fires only for mounted Vue components. Calling it from a Pinia store's `setup()`, a router guard, or any other non-component context will load data once but **never react to subsequent changes** — the `onMounted` callback never runs there, so no subscriptions are registered. For those contexts, subscribe directly (see [Subscribing Outside a Component](#subscribing-outside-a-component) below).
+The data a component renders is a plain `Model.query` (see [Read](#read-find--query--first--count) for the compiled call) that you re-run whenever the underlying records change. `useJsBaoDataLoader` is the **web template's** Vue composable that wires that re-run for you — it is framework glue around the same query, not a different API.
+
+**It is component-only**: it registers its model subscriptions and document-event listeners inside `onMounted`, which fires only for mounted Vue components. Calling it from a Pinia store's `setup()`, a router guard, or any other non-component context will load data once but **never react to subsequent changes** — the `onMounted` callback never runs there, so no subscriptions are registered. For those contexts, subscribe directly (see [Subscribing Outside a Component](#subscribing-outside-a-component) below).
 
 It handles four key concerns:
 
@@ -882,23 +800,9 @@ It handles four key concerns:
 - Push filtering logic into js-bao `.query()` calls rather than fetching everything and filtering in JavaScript
 - Always pass `documentReady` - typically a ref that becomes true after your document opening logic completes
 
-```typescript
-const {
-  data: todos,
-  initialDataLoaded,
-  reload,
-} = useJsBaoDataLoader<{ items: TodoItem[]; total: number }>({
-  subscribeTo: [TodoItem],
-  queryParams: computed(() => ({ listId: props.listId, showCompleted })),
-  documentReady,
-  async loadData(queryParams) {
-    const { listId, showCompleted } = queryParams ?? {};
-    const query = showCompleted ? { listId } : { listId, completed: false };
-    const result = await TodoItem.query(query, { sort: { order: 1 } });
-    return { items: result.data, total: result.data.length };
-  },
-});
-```
+Under the hood it wraps the same compiled client calls documented above — `Model.subscribe` ([Subscribe to changes](#subscribe-to-changes)) to react to changes and `Model.query` to load — so this section is just the Vue-composable binding around them:
+
+{{ example: documents/dataloader-glue }}
 
 **Rules:**
 
@@ -915,37 +819,9 @@ const {
 
 `useJsBaoDataLoader` is the right tool inside a component. Outside one — a **Pinia store**, a singleton service, a router guard — do not reach for it: its `onMounted`-based subscriptions never register there, so reactive updates silently never fire.
 
-`Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle (see [Subscribe to changes](#subscribe-to-changes) above for the compiled call). It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). Wire it up directly in the store's `setup()` and keep the unsubscribe handle so you can tear it down:
+`Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle (see [Subscribe to changes](#subscribe-to-changes) above for the compiled call). It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). The neutral pattern is just `subscribe` + re-`query`; everything below is **web-template glue** (Pinia) showing where to hang that wiring:
 
-```typescript
-// stores/tasksStore.ts
-import { defineStore } from "pinia";
-import { ref } from "vue";
-import { Task } from "@/models";
-
-export const useTasksStore = defineStore("tasks", () => {
-  const tasks = ref<Task[]>([]);
-  let unsubscribe: (() => void) | null = null;
-
-  async function reload() {
-    const result = await Task.query({ completed: false }, { sort: { priority: -1 } });
-    tasks.value = result.data as Task[];
-  }
-
-  function start() {
-    if (unsubscribe) return;            // idempotent — don't double-subscribe
-    unsubscribe = Task.subscribe(reload); // fires on every Task change, in any context
-    void reload();                        // initial load
-  }
-
-  function stop() {
-    unsubscribe?.();
-    unsubscribe = null;
-  }
-
-  return { tasks, reload, start, stop };
-});
-```
+{{ example: documents/subscribe-store }}
 
 Call `start()` once when the store first comes into use (e.g. after login / first document open) and `stop()` when tearing down (e.g. on logout) to release the listener.
 
@@ -962,45 +838,13 @@ This is the same `Model.subscribe()` that `useJsBaoDataLoader` calls internally 
 {{#lang swift}}
 ### View-data binding with `BaoDataLoader`
 
-Bind a `BaoDataLoader<[T]>` rather than subscribing to `client.events.on(...)` directly or rolling a `@Published var items` + manual `refresh()`. The loader owns its subscription lifecycle (cancelled on deinit), debounces bursts (~50ms), runs the first load immediately, and re-runs a synchronous `load` closure on every trigger.
+The data a view renders is a plain facade query — `TodoItem.findAll()` / `TodoItem.query(...)` (see [Read](#read-find--query--first--count)) — re-run whenever the records change, which you observe with `TodoItem.subscribe` (see [Subscribe to changes](#subscribe-to-changes)). `BaoDataLoader<[T]>` is the **SwiftUI glue** (PrimitiveApp package) that wires that re-run into a view: bind it rather than subscribing to `client.events.on(...)` directly or rolling a `@Published var items` + manual `refresh()`. The loader owns its subscription lifecycle (cancelled on deinit), debounces bursts (~50ms), runs the first load immediately, and re-runs a synchronous `load` closure on every trigger.
 
-```swift
-struct TodoListView: View {
-    @EnvironmentObject var appState: MyAppState
-    @StateObject private var loader = BaoDataLoader<[TodoItem]>()
+The view below is framework glue; the only Primitive calls in it are the `findAll()` query and the `TodoItem.subscribe` trigger:
 
-    var body: some View {
-        Group {
-            // Render through `loader.phase`, not `loader.data ?? []`.
-            // `?? []` collapses "not yet loaded" with "loaded, empty",
-            // flashing the empty state for ~50ms on every appearance.
-            switch loader.phase {
-            case .loading:           ProgressView()
-            case .empty:             Text("No todos yet")
-            case .loaded(let todos): List(todos) { /* row */ }
-            }
-        }
-        // `.task(id:)`, NOT a bare `.task`. `appState.todos` is bound
-        // asynchronously in `onDocumentOpened` (after connect + doc open),
-        // so it's nil on first appearance. A bare `.task { guard let … else
-        // { return } }` runs once, sees nil, bails, and never binds — the
-        // screen sticks on its spinner. Keying the task on readiness re-runs
-        // it the instant the model arrives. (Or gate the subtree behind
-        // `ReadyGate(appState.todos) { _ in … }` and use a plain `.task`.)
-        .task(id: appState.todos == nil) {
-            guard let todos = appState.todos else { return }
-            loader.bind(
-                client: appState.client,
-                subscribeTo: [.onModelChange(todos)]
-            ) { _ in
-                todos.findAll().sorted { $0.sortOrder < $1.sortOrder }
-            }
-        }
-    }
-}
-```
+{{ example: documents/dataloader-glue }}
 
-`.onModelChange(model)` fires on **any** add/update/delete on that model — local writes (synchronous) and remote writes (observer drain) both — so `reloadNow()` after a write is unneeded; call it only when the `load` closure reads something the loader can't subscribe to (a REST resource). Other triggers (`LoaderTrigger`): `.onSync`, `.onRemoteUpdate`, `.onDocumentEvents`, `.onConnect`, and `.custom((client, reload) -> EventSubscription?)`.
+`.onModel(subscribe: TodoItem.subscribe)` fires on **any** add/update/delete recorded in that model's shared store — local writes and remote writes both — so `reloadNow()` after a write is unneeded; call it only when the `load` closure reads something the loader can't subscribe to (a REST resource). Other triggers (`LoaderTrigger`): `.onSync`, `.onDocumentSyncStateChanged`, `.onDocumentEvents`, `.onConnect`, `.onModelChange(_:)` for a hand-built runtime-schema `DynamicModel`, and `.custom((client, reload) -> EventSubscription?)`.
 
 `loader.phase` is a trinary: `.loading` (first load not complete), `.empty` (first load complete, data conforms to `LoaderEmptiness` and is empty), `.loaded(Data)`. `[T]`, `String`, and `Optional` get `LoaderEmptiness` out of the box.
 
@@ -1016,7 +860,7 @@ struct TodoListView: View {
 ## Saving Data
 
 {{#lang swift}}
-Writes go through the bound `TypedModel<T>` and are local-first — applied to the CRDT immediately and synced in the background (see [`schema.toml` + codegen + `TypedModel<T>`](#schematoml--codegen--typedmodelt) for the create/update/delete contract). `save()` uses merge semantics: only the fields you set are written; unset fields are preserved.
+Writes go through record instances and are local-first — applied to the CRDT immediately and synced in the background (see [`schema.toml` + codegen + the model facade](#schematoml--codegen--the-model-facade) for the save/delete contract). `try record.save(in: documentId)` uses merge semantics: `nil` optional fields are not written, so fields you didn't set are preserved on update.
 {{/lang}}
 
 {{#lang ts}}
@@ -1102,28 +946,9 @@ Delete a record after finding it — see [Delete](#delete) above for the compile
 
 ### Upsert by Unique Constraint
 
-`upsertByUnique(constraintName, lookupValue(s), data, options?)` — finds an existing record by a named constraint and updates it, or creates one if none exists. The `data` object MUST include the same constraint field values as `lookupValue` (mismatch throws). When creating a new record, `targetDocument` is REQUIRED.
+`upsertByUnique(constraintName, lookupValue(s), data, options?)` finds an existing record by a named constraint and updates it, or creates one if none exists — see [Upsert by named unique constraint](#upsert-by-named-unique-constraint) above for the compiled call. The `data` object MUST include the same constraint field values as `lookupValue` (mismatch throws), and `targetDocument` is REQUIRED whenever a new record may be created. A single-field constraint takes a scalar lookup value instead of an array.
 
-```typescript
-// Composite-key example — uses the constraint name declared in models.toml above.
-await Category.upsertByUnique(
-  "name_parent_unique",                    // constraint name
-  ["Work", null],                          // values in field order
-  { name: "Work", parentId: null, color: "blue" },
-  { targetDocument: documentId }           // required if a new record is created
-);
-
-// Single-field example — value can be a scalar instead of an array.
-// Auto-generated constraint name uses the schema `name`, not the class name.
-await User.upsertByUnique(
-  "users_email_unique",                    // <schemaName>_<fieldName>_unique
-  "alice@example.com",
-  { email: "alice@example.com", name: "Alice" },
-  { targetDocument: documentId }
-);
-```
-
-Single-field constraints declared via `unique = true` in TOML get an auto-generated name of `<modelName>_<fieldName>_unique` (where `modelName` is the `[models.<name>]` block key). Use `[[models.X.unique_constraints]]` (model level — not under `options`) to control the name explicitly.
+Single-field constraints declared via `unique = true` in TOML get an auto-generated name of `<modelName>_<fieldName>_unique` (where `modelName` is the `[models.<name>]` block key, not the class name). Use `[[models.X.unique_constraints]]` (model level — not under `options`) to control the name explicitly.
 
 For single-field upserts where the value already lives on the instance, `save({ upsertOn })` is simpler than `upsertByUnique` — see [Upsert by natural key](#upsert-by-natural-key) above for the compiled call.
 
@@ -1134,11 +959,11 @@ For single-field upserts where the value already lives on the instance, `save({ 
 await Category.upsertByUnique(["name", "parentId"], ...); // throws: constraint not found
 
 // DON'T: omit targetDocument when creating
-await Category.upsertByUnique("name_parent_unique", ["Work", null], { name: "Work", parentId: null });
+await Category.upsertByUnique("name_parentId", ["Work", "root"], { name: "Work", parentId: "root" });
 // throws: targetDocument is required when creating new records
 
 // DON'T: data values that don't match lookupValue
-await Category.upsertByUnique("name_parent_unique", ["Work", null], { name: "Home", parentId: null }, { targetDocument });
+await Category.upsertByUnique("name_parentId", ["Work", "root"], { name: "Home", parentId: "root" }, { targetDocument });
 // throws: Mismatch between dataToUpsert.'name' and uniqueLookupValue
 ```
 
@@ -1462,18 +1287,9 @@ Repeated email-based calls are idempotent: a second `updatePermissions(documentI
 
 **There is no `permission: null` to remove.** Removal is a separate call (`removePermission` by userId or by email; `transferOwnership` to hand a document to a new owner):
 
+{{ example: documents/manage-permissions }}
+
 {{#lang ts}}
-```typescript
-// Remove a current member by userId:
-await client.documents.removePermission(documentId, "user-abc");
-await client.documents.removePermission(documentId, { userId: "user-abc" });
-
-// Cancel a pending email-based invite, OR remove a current member matched by email:
-await client.documents.removePermission(documentId, { email: "alice@example.com" });
-
-await client.documents.transferOwnership(documentId, newOwnerId);
-```
-
 **Don't do this** (silent no-op for someone with a higher group permission, and there is no `null` form):
 
 ```typescript
@@ -1489,6 +1305,9 @@ await client.documents.updatePermissions(documentId, {
 });
 // Correct: also lower or revoke the group permission.
 ```
+{{/lang}}
+{{#lang swift}}
+There is no `setPermissions`, and `updatePermissions` with a lower permission does **not** lower a higher group-derived permission — the user keeps access via the group.
 {{/lang}}
 
 Lowering a user's direct permission while they still have a higher one via a group is a no-op — the group wins (effective = MAX). To actually lower it, also lower or revoke the group permission.
@@ -1522,19 +1341,7 @@ Lowering a user's direct permission while they still have a higher one via a gro
 
 The method is **`grantGroupPermission`** (no `setGroupPermission`). Member changes inside the group propagate automatically — no per-membership permission calls.
 
-{{#lang ts}}
-```typescript
-await client.documents.grantGroupPermission(documentId, {
-  groupType: "team",
-  groupId: "engineering",
-  permission: "read-write",       // owner | read-write | reader
-});
-
-// Listing / revoking
-await client.documents.listGroupPermissions(documentId);
-await client.documents.revokeGroupPermission(documentId, "team", "engineering");
-```
-{{/lang}}
+{{ example: documents/group-permission }}
 
 #### Looking up users
 
@@ -1824,7 +1631,7 @@ await client.invitations.delete(invitationId);
 
 `accessibleDocumentSummaries` does the merged owned + shared set in one call.
 
-For **writes**, use the typed params factories — `documents.updatePermissions(documentId:params: .email("…", permission: "read-write", sendEmail: false, documentUrl: …))` (or `.user(…)` / `.batch([…])`) and `collections.addMember(collectionId:params: .email("…", permission: .readWrite))` (or `.user(…)`). To cancel a pending email invite, read the row's `deferredId` via `pendingInvitationSummaries(...)`, then `client.invitations.revokeDeferredGrant(deferredId:type:)` (`.document` for a per-doc invite, `.group` for a collection one).
+For **writes**, use the typed params factories — `documents.updatePermissions(documentId:params: .email("…", permission: "read-write", sendEmail: false, documentUrl: …))` (or `.user(…)` / `.batch([…])`) and `collections.addMember(collectionId:params: .email("…", permission: .readWrite))` (or `.user(…)`). To cancel a pending email invite on a document, call `documents.removePermission(documentId:, .email("…"))`; alternatively, read the row's `deferredId` via `pendingInvitationSummaries(...)` and call `client.invitations.revokeDeferredGrant(deferredId:type:)` (`.document` for a per-doc invite, `.group` for a collection one).
 {{/lang}}
 
 ### Sharing Discovery Cheat Sheet

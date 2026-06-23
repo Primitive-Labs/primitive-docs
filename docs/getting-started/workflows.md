@@ -161,7 +161,7 @@ A workflow runs on the server, but its result often belongs in a **document** �
 
 1. The client registers an apply handler for the workflow with `workflows.define(workflowKey, { onApply })`.
 2. When a run reaches `apply_pending`, a client calls `claimApply()` (an exclusive, time-limited claim), runs the handler, then `confirmApply()` — or `releaseApply()` on failure so another client can retry.
-3. The template helpers and Swift's `runAndApply(...)` wrap this loop for you — most apps never call claim/confirm directly.
+3. `define(...)` wraps this loop for you — when the status event arrives, the client claims the lease, runs your handler, and confirms (or releases on a thrown error). Most apps never call claim/confirm directly.
 
 If a workflow's output doesn't need to land in a document — it writes to databases, sends email, returns a value — leave `requiresClientApply` off. Server-only workflows (cron-fired jobs especially) should set it to `false` explicitly, otherwise runs sit in `apply_pending` waiting for a client that never comes:
 
@@ -223,7 +223,7 @@ primitive cron-triggers delete <trigger-id>
 
 :::
 
-Two limits: 50 cron triggers per app (consolidate with a single trigger fanning out via `workflow.start`), and 1-minute minimum granularity.
+Two limits: 50 cron triggers per app (consolidate with a single trigger that fans out — `iterate-users`, or a `forEach` over `workflow.call`), and 1-minute minimum granularity.
 
 Cron-fired runs are persistent workflow runs like any other — `meta.triggerId` identifies the trigger that fired them. Remember `requiresClientApply = false` for cron workflows (above).
 
@@ -277,6 +277,42 @@ accessRule = "hasRole('admin') || isMemberOf('team', 'ops')"
 With no rule, any signed-in member of the app can start the workflow; admins and owners always pass regardless of the rule. The rule is evaluated on every client invocation — asynchronous or synchronous — and when another workflow invokes this one through a `workflow.call` step. Cron triggers and inbound webhooks have their own controls and skip it; that's what makes the [webhook lock-down pattern](#via-inbound-webhooks) work.
 
 Push the rule with `primitive sync push` like any other workflow config, or change it in place with `primitive workflows update <id> --access-rule "<CEL>"`. For the rule language and the identity context available to it (`hasRole`, `isMemberOf`, `memberGroups`), see [Access Control](./access-control.md).
+
+## System Workflows
+
+By default a workflow runs **as the user who started it** (`runAs = "caller"`): every step acts with that member's own permissions — it touches only documents they can access, and its group and data operations are checked against their roles. This is the safe default, and most workflows want it.
+
+Set `runAs = "system"` to run a workflow as the **app itself** instead of as any one user:
+
+```toml
+[workflow]
+key = "nightly-digest"
+name = "Nightly Digest"
+runAs = "system"
+```
+
+A system run executes with the app's own privileges — which is what lets a scheduled job read and write across every user's data. Because it acts on no one's behalf, who may start one is tightly held:
+
+- **Only admins and owners can start a system workflow.** A regular member who tries is refused with a `403` — never silently downgraded to a caller run.
+- **Cron triggers and inbound webhooks can only fire system workflows.** A trigger has no human principal to borrow, so it refuses to start a `caller` workflow. (Member-initiated runs are what caller workflows are for.)
+
+Runs are attributed to the app's system principal, and every system run records who set it off — the admin who started it, or the trigger that fired it — for the audit trail.
+
+### Sensitive capabilities
+
+A system run can always read and write the app's documents and data. Anything beyond that baseline is **opt-in**: declare it in `capabilities` so a privileged workflow does only what you intend.
+
+```toml
+[workflow]
+key = "sync-team-roster"
+name = "Sync Team Roster"
+runAs = "system"
+capabilities = ["membership"]
+```
+
+`membership` lets the workflow change group membership — the `group.addMember` and `group.removeMember` steps. Without the grant, those steps in a system workflow are refused. Read-only group checks never need it.
+
+[`iterate-users`](#iterate-users) is system-only — it fans out across the entire user roster, which no single caller has the standing to do. A workflow that uses it must set `runAs = "system"`, or the server rejects it when you push.
 
 ## Testing and Debugging Workflows
 
@@ -345,14 +381,16 @@ Every step has an `id` (unique within the workflow) and a `kind` (the step type)
 | `integration.call` | Call an external API via a configured integration |
 | `database.query` / `mutate` / `count` / `aggregate` / `pipeline` / `applyToQuery` | Run registered database operations |
 | `document.query` / `queryOne` / `count` / `save` / `patch` / `delete` | Read and write records in a document's models |
+| `document.resolveAlias` | Resolve a document alias to its id (or null) for conditional branching |
 | `group.addMember` / `removeMember` / `checkMembership` / `listMembers` / `listUserMemberships` | Group membership operations |
 | `collect` | Auto-paginate any step that returns `{ items, cursor }` |
-| `workflow.call` | Run a child workflow synchronously, inline |
-| `workflow.start` + `workflow.await` | Fan out child workflows in parallel, then wait |
+| `workflow.call` | Run a child workflow synchronously, inline (use `forEach` to fan out) |
 | `email.send` | Send an email (template-based or inline) |
 | `blob.upload` / `blob.download` / `blob.signedUrl` | Read, write, or sign blob URLs |
 | `analytics.write` / `analytics.query` | Emit analytics events or query server-side aggregates |
 | `noop` | Return `{ message, payload }`; useful as a placeholder |
+
+Steps that reach across the network — `llm.chat`, `gemini.generate`, the `database.*` steps, and `email.send` — are bounded by a timeout: 120 seconds for the LLM and Gemini steps, 30 seconds for database and email. Override it per step with a `timeout` field (in milliseconds). A step that exceeds its timeout fails without retrying, recording a failed step-run rather than hanging the run.
 
 ### `transform`
 
@@ -400,10 +438,15 @@ id = "normalize"
 kind = "script"
 ref = "normalize-order"     # the script's name: transforms/normalize-order.rhai
 saveAs = "order"
+# configId = "..."          # optional — pin a specific ScriptConfig for determinism
 [steps.with]
 raw = "{{ steps.fetch.body }}"
 currency = "{{ input.currency }}"
 ```
+
+`configId` is optional. Without it, the runner resolves the script's active config body at execution time, so pushing a new `.rhai` body reaches all referencing workflows on their next run with no re-publish step. Set `configId` to pin a specific version when determinism is required.
+
+`limits` is also optional and lowers the per-run sandbox ceilings for this step (`maxOperations`, `wallMsHint`, `maxOutputBytes`, `maxArrayLength`, `maxObjectKeys`, `maxNestingDepth`, `maxStringSize`, `maxCallDepth`, `maxLogBytes`). Requested values are clamped at the app ceiling; they can only lower, never raise it.
 
 Given `steps.fetch.body` of `{ "items": [ { "sku": "a1", "qty": 2, "price": 5.0 }, { "sku": "b2", "qty": 0, "price": 9.0 } ] }` and input `{ "currency": "USD" }`, the script returns:
 
@@ -413,11 +456,11 @@ Given `steps.fetch.body` of `{ "items": [ { "sku": "a1", "qty": 2, "price": 5.0 
 
 One wiring detail: a script's return value lands under `steps.<id>.output.*` — later steps read <span v-pre>`{{ steps.normalize.output.total }}`</span>, not <span v-pre>`{{ steps.normalize.total }}`</span> (unlike `transform`, whose result is the table directly).
 
-Workflows pin script bodies when they're pushed or published: each workflow snapshots the current body of every script it references, and runs execute that snapshot — not the live script. Pushing a changed `.rhai` file alone doesn't change a deployed workflow's behavior; re-push the referencing workflow to pick up the new body. `sync push` warns when a script update leaves referencing workflows on the previous body, naming each one.
+Pushing a changed `.rhai` file (`primitive sync push`) creates a new script version and activates it — every workflow that references the script by name picks up the new body on its next run, with no re-publish step needed.
 
 ### `iterate-users`
 
-Fans another workflow out across **every user in the app**, once per user, as a restartable singleton — built for big per-user batch jobs (backfills, digests) that must survive restarts without re-processing completed users:
+Fans another workflow out across **every user in the app**, once per user, as a restartable singleton — built for big per-user batch jobs (backfills, digests) that must survive restarts without re-processing completed users. It's a [system-only](#system-workflows) step: the workflow must set `runAs = "system"`.
 
 ```toml
 [[steps]]
@@ -434,7 +477,18 @@ workflowKey = "process-one-user"   # the workflow to run once per user
 reason = "preferences backfill"    # static input merged into each child run
 ```
 
-`source` selects which users to iterate — `mode = "app"` walks the app's full user roster, fetched in pages of `pageSize`. For each user, the step starts a child run of the workflow named by `perUser.workflowKey` (a separate workflow you define), passing the user's id plus anything in `perUser.input` as that run's input, with up to `concurrency` child runs in flight per page. Prefer this over a hand-rolled `forEach` when the fan-out is app-wide and long-running.
+`source` selects which users to iterate — `mode = "app"` walks the app's full user roster, fetched in pages of `pageSize`. For each user, the step starts a child run of the workflow named by `perUser.workflowKey` (a separate workflow you define), with up to `concurrency` child runs in flight per page. Prefer this over a hand-rolled `forEach` when the fan-out is app-wide and long-running.
+
+Each child run receives the iterated user's id as `input.userId` automatically — a child that needs nothing else can read <span v-pre>`{{ input.userId }}`</span> with no `perUser.input` block at all. When you do supply `perUser.input`, its values are rendered per user against a `user` binding — the iterated user's row, with `user.userId` and `user.role` — and full template syntax works, including fallbacks and filters:
+
+```toml novalidate
+[steps.perUser.input]
+greetingName = "{{ user.userId | upper }}"
+tier = "{{ user.role || 'member' }}"
+reason = "preferences backfill"        # static values pass through unchanged
+```
+
+A key you set in `perUser.input` wins over the injected default, so <span v-pre>`userId = "{{ user.userId }}"`</span> is redundant but harmless.
 
 ### `switch`
 
@@ -621,6 +675,34 @@ status = "paid"
 
 Writes are durable when the step completes and reach connected clients like any other document change — use document steps when the workflow owns the write. When the result should instead land in data only clients write, leave the writing to [client apply](#applying-results-to-local-data-client-apply).
 
+**Caller-mode access.** In a [caller workflow](#system-workflows) (the default), document steps act with the **starting user's** own document permissions, checked per operation: the reads (`query`, `queryOne`, `count`) need `reader` on the target document, `save` and `patch` need `read-write`, and `delete` needs `owner`. A step that reaches past what the caller may do fails the run — so a templated or user-supplied `documentId` can't be used to touch a document the caller couldn't open themselves. A [system workflow](#system-workflows) runs with the app's privileges and skips these per-caller checks.
+
+**Targeting a document by alias.** Instead of a fixed `documentId`, a step can name a document by its [alias](./working-with-documents.md#ensuring-exactly-one-document-with-aliases) — convenient for the one-document-per-user pattern, where each caller has their own:
+
+```toml
+[[steps]]
+id = "load"
+kind = "document.query"
+modelName = "Habit"
+saveAs = "habits"
+[steps.documentAlias]
+scope = "user"          # the caller's own alias (or "app" for an app-shared one)
+aliasKey = "tracker"
+```
+
+Give a step either `documentId` or `documentAlias`, not both. A `user`-scoped alias always resolves to the caller's own document; an `app`-scoped alias resolves only when the caller has access to it. If the alias doesn't resolve, the step fails the same way a missing `documentId` would.
+
+**Branching on whether an alias exists.** When you'd rather check than fail — "has this user set up their tracker yet?" — use `document.resolveAlias`. It returns `{ documentId }`, or `{ documentId: null }` when there's nothing to resolve, so a later step can `runIf` on the result instead of erroring:
+
+```toml
+[[steps]]
+id = "find-tracker"
+kind = "document.resolveAlias"
+scope = "user"
+aliasKey = "tracker"
+saveAs = "tracker"
+```
+
 ### Group Steps
 
 `group.addMember`, `group.removeMember`, `group.checkMembership`, `group.listMembers`, and `group.listUserMemberships` manage [groups](./users-and-groups.md) from a workflow:
@@ -668,28 +750,7 @@ workflowKey = "onboard-user"
 userId = "{{ input.userId }}"
 ```
 
-### `workflow.start` + `workflow.await`
-
-Fan-out: start child workflows in parallel (typically with `forEach`), then wait for them all:
-
-```toml
-[[steps]]
-id = "start-all"
-kind = "workflow.start"
-forEach = "steps.get-users.data"
-as = "user"
-workflowKey = "process-item"
-[steps.input]
-userId = "{{ user.id }}"
-
-[[steps]]
-id = "results"
-kind = "workflow.await"
-runs = "steps.start-all"
-onPartialFailure = "fail"       # fail (default) | continue
-```
-
-`workflow.await` returns `{ completed, failed, allSucceeded }`.
+Add `forEach` to fan out — the child runs once per item, and the step returns the array of child results. For app-wide, restartable fan-out over your entire user roster, use [`iterate-users`](#iterate-users) instead.
 
 ### `email.send`
 
@@ -718,6 +779,8 @@ primitive email-templates set order-confirmation \
   --subject "Your order #{{orderId}}" \
   --html-file ./order.html
 ```
+
+For the full CLI reference for managing and customizing email templates — including listing variables, testing, and reverting to defaults — see [Email Template Customization](./authentication.md#email-template-customization).
 
 #### Inline Mode
 

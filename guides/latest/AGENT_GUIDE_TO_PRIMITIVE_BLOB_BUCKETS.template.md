@@ -26,23 +26,9 @@ Admin/owner only. Deleting a bucket cascades to every blob inside it.
 
 ## Overview
 
-**Blob buckets** — general-purpose storage outside any document context. Each bucket has its own access policy, TTL tier, and supports time-limited signed URLs. **Cap: 100 MB per blob.**
+**Blob buckets** — general-purpose storage outside any document context. Each bucket has its own access preset, TTL tier, and supports time-limited signed URLs. **Cap: 100 MB per blob.**
 
-{{#lang ts}}
-```typescript
-// There is NO bucket() context object. The bucket key/ID is a positional arg.
-await client.blobBuckets.upload("avatars", { filename, contentType, data });
-await client.blobBuckets.getSignedUrl("avatars", blobId, 3600);
-```
-{{/lang}}
-
-{{#lang swift}}
-```swift
-// There is no bucket() context object. The bucket key/ID is a positional arg.
-try await client.blobBuckets.upload(bucketIdOrKey: "avatars", data: data, filename: filename, contentType: contentType)
-try await client.blobBuckets.getSignedUrl(bucketIdOrKey: "avatars", blobId: blobId, expiresInSeconds: 3600)
-```
-{{/lang}}
+{{ example: blobs/bucket-positional-args }}
 
 **Decision rule:** use document-scoped blobs when the file's lifetime and access naturally match a document's. Use a bucket for avatars, workflow outputs, public assets, anonymous reads via signed URLs, or anything that should live outside any specific document. Document-scoped blobs (10 MB cap, permission inheritance, offline caching) are covered in the [Blobs guide](AGENT_GUIDE_TO_PRIMITIVE_BLOBS.md).
 
@@ -50,7 +36,7 @@ try await client.blobBuckets.getSignedUrl(bucketIdOrKey: "avatars", blobId: blob
 
 ## Bucket configuration
 
-A bucket has a `ttlTier` and an `accessPolicy`. Configure via TOML sync (preferred), the CLI, or `createBucket` (see **Bucket admin** above).
+A bucket has a `ttlTier` and a `preset` (or a `ruleSetId` for a custom bucket). Configure via TOML sync (preferred), the CLI, or `createBucket` (see **Bucket admin** above).
 
 ```toml
 # config/blob-buckets/avatars.toml
@@ -59,30 +45,35 @@ key = "avatars"
 name = "User avatars"
 description = "Profile pictures"           # optional
 ttlTier = "permanent"                       # 1d | 3d | 14d | 28d | 180d | 365d | permanent
-accessPolicy = "authenticated"              # public-read | authenticated | owner-only
-# ruleSetId = "<rule-set-id>"               # optional; when set, the rule set governs
-                                            # member-level reads/writes (see Access policies)
+preset = "authenticated"                    # public | authenticated | admin-only | personal-uploads
+# ruleSetId = "<rule-set-id>"               # optional; makes a `custom` bucket whose access
+                                            # is governed entirely by the rule set (see below)
 ```
 
-The TOML root table is `[bucket]` (not `[blobBucket]`). The CLI's `primitive sync` reads from `config/blob-buckets/<key>.toml`.
+The TOML root table is `[bucket]` (not `[blobBucket]`). The CLI's `primitive sync` reads from `config/blob-buckets/<key>.toml`. Give a bucket a `preset` or a `ruleSetId`, not both. To change either later, edit the TOML and `primitive sync push` again.
 
 Or via CLI:
 
 ```bash
 primitive blob-buckets create \
   --key avatars --name "User avatars" \
-  --ttl permanent --access authenticated
+  --ttl permanent --preset authenticated
 ```
 
-### Access policies
+### Access presets
 
-| Policy           | Read                                  | Write                                 |
-|------------------|---------------------------------------|---------------------------------------|
-| `public-read`    | Anyone (no auth)                      | Admin/owner only                      |
-| `authenticated`  | Any signed-in user (or admin/owner)   | Any signed-in user (or admin/owner)   |
-| `owner-only`     | Admin/owner only                      | Admin/owner only                      |
+Presets govern blob ops at the granularity of `read` (download/getMeta), `write` (upload), `list` (enumerate), `delete`, and `share` (mint a signed URL). Admin/owner always bypass.
 
-When a bucket has a `ruleSetId`, the attached rule set is the **authority for member-level access** and takes precedence over the `accessPolicy` matrix above: admins/owners are always allowed, unauthenticated callers get 401, and every other read/write is decided by evaluating the rule set (resource type `blob_bucket`). A missing or orphaned rule set denies closed — member access fails until the rule set exists.
+| Preset             | Member access                                                                 |
+|--------------------|-------------------------------------------------------------------------------|
+| `public`           | Anyone, incl. anonymous, can `read`/`list`; no member `write`/`delete`/`share` |
+| `authenticated`    | Any signed-in member: `read`/`write`/`list`/`delete`/`share` (`!isAnonymous()`) |
+| `admin-only`       | Admin/owner only (every member op denied)                                      |
+| `personal-uploads` | Any member `write`s; each member `read`/`delete`/`share`s only blobs where `record.blobCreatedBy == user.userId`; `list` is admin-only |
+
+`public` is the only preset that serves **anonymous reads** — an unauthenticated request can `read`/`list` it directly (no signed URL needed).
+
+For access no preset expresses, set `ruleSetId` to make a `custom` bucket: the rule set is the authority for member access (resource type `blob_bucket`), evaluated per op (`read`/`write`/`list`/`delete`/`share`; in a configured rule set `list`/`share` fall back to `read` and `delete` to `write`). Admins/owners always pass; a missing/orphaned rule set denies closed. Rule CEL exposes `isAnonymous()` and `record.blobCreatedBy` (the uploader's id; null for bucket-level `list`).
 
 ### TTL tiers
 
@@ -141,9 +132,9 @@ imgEl.src = `/app/${appId}/api/blob-buckets/${bucketId}/blobs/${blobId}`; // 401
 
 ### Signed URLs
 
-The signed-URL call is shown in **Read (signed URL / download)** above. A signed URL bypasses the bucket's access policy entirely (anyone with the URL can read until it expires). Treat them as bearer tokens. Don't email or log them.
+The signed-URL call is shown in **Read (signed URL / download)** above. A signed URL bypasses the bucket's preset entirely (anyone with the URL can read until it expires). Treat them as bearer tokens. Don't email or log them.
 
-The signed-URL request endpoint requires `member` permission on the app, so generation itself is restricted to authenticated app users — even for a `public-read` bucket. The resulting URL is then unauthenticated.
+The signed-URL request endpoint requires `member` permission on the app, so generation itself is restricted to authenticated app users — even for a `public` bucket. The resulting URL is then unauthenticated.
 
 {{#lang ts}}
 To display a bucket image, point an element at the returned `url`:
@@ -173,7 +164,7 @@ The `blob.upload`, `blob.download`, and `blob.signedUrl` workflow steps write to
 
 - Storing user-uploaded documents in a bucket when they should be document-scoped blobs with permission inheritance.
 - Leaving a bucket on `permanent` when blobs are only needed briefly. Object storage is billed; pick the shortest tier.
-- Using `public-read` and then trying to enforce per-user access. `public-read` bypasses all per-user checks at read time. Use `authenticated` and gate access in your own code before issuing signed URLs.
+- Using `public` and then trying to enforce per-user access. `public` bypasses all per-user checks at read time. Use `authenticated` (or `personal-uploads` for owner-scoped blobs) and gate access in your own code before issuing signed URLs.
 - Calling `getSignedUrl` on every render. Each call is a network round-trip; cache the URL until `expiresAt - 60s`.
 - Writing to the underlying object store outside of Primitive. Side-channel objects don't appear in `list()` and won't be cleaned up by bucket deletion.
 - Reusing a `documentId` as a `bucketKey`. Different namespaces; offers no benefit and is confusing.

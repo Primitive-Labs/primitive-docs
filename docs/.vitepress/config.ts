@@ -361,7 +361,7 @@ export default defineConfig({
         items: [
           { text: 'Overview', link: '/' },
           { text: 'Quick Start', link: '/getting-started/template-app' },
-          { text: 'Configuring Your Backend', link: '/getting-started/configuring-your-backend' },
+          { text: 'Configuring Primitive Services', link: '/getting-started/configuring-primitive-services' },
           { text: 'Example Apps', link: '/getting-started/example-apps' },
         ],
         collapsed: false,

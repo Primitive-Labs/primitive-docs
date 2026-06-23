@@ -68,17 +68,7 @@ The Primitive Admin Console is a web-based dashboard for managing your apps, use
 
 ## When to Use the Console vs. the CLI
 
-Both tools manage the same configuration — use whichever fits your workflow:
-
-| Task | Console | CLI |
-|---|---|---|
-| Exploring and testing | Preferred — visual feedback, interactive | Works but less convenient |
-| Version-controlled config | Not applicable | Preferred — TOML files in your repo |
-| Quick one-off changes | Convenient | Convenient |
-| AI agent automation | Not applicable | Preferred — agents use CLI commands |
-| CI/CD pipelines | Not applicable | Preferred — scriptable |
-
-In practice, many developers use the console for exploring and testing, and the CLI (with `primitive sync`) for managing configuration as code.
+Both tools manage the same configuration. In practice, many developers use the console for exploring and testing, and the CLI (with `primitive sync`) for managing configuration as code — see [Console or Code?](./configuring-primitive-services.md#console-or-code) for the full breakdown.
 
 ## Next Steps
 

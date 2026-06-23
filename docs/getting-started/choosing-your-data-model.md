@@ -25,7 +25,7 @@ Documents are local-first collaborative containers. Data lives on the device, sy
 - **Offline access is important** — Users need to work without a network connection
 - **Data is naturally partitioned by sharing context** — Different people have access to different data sets
 
-Documents are the right choice for the "inner" data of most productivity and collaboration apps. Individual documents have a 10 MB data limit — for larger data sets, partition across multiple documents.
+Documents are the right choice for the "inner" data of most productivity and collaboration apps. An individual document works best under ~10 MB — for larger data sets, partition across multiple documents.
 
 ## When to Use Databases
 

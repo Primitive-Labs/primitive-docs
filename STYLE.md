@@ -42,7 +42,7 @@ The review question is not "is everything at the same level?" but "**does anythi
 - **One page per concept; parallel concepts get parallel treatment.** Workflows and prompts are parallel concepts — each owns a page. Don't bundle concepts because they're often used together.
 - **Introduce every concept on its own terms.** Never frame feature A as an appendage of feature B. Databases are not "data that workflows act on"; subscriptions are a client feature independent of workflows. Cross-feature link blurbs describe the target on *its* terms ("Workflows — multi-step server-side automation").
 - **A concept's capabilities live on that concept's page.** Database subscriptions belong on the databases page; every way to invoke a workflow belongs on the workflows page. When features compose, write a factual integration note inside a section — don't relocate a capability to its collaborator's page.
-- **Centralize cross-cutting concepts, then reference them.** Configuration-as-code lives in `configuring-your-backend.md`; CEL access control lives in `access-control.md`. Feature pages link there and add only their surface-specific context.
+- **Centralize cross-cutting concepts, then reference them.** Configuration-as-code lives in `configuring-primitive-services.md`; CEL access control lives in `access-control.md`. Feature pages link there and add only their surface-specific context.
 
 ## Things human docs never say
 

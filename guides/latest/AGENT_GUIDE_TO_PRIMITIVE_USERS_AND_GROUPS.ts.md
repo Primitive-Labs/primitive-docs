@@ -79,18 +79,19 @@ For app-specific user data (preferences, settings, profile fields beyond name/em
 **Do this:**
 
 ```typescript
-// Store additional user data in a document, keyed by the platform userId
-const userProfile = new UserProfile();
-userProfile.userId = platformUserId; // reference the platform user
-userProfile.bio = "Software engineer";
-userProfile.theme = "dark";
-await userProfile.save({ targetDocument: userDocumentId });
+  // Store additional user data in a document, keyed by the platform userId.
+  const profile = new AppUser({
+    id: platformUserId, // reference the platform user
+    email: "alice@example.com",
+    name: "Software engineer",
+  });
+  await profile.save({ targetDocument: userDocumentId });
 
-// Or in a database via registered operation
-await client.databases.executeOperation(dbId, "updateProfile", {
-  params: { bio: "Software engineer", theme: "dark" },
-  // The operation uses $user.userId server-side — no need to pass userId
-});
+  // Or in a database via a registered operation. The operation uses
+  // $user.userId server-side — no need to pass the userId yourself.
+  await client.databases.executeOperation(dbId, "updateProfile", {
+    params: { bio: "Software engineer", theme: "dark" },
+  });
 ```
 
 **Don't do this:**
@@ -351,9 +352,6 @@ Use this to render the "pending members" section of a group sharing UI without h
   const memberships = await client.groups.listUserMemberships(userId);
   // [{ groupType, groupId, name, description?, addedAt, addedBy }]
 ```
-
-`name` is joined from `AppGroup` at call time; orphan rows (membership pointing at a deleted group) are skipped.
-Pass `{ groupType }` to filter to a single type — a server-side range push-down, not a post-query filter.
 
 ## Group Type Configuration
 
@@ -738,47 +736,46 @@ autoAddCreator = true
 **Runtime** (in app code):
 
 ```typescript
-// User creates a team
-await client.groups.create({
-  groupType: "team",
-  groupId: "alpha-team",
-  name: "Alpha Team",
-});
+  // User creates a team.
+  await client.groups.create({
+    groupType: "team",
+    groupId: "alpha-team",
+    name: "Alpha Team",
+  });
 
-// Share a document with the team
-await client.documents.grantGroupPermission(docId, {
-  groupType: "team",
-  groupId: "alpha-team",
-  permission: "read-write",
-});
-
-// Database operations gated by team membership
-// access: "isMemberOf('team', database.metadata.teamId)"
+  // Share a document with the team — every member inherits read-write.
+  await client.documents.grantGroupPermission(docId, {
+    groupType: "team",
+    groupId: "alpha-team",
+    permission: "read-write",
+  });
 ```
+
+Gate the team's database operations on membership in CEL: `access: "isMemberOf('team', database.metadata.teamId)"`.
 
 ### Role-based access (reviewer, editor, viewer)
 
 Use group types as roles within a context.
 
 ```typescript
-// Create role groups for a project
-await client.groups.create({ groupType: "editor", groupId: "project-1", name: "Project 1 Editors" });
-await client.groups.create({ groupType: "viewer", groupId: "project-1", name: "Project 1 Viewers" });
+  // Create role groups for a project.
+  await client.groups.create({ groupType: "editor", groupId: "project-1", name: "Project 1 Editors" });
+  await client.groups.create({ groupType: "viewer", groupId: "project-1", name: "Project 1 Viewers" });
 
-// Grant different document permissions
-await client.documents.grantGroupPermission(docId, {
-  groupType: "editor", groupId: "project-1", permission: "read-write",
-});
-await client.documents.grantGroupPermission(docId, {
-  groupType: "viewer", groupId: "project-1", permission: "reader",
-});
-
-// Database operations with role checks
-// Editors can modify:
-// access: "isMemberOf('editor', params.projectId)"
-// Viewers can read:
-// access: "isMemberOf('viewer', params.projectId) || isMemberOf('editor', params.projectId)"
+  // Grant different document permissions per role.
+  await client.documents.grantGroupPermission(docId, {
+    groupType: "editor",
+    groupId: "project-1",
+    permission: "read-write",
+  });
+  await client.documents.grantGroupPermission(docId, {
+    groupType: "viewer",
+    groupId: "project-1",
+    permission: "reader",
+  });
 ```
+
+Gate the operations on role membership in CEL — editors can modify (`access: "isMemberOf('editor', params.projectId)"`); viewers can read (`access: "isMemberOf('viewer', params.projectId) || isMemberOf('editor', params.projectId)"`).
 
 ### Relationship modeling (parent-child, mentor-mentee)
 
@@ -803,18 +800,18 @@ The per-parameter `access` expression ensures parents can only view their own ch
 **Runtime** (in app code):
 
 ```typescript
-// A "parent-of" group per student
-await client.groups.create({
-  groupType: "parent-of",
-  groupId: "student-123",
-  name: "Parents of Student 123",
-});
-await client.groups.addMember("parent-of", "student-123", { userId: parentUserId });
+  // A "parent-of" group per student.
+  await client.groups.create({
+    groupType: "parent-of",
+    groupId: "student-123",
+    name: "Parents of Student 123",
+  });
+  await client.groups.addMember("parent-of", "student-123", { userId: parentUserId });
 
-// Parent queries their child's grades — server enforces access
-const grades = await client.databases.executeOperation(dbId, "viewGrades", {
-  params: { studentId: "student-123" },
-});
+  // Parent queries their child's grades — server enforces access.
+  const grades = await client.databases.executeOperation(dbId, "viewGrades", {
+    params: { studentId: "student-123" },
+  });
 ```
 
 ### Organization hierarchy
@@ -822,26 +819,23 @@ const grades = await client.databases.executeOperation(dbId, "viewGrades", {
 Model nested organizational structure with multiple group types.
 
 ```typescript
-// Organization-level groups
-await client.groups.create({ groupType: "org", groupId: "acme-corp", name: "Acme Corp" });
+  // Organization-level group.
+  await client.groups.create({ groupType: "org", groupId: "acme-corp", name: "Acme Corp" });
 
-// Department-level groups
-await client.groups.create({ groupType: "dept", groupId: "engineering", name: "Engineering" });
-await client.groups.create({ groupType: "dept", groupId: "marketing", name: "Marketing" });
+  // Department-level groups.
+  await client.groups.create({ groupType: "dept", groupId: "engineering", name: "Engineering" });
+  await client.groups.create({ groupType: "dept", groupId: "marketing", name: "Marketing" });
 
-// Team-level groups
-await client.groups.create({ groupType: "team", groupId: "backend", name: "Backend Team" });
+  // Team-level group.
+  await client.groups.create({ groupType: "team", groupId: "backend", name: "Backend Team" });
 
-// A user can be in multiple groups at different levels
-await client.groups.addMember("org", "acme-corp", { userId });
-await client.groups.addMember("dept", "engineering", { userId });
-await client.groups.addMember("team", "backend", { userId });
-
-// CEL can check any level:
-// "isMemberOf('org', database.metadata.orgId)"
-// "isMemberOf('dept', params.deptId)"
-// "isMemberOf('team', database.metadata.teamId)"
+  // A user can be in multiple groups at different levels.
+  await client.groups.addMember("org", "acme-corp", { userId });
+  await client.groups.addMember("dept", "engineering", { userId });
+  await client.groups.addMember("team", "backend", { userId });
 ```
+
+CEL can check any level: `"isMemberOf('org', database.metadata.orgId)"`, `"isMemberOf('dept', params.deptId)"`, `"isMemberOf('team', database.metadata.teamId)"`.
 
 ## Best Practices
 

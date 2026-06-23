@@ -84,7 +84,7 @@ Every event (auto or custom) gets these populated automatically:
 
 Events are buffered on the device and persisted locally while offline; persisted events are flushed automatically when the WebSocket reconnects. A rate limiter caps emission at **300 events/minute with a 60-token burst** — events over the cap are dropped silently. No special code needed.
 
-The offline buffer is persisted to IndexedDB with a **1 MiB** cap; when it exceeds the cap the **oldest** events are dropped.
+The offline buffer is persisted with a **~1 MiB** cap; when it exceeds the cap the **oldest** events are dropped.
 
 ---
 
@@ -193,11 +193,11 @@ Events with no authenticated user are dropped. To log on pre-auth screens (landi
 
 Events are buffered and flushed automatically — including when the WebSocket reconnects — so you rarely need to flush manually. Call `flush` to force a send (e.g. before an explicit teardown).
 
-The queue auto-flushes every **100ms** or when the buffer reaches **25 KiB**, and the client also flushes on `beforeunload`, on tab visibility hidden, and on reconnect.
-
 ```typescript
-client.analytics.flush();
+  client.analytics.flush();
 ```
+
+The queue auto-flushes every **100ms** or when the buffer reaches **25 KiB**, and the client also flushes on `beforeunload`, on tab visibility hidden, and on reconnect.
 
 Pre-existing browser hooks (added by the client itself):
 - `beforeunload` → fires `session_end`, then flushes
@@ -378,49 +378,47 @@ These fields are absent (or zero) when the event type doesn't produce them.
 
 ## Complete Example: Feature Usage Tracking
 
+Configure auto events on the client, set the app-version override once, then log a per-feature action and a pre-auth landing event.
+
 ```typescript
-import { JsBaoClient, ANALYTICS_UNAUTHENTICATED_USER } from "js-bao-wss-client";
-
-const client = new JsBaoClient({
-  appId: "app-123",
-  apiUrl: "https://api.example.com",
-  wsUrl: "wss://ws.example.com",
-  analyticsAutoEvents: {
-    sessionEnd: true,
-    blobUploads: { start: false, success: true, failure: true },
-    llm: { start: false, success: true, failure: true },
-  },
-});
-
-// Set version once after init (or after deploy notification)
-client.analytics.setAppVersionOverride("2.1.4");
-
-function trackFeatureUsed(
-  userUlid: string,
-  feature: string,
-  action: string,
-  context?: Record<string, unknown>
-) {
-  client.analytics.logEvent({
-    action,
-    feature,
-    user_ulid: userUlid,
-    context_json: context,
+  const client = await initializeClient({
+    apiUrl: "https://primitiveapi.com",
+    wsUrl: "wss://primitiveapi.com",
+    appId: "YOUR_APP_ID",
+    analyticsAutoEvents: {
+      sessionEnd: true,
+      blobUploads: { start: false, success: true, failure: true },
+      llm: { start: false, success: true, failure: true },
+    },
   });
-}
 
-// Authenticated event
-trackFeatureUsed(currentUserUlid, "reports", "report_generated", {
-  reportType: "quarterly",
-  format: "pdf",
-});
+  // Set version once after init (or after a deploy notification)
+  client.analytics.setAppVersionOverride("2.1.4");
 
-// Pre-auth event (landing page)
-client.analytics.logEvent({
-  action: "landing_page_view",
-  feature: "onboarding",
-  user_ulid: ANALYTICS_UNAUTHENTICATED_USER,
-});
+  function trackFeatureUsed(
+    userUlid: string,
+    feature: string,
+    action: string,
+    context?: Record<string, unknown>,
+  ) {
+    client.analytics.logEvent({
+      action,
+      feature,
+      user_ulid: userUlid,
+      context_json: context,
+    });
+  }
 
-// No need for a beforeunload flush — the client adds one automatically.
+  // Authenticated event
+  trackFeatureUsed(currentUserUlid, "reports", "report_generated", {
+    reportType: "quarterly",
+    format: "pdf",
+  });
+
+  // Pre-auth event (landing page)
+  client.analytics.logEvent({
+    action: "landing_page_view",
+    feature: "onboarding",
+    user_ulid: ANALYTICS_UNAUTHENTICATED_USER,
+  });
 ```

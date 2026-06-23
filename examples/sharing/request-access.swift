@@ -19,3 +19,18 @@ func accessRequests(
   // #endregion example
   _ = requests
 }
+
+// Deny a request instead, optionally pointing the requester at the doc's URL.
+func denyRequest(
+  client: JsBaoClient,
+  documentId: String,
+  requestId: String
+) async throws {
+  // #region deny
+  _ = try await client.documents.denyAccessRequest(
+    documentId: documentId,
+    requestId: requestId,
+    options: DenyAccessRequestOptions(documentUrl: "https://myapp.example/docs/sales-handbook")
+  )
+  // #endregion deny
+}

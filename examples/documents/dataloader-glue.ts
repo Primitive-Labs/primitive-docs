@@ -2,20 +2,29 @@
 // (primitive-app-template src/composables/useJsBaoDataLoader.ts) and Vue APIs
 // not present in this repo.
 import type { Ref } from "vue";
+import { computed } from "vue";
 import { useJsBaoDataLoader } from "@/composables/useJsBaoDataLoader";
-import { Task } from "@/models/Task.generated";
+import { TodoItem } from "@/models";
 
-export function useOpenTasks(documentReady: Ref<boolean>) {
+// Inside a component's <script setup>, with `props`, a `showCompleted` flag,
+// and a `documentReady` ref in scope:
+export function useTodoList(props: { listId: string }, showCompleted: boolean, documentReady: Ref<boolean>) {
   // #region example
-  const { data: tasks, initialDataLoaded, isLoading } = useJsBaoDataLoader({
-    subscribeTo: [Task],   // reload whenever Task records change
-    documentReady,         // gate loads until the document is open
-    queryParams: null,
-    loadData: async () => {
-      const page = await Task.query({ completed: false }, { sort: { priority: -1 } });
-      return page.data;
+  const {
+    data: todos,
+    initialDataLoaded,
+    reload,
+  } = useJsBaoDataLoader<{ items: TodoItem[]; total: number }>({
+    subscribeTo: [TodoItem],
+    queryParams: computed(() => ({ listId: props.listId, showCompleted })),
+    documentReady,
+    async loadData(queryParams) {
+      const { listId, showCompleted } = queryParams ?? {};
+      const query = showCompleted ? { listId } : { listId, completed: false };
+      const result = await TodoItem.query(query, { sort: { order: 1 } });
+      return { items: result.data, total: result.data.length };
     },
   });
   // #endregion example
-  return { tasks, initialDataLoaded, isLoading };
+  return { todos, initialDataLoaded, reload };
 }

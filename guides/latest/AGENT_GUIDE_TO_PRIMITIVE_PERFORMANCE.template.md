@@ -146,34 +146,7 @@ definition = '{"filter":{},"sort":{"groupId":1},"limit":1000}'
 
 Call it once, then group client-side:
 
-{{#lang ts}}
-```ts
-const all = await db.executeOperation("listAllTargets");
-const byGroup = new Map<string, Target[]>();
-for (const t of all.data) {
-  const list = byGroup.get(t.groupId) ?? [];
-  list.push(t);
-  byGroup.set(t.groupId, list);
-}
-for (const group of groups) {
-  const targets = byGroup.get(group.id) ?? [];
-  // ...
-}
-```
-{{/lang}}
-{{#lang swift}}
-```swift
-let all = try await db.executeOperation(name: "listAllTargets")
-var byGroup: [String: [Target]] = [:]
-for t in all.data {
-  byGroup[t.groupId, default: []].append(t)
-}
-for group in groups {
-  let targets = byGroup[group.id] ?? []
-  // ...
-}
-```
-{{/lang}}
+{{ example: performance/bulk-then-group }}
 
 If you can fold the bulk op into a pipeline (Pattern 1), do that instead — same round-trip count, fewer named ops to maintain.
 
@@ -297,7 +270,7 @@ async function initialize() {
 ```swift
 func initialize() async throws {
   // Always loaded, even on screens that never consult it
-  authConfig = try await client.getAuthConfig()
+  authConfig = try await client.auth.getAuthConfig()
   // Always loaded, even though only some screens care about memberships
   memberships = try await client.groups.listUserMemberships(userId: userId)
   // Always awaited before isAuthenticated flips true
@@ -364,7 +337,7 @@ func initialize() async throws {
 func loadAuthConfig() async {
   if authConfig != nil { return }
   if let task = authConfigTask { return await task.value }
-  let task = Task { normalize(try await client.getAuthConfig()) }
+  let task = Task { normalize(try await client.auth.getAuthConfig()) }
   authConfigTask = task
   authConfig = await task.value
 }
@@ -598,10 +571,14 @@ final class SourceStore: ObservableObject {
   // a server-registered subscription key, and an options object carrying the
   // `onChange` callback (plus any `params` forwarded to the subscription's
   // filter CEL).
-  func observe(dbId: String) {
-    client.databases.subscribe(databaseId: dbId, key: "source-changes") { [weak self] _ in
-      self?.invalidate()
-    }
+  func observe(dbId: String) throws {
+    _ = try client.databases.subscribe(
+      databaseId: dbId,
+      subscriptionKey: "source-changes",
+      options: DatabaseSubscribeOptions(onChange: { [weak self] _ in
+        self?.invalidate()
+      })
+    )
   }
 }
 ```
@@ -664,7 +641,7 @@ When auditing an existing Primitive app, these usually find real wins:
 | N+1 in a loop | `for .* in` followed by `try await .*executeOperation` |
 | Per-symbol third-party call | calls to `client.integrations.call` inside a loop |
 | Eager full-reload on every state change | a change observer whose body does `try await load…` |
-| Awaiting non-critical init | `try await client.getAuthConfig()`, `try await listUserMemberships`, `try await initializeUserPrefs()` inside `initialize()` / `completeAuthentication()` |
+| Awaiting non-critical init | `try await client.auth.getAuthConfig()`, `try await listUserMemberships`, `try await initializeUserPrefs()` inside `initialize()` / `completeAuthentication()` |
 | Cached value behind a re-block | `await ensurePrefsReady(); let cached = getPref(...)` (yes — really) |
 | Sequential awaits | three or more consecutive `try await db.executeOperation(...)` lines |
 {{/lang}}

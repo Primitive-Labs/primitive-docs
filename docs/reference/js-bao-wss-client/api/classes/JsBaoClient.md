@@ -2900,11 +2900,17 @@ Sub-API for managing documents (list, create, get, delete, share).
 
 ***
 
-### gemini
+### ~~gemini~~
 
 > **gemini**: [`GeminiAPI`](../interfaces/GeminiAPI.md)
 
 Sub-API for Gemini model operations.
+
+#### Deprecated
+
+The direct Gemini client API is deprecated and will be removed in
+a future major release. Use [client.prompts.execute](../interfaces/PromptsAPI.md#execute)
+(managed prompts) or a workflow `gemini.generate` step instead.
 
 ***
 
@@ -2940,11 +2946,17 @@ Sub-API for app-level invitations and deferred grants.
 
 ***
 
-### llm
+### ~~llm~~
 
 > **llm**: [`LlmAPI`](../interfaces/LlmAPI.md)
 
 Sub-API for LLM (large language model) operations.
+
+#### Deprecated
+
+The direct LLM client API is deprecated and will be removed in a
+future major release. Use [client.prompts.execute](../interfaces/PromptsAPI.md#execute)
+(managed prompts) or a workflow `llm.chat` step instead.
 
 ***
 

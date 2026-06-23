@@ -124,60 +124,7 @@ The cascading delete is `client.invitations.delete(id)` — there is **no `clien
 
 Admins/owners can invite at any role; members can invite only at `role: "member"` and only when `memberInvitationsEnabled` is true (check `quota()` first). `sendEmail` defaults to `false` — when `true` the server delivers a default invitation email, otherwise you deliver the `inviteToken` yourself. `source` (≤64 chars) and `note` are optional audit/admin-UI metadata; `expiresAt` overrides the default expiry.
 
-{{#lang ts}}
-```typescript
-// Admins/owners: any role
-await client.invitations.create({
-  email: "alice@example.com",
-  role: "member", // or "admin" / "owner" (admin/owner only)
-});
-
-// Full options
-await client.invitations.create({
-  email: "alice@example.com",
-  role: "member",
-  expiresAt: new Date(Date.now() + 7 * 86400_000).toISOString(), // optional override
-  source: "team-onboarding-flow",
-  note: "Backend hire — Q2 cohort",
-  sendEmail: true,
-});
-
-// Members: gate on quota first
-const quota = await client.invitations.quota();
-if (!quota.unlimited && quota.remaining <= 0) {
-  return showQuotaExhausted();
-}
-await client.invitations.create({ email, role: "member" });
-```
-{{/lang}}
-{{#lang swift}}
-```swift
-// Admins/owners: any role
-_ = try await client.invitations.create(params: [
-  "email": "alice@example.com",
-  "role": "member",  // or "admin" / "owner" (admin/owner only)
-])
-
-// Full options
-_ = try await client.invitations.create(params: [
-  "email": "alice@example.com",
-  "role": "member",
-  "expiresAt": ISO8601DateFormatter().string(from: Date().addingTimeInterval(7 * 86400)),
-  "source": "team-onboarding-flow",
-  "note": "Backend hire — Q2 cohort",
-  "sendEmail": true,
-])
-
-// Members: gate on quota first
-let quota = try await client.invitations.quota()
-let unlimited = quota["unlimited"] as? Bool ?? false
-let remaining = quota["remaining"] as? Int ?? 0
-if !unlimited && remaining <= 0 {
-  return showQuotaExhausted()
-}
-_ = try await client.invitations.create(params: ["email": email, "role": "member"])
-```
-{{/lang}}
+{{ example: sharing/invitation-create-options }}
 
 ### Member invitations + quotas
 
@@ -230,22 +177,7 @@ Capture the `inviteToken` from the mint response if you need to build accept URL
 
 For resend / lookup after the initial response is gone, fetch the invitation by id and rebuild the accept URL from its `inviteToken`. The returned record carries `invitationId`, `email`, `role`, `invitedBy`, `invitedAt`, `expiresAt`, `accepted`, `acceptedAt`, `source`, `note`, `inviteToken`, and a computed `status` (`"pending" | "expired" | "accepted"`).
 
-{{#lang ts}}
-```typescript
-const inv = await client.invitations.get(invitationId);
-const acceptUrl = `${myApp.baseUrl}/invite/accept?inviteToken=${inv.inviteToken}`;
-await myEmailService.send({ to: inv.email, link: acceptUrl });
-```
-{{/lang}}
-{{#lang swift}}
-```swift
-let inv = try await client.invitations.get(invitationId: invitationId)
-let inviteToken = inv["inviteToken"] as? String ?? ""
-let email = inv["email"] as? String ?? ""
-let acceptUrl = "\(myApp.baseURL)/invite/accept?inviteToken=\(inviteToken)"
-try await myEmailService.send(to: email, link: acceptUrl)
-```
-{{/lang}}
+{{ example: sharing/invitation-get-token }}
 
 Permissions for `invitations.get`: app admin/owner, OR the invitation's original inviter. Members who did not create the invitation receive 403 — `inviteToken` is a bearer credential, so read access is intentionally narrow.
 
@@ -298,20 +230,7 @@ Deferred grants are re-validated at resolution time. In a `domain`-restricted ap
 
 ### Inspecting pending state (debug only)
 
-{{#lang ts}}
-```typescript
-const { grants, nextCursor } = await client.invitations.listDeferredGrants({
-  email: "alice@example.com",
-});
-```
-{{/lang}}
-{{#lang swift}}
-```swift
-let (grants, nextCursor) = try await client.invitations.listDeferredGrants(
-  email: "alice@example.com"
-)
-```
-{{/lang}}
+{{ example: sharing/list-deferred-grants }}
 
 Reserve this for admin/debug UIs. For end-user "people with access + pending invitations" UI, use the per-resource `listPendingInvitations` endpoints on documents/groups/collections (see the [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#building-a-members--pending-ui)).
 
@@ -323,47 +242,7 @@ Reserve this for admin/debug UIs. For end-user "people with access + pending inv
 
 Check quota, mint the app invitation, share the project document by email, and add the email to the team group. After signup all three resolve in one server-side transaction.
 
-{{#lang ts}}
-```typescript
-async function onboardTeammate(email: string, projectDocId: string) {
-  const quota = await client.invitations.quota();
-  if (!quota.unlimited && quota.remaining <= 0) {
-    throw new Error("Invitation quota exhausted");
-  }
-
-  await client.invitations.create({ email, role: "member" });
-
-  await client.documents.updatePermissions(projectDocId, {
-    permissions: [{ email, permission: "read-write" }],
-  });
-
-  await client.groups.addMember("team", "engineering", { email });
-}
-```
-{{/lang}}
-{{#lang swift}}
-```swift
-func onboardTeammate(email: String, projectDocId: String) async throws {
-  let quota = try await client.invitations.quota()
-  let unlimited = quota["unlimited"] as? Bool ?? false
-  let remaining = quota["remaining"] as? Int ?? 0
-  if !unlimited && remaining <= 0 {
-    throw OnboardingError.quotaExhausted
-  }
-
-  _ = try await client.invitations.create(params: ["email": email, "role": "member"])
-
-  _ = try await client.documents.updatePermissions(
-    documentId: projectDocId,
-    params: ["permissions": [["email": email, "permission": "read-write"]]]
-  )
-
-  _ = try await client.groups.addMember(
-    groupType: "team", groupId: "engineering", params: ["email": email]
-  )
-}
-```
-{{/lang}}
+{{ example: sharing/invite-onboarding }}
 
 ---
 
@@ -371,34 +250,7 @@ func onboardTeammate(email: String, projectDocId: String) async throws {
 
 The `invitation` event is the only typed app-membership event. The lifecycle action is on `event.action` (not `event.type`, which is always `"invitation"`). Branch on `action`: `created`/`updated`/`cancelled` go to the invitee only; `declined` to both; `accepted` to the inviter only (with `event.acceptedBy` carrying the userId). Treat unknown actions as a no-op.
 
-{{#lang ts}}
-```typescript
-client.on("invitation", (event) => {
-  switch (event.action) {
-    case "created":   /* invitee only */ break;
-    case "updated":   /* invitee only */ break;
-    case "cancelled": /* invitee only */ break;
-    case "declined":  /* both invitee and inviter */ break;
-    case "accepted":  /* inviter only — event.acceptedBy carries the userId */ break;
-    default: /* future-proof: no-op, don't throw */ break;
-  }
-});
-```
-{{/lang}}
-{{#lang swift}}
-```swift
-client.events.on(.invitation) { event in
-  switch event.action {
-  case "created":   break  // invitee only
-  case "updated":   break  // invitee only
-  case "cancelled": break  // invitee only
-  case "declined":  break  // both invitee and inviter
-  case "accepted":  break  // inviter only — event.acceptedBy carries the userId
-  default:          break  // future-proof: no-op, don't throw
-  }
-}
-```
-{{/lang}}
+{{ example: sharing/invitation-events }}
 
 **Targeting is asymmetric** — most actions go to one side only. `accepted` goes to the *inviter*; `created` goes to the *invitee*. Don't expect both sides to see the same events. Polling `invitations.list()` for acceptance is an anti-pattern — subscribe and switch on the `accepted` action instead.
 

@@ -188,6 +188,30 @@ List all blob buckets for the current app (admin/owner only).
 
 ***
 
+### updateBucket()
+
+> **updateBucket**(`bucketIdOrKey`, `params`): `Promise`\<[`BlobBucketInfo`](BlobBucketInfo.md)\>
+
+Update a bucket's access without recreating it (#1020). Admin/owner only.
+Change the `preset`, attach/swap/clear a custom `ruleSetId`, or edit
+`name`/`description`. Setting a non-custom preset clears any rule set.
+
+#### Parameters
+
+##### bucketIdOrKey
+
+`string`
+
+##### params
+
+[`UpdateBlobBucketParams`](UpdateBlobBucketParams.md)
+
+#### Returns
+
+`Promise`\<[`BlobBucketInfo`](BlobBucketInfo.md)\>
+
+***
+
 ### upload()
 
 > **upload**(`bucketIdOrKey`, `params`): `Promise`\<[`BucketBlobUploadResult`](BucketBlobUploadResult.md)\>

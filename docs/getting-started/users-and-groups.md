@@ -64,8 +64,6 @@ You can add members by **email** or by user ID. Most apps should use email — i
 
 :::
 
-Provide **either** `email` or `userId`, not both. `listUserMemberships` rows include `name` and optional `description` joined from the group (orphan rows are skipped); pass a group type to filter to one slice.
-
 The `addMember` result is a discriminated union — branch on `status`:
 
 | `status` | Meaning |
@@ -75,18 +73,6 @@ The `addMember` result is a discriminated union — branch on `status`:
 | `"pending_signup"` | Email is not yet an app user; a deferred add was created. Carries `invitationId` and `inviteToken` for custom invitation emails |
 
 See [Sending Your Own Invitation Emails](./invitations.md#sending-your-own-invitation-emails) for what to do with `inviteToken`.
-
-### Email-Based Adds Work for Non-Members Too
-
-If the email you pass to `addMember` doesn't match an existing app user, the server creates an invitation and remembers the pending add. When that person signs up with that email, they're automatically added to the group.
-
-This means you can onboard someone into the right team *before* they've created an account — and `isMemberOf` checks start working the moment they sign up, no admin action needed.
-
-See [Invitations](./invitations.md) for the full picture (invitation lifecycle, cascade on revoke, domain re-validation).
-
-::: warning CEL membership resolves at signup
-`isMemberOf('team', 'engineering')` returns `false` for a pending (not-yet-signed-up) member until their signup completes. If a workflow or operation needs to act "as if" the person were already a member, wait until the `invitation`/`accepted` event fires.
-:::
 
 Via the CLI:
 
@@ -131,8 +117,6 @@ access = "params.teamId in memberGroups('team')"
 # Member of either the parent org or the team
 access = "isMemberOf('org', params.orgId) || isMemberOf('team', params.teamId)"
 ```
-
-One modeling note: group-level "admin" isn't a built-in concept — model it as a separate group type (e.g. `team-admin`) and check membership there.
 
 Who can *manage* groups themselves — create groups of a type, add or remove members — is governed by **rule sets** bound to the group type. See [Access Control](./access-control.md#rule-sets-governing-management-operations).
 

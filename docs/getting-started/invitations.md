@@ -41,12 +41,13 @@ primitive users invite alice@example.com
 
 Or from your app:
 
-```typescript
-await client.invitations.create({
-  email: "alice@example.com",
-  role: "member",
-});
-```
+::: code-group
+
+<<< ../../examples/invitations/create.ts#example{ts} [JavaScript]
+
+<<< ../../examples/invitations/create.swift#example{swift} [Swift]
+
+:::
 
 The invitee receives an email. The invitation is consumed when they sign up with the invited email, or when they accept it under a different account using the invitation's token (see [How Invitations Resolve](#how-invitations-resolve)).
 
