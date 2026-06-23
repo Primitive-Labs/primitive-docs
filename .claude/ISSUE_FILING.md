@@ -25,6 +25,16 @@ reversible, and keeps the gap from being silently swallowed by a report nobody r
 Filing an issue is *not* the same as documenting the gap in the docs — the docs still show
 only what's there (STYLE.md).
 
+## One issue per problem — no rollups
+
+File each distinct gap, fence, or task as its **own independently-closable issue**. Do **not**
+create (or add rows to) a rollup/checklist tracker that bundles many unrelated items under one
+number — those can only be closed all-or-nothing, hide which parts are done, and go stale as
+items land piecemeal. One fence awaiting parity = one issue; one document needing a restructure
+= one issue. If several issues share a theme, link them to each other rather than merging them
+into a parent checklist. (When you inherit an existing rollup, split it into per-item issues and
+close the rollup — that's how #126 and #125 were retired.)
+
 ## Where to file (repo routing)
 
 File in the repo where the **fix** would land — the source of truth for the surface, not
