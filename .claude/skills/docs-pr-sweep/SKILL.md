@@ -109,12 +109,15 @@ The one situation this skill can't drive to merge by itself is a PR from a **for
 
 ## Step 4 — Merge the passing set into `next`
 
-Once a PR is green on every count in Step 2 (after any Step 3 fixes), merge it — no approval checkpoint is needed for landing on `next`. Before each merge, **assert the base** so this skill can never publish:
+Once a PR is green on every count in Step 2 (after any Step 3 fixes), merge it — no approval checkpoint is needed for landing on `next`. Before each merge, **assert the base** so this skill can never publish, and **assert the issue link** so a fix-PR actually closes the issue it resolves:
 
 ```bash
 test "$(gh pr view <NN> --json baseRefName -q .baseRefName)" = "next" || { echo "REFUSING: base is not next"; exit 1; }
+gh pr view <NN> --json closingIssuesReferences --jq '[.closingIssuesReferences[].number]'   # see below
 gh pr merge <NN> --squash --delete-branch
 ```
+
+**Closing-keyword check.** A PR that fixes a tracked issue must carry a working closing keyword in its **body** (`Fixes #NN` / `Closes #NN` / `Resolves #NN`) — a bare `(#NN)` in the *title* does not close anything. If the PR cites an issue (title `(#NN)`, "Fixes #NN" prose, or a linked issue) but `closingIssuesReferences` comes back empty or missing that number, the link is broken: `gh pr edit <NN> --body` to add the keyword line before merging, so the issue auto-closes on merge instead of lingering open. (This is the defect that stranded #133–136 open after their PRs merged.) Don't manually close as a substitute — fix the link so the merge does it. After the sweep, any issue whose fix-PR merged should be **closed**; spot-check with `gh issue list --state open` and close with evidence anything left dangling.
 
 Merge the flagged same-file PRs **one at a time**, newest-validated first or in whatever order minimizes rework; after each merge, rebase the next conflicting PR on the updated `next` and re-run its Step 2 gates before merging it — a clean validation against a stale base isn't a clean merge. Keep `next` green at every step: the source-stamp gate must still pass after each merge. A `docs-next-sync` PR moving a submodule is expected (that is the whole point of it) — its bundled `docs-sources.json` re-stamp keeps the gate green; what must never happen is a submodule move *backward* (Step 2 ancestry check) or a stamp that disagrees with the pinned HEAD.
 
