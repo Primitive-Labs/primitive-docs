@@ -67,11 +67,11 @@ SHA-256 is computed client-side and used for server-side dedup. See **Upload wit
 
 ### From a file input
 
-```typescript
-const file = (document.querySelector('input[type="file"]') as HTMLInputElement).files![0];
+The upload call is the compiled [Upload](#upload) example — `client.document(documentId).blobs().upload(file)`. The only web-specific glue is pulling the `File` off an `<input>` (`File` objects are accepted directly; `filename`/`contentType` default to `file.name`/`file.type`):
 
-// File objects are accepted directly. If filename/contentType are omitted,
-// they default to file.name and file.type.
+```typescript
+// web-DOM glue: get a File from an <input type="file">, then upload it.
+const file = (document.querySelector('input[type="file"]') as HTMLInputElement).files![0];
 const { blobId } = await client.document(documentId).blobs().upload(file);
 ```
 
@@ -215,9 +215,10 @@ let payload = try await blobs.read(blobId: blobId, as: MyCodable.self)
 
 ## Service worker proxy (for `<img>` / `<video>`)
 
-`downloadUrl` requires the request to carry the user's auth token, which `<img>` tags don't do. Use `proxyUrl` if you've registered a service worker that forwards Primitive auth headers.
+The neutral blob calls here are `blobs.proxyUrl(blobId)` / `downloadUrl` (see [Download URL](#download-url-authenticated)) and `blobs.read(blobId, { as: "blob" })` (see [Read content into memory](#read-content-into-memory)). The rest is **web-DOM glue**: `downloadUrl` requires the request to carry the user's auth token, which `<img>` tags don't do, so on the web you either route through a service worker (`proxyUrl`) or read into memory and hand the element a Blob URL.
 
 ```typescript
+// web-DOM glue around proxyUrl / read — wiring an <img> src.
 if (blobs.hasServiceWorkerControl()) {
   imageElement.src = blobs.proxyUrl(blobId, {
     disposition: "inline",
@@ -259,6 +260,8 @@ Both fields are optional and accept `null` to clear. Errors surface as `BLOB_NOT
 
 ## Complete example: image upload with progress + display
 
+A **web walkthrough** composing the neutral calls already shown — [Upload](#upload), the `blobs:upload-progress` event ([Events](#events)), and `proxyUrl`/`read` ([Service worker proxy](#service-worker-proxy-for-img--video)) — into one DOM flow. The `<img>`/`URL.createObjectURL` wiring is web-DOM glue:
+
 ```typescript
 async function uploadAndDisplay(
   client: JsBaoClient,
@@ -293,6 +296,8 @@ async function uploadAndDisplay(
 ```
 
 ## Complete example: offline-ready gallery
+
+A **web walkthrough** composing [List](#listing), `prefetch` ([Offline & the upload queue](#offline--the-upload-queue)), and `proxyUrl` into a gallery loader. Only the URL-wiring is web-specific:
 
 ```typescript
 async function loadGallery(client: JsBaoClient, documentId: string) {
