@@ -7,10 +7,11 @@ func discoverAuthMethods(client: JsBaoClient) async throws {
   // AuthConfigInfo: appId, name, mode, waitlistEnabled,
   //   googleOAuthEnabled, googleClientId, hasOAuth, redirectUris,
   //   passkeyEnabled, passkeyRpId, passkeyRpName, hasPasskey,
-  //   magicLinkEnabled, otpEnabled
+  //   appleSignInEnabled, hasApple, magicLinkEnabled, otpEnabled
 
   let methods = (
     google: config.hasOAuth,
+    apple: config.hasApple,
     magicLink: config.magicLinkEnabled,
     otp: config.otpEnabled,
     passkey: config.hasPasskey

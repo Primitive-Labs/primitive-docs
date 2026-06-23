@@ -3,7 +3,7 @@
   "stampedAt": "2026-06-23",
   "libraries": {
     "js-bao-wss": {
-      "commit": "0ec5d9471a72ece2d5a4de5dc512f43a61c6fdb5",
+      "commit": "916cb718d6476fdb5588b062eeb085f5afdb6e95",
       "npm": {
         "js-bao-wss-client": "2.0.1",
         "js-bao": "0.5.1",
@@ -17,7 +17,7 @@
       }
     },
     "swift-primitive-app-dev": {
-      "commit": "634dc60c32a0b8712705e7991ab187b1650181eb"
+      "commit": "f96ac7a76fb52154094d96dd1799d6dc07d0c96d"
     }
   }
 }
