@@ -169,7 +169,7 @@ To accept an invitation server-side at verify time (so the deferred grant resolv
 `otpVerify` also accepts an `{ inviteToken }` option to accept an invitation at verify time.
 {{/lang}}
 {{#lang swift}}
-`auth.otpVerify(email:code:)` returns an `OtpVerifyResult` (`.user`, `.isNewUser?`).
+`auth.otpVerify(email:code:)` returns an `OtpVerifyResult` (`.user`, `.isNewUser?`). To accept an invitation at verify time, pass the `inviteToken` parameter: `auth.otpVerify(email:code:inviteToken:)`.
 {{/lang}}
 
 ### Error handling
@@ -416,7 +416,7 @@ await client.logout({
 Logout fires `auth:logout` immediately and `auth:logout:complete` when finished.
 {{/lang}}
 {{#lang swift}}
-`auth.logout(options:)` takes a `LogoutOptions` — `wipeLocal` (delete locally cached document data + KV cache), `revokeOffline` (also revoke any stored offline grant), `clearOfflineIdentity` (defaults `true`), `waitForDisconnect` (await WebSocket teardown before returning; defaults `false`).
+`auth.logout(options:)` takes a `LogoutOptions` — `wipeLocal` (delete locally cached document data + KV cache), `revokeOffline` (also revoke any stored offline grant), `clearOfflineIdentity` (defaults `true`), `waitForDisconnect` (await WebSocket teardown before returning; defaults `false`). Logout fires `auth:logout` immediately and `auth:logout:complete` when finished — the same event names as JS.
 {{/lang}}
 
 ---

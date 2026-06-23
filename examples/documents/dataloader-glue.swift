@@ -16,7 +16,7 @@ struct TaskListView: View {
     .task {
       loader.documentReady = appState.selectedDocId != nil
       loader.bind(client: appState.client, subscribeTo: [.onModel(subscribe: TaskRecord.subscribe)]) { _ in
-        TaskRecord.findAll()
+        try await TaskRecord.findAll()
           .filter { !$0.completed }
           .sorted { $0.priority > $1.priority }
       }

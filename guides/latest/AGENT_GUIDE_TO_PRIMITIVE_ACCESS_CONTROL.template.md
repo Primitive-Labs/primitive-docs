@@ -9,7 +9,7 @@ Guidelines for AI agents writing access rules. Server-evaluated authorization ac
 | `user.userId` | Caller's user ID (`''` when unauthenticated) |
 | `user.role` | Caller's app role |
 | `isAnonymous()` | True when the caller has no account (unauthenticated request); `!isAnonymous()` ⇒ any signed-in member. Matters where anonymous access is reachable, e.g. a `public` blob bucket |
-| `hasRole(role)` | App role check: `"owner"` \| `"admin"` \| `"member"` |
+| `hasRole(role)` | App role check: `"owner"` \| `"admin"` \| `"member"` (app-level role — distinct from the document `owner` permission) |
 | `isMemberOf(groupType, groupId)` | Exact group membership (two args, strict) |
 | `memberGroups(groupType)` | List of groupIds of that type the caller belongs to |
 

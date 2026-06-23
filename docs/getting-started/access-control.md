@@ -25,7 +25,7 @@ Every CEL evaluation sees the authenticated caller:
 | `user.userId` | The caller's user ID (empty string when unauthenticated) |
 | `user.role` | The caller's app role |
 | `isAnonymous()` | True when the caller has no account at all (an unauthenticated request). Write `!isAnonymous()` to require any signed-in member; relevant where anonymous access is possible, such as a `public` [blob bucket](./blobs-and-files.md#access-presets) |
-| `hasRole(role)` | True if the caller's app role is `"owner"`, `"admin"`, or `"member"` as given |
+| `hasRole(role)` | True if the caller's app role is `"owner"`, `"admin"`, or `"member"` as given (app-level role — distinct from the document `owner` [permission](./working-with-documents.md#sharing-documents)) |
 | `isMemberOf(groupType, groupId)` | True if the caller belongs to that exact group |
 | `memberGroups(groupType)` | The list of group IDs of that type the caller belongs to |
 | `fromWorkflow()` / `fromWorkflow(key)` | True when the call comes from the internal workflow runner (optionally a specific workflow) — gate an operation to server-side automation only |
