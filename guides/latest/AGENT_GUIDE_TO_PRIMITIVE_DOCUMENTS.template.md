@@ -511,10 +511,9 @@ type = "boolean"
 default = false
 ```
 
-{{#lang ts}}
 ### Defining Relationships in models.toml
 
-Declare relationships in `models.toml` using `[models.X.relationships.Y]` sections. Codegen emits typed traversal methods on the generated interfaces.
+Declare relationships in `models.toml` using `[models.X.relationships.Y]` sections. Codegen emits typed traversal methods on the generated model types.
 
 ```toml
 # Author hasMany Posts
@@ -532,8 +531,9 @@ model = "authors"
 related_id_field = "authorId"
 ```
 
-After running `npx js-bao-codegen-v2`, the generated interfaces include typed traversal methods:
+After running codegen, the generated model types include typed traversal methods:
 
+{{#lang ts}}
 ```typescript
 // Author.generated.ts
 export interface Author extends AuthorAttrs, BaseModel {
@@ -545,16 +545,22 @@ export interface Post extends PostAttrs, BaseModel {
   author(): Promise<Author | null>;
 }
 ```
+{{/lang}}
+{{#lang swift}}
+```swift
+// Author.generated.swift — hasMany resolves a plain array, ordered per the TOML
+public func posts() async throws -> [Post]
+
+// Post.generated.swift — refersTo resolves the parent record (or nil)
+public func author() async throws -> Author?
+```
+{{/lang}}
 
 Use these at runtime:
 
-```typescript
-const author = await Author.queryOne({ id: authorId });
-const posts = await author.posts(); // PaginatedResult<Post>
-const firstPost = posts.data[0];
-const backRef = await firstPost.author(); // Author | null
-```
+{{ example: documents/relationships }}
 
+{{#lang ts}}
 Relationship traversal uses the same engine as `Model.query(...)` with `include` specs — see [Loading Related Data](#loading-related-data-includes) for the lower-level query-level include syntax.
 {{/lang}}
 
@@ -838,7 +844,7 @@ The view below is framework glue; the only Primitive calls in it are the `findAl
 
 {{ example: documents/dataloader-glue }}
 
-`.onModel(subscribe: TodoItem.subscribe)` fires on **any** add/update/delete recorded in that model's shared store — local writes and remote writes both — so `reloadNow()` after a write is unneeded; call it only when the `load` closure reads something the loader can't subscribe to (a REST resource). Other triggers (`LoaderTrigger`): `.onSync`, `.onRemoteUpdate`, `.onDocumentEvents`, `.onConnect`, `.onModelChange(_:)` for a hand-built runtime-schema `DynamicModel`, and `.custom((client, reload) -> EventSubscription?)`.
+`.onModel(subscribe: TodoItem.subscribe)` fires on **any** add/update/delete recorded in that model's shared store — local writes and remote writes both — so `reloadNow()` after a write is unneeded; call it only when the `load` closure reads something the loader can't subscribe to (a REST resource). Other triggers (`LoaderTrigger`): `.onSync`, `.onDocumentSyncStateChanged`, `.onDocumentEvents`, `.onConnect`, `.onModelChange(_:)` for a hand-built runtime-schema `DynamicModel`, and `.custom((client, reload) -> EventSubscription?)`.
 
 `loader.phase` is a trinary: `.loading` (first load not complete), `.empty` (first load complete, data conforms to `LoaderEmptiness` and is empty), `.loaded(Data)`. `[T]`, `String`, and `Optional` get `LoaderEmptiness` out of the box.
 

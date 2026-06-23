@@ -1226,9 +1226,9 @@ For programmatic imports with per-row `transform` or progress callbacks, use `im
 
 Other options: `data` (pre-parsed rows, instead of `csv`), `delimiter`, `batchSize` (default 5000), `idGenerator` (per-row ID factory; the fallback chain is `idColumn` → `idGenerator` → generated ULID), `onBatchError` (return `false` to abort remaining batches), and `operationName` (the registered save op, default `"save"`, called as `{ modelName, id, data }`).
 
-{{#lang ts}}
 A generated model class can stand in for `modelName` — the import then filters columns to the model's schema and syncs its indexes afterwards (`syncIndexes`, reported as `indexesCreated`):
 
+{{#lang ts}}
 ```typescript
 import { Product } from "./models";
 
@@ -1237,6 +1237,18 @@ const result = await client.databases.importCsv(databaseId, {
   model: Product,
   columnMap: { "Product Name": "name", "Unit Price": "price" },
 });
+```
+{{/lang}}
+{{#lang swift}}
+```swift
+let result = try await client.databases.importCsv(
+  databaseId: databaseId,
+  options: CsvImportOptions(
+    csv: csvString,
+    model: Product.self,
+    columnMap: ["Product Name": "name", "Unit Price": "price"]
+  )
+)
 ```
 {{/lang}}
 

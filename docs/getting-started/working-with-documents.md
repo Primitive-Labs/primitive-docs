@@ -190,14 +190,13 @@ related_id_field = "authorId"
 
 After `pnpm codegen`, the generated interfaces include typed traversal methods:
 
-```typescript
-import { Author, Post } from "@/models";
+::: code-group
 
-const author = await Author.queryOne({ id: authorId });
-const posts = await author.posts();        // PaginatedResult<Post>
-const firstPost = posts.data[0];
-const backRef = await firstPost.author();  // Author | null
-```
+<<< ../../examples/documents/relationships.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/relationships.swift#example{swift} [Swift]
+
+:::
 
 ### Iterating on the Schema
 

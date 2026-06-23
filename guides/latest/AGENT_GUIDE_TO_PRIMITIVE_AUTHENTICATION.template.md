@@ -99,6 +99,18 @@ await client.startOAuthFlow(continueUrl, {
 {{/lang}}
 {{#lang swift}}
 `startOAuthFlow(redirectUri:continueUrl:)` takes an explicit `redirectUri` and **returns** the authorization URL to open yourself (e.g. via `ASWebAuthenticationSession`). It throws `OAuth not configured` if OAuth is unavailable.
+
+It also accepts an optional `waitlist: OAuthWaitlist` (`source` / `note`, enrolls the user via the callback) and `inviteToken: String` (accepts the named invitation when the callback resolves):
+
+```swift
+let authUrl = try await client.startOAuthFlow(
+  redirectUri: redirectUri,
+  waitlist: OAuthWaitlist(source: "landing-page", note: "interested in beta"),
+  inviteToken: tokenFromEmail
+)
+```
+
+Both are threaded through `signInWithGoogle(...)` as well.
 {{/lang}}
 
 ### Handle the callback (instance method — preferred)

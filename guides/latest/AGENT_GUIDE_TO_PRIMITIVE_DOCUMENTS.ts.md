@@ -578,7 +578,7 @@ default = false
 
 ### Defining Relationships in models.toml
 
-Declare relationships in `models.toml` using `[models.X.relationships.Y]` sections. Codegen emits typed traversal methods on the generated interfaces.
+Declare relationships in `models.toml` using `[models.X.relationships.Y]` sections. Codegen emits typed traversal methods on the generated model types.
 
 ```toml
 # Author hasMany Posts
@@ -596,7 +596,7 @@ model = "authors"
 related_id_field = "authorId"
 ```
 
-After running `npx js-bao-codegen-v2`, the generated interfaces include typed traversal methods:
+After running codegen, the generated model types include typed traversal methods:
 
 ```typescript
 // Author.generated.ts
@@ -613,10 +613,15 @@ export interface Post extends PostAttrs, BaseModel {
 Use these at runtime:
 
 ```typescript
-const author = await Author.queryOne({ id: authorId });
-const posts = await author.posts(); // PaginatedResult<Post>
-const firstPost = posts.data[0];
-const backRef = await firstPost.author(); // Author | null
+  const author = await Author.find(authorId);
+  if (!author) return;
+
+  // hasMany: author.posts() returns a PaginatedResult — rows are on `.data`
+  const posts = await author.posts();
+  const firstPost = posts.data[0];
+
+  // refersTo: post.author() returns the parent record (or null)
+  const backRef = await firstPost.author();
 ```
 
 Relationship traversal uses the same engine as `Model.query(...)` with `include` specs — see [Loading Related Data](#loading-related-data-includes) for the lower-level query-level include syntax.
