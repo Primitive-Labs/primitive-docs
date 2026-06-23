@@ -30,4 +30,4 @@ Workflow status response
 
 ### status
 
-> **status**: `string`
+> **status**: [`WorkflowStatusValue`](../type-aliases/WorkflowStatusValue.md)

@@ -162,7 +162,7 @@ indexed = true
 
 ```toml
 [[models.categories.unique_constraints]]
-name = "name_parent_unique"
+name = "name_parentId"
 fields = ["name", "parentId"]
 ```
 
@@ -307,7 +307,17 @@ Save-or-update by a unique field (such as `email`) without knowing the existing 
 
 :::
 
-For composite keys, use `upsertByUnique(constraintName, …)` — see [Unique Constraints](#unique-constraints) above.
+### Upsert by Named Unique Constraint
+
+Save-or-update by a **named** constraint — single- or multi-field — declared with `[[models.<name>.unique_constraints]]`. Use this for composite keys, or any time you match by a constraint other than a single `unique = true` field. The match values come from the record's constraint fields, so every constraint field must be set; pass `targetDocument` so a new record has a home if none matches.
+
+::: code-group
+
+<<< ../../examples/documents/upsert-by-unique.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/upsert-by-unique.swift#example{swift} [Swift]
+
+:::
 
 ::: tip iOS semantics
 `Task.query(...)`, `queryOne`, `count`, and `aggregate` are **synchronous** (no `await`) — they read the in-process CRDT and span every open document by default; scope with `QueryOptions(documents: [docId])`. `Task.find(_:)` and `Task.findAll()` are **`async throws`** — use `try await Task.find(id)`. Writes target one document — `save(in:)` inserts or updates in place and `throws`; `save(in:upsertOn:)` matches by unique field; `delete(in:)` throws only if the document isn't open. Writes are local-first: visible to local reads on the next line, synced to peers in the background.

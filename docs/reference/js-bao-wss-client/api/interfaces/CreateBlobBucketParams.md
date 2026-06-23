@@ -8,11 +8,13 @@
 
 ## Properties
 
-### accessPolicy
+### ~~accessPolicy?~~
 
-> **accessPolicy**: [`BlobBucketAccessPolicy`](../type-aliases/BlobBucketAccessPolicy.md)
+> `optional` **accessPolicy**: [`BlobBucketAccessPolicy`](../type-aliases/BlobBucketAccessPolicy.md)
 
-Access policy for blobs in this bucket
+#### Deprecated
+
+Legacy access enum (#1020); accepted as an input alias for `preset`.
 
 ***
 
@@ -40,11 +42,21 @@ Display name for the bucket
 
 ***
 
+### preset?
+
+> `optional` **preset**: `"public"` \| `"authenticated"` \| `"admin-only"` \| `"personal-uploads"`
+
+Access preset (#1020). One of `public` | `authenticated` | `admin-only` |
+`personal-uploads`. Provide this OR a `ruleSetId` (custom). The legacy
+`accessPolicy` enum is still accepted as an input alias.
+
+***
+
 ### ruleSetId?
 
 > `optional` **ruleSetId**: `string`
 
-Optional rule set ID for CEL-based access control
+Rule set ID for CEL-based access control (makes the bucket `custom`).
 
 ***
 
