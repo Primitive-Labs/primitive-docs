@@ -882,24 +882,24 @@ It handles four key concerns:
 - Push filtering logic into js-bao `.query()` calls rather than fetching everything and filtering in JavaScript
 - Always pass `documentReady` - typically a ref that becomes true after your document opening logic completes
 
-The composable call below is **web-template glue** (Vue + the template's `useJsBaoDataLoader`); the only Primitive call in it is the `TodoItem.query(...)` inside `loadData`, identical to the compiled [Read](#read-find--query--first--count) example:
+Under the hood it wraps the same compiled client calls documented above — `Model.subscribe` ([Subscribe to changes](#subscribe-to-changes)) to react to changes and `Model.query` to load — so this section is just the Vue-composable binding around them:
 
 ```typescript
-const {
-  data: todos,
-  initialDataLoaded,
-  reload,
-} = useJsBaoDataLoader<{ items: TodoItem[]; total: number }>({
-  subscribeTo: [TodoItem],
-  queryParams: computed(() => ({ listId: props.listId, showCompleted })),
-  documentReady,
-  async loadData(queryParams) {
-    const { listId, showCompleted } = queryParams ?? {};
-    const query = showCompleted ? { listId } : { listId, completed: false };
-    const result = await TodoItem.query(query, { sort: { order: 1 } });
-    return { items: result.data, total: result.data.length };
-  },
-});
+  const {
+    data: todos,
+    initialDataLoaded,
+    reload,
+  } = useJsBaoDataLoader<{ items: TodoItem[]; total: number }>({
+    subscribeTo: [TodoItem],
+    queryParams: computed(() => ({ listId: props.listId, showCompleted })),
+    documentReady,
+    async loadData(queryParams) {
+      const { listId, showCompleted } = queryParams ?? {};
+      const query = showCompleted ? { listId } : { listId, completed: false };
+      const result = await TodoItem.query(query, { sort: { order: 1 } });
+      return { items: result.data, total: result.data.length };
+    },
+  });
 ```
 
 **Rules:**

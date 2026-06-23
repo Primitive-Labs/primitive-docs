@@ -719,7 +719,7 @@ struct TodoListView: View {
                 client: appState.client,
                 subscribeTo: [.onModel(subscribe: TodoItem.subscribe)]
             ) { _ in
-                try await TodoItem.findAll().sorted { $0.sortOrder < $1.sortOrder }
+                TodoItem.findAll().sorted { $0.sortOrder < $1.sortOrder }
             }
         }
         .onChange(of: appState.selectedDocId) { _, id in

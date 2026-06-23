@@ -79,9 +79,14 @@ let written = 0;
 for (const t of templates) {
   const base = t.replace(/\.template\.md$/, "");
   const src = readFileSync(join(GUIDES_DIR, t), "utf-8");
-  // Catch stray placeholders that don't resolve, before writing.
-  for (const m of src.matchAll(/\{\{\s*example:\s*([\w.-]+\/[\w.-]+)\s*\}\}/g)) {
-    for (const variant of VARIANTS) {
+  // Catch stray placeholders that don't resolve, before writing. Validate per
+  // variant on the lang-stripped content (not raw src), so a placeholder living
+  // inside a `{{#lang ts}}` block is only required to resolve for ts — that's
+  // what lets a section reference single-language framework glue (no-parity
+  // corpus files) without the other language's build demanding a twin.
+  for (const variant of VARIANTS) {
+    const scoped = applyLangBlocks(src, variant, null, t);
+    for (const m of scoped.matchAll(/\{\{\s*example:\s*([\w.-]+\/[\w.-]+)\s*\}\}/g)) {
       try { regionFor(m[1], variant); }
       catch { problems.push(`✘ ${t}: {{ example: ${m[1]} }} has no ${variant.id} corpus region`); }
     }
