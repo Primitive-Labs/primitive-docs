@@ -860,7 +860,9 @@ Only one stringset facet field is allowed per aggregation. To check membership o
 
 ### useJsBaoDataLoader Pattern
 
-`useJsBaoDataLoader` is the Vue composable for centralized component data loading, provided by the primitive library. **It is component-only**: it registers its model subscriptions and document-event listeners inside `onMounted`, which fires only for mounted Vue components. Calling it from a Pinia store's `setup()`, a router guard, or any other non-component context will load data once but **never react to subsequent changes** — the `onMounted` callback never runs there, so no subscriptions are registered. For those contexts, subscribe directly (see [Subscribing Outside a Component](#subscribing-outside-a-component) below).
+The data a component renders is a plain `Model.query` (see [Read](#read-find--query--first--count) for the compiled call) that you re-run whenever the underlying records change. `useJsBaoDataLoader` is the **web template's** Vue composable that wires that re-run for you — it is framework glue around the same query, not a different API.
+
+**It is component-only**: it registers its model subscriptions and document-event listeners inside `onMounted`, which fires only for mounted Vue components. Calling it from a Pinia store's `setup()`, a router guard, or any other non-component context will load data once but **never react to subsequent changes** — the `onMounted` callback never runs there, so no subscriptions are registered. For those contexts, subscribe directly (see [Subscribing Outside a Component](#subscribing-outside-a-component) below).
 
 It handles four key concerns:
 
@@ -879,6 +881,8 @@ It handles four key concerns:
 - Centralize all data loading for a component in a single `useJsBaoDataLoader` call
 - Push filtering logic into js-bao `.query()` calls rather than fetching everything and filtering in JavaScript
 - Always pass `documentReady` - typically a ref that becomes true after your document opening logic completes
+
+The composable call below is **web-template glue** (Vue + the template's `useJsBaoDataLoader`); the only Primitive call in it is the `TodoItem.query(...)` inside `loadData`, identical to the compiled [Read](#read-find--query--first--count) example:
 
 ```typescript
 const {
@@ -913,7 +917,7 @@ const {
 
 `useJsBaoDataLoader` is the right tool inside a component. Outside one — a **Pinia store**, a singleton service, a router guard — do not reach for it: its `onMounted`-based subscriptions never register there, so reactive updates silently never fire.
 
-`Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle (see [Subscribe to changes](#subscribe-to-changes) above for the compiled call). It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). Wire it up directly in the store's `setup()` and keep the unsubscribe handle so you can tear it down:
+`Model.subscribe(callback)` is a static method that works **anywhere**, independent of the Vue component lifecycle (see [Subscribe to changes](#subscribe-to-changes) above for the compiled call). It returns an unsubscribe function and fires the callback whenever any record of that model changes (local edits or sync from other clients). The neutral pattern is just `subscribe` + re-`query`; everything below is **web-template glue** (Pinia) showing where to hang that wiring:
 
 ```typescript
 // stores/tasksStore.ts
