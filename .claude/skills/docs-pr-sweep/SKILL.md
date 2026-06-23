@@ -96,7 +96,7 @@ Work every PR to merge-ready. Two kinds of work get it there:
 - Examples live in the corpus (`examples/<subject>/<op>.{ts,swift}`) — fix both languages, never an inline fence in one doc.
 - Guide edits go through the `.template.md` + `pnpm render:guides`; never hand-edit a rendered build.
 - The sync rule cuts both ways — if a fact is wrong, fix every place that states it, not just the one the reviewer flagged.
-- A decision to file a parity bug rather than document a gap means *doing both*: scope the prose to the one language's block per STYLE.md **and** file the bug in the library repo where the fix lives.
+- A decision to file a parity bug rather than document a gap means *doing both*: scope the prose to the one language's block per STYLE.md **and** file the bug per `.claude/ISSUE_FILING.md` (which repo, the `ios` label for Swift-client gaps, no assignee unless told).
 - Write present-tense: no "previously", no changelog framing in the docs themselves.
 
 Re-run Step 2's gates, then push to the PR branch:

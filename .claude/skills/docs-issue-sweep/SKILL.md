@@ -47,7 +47,7 @@ Issues are written at a point in time; the libraries and the docs both move. Bef
 
 - If the claim no longer holds, the issue is moot — don't "fix" docs into a wrong state on the issue's authority.
 - If the claim holds but the issue's *proposed* fix is stale or conflicts with STYLE.md, implement what's actually correct and say so in the PR.
-- If the fix would document a one-platform capability or expose a JS/Swift gap, follow STYLE.md's platform treatment and file the parity bug in the library repo where the fix lives.
+- If the fix would document a one-platform capability or expose a JS/Swift gap, follow STYLE.md's platform treatment and file the parity bug per `.claude/ISSUE_FILING.md` (which repo, the `ios` label for Swift-client gaps, no assignee unless told).
 
 ## Step 3 — Implement, one branch per issue
 

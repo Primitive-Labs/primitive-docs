@@ -75,7 +75,7 @@ Skip mechanical noise entirely: source stamps, lockfiles, rendered guide builds,
 ## Step 7 — Land and backflow
 
 1. PR the publish branch into `main` with the release-coverage table (Step 5) **and** the docs-delta summary (Step 6); merging publishes the site (publish-docs.yml verifies the channel is `production`).
-2. Backflow so `next` contains everything `main` does:
+2. Backflow so `next` contains everything `main` does. **`next` is never recreated from `main`** — it carries trued-but-unreleased work a reset would destroy; you *merge* `main` into it. This release-time back-merge is the primary mechanism that keeps `next ⊇ main` (an interactive `docs-next-sync` run can optionally drain sooner, but the unattended nightly never does — it only opens PRs):
 
    ```bash
    git checkout next && git merge main
