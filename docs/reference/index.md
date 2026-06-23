@@ -206,6 +206,7 @@ Generated reference documentation for each project.
   - [TerminateWorkflowOptions](/reference/js-bao-wss-client/api/interfaces/TerminateWorkflowOptions)
   - [TraceEntry](/reference/js-bao-wss-client/api/interfaces/TraceEntry)
   - [TriggerDefInfo](/reference/js-bao-wss-client/api/interfaces/TriggerDefInfo)
+  - [UpdateBlobBucketParams](/reference/js-bao-wss-client/api/interfaces/UpdateBlobBucketParams)
   - [UpdateCollectionTypeConfigParams](/reference/js-bao-wss-client/api/interfaces/UpdateCollectionTypeConfigParams)
   - [UpdateCronTriggerParams](/reference/js-bao-wss-client/api/interfaces/UpdateCronTriggerParams)
   - [UpdateDatabaseTypeConfigParams](/reference/js-bao-wss-client/api/interfaces/UpdateDatabaseTypeConfigParams)
@@ -226,6 +227,7 @@ Generated reference documentation for each project.
   - [AddCollectionMemberParams](/reference/js-bao-wss-client/api/type-aliases/AddCollectionMemberParams)
   - [AuthCode](/reference/js-bao-wss-client/api/type-aliases/AuthCode)
   - [BlobBucketAccessPolicy](/reference/js-bao-wss-client/api/type-aliases/BlobBucketAccessPolicy)
+  - [BlobBucketPreset](/reference/js-bao-wss-client/api/type-aliases/BlobBucketPreset)
   - [BlobBucketTtlTier](/reference/js-bao-wss-client/api/type-aliases/BlobBucketTtlTier)
   - [BlobDisposition](/reference/js-bao-wss-client/api/type-aliases/BlobDisposition)
   - [CollectionAddMemberResult](/reference/js-bao-wss-client/api/type-aliases/CollectionAddMemberResult)
@@ -240,6 +242,7 @@ Generated reference documentation for each project.
   - [ModelIdentifier](/reference/js-bao-wss-client/api/type-aliases/ModelIdentifier)
   - [StorageConfig](/reference/js-bao-wss-client/api/type-aliases/StorageConfig)
   - [TypedModelConstructor](/reference/js-bao-wss-client/api/type-aliases/TypedModelConstructor)
+  - [WorkflowStatusValue](/reference/js-bao-wss-client/api/type-aliases/WorkflowStatusValue)
   - [YjsPersistenceFactory](/reference/js-bao-wss-client/api/type-aliases/YjsPersistenceFactory)
 - **Variables**
   - [ANALYTICS_UNAUTHENTICATED_USER](/reference/js-bao-wss-client/api/variables/ANALYTICS_UNAUTHENTICATED_USER)

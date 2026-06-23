@@ -185,6 +185,21 @@ The generated model statics route through the process-wide default client — ca
   let resolved = try user.save(in: documentId, upsertOn: "email")
 ```
 
+### Upsert by named unique constraint
+
+```swift
+  let category = Category(
+    id: UUID().uuidString,
+    name: "Work",
+    parentId: "root",
+    color: "blue"
+  )
+  // "name_parentId" is the named constraint declared in schema.toml. `mode`
+  // defaults to .either (create-or-update); pass .mustExist / .mustNotExist to
+  // require a single path.
+  let resolved = try category.upsertByUnique("name_parentId", in: documentId)
+```
+
 ### Logical query operators
 
 ```swift

@@ -4,40 +4,46 @@
 
 [js-bao-wss-client](../globals.md) / GeminiPromptOptions
 
-# Interface: GeminiPromptOptions
+# ~~Interface: GeminiPromptOptions~~
+
+## Deprecated
+
+The direct Gemini client API is deprecated and will be removed in
+a future major release. Use [client.prompts.execute](PromptsAPI.md#execute)
+(managed prompts) or a workflow `gemini.generate` step instead.
 
 ## Properties
 
-### generationConfig?
+### ~~generationConfig?~~
 
 > `optional` **generationConfig**: `GeminiGenerationConfig`
 
 ***
 
-### messages
+### ~~messages~~
 
 > **messages**: [`GeminiMessage`](GeminiMessage.md)[]
 
 ***
 
-### model?
+### ~~model?~~
 
 > `optional` **model**: `string`
 
 ***
 
-### safety?
+### ~~safety?~~
 
 > `optional` **safety**: `GeminiSafetySetting`[]
 
 ***
 
-### structuredOutput?
+### ~~structuredOutput?~~
 
 > `optional` **structuredOutput**: [`GeminiStructuredOutput`](GeminiStructuredOutput.md)
 
 ***
 
-### system?
+### ~~system?~~
 
 > `optional` **system**: [`GeminiContentPart`](../type-aliases/GeminiContentPart.md)[]

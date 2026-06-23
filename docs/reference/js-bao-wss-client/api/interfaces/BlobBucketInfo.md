@@ -8,9 +8,13 @@
 
 ## Properties
 
-### accessPolicy
+### ~~accessPolicy~~
 
-> **accessPolicy**: [`BlobBucketAccessPolicy`](../type-aliases/BlobBucketAccessPolicy.md)
+> **accessPolicy**: `string`
+
+#### Deprecated
+
+Read-alias of [preset](#preset) for back-compat (#1020).
 
 ***
 
@@ -59,6 +63,14 @@
 ### name
 
 > **name**: `string`
+
+***
+
+### preset
+
+> **preset**: [`BlobBucketPreset`](../type-aliases/BlobBucketPreset.md)
+
+The bucket's access preset (#1020).
 
 ***
 

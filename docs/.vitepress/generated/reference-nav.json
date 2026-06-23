@@ -809,6 +809,10 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/TriggerDefInfo"
                 },
                 {
+                  "text": "UpdateBlobBucketParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/UpdateBlobBucketParams"
+                },
+                {
                   "text": "UpdateCollectionTypeConfigParams",
                   "link": "/reference/js-bao-wss-client/api/interfaces/UpdateCollectionTypeConfigParams"
                 },
@@ -890,6 +894,10 @@
                   "link": "/reference/js-bao-wss-client/api/type-aliases/BlobBucketAccessPolicy"
                 },
                 {
+                  "text": "BlobBucketPreset",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/BlobBucketPreset"
+                },
+                {
                   "text": "BlobBucketTtlTier",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/BlobBucketTtlTier"
                 },
@@ -944,6 +952,10 @@
                 {
                   "text": "TypedModelConstructor",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/TypedModelConstructor"
+                },
+                {
+                  "text": "WorkflowStatusValue",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/WorkflowStatusValue"
                 },
                 {
                   "text": "YjsPersistenceFactory",

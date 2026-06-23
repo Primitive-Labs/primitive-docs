@@ -4,40 +4,46 @@
 
 [js-bao-wss-client](../globals.md) / GeminiGenerateResult
 
-# Interface: GeminiGenerateResult
+# ~~Interface: GeminiGenerateResult~~
+
+## Deprecated
+
+The direct Gemini client API is deprecated and will be removed in
+a future major release. Use [client.prompts.execute](PromptsAPI.md#execute)
+(managed prompts) or a workflow `gemini.generate` step instead.
 
 ## Properties
 
-### candidates?
+### ~~candidates?~~
 
 > `optional` **candidates**: `GeminiCandidate`[]
 
 ***
 
-### message
+### ~~message~~
 
 > **message**: [`GeminiMessage`](GeminiMessage.md)
 
 ***
 
-### raw?
+### ~~raw?~~
 
 > `optional` **raw**: `unknown`
 
 ***
 
-### usage?
+### ~~usage?~~
 
 > `optional` **usage**: `object`
 
-#### promptTokens?
+#### ~~promptTokens?~~
 
 > `optional` **promptTokens**: `number`
 
-#### responseTokens?
+#### ~~responseTokens?~~
 
 > `optional` **responseTokens**: `number`
 
-#### totalTokens?
+#### ~~totalTokens?~~
 
 > `optional` **totalTokens**: `number`

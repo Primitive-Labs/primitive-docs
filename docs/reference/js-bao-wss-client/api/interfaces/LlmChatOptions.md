@@ -4,72 +4,78 @@
 
 [js-bao-wss-client](../globals.md) / LlmChatOptions
 
-# Interface: LlmChatOptions
+# ~~Interface: LlmChatOptions~~
+
+## Deprecated
+
+The direct LLM client API is deprecated and will be removed in a
+future major release. Use [client.prompts.execute](PromptsAPI.md#execute)
+(managed prompts) or a workflow `llm.chat` step instead.
 
 ## Properties
 
-### attachments?
+### ~~attachments?~~
 
 > `optional` **attachments**: (\{ `base64?`: `string`; `mime?`: `string`; `type`: `"image"`; `url?`: `string`; \} \| \{ `base64`: `string`; `mime?`: `string`; `type`: `"audio"`; \} \| \{ `base64?`: `string`; `filename?`: `string`; `type`: `"pdf"`; `url?`: `string`; \})[]
 
 ***
 
-### max\_tokens?
+### ~~max\_tokens?~~
 
 > `optional` **max\_tokens**: `number`
 
 ***
 
-### messages
+### ~~messages~~
 
 > **messages**: `object`[]
 
-#### content?
+#### ~~content?~~
 
 > `optional` **content**: `any`
 
-#### role
+#### ~~role~~
 
 > **role**: `string`
 
 ***
 
-### model?
+### ~~model?~~
 
 > `optional` **model**: `string`
 
 ***
 
-### plugins?
+### ~~plugins?~~
 
 > `optional` **plugins**: `any`[]
 
 ***
 
-### reasoning?
+### ~~reasoning?~~
 
 > `optional` **reasoning**: [`ReasoningOptions`](ReasoningOptions.md)
 
 ***
 
-### temperature?
+### ~~temperature?~~
 
 > `optional` **temperature**: `number`
 
 ***
 
-### tool\_choice?
+### ~~tool\_choice?~~
 
 > `optional` **tool\_choice**: `any`
 
 ***
 
-### tools?
+### ~~tools?~~
 
 > `optional` **tools**: `any`
 
 ***
 
-### top\_p?
+### ~~top\_p?~~
 
 > `optional` **top\_p**: `number`

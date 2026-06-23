@@ -223,6 +223,20 @@ Every example below is compiled against the real client as part of the docs buil
   await user.save({ upsertOn: "email" });
 ```
 
+### Upsert by named unique constraint
+
+```typescript
+  // "name_parentId" is the named constraint declared in the schema
+  // ([[models.categories.unique_constraints]] name = "name_parentId",
+  //  fields = ["name", "parentId"]).
+  const category = await Category.upsertByUnique(
+    "name_parentId", // the constraint NAME — not the field list
+    ["Work", "root"], // lookup values, in the constraint's field order
+    { name: "Work", parentId: "root", color: "blue" },
+    { targetDocument: documentId }, // required if a new record is created
+  );
+```
+
 ### Logical query operators
 
 ```typescript
@@ -1028,28 +1042,9 @@ Delete a record after finding it — see [Delete](#delete) above for the compile
 
 ### Upsert by Unique Constraint
 
-`upsertByUnique(constraintName, lookupValue(s), data, options?)` — finds an existing record by a named constraint and updates it, or creates one if none exists. The `data` object MUST include the same constraint field values as `lookupValue` (mismatch throws). When creating a new record, `targetDocument` is REQUIRED.
+`upsertByUnique(constraintName, lookupValue(s), data, options?)` finds an existing record by a named constraint and updates it, or creates one if none exists — see [Upsert by named unique constraint](#upsert-by-named-unique-constraint) above for the compiled call. The `data` object MUST include the same constraint field values as `lookupValue` (mismatch throws), and `targetDocument` is REQUIRED whenever a new record may be created. A single-field constraint takes a scalar lookup value instead of an array.
 
-```typescript
-// Composite-key example — uses the constraint name declared in models.toml above.
-await Category.upsertByUnique(
-  "name_parent_unique",                    // constraint name
-  ["Work", null],                          // values in field order
-  { name: "Work", parentId: null, color: "blue" },
-  { targetDocument: documentId }           // required if a new record is created
-);
-
-// Single-field example — value can be a scalar instead of an array.
-// Auto-generated constraint name uses the schema `name`, not the class name.
-await User.upsertByUnique(
-  "users_email_unique",                    // <schemaName>_<fieldName>_unique
-  "alice@example.com",
-  { email: "alice@example.com", name: "Alice" },
-  { targetDocument: documentId }
-);
-```
-
-Single-field constraints declared via `unique = true` in TOML get an auto-generated name of `<modelName>_<fieldName>_unique` (where `modelName` is the `[models.<name>]` block key). Use `[[models.X.unique_constraints]]` (model level — not under `options`) to control the name explicitly.
+Single-field constraints declared via `unique = true` in TOML get an auto-generated name of `<modelName>_<fieldName>_unique` (where `modelName` is the `[models.<name>]` block key, not the class name). Use `[[models.X.unique_constraints]]` (model level — not under `options`) to control the name explicitly.
 
 For single-field upserts where the value already lives on the instance, `save({ upsertOn })` is simpler than `upsertByUnique` — see [Upsert by natural key](#upsert-by-natural-key) above for the compiled call.
 
@@ -1060,11 +1055,11 @@ For single-field upserts where the value already lives on the instance, `save({ 
 await Category.upsertByUnique(["name", "parentId"], ...); // throws: constraint not found
 
 // DON'T: omit targetDocument when creating
-await Category.upsertByUnique("name_parent_unique", ["Work", null], { name: "Work", parentId: null });
+await Category.upsertByUnique("name_parentId", ["Work", "root"], { name: "Work", parentId: "root" });
 // throws: targetDocument is required when creating new records
 
 // DON'T: data values that don't match lookupValue
-await Category.upsertByUnique("name_parent_unique", ["Work", null], { name: "Home", parentId: null }, { targetDocument });
+await Category.upsertByUnique("name_parentId", ["Work", "root"], { name: "Home", parentId: "root" }, { targetDocument });
 // throws: Mismatch between dataToUpsert.'name' and uniqueLookupValue
 ```
 
