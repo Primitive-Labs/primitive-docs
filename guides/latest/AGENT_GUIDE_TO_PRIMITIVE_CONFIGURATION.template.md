@@ -5,13 +5,13 @@ Guidelines for AI agents configuring Primitive services. Everything Primitive do
 ## The sync loop
 
 ```bash
-primitive sync init --dir ./config     # create directory structure
-primitive sync pull --dir ./config    # download server config as TOML
-primitive sync diff --dir ./config    # preview changes
-primitive sync push --dir ./config    # apply local TOML to the server
+primitive sync init     # create directory structure
+primitive sync pull     # download server config as TOML
+primitive sync diff     # preview changes
+primitive sync push     # apply local TOML to the server
 ```
 
-With project-scoped environments (`.primitive/config.json`), omit `--dir` and the sync directory auto-resolves to `.primitive/sync/<env>/<appId>/` — one isolated slot per environment, so a `pull --env staging` never touches production state.
+With project-scoped environments (`.primitive/config.json`), the sync directory auto-resolves to `.primitive/sync/<env>/<appId>/` — one isolated slot per environment, so a `pull --env staging` never touches production state. Pass `--dir <path>` only to override that location with a fixed directory shared across environments.
 
 ## Pull snapshots and revert
 

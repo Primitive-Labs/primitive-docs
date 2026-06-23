@@ -26,7 +26,7 @@ Summarize the following text in a {{ input.style || 'brief' }} style:
 ```
 
 ```bash
-primitive sync push --dir ./config
+primitive sync push
 ```
 
 ## Template Variables

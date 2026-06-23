@@ -369,7 +369,7 @@ autoAddCreator = true          # auto-add creator as member when the config exis
 Push to the server:
 
 ```bash
-primitive sync push --dir ./config
+primitive sync push
 ```
 
 **Defaults & gotchas:**
@@ -559,7 +559,7 @@ autoAddCreator = true
 Push both configs:
 
 ```bash
-primitive sync push --dir ./config
+primitive sync push
 ```
 
 ### Rule CEL context
@@ -640,7 +640,7 @@ Test a rule set with a simulated request, or debug against a real user's live me
   });
 ```
 
-`result.trace` shows every `isMemberOf`/`memberGroups`/`hasRole` call and its result. To update rule sets, edit the TOML file and run `primitive sync push --dir ./config`.
+`result.trace` shows every `isMemberOf`/`memberGroups`/`hasRole` call and its result. To update rule sets, edit the TOML file and run `primitive sync push`.
 
 ## Rule Sets for Collection Management
 
@@ -713,7 +713,7 @@ collectionType = "class-reports"
 ruleSetName    = "class-reports-rules"
 ```
 
-Then push with `primitive sync push --dir ./config`. The SDK equivalents are `client.collectionTypeConfigs.{ list, get, create, update, delete }` (parallel to `client.groupTypeConfigs.*`).
+Then push with `primitive sync push`. The SDK equivalents are `client.collectionTypeConfigs.{ list, get, create, update, delete }` (parallel to `client.groupTypeConfigs.*`).
 
 ## Common Patterns
 

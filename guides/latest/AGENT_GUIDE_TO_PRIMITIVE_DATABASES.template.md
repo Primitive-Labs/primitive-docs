@@ -49,7 +49,7 @@ Database setup has two phases: **configuration** (via CLI and TOML config files)
 Initialize a sync directory and create config files:
 
 ```bash
-primitive sync init --dir ./config
+primitive sync init
 ```
 
 Create a database type config with operations in `config/database-types/project.toml`:
@@ -86,7 +86,7 @@ params = '{"title":{"type":"string","required":true},"projectId":{"type":"string
 Push configuration to the server:
 
 ```bash
-primitive sync push --dir ./config
+primitive sync push
 ```
 
 ### 2. Use databases in app code
@@ -264,8 +264,10 @@ primitive databases import-csv <database-id> <file.csv> --model <name> \
 Generate TypeScript record interfaces and op param/result types from the database-type TOML:
 
 ```bash
-primitive databases codegen --sync-dir ./config --output ./src/generated/db
+primitive databases codegen -o ./src/generated/db
 ```
+
+Codegen reads the database-type TOML from the auto-resolved sync directory (`.primitive/sync/<env>/<appId>/`); pass `--sync-dir <path>` only when overriding it. With no `-o`, generated files land in `<sync-dir>/database-types/generated/`.
 
 **Codegen enum / union / required typing.** When a field or an operation param restricts a string to a fixed set of values, codegen emits a TypeScript string-literal union (e.g. `status: "open" | "in-progress" | "closed"`) instead of `string`, and enum params are validated server-side as well. Fields that operation params mark `required` are emitted as non-optional on the generated record interface. This keeps generated types aligned with the server's validation instead of widening everything to `string`.
 {{/lang}}

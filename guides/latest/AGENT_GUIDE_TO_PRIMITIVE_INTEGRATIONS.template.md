@@ -366,15 +366,18 @@ primitive integrations tests runs <id> [--limit 20] [--group <comparison-group>]
 ### Sync (TOML <-> server)
 
 ```bash
-primitive sync init [--dir ./config]    # create config tree + .primitive-sync.json
-primitive sync pull [--dir ./config]    # server -> local TOML
-primitive sync push [--dry-run] [--force] [--dir ./config]
-primitive sync diff [--dir ./config]
+primitive sync init     # create config tree + .primitive-sync.json
+primitive sync pull     # server -> local TOML
+primitive sync push [--dry-run] [--force]
+primitive sync diff
 ```
 
-`init` creates these subdirs: `integrations/`, `webhooks/`, `cron-triggers/`, `blob-buckets/`, `prompts/`, `workflows/`, `database-types/`, `rule-sets/`, `group-type-configs/`, `collection-type-configs/`, `email-templates/`. Integration files live at `config/integrations/<key>.toml`.
+The sync directory auto-resolves to `.primitive/sync/<env>/<appId>/`; pass `--dir <path>` to override it. `init` creates these subdirs: `integrations/`, `webhooks/`, `cron-triggers/`, `blob-buckets/`, `prompts/`, `workflows/`, `database-types/`, `rule-sets/`, `group-type-configs/`, `collection-type-configs/`, `email-templates/`. Integration files live at `integrations/<key>.toml`.
 
 ## Typical Workflow
+
+# This worked example pins a fixed sync dir (`--dir ./config`) so the file paths
+# below are concrete; omit `--dir` to use the default `.primitive/sync/<env>/<appId>/`.
 
 ```bash
 # Initial setup
@@ -400,8 +403,8 @@ defaultMethod = "POST"
 EOF
 
 # Push and configure
-primitive sync push --dry-run
-primitive sync push
+primitive sync push --dir ./config --dry-run
+primitive sync push --dir ./config
 primitive secrets set OPENAI_API_KEY --value sk-...
 primitive integrations test <integration-id> --method POST --path /v1/responses \
   --body '{"model":"gpt-4.1-mini","input":"hi"}'
