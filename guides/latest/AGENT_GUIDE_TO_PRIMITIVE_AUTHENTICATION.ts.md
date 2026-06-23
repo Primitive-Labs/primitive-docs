@@ -153,6 +153,7 @@ const token = await client.startOAuthFlow();
 const { token } = await client.handleOAuthCallback(code, state);
 ```
 
+
 ---
 
 ## Magic Link

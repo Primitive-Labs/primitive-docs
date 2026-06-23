@@ -53,7 +53,7 @@ AuthGateView(
 |---|---|---|
 | Component | `PrimitiveLogin` | `PrimitiveLoginView`, wrapped by `AuthGateView` |
 | Email sign-in | `emailAuthMethod`: `"magic_link"` (default) or `"one_time_code"` | One-time code |
-| Google OAuth | Button appears automatically when configured | Pass `showGoogleOAuth: true` (runs in an `ASWebAuthenticationSession` sheet) |
+| Social sign-in | Google button appears automatically when configured | Google and Sign in with Apple buttons appear automatically when configured (Google runs in an `ASWebAuthenticationSession` sheet) |
 | After sign-in | Navigates to `defaultContinueRoute` | Renders the `AuthGateView` content closure |
 
 ### Choosing Your Email Sign-In Method (Web)
@@ -184,6 +184,16 @@ Discover which sign-in methods are enabled before rendering any UI:
 <<< ../../examples/auth/oauth.swift#example{swift} [Swift]
 
 :::
+
+On iOS, `signInWithGoogle` and `signInWithApple` wrap the whole flow in a single call — they present the system auth sheet, run the redirect and code exchange, apply the session token, and reconnect the WebSocket. Each returns the signed-in `userId` and an `isNewUser` flag. Google derives its redirect URI from the bundled `GoogleService-Info.plist` (or pass `redirectUri:` explicitly); Apple uses the app's "Sign in with Apple" entitlement and the server's configured Apple audiences. Read `hasApple` from the auth config to decide whether to show the Apple button.
+
+```swift
+let google = try await client.signInWithGoogle()
+// google.userId, google.isNewUser
+
+let apple = try await client.signInWithApple()
+// apple.userId, apple.isNewUser
+```
 
 **Magic Link** — request a link, then verify the token your callback page receives:
 

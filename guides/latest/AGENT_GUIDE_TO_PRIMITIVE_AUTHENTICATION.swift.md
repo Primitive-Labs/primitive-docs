@@ -40,10 +40,11 @@ In the starter template this wiring is owned for you by `PrimitiveAppState.initi
   // AuthConfigInfo: appId, name, mode, waitlistEnabled,
   //   googleOAuthEnabled, googleClientId, hasOAuth, redirectUris,
   //   passkeyEnabled, passkeyRpId, passkeyRpName, hasPasskey,
-  //   magicLinkEnabled, otpEnabled
+  //   appleSignInEnabled, hasApple, magicLinkEnabled, otpEnabled
 
   let methods = (
     google: config.hasOAuth,
+    apple: config.hasApple,
     magicLink: config.magicLinkEnabled,
     otp: config.otpEnabled,
     passkey: config.hasPasskey
@@ -51,6 +52,7 @@ In the starter template this wiring is owned for you by `PrimitiveAppState.initi
 ```
 
 `hasOAuth` is true when Google OAuth is enabled (the flag defaults to enabled when both `googleClientId` and the server-side `googleClientSecret` are configured). `magicLinkEnabled` and `otpEnabled` default to `true` unless explicitly disabled in the Admin Console.
+`hasApple` reports Sign in with Apple availability (`appleSignInEnabled` plus configured Apple audiences); gate the native `signInWithApple` button on it.
 
 ## Server App Settings ↔ Client Contract
 
@@ -119,6 +121,20 @@ When the callback page can construct a client (you already have the JWT or are h
 // WRONG — handleOAuthCallback does not return the token; it stores it.
 let token = try await client.handleOAuthCallback(code: code, state: state)
 ```
+
+### Native one-call sign-in (Google / Apple)
+
+`startOAuthFlow` + `handleOAuthCallback` are the raw building blocks. For the native experience use the one-call helpers — each presents the system auth sheet, runs the redirect + code exchange, applies the session token (cause `"google"` / `"apple"`, emitting `.authSuccess` / `.authState`), and re-authenticates the WebSocket. Both return the signed-in `userId` and the server's `isNewUser` flag:
+
+```swift
+let google = try await client.signInWithGoogle()   // GoogleSignInResult(userId, isNewUser)
+let apple = try await client.signInWithApple()      // AppleSignInResult(userId, isNewUser)
+```
+
+- `signInWithGoogle(presentationAnchor:redirectUri:)` — when `redirectUri` is nil it derives the URI from the bundled `GoogleService-Info.plist`; it throws if neither is available. Throws `OAuthSignInError.cancelled` when the user dismisses the sheet.
+- `signInWithApple(presentationAnchor:)` — uses the app's "Sign in with Apple" entitlement and the server's configured Apple audiences. Throws `AppleSignInError.cancelled` on dismissal, `.notConfigured` when the server has no Apple audiences.
+
+Gate the buttons on the auth config: `hasOAuth` for Google, `hasApple` for Apple (`AuthConfigInfo` also carries `appleSignInEnabled`). The starter template's `PrimitiveAuthManager` wraps both helpers and renders only the providers `availableProviders` reports.
 
 ---
 
