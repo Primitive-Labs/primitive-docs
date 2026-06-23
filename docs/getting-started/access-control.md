@@ -1,6 +1,6 @@
 # Access Control
 
-Server API calls in Primitive are gated by access rules written in **[CEL](https://github.com/google/cel-spec)** — a one-line expression evaluated against the authenticated caller. Database operations, real-time subscriptions, workflow invocation, management of groups and collections: one expression language, one identity context. Learn it once and you can read and write the access rules anywhere they appear. (Documents are the exception — they use direct permission grants per user or group, covered in [Sharing Documents](./working-with-documents.md#sharing-documents).)
+Server API calls in Primitive are gated by access rules written in **[CEL](https://github.com/google/cel-spec)** — a one-line expression evaluated against the authenticated caller. Database operations, real-time subscriptions, workflow invocation, management of groups and collections: one expression language, one identity context. Learn it once and you can read and write the access rules anywhere they appear.
 
 ## CEL in Sixty Seconds
 
