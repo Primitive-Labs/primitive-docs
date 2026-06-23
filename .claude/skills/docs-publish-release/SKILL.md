@@ -75,7 +75,11 @@ Skip mechanical noise entirely: source stamps, lockfiles, rendered guide builds,
 ## Step 7 — Land and backflow
 
 1. PR the publish branch into `main` with the release-coverage table (Step 5) **and** the docs-delta summary (Step 6); merging publishes the site (publish-docs.yml verifies the channel is `production`).
-2. Backflow so `next` contains everything `main` does. **`next` is never recreated from `main`** — it carries trued-but-unreleased work a reset would destroy; you *merge* `main` into it. This release-time back-merge is the primary mechanism that keeps `next ⊇ main` (an interactive `docs-next-sync` run can optionally drain sooner, but the unattended nightly never does — it only opens PRs):
+2. Backflow so `next` contains everything `main` does. **`next` is never recreated from `main`** — it carries trued-but-unreleased work a reset would destroy; you *merge* `main` into it. This release-time back-merge is the primary mechanism that keeps `next ⊇ main` (an interactive `docs-next-sync` run can optionally drain sooner, but the unattended nightly never does — it only opens PRs).
+
+   **CI normally does this for you.** `backmerge-main-to-next.yml` fires when the publish PR (head `publish/**`) merges into `main` — whether you opened it or the automated publisher did — and performs this back-merge channel-preservingly: it takes `main`'s new content but forces `next`'s channel/stamp/pins, runs the next gates, and pushes `next` directly. So after the publish PR merges, **check that workflow succeeded** rather than running anything by hand.
+
+   Only run the back-merge manually if that workflow **failed or aborted** (it aborts and goes red on a content conflict outside the channel/stamp/pin files — exactly the case a human must resolve):
 
    ```bash
    git checkout next && git merge main
