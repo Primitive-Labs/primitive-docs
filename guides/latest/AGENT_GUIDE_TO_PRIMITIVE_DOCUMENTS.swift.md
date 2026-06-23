@@ -139,10 +139,10 @@ The generated model statics route through the process-wide default client — ca
 ### Read (find / query / first / count)
 
 ```swift
-  // Find one by id
-  let task = Task.find("task-id")
+  // Find one by id (async throws — find/findAll require await)
+  let task = try await Task.find("task-id")
 
-  // Query with filters
+  // Query with filters (synchronous — query/count/queryOne are synchronous)
   let urgent = Task.query(["priority": ["$gte": 2], "completed": false])
 
   // First match (with a sort)
@@ -158,7 +158,7 @@ The generated model statics route through the process-wide default client — ca
 ### Update
 
 ```swift
-  if var task = Task.find(taskId) {
+  if var task = try await Task.find(taskId) {
     task.completed = true
     try task.save(in: documentId)
   }
@@ -167,7 +167,7 @@ The generated model statics route through the process-wide default client — ca
 ### Delete
 
 ```swift
-  if let task = Task.find(taskId) {
+  if let task = try await Task.find(taskId) {
     try task.delete(in: documentId)
   }
 ```
@@ -175,15 +175,14 @@ The generated model statics route through the process-wide default client — ca
 ### Upsert by natural key
 
 ```swift
-  let email = "alice@example.com"
-  // Reuse the existing record's id when one matches the email; otherwise mint a new id.
-  let existing = AppUser.query(["email": email]).first
   let user = AppUser(
-    id: existing?.id ?? UUID().uuidString,
-    email: email,
+    id: UUID().uuidString,
+    email: "alice@example.com",
     name: "Alice"
   )
-  try user.save(in: documentId)
+  // "email" must have a single-field unique constraint in schema.toml.
+  // On merge, the returned record carries the existing record's id.
+  let resolved = try user.save(in: documentId, upsertOn: "email")
 ```
 
 ### Logical query operators
@@ -398,7 +397,7 @@ final class MyAppState: PrimitiveAppState {
 
 For per-document setup beyond models, override the `onDocumentOpened(doc:documentId:)` hook — the base class opens the doc once and hands you the live `YDocument`, so don't call `openDocument(...)` again just to get one.
 
-For a **fresh doc you'll write immediately**, use `client.createDocument(options:)` — it returns `(documentId, doc: YDocument?)` and the returned `YDocument` is writable at once (local-first). Re-opening a freshly-created empty doc with `waitForLoad: .network` parks ~15s waiting for a sync event that never has anything to deliver.
+For a **fresh doc you'll write immediately**, use `client.createDocument(options:)` — it returns a `CreateDocumentResult` with `metadata: JSONValue?`; extract `metadata?["documentId"]?.stringValue` to get the new document's id. Re-opening a freshly-created empty doc with `waitForLoad: .network` parks ~15s waiting for a sync event that never has anything to deliver.
 
 **Multi-doc apps (one ambient library doc + N per-item docs).** `selectDocumentAwaiting(_:)` is the *single*-selected-doc lifecycle — it closes the previously selected doc first, so using it for a per-item detail view closes your library/index doc. For one ambient doc plus transient detail docs, use `appState.openAuxiliaryDoc(_:)` from the detail view's `.task` and `appState.closeAuxiliaryDoc(_:)` from `.onDisappear`. These register the doc for sync, but they don't touch `selectedDocId` or fire `onDocumentOpened`. Once open, read the doc's records through the facade scoped to that document:
 
@@ -550,7 +549,7 @@ public extension TodoItem {
 - **IDs are `String`** — supply `UUID().uuidString` (or a ULID) when not provided.
 - Register models with `client.registerModels([TodoItem.self])` at connect time (or rely on the facade's lazy registration on first read) — registered models are mirrored into the client's shared store and listed in the in-app debug inspector automatically.
 
-CRUD through the facade is local-first (applied to the CRDT immediately, synced in the background). Writes throw — `try record.save(in: documentId)` inserts or updates in place and returns `self`; `save(in:upsertOn:)` matches on a single-field unique constraint instead of `id`; `try record.delete(in: documentId)`; all three throw if the target document isn't open. Reads (`find`, `findAll`, `queryOne`, `query(["completed": false], options: QueryOptions(sort: ["sortOrder": 1], limit: 50))`, `count`) are synchronous, span every open document by default (scope with `QueryOptions(documents: [...])`), and are `@MainActor`-isolated. Predicate operators: equality, `$gt`/`$gte`/`$lt`/`$lte`, `$containsText`, `$or`/`$and`/`$not`.
+CRUD through the facade is local-first (applied to the CRDT immediately, synced in the background). Writes throw — `try record.save(in: documentId)` inserts or updates in place; `save(in:upsertOn:)` matches on a single-field unique constraint instead of `id` and returns the resolved record; `try record.delete(in: documentId)`; all three throw if the target document isn't open. Reads: `query(...)`, `queryOne`, `count`, and `aggregate` are **synchronous**, span every open document by default (scope with `QueryOptions(documents: [...])`), and are `@MainActor`-isolated. `find(_ id:)` and `findAll()` are **`async throws`** — use `try await TodoItem.find(id)`. Predicate operators: equality, `$gt`/`$gte`/`$lt`/`$lte`, `$containsText`, `$or`/`$and`/`$not`.
 
 > **SourceKit footgun, first time only.** Editing the companion before codegen has ever run shows a red `No such module 'PrimitiveApp'` underline. The real cause is that the generated type doesn't exist yet — run `swift build` once (or the `run-ios.sh` codegen step) and it clears. Only the very first scaffold hits this.
 

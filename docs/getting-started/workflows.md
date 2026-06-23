@@ -438,10 +438,15 @@ id = "normalize"
 kind = "script"
 ref = "normalize-order"     # the script's name: transforms/normalize-order.rhai
 saveAs = "order"
+# configId = "..."          # optional — pin a specific ScriptConfig for determinism
 [steps.with]
 raw = "{{ steps.fetch.body }}"
 currency = "{{ input.currency }}"
 ```
+
+`configId` is optional. Without it, the runner resolves the script's active config body at execution time, so pushing a new `.rhai` body reaches all referencing workflows on their next run with no re-publish step. Set `configId` to pin a specific version when determinism is required.
+
+`limits` is also optional and lowers the per-run sandbox ceilings for this step (`maxOperations`, `wallMsHint`, `maxOutputBytes`, `maxArrayLength`, `maxObjectKeys`, `maxNestingDepth`, `maxStringSize`, `maxCallDepth`, `maxLogBytes`). Requested values are clamped at the app ceiling; they can only lower, never raise it.
 
 Given `steps.fetch.body` of `{ "items": [ { "sku": "a1", "qty": 2, "price": 5.0 }, { "sku": "b2", "qty": 0, "price": 9.0 } ] }` and input `{ "currency": "USD" }`, the script returns:
 
@@ -774,6 +779,8 @@ primitive email-templates set order-confirmation \
   --subject "Your order #{{orderId}}" \
   --html-file ./order.html
 ```
+
+For the full CLI reference for managing and customizing email templates — including listing variables, testing, and reverting to defaults — see [Email Template Customization](./authentication.md#email-template-customization).
 
 #### Inline Mode
 

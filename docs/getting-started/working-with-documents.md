@@ -310,7 +310,7 @@ Save-or-update by a unique field (such as `email`) without knowing the existing 
 For composite keys, use `upsertByUnique(constraintName, …)` — see [Unique Constraints](#unique-constraints) above.
 
 ::: tip iOS semantics
-Model reads are **synchronous** against the local CRDT (`Task.findAll()`, `Task.query([...])` — no `await`) and span every open document by default; scope with `QueryOptions(documents: [docId])`. Writes target one document — `save(in:)` inserts or updates in place and `throws` (it validates the write and requires the document to be open); `delete(in:)` throws only if the document isn't open. Writes are local-first: visible to local reads on the next line, synced to peers in the background.
+`Task.query(...)`, `queryOne`, `count`, and `aggregate` are **synchronous** (no `await`) — they read the in-process CRDT and span every open document by default; scope with `QueryOptions(documents: [docId])`. `Task.find(_:)` and `Task.findAll()` are **`async throws`** — use `try await Task.find(id)`. Writes target one document — `save(in:)` inserts or updates in place and `throws`; `save(in:upsertOn:)` matches by unique field; `delete(in:)` throws only if the document isn't open. Writes are local-first: visible to local reads on the next line, synced to peers in the background.
 :::
 
 ## Querying
