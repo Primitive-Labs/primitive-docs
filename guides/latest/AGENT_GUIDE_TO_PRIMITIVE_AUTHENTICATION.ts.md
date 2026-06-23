@@ -451,26 +451,24 @@ const doc = await client.openDocument(id);     // before await client.waitForAut
 
 ## JWT Persistence
 
-Optional — persists the JWT so a relaunch doesn't require re-authentication.
-
-Opt in at `initializeClient` and the token is written to browser storage:
+Optional — opt in through the client's `auth` options so a relaunch reuses the short-lived token while it's still within the refresh window, instead of forcing a fresh sign-in. `getAuthPersistenceInfo()` reports whether persistence is on.
 
 ```typescript
-import { initializeClient } from "js-bao-wss-client";
+  const client = await initializeClient({
+    apiUrl: "https://primitiveapi.com",
+    wsUrl: "wss://primitiveapi.com",
+    appId: "YOUR_APP_ID",
+    auth: {
+      persistJwtInStorage: true,
+      storageKeyPrefix: "my-app",
+    },
+  });
 
-const client = await initializeClient({
-  apiUrl, wsUrl, appId, oauthRedirectUri,
-  auth: {
-    persistJwtInStorage: true,
-    storageKeyPrefix: "my-app", // namespace; required for multi-tenant on same origin
-  },
-});
-
-const info = client.getAuthPersistenceInfo();
-// { mode: "memory" | "persisted", hydrated: boolean }
+  // mode: "memory" | "persisted"; hydrated: was a cached token restored?
+  const info = client.getAuthPersistenceInfo();
 ```
 
-Persisted tokens within ~2 min of expiry are not reused. Tokens are cleared on logout and on `auth-failed`.
+The token is written to browser storage; `storageKeyPrefix` namespaces it (required for multiple clients on the same origin). `getAuthPersistenceInfo()` returns `{ mode: "memory" | "persisted", hydrated }` — `hydrated` is whether a cached token was restored this session. Persisted tokens within ~2 min of expiry are not reused; tokens are cleared on logout and on `auth-failed`.
 
 ---
 
@@ -521,9 +519,9 @@ Logout fires `auth:logout` immediately and `auth:logout:complete` when finished.
 
 ## Auth State in Apps
 
-Gate the app's main layout on auth state so child views can assume an authenticated user, and react to auth loss centrally. The starter template implements this gate; if you're not using it, replicate it.
+The neutral signal is the client's own auth state: `client.isAuthenticated()` is the live boolean, and `client.waitForAuthReady()` gates work until auth (and offline DBs) are ready — see [Token Inspection & Manual Token](#token-inspection--manual-token) for the compiled calls. Gate the app's main layout on that signal so child views can assume an authenticated user, and react to auth loss centrally. The patterns below are **framework wiring** around that flag — the starter template implements them; if you're not using it, replicate them.
 
-The template ([primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template)) provides a `userStore` (Pinia) and `AppLayout`.
+The template ([primitive-app-template](https://github.com/Primitive-Labs/primitive-app-template)) provides a `userStore` (Pinia) and `AppLayout` that mirror `client.isAuthenticated()` into a reactive `userStore.isAuthenticated`.
 
 ### Two key flags (template store)
 
@@ -531,6 +529,8 @@ The template ([primitive-app-template](https://github.com/Primitive-Labs/primiti
 - **`isAuthenticated`** — live reactive. Can flip in either direction at any time (token expiry, server invalidation, login).
 
 ### Layout gate (recommended default)
+
+Web-template glue (Vue) gating `<router-view>` on the auth flag:
 
 ```vue
 <template v-if="!userStore.isAuthenticated">
@@ -544,6 +544,8 @@ The template ([primitive-app-template](https://github.com/Primitive-Labs/primiti
 Components inside the gate **don't** need to null-check `currentUser` or watch `isAuthenticated`. If auth is lost, they unmount.
 
 ### Reactive watchers (downstream stores)
+
+Web-template glue (Vue) reacting to auth-state transitions — initialize on sign-in, reset on sign-out:
 
 ```typescript
 watch(
@@ -582,9 +584,9 @@ See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-gra
 
 ## Invite Token Persistence Across Auth Round-Trips (Template Pattern)
 
-When an invitation link carries an `inviteToken` query parameter and the recipient is not signed in, the token must survive the auth redirect so the server can resolve deferred grants atomically at verification time.
+The neutral contract is small: pass the `inviteToken` to the auth call that completes sign-in (`client.otpVerify(...)`, `magicLinkVerify`, or the OAuth flow) so the server resolves deferred grants atomically at verification time. The only hard part is that when the recipient isn't signed in, the token must **survive the auth redirect** — and that round-trip is web-template glue.
 
-The template implements this in `src/lib/inviteToken.ts`:
+The template implements the round-trip in `src/lib/inviteToken.ts` (sessionStorage); the one Primitive call below is `client.otpVerify(email, code, { inviteToken })`:
 
 ```typescript
 import {

@@ -368,9 +368,6 @@ Use this to render the "pending members" section of a group sharing UI without h
   // [["groupType", "groupId", "name", "description"?, "addedAt", "addedBy"]]
 ```
 
-`name` is joined from `AppGroup` at call time; orphan rows (membership pointing at a deleted group) are skipped.
-The call returns every membership for the user; filter by `groupType` on the returned list.
-
 ## Group Type Configuration
 
 Group types are configured via TOML config files and the `primitive sync` command (version-controlled alongside your code).

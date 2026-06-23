@@ -340,9 +340,25 @@ let doc = try await client.openDocument(id)  // before try await client.waitForA
 
 ## JWT Persistence
 
-Optional — persists the JWT so a relaunch doesn't require re-authentication.
+Optional — opt in through the client's `auth` options so a relaunch reuses the short-lived token while it's still within the refresh window, instead of forcing a fresh sign-in. `getAuthPersistenceInfo()` reports whether persistence is on.
 
-The client persists the token to the Keychain across app launches. `waitForAuthBootstrap()` restores any persisted session, so an authenticated user stays signed in on relaunch. Tokens within ~2 min of expiry are not reused, and are cleared on logout and on `authFailed`.
+```swift
+  let client = JsBaoClient(options: JsBaoClientOptions(
+    apiUrl: "https://primitiveapi.com",
+    wsUrl: "wss://primitiveapi.com",
+    appId: "YOUR_APP_ID",
+    auth: AuthConfig(
+      persistJwtInStorage: true,
+      storageKeyPrefix: "my-app"
+    )
+  ))
+
+  try await client.waitForAuthBootstrap()
+  // ["mode": "persisted" | "memory", "prefix": <storageKeyPrefix>]
+  let info = client.getAuthPersistenceInfo()
+```
+
+The token is stored in the Keychain; `storageKeyPrefix` namespaces it. `waitForAuthBootstrap()` restores any persisted session, so an authenticated user stays signed in on relaunch. `getAuthPersistenceInfo()` returns `["mode": "persisted" | "memory", "prefix": <storageKeyPrefix>]`. Tokens within ~2 min of expiry are not reused, and are cleared on logout and on `authFailed`.
 
 ---
 
@@ -361,13 +377,13 @@ The client persists the token to the Keychain across app launches. `waitForAuthB
 
 ## Auth State in Apps
 
-Gate the app's main layout on auth state so child views can assume an authenticated user, and react to auth loss centrally. The starter template implements this gate; if you're not using it, replicate it.
+The neutral signal is the client's own auth state: `client.isAuthenticated()` is the live boolean, and `client.waitForAuthReady()` gates work until auth (and offline DBs) are ready — see [Token Inspection & Manual Token](#token-inspection--manual-token) for the compiled calls. Gate the app's main layout on that signal so child views can assume an authenticated user, and react to auth loss centrally. The patterns below are **framework wiring** around that flag — the starter template implements them; if you're not using it, replicate them.
 
-The template ([swift-primitive-app-dev](https://github.com/Primitive-Labs/swift-primitive-app-dev)) provides `PrimitiveAppState` + `PrimitiveAuthManager` (`@Published isAuthenticated`/`userId`/`loginState`) and `AuthGateView`.
+The template ([swift-primitive-app-dev](https://github.com/Primitive-Labs/swift-primitive-app-dev)) provides `PrimitiveAppState` + `PrimitiveAuthManager` (`@Published isAuthenticated`/`userId`/`loginState`) and `AuthGateView` — SwiftUI glue that mirrors `client.isAuthenticated()` into observable state.
 
 ### Layout gate (recommended default)
 
-`AuthGateView(appState:appName:authManager:) { content }` is the layout gate — it walks initializing → login (`PrimitiveLoginView`) → connecting → connected and only renders `content` when connected, so views inside never null-check the user:
+SwiftUI glue (PrimitiveApp package) — `AuthGateView(appState:appName:authManager:) { content }` is the layout gate; it walks initializing → login (`PrimitiveLoginView`) → connecting → connected and only renders `content` when connected, so views inside never null-check the user:
 
 ```swift
 AuthGateView(appState: appState, appName: "MyApp", authManager: authManager) {
@@ -377,7 +393,7 @@ AuthGateView(appState: appState, appName: "MyApp", authManager: authManager) {
 
 ### Reactive observers (downstream state)
 
-Subscribe to `authManager.$isAuthenticated` (Combine) to initialize or reset downstream state on transitions:
+SwiftUI/Combine glue reacting to auth-state transitions — subscribe to `authManager.$isAuthenticated` to initialize or reset downstream state:
 
 ```swift
 authManager.$isAuthenticated
