@@ -54,11 +54,11 @@ const latest   = await db.executeOperation("listLatestSnapshot");
 {{#lang swift}}
 ```swift
 // 5 sequential round trips to the SAME database
-let groups = try await db.executeOperation(name: "listGroups")
-let accounts = try await db.executeOperation(name: "listAccounts")
-let holdings = try await db.executeOperation(name: "listHoldings")
-let targets = try await db.executeOperation(name: "listAllTargets")
-let latest = try await db.executeOperation(name: "listLatestSnapshot")
+let groups = try await client.databases.executeOperation(databaseId: dbId, name: "listGroups")
+let accounts = try await client.databases.executeOperation(databaseId: dbId, name: "listAccounts")
+let holdings = try await client.databases.executeOperation(databaseId: dbId, name: "listHoldings")
+let targets = try await client.databases.executeOperation(databaseId: dbId, name: "listAllTargets")
+let latest = try await client.databases.executeOperation(databaseId: dbId, name: "listLatestSnapshot")
 ```
 {{/lang}}
 
@@ -120,9 +120,10 @@ for (const group of groups) {
 {{#lang swift}}
 ```swift
 for group in groups {
-  let targets = try await db.executeOperation(
+  let targets = try await client.databases.executeOperation(
+    databaseId: dbId,
     name: "listTargetsByGroup",
-    params: ["groupId": group.id]
+    options: ExecuteOperationOptions(params: ["groupId": .string(group.id)])
   )
   // ...use targets
 }
@@ -169,9 +170,9 @@ const c = await db.executeOperation("opC");
 {{/lang}}
 {{#lang swift}}
 ```swift
-let a = try await db.executeOperation(name: "opA")
-let b = try await db.executeOperation(name: "opB")
-let c = try await db.executeOperation(name: "opC")
+let a = try await client.databases.executeOperation(databaseId: dbId, name: "opA")
+let b = try await client.databases.executeOperation(databaseId: dbId, name: "opB")
+let c = try await client.databases.executeOperation(databaseId: dbId, name: "opC")
 ```
 {{/lang}}
 
@@ -213,11 +214,12 @@ for (const symbol of symbols) {
 ```swift
 // 21 individual proxy calls for 21 symbols
 for symbol in symbols {
-  _ = try await client.integrations.call(
+  _ = try await client.integrations.call(IntegrationCallRequest(
     integrationKey: "yahoo-finance",
+    method: "GET",
     path: "/v8/finance/chart/\(symbol)"
     // ...
-  )
+  ))
 }
 ```
 {{/lang}}
@@ -336,8 +338,11 @@ func initialize() async throws {
 // Lazy: idempotent, de-duped
 func loadAuthConfig() async {
   if authConfig != nil { return }
-  if let task = authConfigTask { return await task.value }
-  let task = Task { normalize(try await client.auth.getAuthConfig()) }
+  // getAuthConfig() is `throws`; catch inside the Task so the cached task —
+  // and this loader — stay non-throwing (callers fire it without `try`).
+  let task = authConfigTask ?? Task {
+    (try? await client.auth.getAuthConfig()).map(normalize)
+  }
   authConfigTask = task
   authConfig = await task.value
 }
@@ -643,7 +648,7 @@ When auditing an existing Primitive app, these usually find real wins:
 | Eager full-reload on every state change | a change observer whose body does `try await load…` |
 | Awaiting non-critical init | `try await client.auth.getAuthConfig()`, `try await listUserMemberships`, `try await initializeUserPrefs()` inside `initialize()` / `completeAuthentication()` |
 | Cached value behind a re-block | `await ensurePrefsReady(); let cached = getPref(...)` (yes — really) |
-| Sequential awaits | three or more consecutive `try await db.executeOperation(...)` lines |
+| Sequential awaits | three or more consecutive `try await client.databases.executeOperation(...)` lines |
 {{/lang}}
 
 ## Measuring
