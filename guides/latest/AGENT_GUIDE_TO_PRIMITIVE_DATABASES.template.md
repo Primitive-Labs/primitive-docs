@@ -282,18 +282,14 @@ A **database type** is a named configuration shared across many databases. It pr
 - **`autoPopulatedFields`** — declarative server-side field stamping on writes (see below)
 - **`defaultAccess`** — fallback CEL access rule applied to operations that omit their own `access`
 - **`[models.*]` schema** — optional server-enforced model declaration. When present, every op edit (and the schema edit itself) is checked against it; see [Schema gate](#schema-gate)
-{{#lang ts}}
 - **Subscriptions** — type-scoped real-time subscription definitions (managed via `[[subscriptions]]` blocks in the TOML)
-{{/lang}}
 - **Rule set attachment** — controls who can edit the type config and its operations
 
 {{#lang swift}}
 Swift `executeOperation` can call **any** registered operation regardless of its `type` (it returns `JSONValue`). Operation *management* is narrower: Swift's `DatabaseOperationType` enum — used by `createOperation` / `listOperations` — models only `query`, `mutation`, `count`, and `aggregate`. Define and manage `pipeline` and `applyToQuery` operations through TOML and the `primitive` CLI rather than the typed Swift management API.
 {{/lang}}
 
-{{#lang ts}}
 Real-time subscriptions are also part of the type config — see [Real-Time Subscriptions](#real-time-subscriptions). One subscription definition serves every database of that type. Define them as `[[subscriptions]]` blocks in the same TOML file; `primitive sync push` manages them alongside operations.
-{{/lang}}
 
 ### Triggers
 
@@ -975,7 +971,6 @@ For a unified "all DBs I can access" view, combine `databases.list()` with `grou
 
 **Group permissions are still admin-level access — they don't replace operation-level CEL.** Only the database owner (or an app admin) can grant/revoke group permissions.
 
-{{#lang ts}}
 ## Real-Time Subscriptions
 
 Databases push changes to connected clients over WebSocket. A subscription answers "how does the client find out something changed?" — the client registers interest in a named subscription, and the server pushes batched record changes as they happen. Subscriptions are **type-scoped** — one definition per `(databaseType, subscriptionKey)` applies to every database of that type. The model key is `(appId, databaseType, subscriptionKey)`. Max 20 subscriptions per database type.
@@ -1088,6 +1083,7 @@ The client auto-reissues `db.subscribe` on WebSocket reconnect — no app code n
 
 #### Wrong
 
+{{#lang ts}}
 ```typescript
 // WRONG — there is no .on() / .unsubscribe() / "reconnected" event.
 const sub = await client.databases.database(databaseId).subscribe("my-open-tickets");
@@ -1103,9 +1099,30 @@ filter: "record.assigneeId == user.userId"
 // CORRECT:
 filter: "record.data.assigneeId == user.userId"
 ```
+{{/lang}}
+{{#lang swift}}
+```swift
+// WRONG — there is no event-emitter. `subscribe` takes an `onChange` closure
+// and returns an unsub function (`() -> Void`) synchronously; the returned
+// handle has no `.on(...)` / `.unsubscribe()`.
+let unsub = try client.databases.subscribe(databaseId: databaseId, subscriptionKey: "my-open-tickets", options: opts)
+unsub.on("change", handler)   // ✗ unsub is a function, not an emitter
+
+// WRONG — onChange receives a DatabaseChangePayload envelope whose `changes`
+// is an array, not a single record. Iterate `event.changes`.
+DatabaseSubscribeOptions(onChange: { event in render(event) })
+
+// WRONG — in the subscription's filter CEL, record payload fields are nested
+// under `record.data`, not spread on `record`.
+filter: "record.assigneeId == user.userId"
+// CORRECT:
+filter: "record.data.assigneeId == user.userId"
+```
+{{/lang}}
 
 ### Change envelope shape
 
+{{#lang ts}}
 ```typescript
 interface DatabaseChangePayload {
   type: "db.change";
@@ -1134,6 +1151,39 @@ interface DatabaseChangeEvent {
   previousData?: any;  // present on patch/delete, subject to `select`
 }
 ```
+{{/lang}}
+{{#lang swift}}
+The `onChange` closure receives a `DatabaseChangePayload`; each element of its `changes` array is a `DatabaseChangeEvent`. `op` and `changeType` are plain `String`s; `data` / `previousData` are opaque record blobs typed `Any?`.
+
+```swift
+public struct DatabaseChangePayload {
+    public let databaseId: String
+    public let subscriptionKey: String
+    public let changes: [DatabaseChangeEvent]   // 1+ changes; batched per write op
+    public let timestamp: String                // ISO
+    /// Writer's connection id, or nil for server-side writes (cron, workflow, admin).
+    public let originConnectionId: String?
+    /// Writer's user id, or nil for server-side writes.
+    public let originUserId: String?
+    /// True iff this exact connection produced the write. Synthesized per recipient.
+    public let isOrigin: Bool
+    /// True iff any session signed in as the current user produced the write.
+    public let isOriginUser: Bool
+}
+
+public struct DatabaseChangeEvent {
+    /// "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet".
+    public let op: String
+    /// Filter-set transition: "enter" (newly matching), "update" (in-set change),
+    /// "leave" (no longer matches). nil on older server frames.
+    public let changeType: String?
+    public let modelName: String
+    public let id: String
+    public let data: Any?          // present on save/patch/increment/addToSet/removeFromSet, subject to `select`
+    public let previousData: Any?  // present on patch/delete, subject to `select`
+}
+```
+{{/lang}}
 
 ### Change-frame origin attribution
 
@@ -1162,7 +1212,12 @@ On WS reconnect the local connection id rotates, so a frame for the writer's own
 
 Make the initial-load operation's filter and the subscription's `filter` semantically equivalent. If they diverge, the UI will flicker (records the operation returned but the subscription never updates, or vice versa).
 
+{{#lang ts}}
 There is no built-in "reconnected" callback. If you need to re-run the initial load after a disconnect, listen for status events on the client itself — `JsBaoClient` extends `Observable`, so `client.on("status", ({ status }) => { ... })` lets you trigger your loader when the WS comes back up.
+{{/lang}}
+{{#lang swift}}
+There is no built-in "reconnected" callback. To re-run the initial load after a disconnect, observe client status — `client.events.on(.status) { (event: StatusChangedEvent) in if event.status == .connected { ... } }` — and re-fire your loader when the socket reconnects. `BaoDataLoader` does exactly this for you: it reloads when the connection flips back to `.connected`.
+{{/lang}}
 
 ### Critical Rules
 
@@ -1198,7 +1253,6 @@ There is no built-in "reconnected" callback. If you need to re-run the initial l
 - "Seeing my own writes" — only happens if a different connection performed the write (e.g. another tab) or you have a client-side optimistic update on the same path.
 
 For driving subscriptions from a scheduled write (a cron-triggered workflow mutating a database), see the [Workflows agent guide](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md#cron-triggers). The cron-spawned mutation is just a normal write; the subscription doesn't know cron exists.
-{{/lang}}
 
 ## Schema Introspection
 
