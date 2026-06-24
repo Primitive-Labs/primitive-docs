@@ -69,7 +69,7 @@ Database setup has two phases: **configuration** (via CLI and TOML config files)
 Initialize a sync directory and create config files:
 
 ```bash
-primitive sync init --dir ./config
+primitive sync init
 ```
 
 Create a database type config with operations in `config/database-types/project.toml`:
@@ -106,7 +106,7 @@ params = '{"title":{"type":"string","required":true},"projectId":{"type":"string
 Push configuration to the server:
 
 ```bash
-primitive sync push --dir ./config
+primitive sync push
 ```
 
 ### 2. Use databases in app code

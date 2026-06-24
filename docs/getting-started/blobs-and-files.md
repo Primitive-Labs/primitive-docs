@@ -29,7 +29,7 @@ ttlTier = "permanent"
 Push it:
 
 ```bash
-primitive sync push --dir ./config
+primitive sync push
 ```
 
 Or via the CLI:

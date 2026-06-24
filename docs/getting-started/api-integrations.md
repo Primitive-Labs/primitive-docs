@@ -47,10 +47,10 @@ The value resolves server-side when the request is proxied and is never exposed 
 
 ```bash
 # Initialize config directory
-primitive sync init --dir ./config
+primitive sync init
 
 # Push integration config to server
-primitive sync push --dir ./config
+primitive sync push
 
 # Test the integration
 primitive integrations test weather-api

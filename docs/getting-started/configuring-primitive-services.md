@@ -14,12 +14,14 @@ Both edit the same underlying configuration. Most teams explore in the console a
 `primitive sync` round-trips your app's configuration between the server and a directory of TOML files:
 
 ```bash
-primitive sync init --dir ./config     # create the directory structure
-primitive sync pull --dir ./config    # download current server config as TOML
+primitive sync init     # create the directory structure
+primitive sync pull     # download current server config as TOML
 # ... edit files locally ...
-primitive sync diff --dir ./config    # see what would change
-primitive sync push --dir ./config    # apply your changes to the server
+primitive sync diff     # see what would change
+primitive sync push     # apply your changes to the server
 ```
+
+The sync directory auto-resolves to `.primitive/sync/<env>/<appId>/` — one isolated slot per environment. Pass `--dir <path>` to override it with a fixed directory.
 
 The files live in your repo, so configuration changes ride the same workflow as code: branches, diffs, reviews, rollbacks. `sync push` validates every file before applying anything — a validation error aborts the push with no changes applied — and reports the file and entity behind any failure.
 

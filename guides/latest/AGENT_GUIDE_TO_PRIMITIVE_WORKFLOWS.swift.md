@@ -931,7 +931,7 @@ firedAt = "{{now}}"
 ```
 
 ```bash
-primitive sync push --dir ./config
+primitive sync push
 ```
 
 The TOML key `key` maps to the API field `triggerKey`. The field name is `cron` (not `schedule`).
@@ -1171,12 +1171,12 @@ Setting `status = "active"` without an active config or revision returns: `Canno
 ## CLI
 
 ```bash
-# Sync (recommended for everything)
-primitive sync init --dir ./config
-primitive sync pull --dir ./config
-primitive sync diff --dir ./config
-primitive sync push --dir ./config --dry-run
-primitive sync push --dir ./config
+# Sync (recommended for everything; sync dir auto-resolves to .primitive/sync/<env>/<appId>/)
+primitive sync init
+primitive sync pull
+primitive sync diff
+primitive sync push --dry-run
+primitive sync push
 
 # Workflow CRUD (when not using sync)
 primitive workflows list [--status active] [--json]
