@@ -141,7 +141,7 @@ There is **no single "my documents" list**. A user reaches documents through **f
   });
 ```
 
-Each shared document in the result extends the base `DocumentInfo` (`title`, `createdBy`, `createdAt`, `lastModified`, plus `tags`/`metadata`/`thumbnailBlobId` when set) with the share-only extras `permission` (never `"owner"`), `source` (`"permission"` | `"invitation"`), `grantedBy`, `invitationId` (invitation rows only).
+Each row from `sharedDocuments` extends the base `DocumentInfo` (`title`, `createdBy`, `createdAt`, `lastModified`, plus `tags`/`metadata`/`thumbnailBlobId` when set) with the share-only extras `permission` (never `"owner"`), `source` (`"permission"` | `"invitation"`), `grantedBy`, `invitationId` (invitation rows only).
 
 `ownedDocuments` and `sharedDocuments` return the unified `{ items, cursor }` envelope (raw-JSON `cursor`, NOT base64url). `ownedDocuments()` returns a flat `DocumentInfo[]` by default, or the envelope with `returnPage: true`.
 
@@ -387,7 +387,7 @@ List with `me.ownedDocuments()` and `open()` the selected document; create a new
 
 **Best for:** Apps that query across many documents, each with its own sharing context — chat (per channel), multi-tenant dashboards, collaborative workspaces with distinct collections.
 
-All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `me.ownedDocuments({ tag })` (and `me.sharedDocuments({ tag })` if the user can also be a non-owner), open each, and track per-document readiness yourself. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over local tracking.
+All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with a tag-filtered `me.ownedDocuments` (and `me.sharedDocuments` if the user can also be a non-owner), open each, and track per-document readiness yourself. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over local tracking.
 
 ```typescript
   // Open every document with a given tag
@@ -1309,7 +1309,11 @@ The point-in-time checks accept an optional `timeoutMs`.
 
 ### Updating Document Metadata
 
-Update a document's title, thumbnail, and presentation metadata — see [Update thumbnail / metadata](#update-thumbnail--metadata) above for the compiled call. Each field is optional; pass `null` to clear `thumbnailBlobId` or `metadata`. `documents.isOpen(documentId)` reports whether a document is currently open.
+Update a document's title, thumbnail, and presentation metadata — see [Update thumbnail / metadata](#update-thumbnail--metadata) above for the compiled call. Each field is optional; omit one to leave it unchanged.
+
+Pass `null` to clear `thumbnailBlobId` or `metadata`.
+
+`documents.isOpen(documentId)` reports whether a document is currently open.
 
 `thumbnailBlobId` points at a blob you've already uploaded; the platform marks the referenced blob readable to anyone with access to the document. `metadata` is a JSON-serializable object with a 4KB cap on its serialized UTF-8 form — keep it to the kind of presentation hints that need to travel with the document (cover image references, badge colors, list layout). Failures return:
 
@@ -1373,7 +1377,7 @@ When `sendEmail: true`, the server delivers per-recipient emails:
 
 Both branches share two preconditions when `sendEmail: true`: `documentUrl` must be supplied in the request, and the app must have `baseUrl` configured (so the deferred branch can compose its accept URL). Either missing returns HTTP 400 (`"documentUrl is required when sendEmail is true"` or `"Cannot send share email: app baseUrl is not configured"`). Customize either email type with `primitive email-templates set document-share ...` or `primitive email-templates set document-share-deferred ...`.
 
-Repeated email-based calls are idempotent: a second `updatePermissions(documentId, { email })` with the same email updates the existing pending `DeferredDocumentPermission` in place rather than creating a duplicate row, so the latest `permission` value wins at signup-time resolution and `client.documents.listPendingInvitations(documentId)` shows one entry per pending recipient.
+Repeated email-based calls are idempotent: a second `updatePermissions` call for the same email updates the existing pending `DeferredDocumentPermission` in place rather than creating a duplicate row, so the latest `permission` value wins at signup-time resolution and `client.documents.listPendingInvitations(documentId)` shows one entry per pending recipient.
 
 **There is no `permission: null` to remove.** Removal is a separate call (`removePermission` by userId or by email; `transferOwnership` to hand a document to a new owner):
 
@@ -1663,7 +1667,7 @@ await client.collections.revokeGroupPermission(collectionId, "team", "engineerin
 // Change a user's permission: call addMember again with the new level.
 ```
 
-The deferred-grant flow on `collections.addMember({ email })` mirrors the document share path: `app.baseUrl` must be configured, `sendEmail: true` requires `collectionUrl`, and `client.invitations.delete(invitationId)` cancels every pending collection add (plus any pending document shares and group adds) attached to the invitation. See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-grants) for the resolution lifecycle.
+The deferred-grant flow when adding a collection member by email (`collections.addMember`) mirrors the document share path: `app.baseUrl` must be configured, `sendEmail: true` requires `collectionUrl`, and `client.invitations.delete(invitationId)` cancels every pending collection add (plus any pending document shares and group adds) attached to the invitation. See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-grants) for the resolution lifecycle.
 
 For per-context CEL rules using `collectionType` + `contextId` (and the `hasCollectionAccess` helper), see [Rule Sets for Collection Management](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md#rule-sets-for-collection-management) in the Users and Groups guide.
 
