@@ -432,9 +432,11 @@ Upload size limit: **10 MB**. Attachments are sent to the model as file parts (`
 ## Sync (TOML version control)
 
 ```bash
-primitive sync pull [app-id] [--dir ./config]
-primitive sync push [app-id] [--dir ./config] [--dry-run]
+primitive sync pull [app-id]
+primitive sync push [app-id] [--dry-run]
 ```
+
+The sync directory auto-resolves to `.primitive/sync/<env>/<appId>/`; pass `--dir <path>` to override it.
 
 ### Directory layout (verified in `cli/src/commands/sync.ts` — see the layout block in the `sync` command's help text)
 
@@ -584,13 +586,13 @@ primitive prompts tests runs <prompt-id> --json     # compare runs across config
 ### Version control
 
 ```bash
-primitive sync pull --dir ./config
-git add ./config && git commit -m "Snapshot prompts"
+primitive sync pull
+git add .primitive/sync && git commit -m "Snapshot prompts"
 
-# edit ./config/prompts/*.toml
+# edit the synced prompts/*.toml files
 
-primitive sync push --dir ./config --dry-run        # preview
-primitive sync push --dir ./config                  # apply
+primitive sync push --dry-run        # preview
+primitive sync push                  # apply
 ```
 
 ---

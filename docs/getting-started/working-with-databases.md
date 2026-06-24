@@ -30,12 +30,14 @@ primitive databases create "Product Catalog" --type products
 
 ### 2. Define Operations
 
-Pull your config directory, then define operations in `config/database-types/products.toml`:
+Pull your config directory, then define operations in the synced `database-types/products.toml`:
 
 ```bash
-primitive sync init --dir ./config
-primitive sync pull --dir ./config
+primitive sync init
+primitive sync pull
 ```
+
+The sync directory auto-resolves to `.primitive/sync/<env>/<appId>/`; pass `--dir <path>` to override it.
 
 ```toml
 [type]
@@ -69,7 +71,7 @@ params = '{"name":{"type":"string","required":true},"price":{"type":"number","re
 ### 3. Push to Server
 
 ```bash
-primitive sync push --dir ./config
+primitive sync push
 ```
 
 ### 4. Use in Your App
@@ -307,10 +309,10 @@ primitive databases schema generate inventory
 Generate record interfaces and operation param/result types from your database-type TOML:
 
 ```bash
-primitive databases codegen --sync-dir ./config --output ./src/generated/db
+primitive databases codegen -o ./src/generated/db
 ```
 
-This reads the `[models.*]` blocks and `[[operations]]` definitions and emits typed interfaces — one per model, plus typed params and results per operation. Fields and params restricted to a fixed set of string values become TypeScript string-literal unions, so invalid values are caught at compile time (enum params are also validated server-side).
+Codegen reads the database-type TOML from the auto-resolved sync directory; pass `--sync-dir <path>` to override it. This reads the `[models.*]` blocks and `[[operations]]` definitions and emits typed interfaces — one per model, plus typed params and results per operation. Fields and params restricted to a fixed set of string values become TypeScript string-literal unions, so invalid values are caught at compile time (enum params are also validated server-side).
 
 ## Bulk CSV Import
 

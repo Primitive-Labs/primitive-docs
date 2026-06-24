@@ -309,7 +309,7 @@ A missing `documentId`/`modelName` (or `recordId` on a write), or a `documentId`
 
 **Caller-mode ACL.** When the run is `runAs: "caller"` (the default — see [Execution identity](#execution-identity-runas-system-workflows)), every op enforces the caller's per-document permission: `query`/`queryOne`/`count` need `reader`, `save`/`patch` need `read-write`, `delete` needs `owner`. A `null`/insufficient permission throws `DocumentAccessDeniedError` (non-retryable) — a templated/user-supplied `documentId` can't bypass the ACL. `runAs: "system"` runs app-privileged (no per-caller check).
 
-**Targeting by alias.** Supply a `documentAlias { scope, aliasKey }` block instead of `documentId` (exactly one of the two). `scope = "user"` resolves the caller's own alias (forces `userId = caller`; requires `runAs: "caller"`); `scope = "app"` resolves an app-scoped alias after checking the caller's effective permission. A non-resolving alias fails the step like a bad `documentId` (Option A — hard fail).
+**Targeting by alias.** Supply a `documentAlias { scope, aliasKey }` block instead of `documentId` (exactly one of the two). In a caller run, `scope = "user"` resolves the caller's own alias (forces `userId = caller`); `scope = "app"` resolves an app-scoped alias after checking the caller's effective permission. In a **system** run, a `scope = "user"` alias requires an explicit subject `userId` on the block — `documentAlias { scope = "user", aliasKey, userId }` — resolved app-privileged (see [subject-user methods](#subject-user-methods-system-workflows)). A non-resolving alias fails the step like a bad `documentId` (Option A — hard fail).
 
 ```toml
 [[steps]]
@@ -354,7 +354,7 @@ userId = "{{ input.userId }}"   # OR email = "...", not both
 
 `addMember` is idempotent. With `email`, returns `{ status: "pending_signup", invitationId, inviteToken, ... }` if the email has no AppUser yet.
 
-Group operations evaluate the group type's CEL rules. For workflow-issued operations, rules can match `fromWorkflow("workflowKey")`.
+Group operations evaluate the group type's CEL rules. For workflow-issued operations, rules can match `fromWorkflow("workflowKey")`. In a system run, `addMember`/`removeMember` record `sys:<appId>` as the membership's `addedBy` (not the admin/cron/webhook that initiated the run).
 
 ### `collect`
 
@@ -499,7 +499,7 @@ saveAs = "billingUpgrades"
 
 ### `script`
 
-Runs a sandboxed [Rhai](https://rhai.rs/) script over JSON input and returns JSON. Use it for transforms too involved for a templated `transform` step (nested reshaping, derived fields, array map/filter/reduce). The sandbox is **deterministic and side-effect-free** — no network, clock, or storage access — so script steps are safe to retry and easy to test.
+Runs a sandboxed [Rhai](https://rhai.rs/) script over JSON input and returns JSON. Use it for transforms too involved for a templated `transform` step (nested reshaping, derived fields, array map/filter/reduce). The sandbox is **deterministic and side-effect-free** — no network, clock, or storage access — so script steps are safe to retry and easy to test. The [Scripts guide](AGENT_GUIDE_TO_PRIMITIVE_SCRIPTS.md) covers the script model, input/output contract, limits, error codes, and gotchas in full; this section is the step-level reference.
 
 ```toml
 [[steps]]
@@ -533,6 +533,7 @@ Given `steps.fetch.body = { "items": [{ "sku": "a1", "qty": 2, "price": 5.0 }, {
 - **Result nesting.** A script step's return value lands under `steps.<id>.output.*` (alongside `scriptMetrics` and the engine's `ok`) — unlike `transform`, whose result is the templated table directly (`steps.<id>.<field>`). Wire downstream templates/`runIf` as `{{ steps.normalize.output.total }}`, not `{{ steps.normalize.total }}`.
 - **Script bodies resolve live at run time.** The runner looks up the script's active config body on each execution; there is no publish-time snapshot. Pushing a changed `.rhai` file (`primitive sync push`) creates a new config and activates it — referencing workflows pick up the new body on their next run with no re-publish step. Pin a specific config with `configId = "..."` on the step to bypass the active-config lookup when determinism is required.
 - Handy patterns: `parse_json(input.someJsonString)` for JSON-string fields (e.g. payload columns stored as strings); missing keys read as `()` (test with `h.symbol != ()`); `NaN`/`Infinity` can't survive JSON output — they serialize as `null`, so return a sentinel instead.
+- **`parse_json` is object-only.** Handed a string whose top-level JSON value is an **array**, it raises `output type mismatch: want map, got array` — the "output type" is `parse_json`'s expected output, not the step's, so it reads like an output-shape problem even when the script returns a map. Wrap the array first: `parse_json("{\"a\":" + raw + "}").a`. Top-level objects need no workaround.
 - `limits` (optional) lets a step lower the per-run ceilings (`maxOperations`, `wallMsHint`, `maxOutputBytes`, `maxArrayLength`, `maxObjectKeys`, `maxNestingDepth`, `maxStringSize`, `maxCallDepth`, `maxLogBytes`); requested values are clamped at the app ceiling, never raised.
 - Deterministic failures (parse / compile / runtime / limit / validation) come back as a non-retryable step error so durable retries don't re-run a guaranteed failure; transient/transport errors throw and retry normally. The runtime fails closed — it never silently passes input through.
 - Each execution records per-step telemetry on the `WorkflowRun.scriptMetrics` array (operation counts, input/output byte sizes, runtime version), visible in run detail.
@@ -873,6 +874,40 @@ capabilities = ["membership"]
 
 **`iterate-users` is system-only.** A workflow containing an `iterate-users` step must set `runAs = "system"` — otherwise it's rejected at save time (`'iterate-users' is system-only and may appear only in a runAs:"system" workflow`).
 
+### Subject-user methods (system workflows)
+
+A system run can act **about** a specific app user without impersonating them — the run's actor stays `sys:<appId>` for audit; `userId` is an explicit **subject** parameter. The `*ForUser` step kinds are **system-only** (calling one from a `runAs: "caller"` run throws non-retryably: `<kind> is only supported in runAs:"system" workflows`). In each, `userId` may be set on the step or inherited from `input.userId` (e.g. the iterated subject under `iterate-users`). The subject must be an `AppUser` of the app, or the step fails non-retryably (`Subject user <id> is not a member of app <appId>`). These reads need no `capabilities` grant — being a system run is the gate.
+
+| Kind | Key fields | Output |
+|---|---|---|
+| `user.get` | `userId` | `{ userId, email, name, appRole, rootDocId, disabled }` |
+| `user.resolve` | `userId` **or** `email` | `{ userId: null }` on no app-member match, else `{ userId, user }` (`user` shaped like `user.get`) |
+| `document.resolveAliasForUser` | `userId`, `aliasKey` | `{ documentId: string \| null, aliasKey, userId }` — app-privileged (alias existence ≠ subject access); `null` on miss (vs. the inline `documentAlias.userId` form, which hard-fails) |
+| `document.listForUser` | `userId`, `limit?`, `includeRoot?` (default `true`), `ownerOnly?`, `tag?`, `cursor?`, `forward?` | `{ items: [DocumentInfo...], cursor? }` — direct + root grants only (group/collection-derived discovery not yet included) |
+| `document.getForUser` | `userId`, `documentId`, `systemBypass?` | `{ document: DocumentInfo \| null, permission? }` — requires the subject's effective (direct + group) permission by default (`{ document: null }` when none); `systemBypass: true` reads by id app-privileged (`permission: "system"`) |
+| `document.getOrCreateWithAliasForUser` | `userId`, `aliasKey`, `title?`, `permission?` (`read`\|`write`\|`owner`, default `write`), `tags?` | `{ documentId, aliasKey, userId, created }` — created with `createdBy = sys:<appId>`; subject gets the alias + the default grant; race-safe |
+| `database.queryForUser` / `mutateForUser` / `countForUser` / `aggregateForUser` / `pipelineForUser` / `applyToQueryForUser` | same fields as the base `database.*` kind, plus `userId` | base kind's output; CEL rules + DB triggers evaluate as the **subject** (`user.userId`, `hasRole`, `isMemberOf` refer to the subject), actor stays system. `ok`/verdict semantics match the base kind |
+| `analytics.writeForUser` | `userId`, `action`, `feature` | event attributed to the subject; system actor + workflow run id carried in the event context for audit |
+
+```toml
+[[steps]]
+id = "ensure"
+kind = "document.getOrCreateWithAliasForUser"
+userId = "{{ input.userId }}"   # explicit subject, or inherited from input.userId
+aliasKey = "profile"
+title = "Profile"
+
+[[steps]]
+id = "assignments"
+kind = "database.queryForUser"
+userId = "{{ input.userId }}"
+databaseId = "{{ input.classroomDbId }}"
+operationName = "listAssignments"
+saveAs = "assignments"
+```
+
+Once a subject method returns a concrete `documentId`, the app-privileged `document.query` / `save` / `patch` / `delete` steps read/write it — there are **no** `*ForUser` write kinds. The CRUD `document.*` steps also accept `documentAlias { scope = "user", aliasKey, userId }` to resolve a subject's alias inline (hard-fails on miss).
+
 ## Inbound webhooks
 
 External services trigger workflows via inbound webhooks. Define them as `webhooks/*.toml` in the sync directory and push with `primitive sync push`:
@@ -931,7 +966,7 @@ firedAt = "{{now}}"
 ```
 
 ```bash
-primitive sync push --dir ./config
+primitive sync push
 ```
 
 The TOML key `key` maps to the API field `triggerKey`. The field name is `cron` (not `schedule`).
@@ -1139,12 +1174,12 @@ Setting `status = "active"` without an active config or revision returns: `Canno
 ## CLI
 
 ```bash
-# Sync (recommended for everything)
-primitive sync init --dir ./config
-primitive sync pull --dir ./config
-primitive sync diff --dir ./config
-primitive sync push --dir ./config --dry-run
-primitive sync push --dir ./config
+# Sync (recommended for everything; sync dir auto-resolves to .primitive/sync/<env>/<appId>/)
+primitive sync init
+primitive sync pull
+primitive sync diff
+primitive sync push --dry-run
+primitive sync push
 
 # Workflow CRUD (when not using sync)
 primitive workflows list [--status active] [--json]
