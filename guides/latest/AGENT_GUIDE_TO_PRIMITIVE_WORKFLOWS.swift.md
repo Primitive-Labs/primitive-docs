@@ -309,7 +309,7 @@ A missing `documentId`/`modelName` (or `recordId` on a write), or a `documentId`
 
 **Caller-mode ACL.** When the run is `runAs: "caller"` (the default — see [Execution identity](#execution-identity-runas-system-workflows)), every op enforces the caller's per-document permission: `query`/`queryOne`/`count` need `reader`, `save`/`patch` need `read-write`, `delete` needs `owner`. A `null`/insufficient permission throws `DocumentAccessDeniedError` (non-retryable) — a templated/user-supplied `documentId` can't bypass the ACL. `runAs: "system"` runs app-privileged (no per-caller check).
 
-**Targeting by alias.** Supply a `documentAlias { scope, aliasKey }` block instead of `documentId` (exactly one of the two). `scope = "user"` resolves the caller's own alias (forces `userId = caller`; requires `runAs: "caller"`); `scope = "app"` resolves an app-scoped alias after checking the caller's effective permission. A non-resolving alias fails the step like a bad `documentId` (Option A — hard fail).
+**Targeting by alias.** Supply a `documentAlias { scope, aliasKey }` block instead of `documentId` (exactly one of the two). In a caller run, `scope = "user"` resolves the caller's own alias (forces `userId = caller`); `scope = "app"` resolves an app-scoped alias after checking the caller's effective permission. In a **system** run, a `scope = "user"` alias requires an explicit subject `userId` on the block — `documentAlias { scope = "user", aliasKey, userId }` — resolved app-privileged (see [subject-user methods](#subject-user-methods-system-workflows)). A non-resolving alias fails the step like a bad `documentId` (Option A — hard fail).
 
 ```toml
 [[steps]]
@@ -354,7 +354,7 @@ userId = "{{ input.userId }}"   # OR email = "...", not both
 
 `addMember` is idempotent. With `email`, returns `{ status: "pending_signup", invitationId, inviteToken, ... }` if the email has no AppUser yet.
 
-Group operations evaluate the group type's CEL rules. For workflow-issued operations, rules can match `fromWorkflow("workflowKey")`.
+Group operations evaluate the group type's CEL rules. For workflow-issued operations, rules can match `fromWorkflow("workflowKey")`. In a system run, `addMember`/`removeMember` record `sys:<appId>` as the membership's `addedBy` (not the admin/cron/webhook that initiated the run).
 
 ### `collect`
 
@@ -873,6 +873,40 @@ capabilities = ["membership"]
 `membership` gates the `group.addMember` / `group.removeMember` steps in a **system** run — without the grant they reject (`group.addMember requires the 'membership' capability`). Read-only group steps (`checkMembership`, `listMembers`, `listUserMemberships`) are never gated, and caller runs are governed by access rules, not capabilities, so the gate never applies to them.
 
 **`iterate-users` is system-only.** A workflow containing an `iterate-users` step must set `runAs = "system"` — otherwise it's rejected at save time (`'iterate-users' is system-only and may appear only in a runAs:"system" workflow`).
+
+### Subject-user methods (system workflows)
+
+A system run can act **about** a specific app user without impersonating them — the run's actor stays `sys:<appId>` for audit; `userId` is an explicit **subject** parameter. The `*ForUser` step kinds are **system-only** (calling one from a `runAs: "caller"` run throws non-retryably: `<kind> is only supported in runAs:"system" workflows`). In each, `userId` may be set on the step or inherited from `input.userId` (e.g. the iterated subject under `iterate-users`). The subject must be an `AppUser` of the app, or the step fails non-retryably (`Subject user <id> is not a member of app <appId>`). These reads need no `capabilities` grant — being a system run is the gate.
+
+| Kind | Key fields | Output |
+|---|---|---|
+| `user.get` | `userId` | `{ userId, email, name, appRole, rootDocId, disabled }` |
+| `user.resolve` | `userId` **or** `email` | `{ userId: null }` on no app-member match, else `{ userId, user }` (`user` shaped like `user.get`) |
+| `document.resolveAliasForUser` | `userId`, `aliasKey` | `{ documentId: string \| null, aliasKey, userId }` — app-privileged (alias existence ≠ subject access); `null` on miss (vs. the inline `documentAlias.userId` form, which hard-fails) |
+| `document.listForUser` | `userId`, `limit?`, `includeRoot?` (default `true`), `ownerOnly?`, `tag?`, `cursor?`, `forward?` | `{ items: [DocumentInfo...], cursor? }` — direct + root grants only (group/collection-derived discovery not yet included) |
+| `document.getForUser` | `userId`, `documentId`, `systemBypass?` | `{ document: DocumentInfo \| null, permission? }` — requires the subject's effective (direct + group) permission by default (`{ document: null }` when none); `systemBypass: true` reads by id app-privileged (`permission: "system"`) |
+| `document.getOrCreateWithAliasForUser` | `userId`, `aliasKey`, `title?`, `permission?` (`read`\|`write`\|`owner`, default `write`), `tags?` | `{ documentId, aliasKey, userId, created }` — created with `createdBy = sys:<appId>`; subject gets the alias + the default grant; race-safe |
+| `database.queryForUser` / `mutateForUser` / `countForUser` / `aggregateForUser` / `pipelineForUser` / `applyToQueryForUser` | same fields as the base `database.*` kind, plus `userId` | base kind's output; CEL rules + DB triggers evaluate as the **subject** (`user.userId`, `hasRole`, `isMemberOf` refer to the subject), actor stays system. `ok`/verdict semantics match the base kind |
+| `analytics.writeForUser` | `userId`, `action`, `feature` | event attributed to the subject; system actor + workflow run id carried in the event context for audit |
+
+```toml
+[[steps]]
+id = "ensure"
+kind = "document.getOrCreateWithAliasForUser"
+userId = "{{ input.userId }}"   # explicit subject, or inherited from input.userId
+aliasKey = "profile"
+title = "Profile"
+
+[[steps]]
+id = "assignments"
+kind = "database.queryForUser"
+userId = "{{ input.userId }}"
+databaseId = "{{ input.classroomDbId }}"
+operationName = "listAssignments"
+saveAs = "assignments"
+```
+
+Once a subject method returns a concrete `documentId`, the app-privileged `document.query` / `save` / `patch` / `delete` steps read/write it — there are **no** `*ForUser` write kinds. The CRUD `document.*` steps also accept `documentAlias { scope = "user", aliasKey, userId }` to resolve a subject's alias inline (hard-fails on miss).
 
 ## Inbound webhooks
 

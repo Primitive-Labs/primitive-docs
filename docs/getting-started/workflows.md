@@ -314,6 +314,56 @@ capabilities = ["membership"]
 
 [`iterate-users`](#iterate-users) is system-only — it fans out across the entire user roster, which no single caller has the standing to do. A workflow that uses it must set `runAs = "system"`, or the server rejects it when you push.
 
+### Acting on Behalf of a User
+
+A system run acts as the app, not as any one member — but a per-user job often needs to work *about* a specific user: read the documents they can see, run a database operation under their access rules, or attribute an event to them. The `*ForUser` step variants do exactly that. Each takes an explicit `userId` **subject** and operates as if it were checking that user, while the run's actor stays the system principal for the audit trail — the workflow acts *about* the user, never *as* them.
+
+These steps are **system-only** — a `runAs = "caller"` workflow that calls one is rejected — and the subject must be a member of the app, or the step fails. `userId` can be set on the step or inherited from `input.userId`, so a child workflow fanned out by [`iterate-users`](#iterate-users) gets the iterated user as its subject with no wiring:
+
+```toml
+[[steps]]
+id = "ensure-profile"
+kind = "document.getOrCreateWithAliasForUser"
+userId = "{{ input.userId }}"
+aliasKey = "profile"
+title = "Profile"
+# permission = "write"   # the subject's grant on a freshly created doc; default "write"
+
+[[steps]]
+id = "assignments"
+kind = "database.queryForUser"
+userId = "{{ input.userId }}"
+databaseId = "{{ input.classroomDbId }}"
+operationName = "listAssignments"
+saveAs = "assignments"
+
+[[steps]]
+id = "track"
+kind = "analytics.writeForUser"
+userId = "{{ input.userId }}"
+action = "profile.processed"
+feature = "onboarding"
+```
+
+A `database.*ForUser` step evaluates the operation's CEL access rules and database triggers as the **subject** — `user.userId`, `hasRole(...)`, and `isMemberOf(...)` all refer to that user — even though the actor recorded on the run stays the system principal.
+
+The subject-user steps:
+
+| Kind | Returns |
+|---|---|
+| `user.get` | The subject's profile: `{ userId, email, name, appRole, rootDocId, disabled }` |
+| `user.resolve` | Resolve a subject by `userId` or `email`; `{ userId: null }` when no app member matches, else `{ userId, user }` |
+| `document.resolveAliasForUser` | Resolve the subject's user-scoped alias (app-privileged); `{ documentId: null }` on miss |
+| `document.listForUser` | Documents visible to the subject — direct and root-document grants — as `{ items, cursor }` |
+| `document.getForUser` | One document as the subject sees it: `{ document, permission }`, or `{ document: null }` when they have no effective access. Pass `systemBypass = true` for an app-privileged read by id |
+| `document.getOrCreateWithAliasForUser` | Ensure a per-subject document exists (created by the system actor, with the alias and a default `write` grant to the subject): `{ documentId, aliasKey, userId, created }` |
+| `database.*ForUser` | `queryForUser` / `mutateForUser` / `countForUser` / `aggregateForUser` / `pipelineForUser` / `applyToQueryForUser` — the matching `database.*` step, run under the subject's access rules and trigger context |
+| `analytics.writeForUser` | Emit an analytics event attributed to the subject |
+
+`document.listForUser` covers the subject's direct and root-document grants; documents reachable only through a group or collection aren't included yet.
+
+Once a subject method hands back a concrete `documentId`, the ordinary `document.query` / `save` / `patch` / `delete` steps read and write it app-privileged — there are no separate `*ForUser` write kinds. Those CRUD steps also accept an inline subject alias, `documentAlias = { scope = "user", aliasKey = "...", userId = "..." }`, which resolves the subject's alias in place and fails the step if it doesn't exist.
+
 ## Testing and Debugging Workflows
 
 **Test cases** live alongside the workflow and run against the real engine:
@@ -389,6 +439,8 @@ Every step has an `id` (unique within the workflow) and a `kind` (the step type)
 | `blob.upload` / `blob.download` / `blob.signedUrl` | Read, write, or sign blob URLs |
 | `analytics.write` / `analytics.query` | Emit analytics events or query server-side aggregates |
 | `noop` | Return `{ message, payload }`; useful as a placeholder |
+
+System workflows add subject-user variants — `user.get` / `user.resolve`, `document.*ForUser`, `database.*ForUser`, and `analytics.writeForUser` — for acting about a specific user; see [Acting on Behalf of a User](#acting-on-behalf-of-a-user).
 
 Steps that reach across the network — `llm.chat`, `gemini.generate`, the `database.*` steps, and `email.send` — are bounded by a timeout: 120 seconds for the LLM and Gemini steps, 30 seconds for database and email. Override it per step with a `timeout` field (in milliseconds). A step that exceeds its timeout fails without retrying, recording a failed step-run rather than hanging the run.
 
@@ -716,7 +768,7 @@ groupId = "{{ input.teamId }}"
 userId = "{{ input.userId }}"   # or email = "...", not both
 ```
 
-Group steps evaluate the group type's rule sets like any other caller; rules can match workflow-issued operations with `fromWorkflow("workflowKey")` — see [Access Control](./access-control.md).
+Group steps evaluate the group type's rule sets like any other caller; rules can match workflow-issued operations with `fromWorkflow("workflowKey")` — see [Access Control](./access-control.md). In a [system run](#system-workflows), `addMember` and `removeMember` record the app's system principal as the member's `addedBy` — not the admin or trigger that started the run.
 
 ### `collect`
 
