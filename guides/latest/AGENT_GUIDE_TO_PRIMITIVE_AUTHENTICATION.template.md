@@ -407,7 +407,7 @@ const client = await initializeClient({
 `baseUrl` must be a same-origin worker that forwards `/auth/*` and `/oauth/callback` to `/app/:appId/api/auth/*`. When configured, `magicLinkVerify`, `otpVerify`, `handleOAuthCallback`, `logout`, and the OAuth-code static helper all route through the proxy.
 {{/lang}}
 {{#lang swift}}
-The token is stored in the Keychain; `storageKeyPrefix` namespaces it. `waitForAuthBootstrap()` restores any persisted session, so an authenticated user stays signed in on relaunch. `getAuthPersistenceInfo()` returns `["mode": "persisted" | "memory", "prefix": <storageKeyPrefix>]`. Tokens within ~2 min of expiry are not reused, and are cleared on logout and on `authFailed`.
+The token is persisted through the client's storage provider (SQLite by default); `storageKeyPrefix` namespaces it. The Keychain holds offline-access grants, not the JWT session. `waitForAuthBootstrap()` restores any persisted session, so an authenticated user stays signed in on relaunch. `getAuthPersistenceInfo()` returns `["mode": "persisted" | "memory", "prefix": <storageKeyPrefix>]`. Tokens within ~2 min of expiry are not reused; an expired persisted token triggers a cookie-based refresh on startup and is cleared if that refresh fails. `logout(wipeLocal: true)` clears the persisted JWT.
 {{/lang}}
 
 ---
@@ -626,7 +626,7 @@ Overrides are tracked by `primitive sync` (TOML in `email-templates/`). Custom t
 10. Customize email templates via CLI if you need branded auth emails.
 {{/lang}}
 {{#lang swift}}
-4. Listen to `authFailed` and `onlineAuthRequired` (minimum) to prompt re-login.
+4. Listen to `.authFailed` and `.authOnlineRequired` (minimum) to prompt re-login.
 5. Catch `AuthError` and switch on `error.code`.
 6. Gate your app layout on `isAuthenticated` (via `AuthGateView`) so child views can assume an authenticated user.
 7. Observe `authManager.$isAuthenticated` in downstream state (it changes both directions).
