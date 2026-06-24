@@ -90,15 +90,9 @@ EOF
 
 The PR body states: what the issue reported, what was verified against source, what changed (pages/templates/corpus), and the validation results.
 
-**The closing keyword is mandatory and goes in the body, not the title.** A bare `(#NN)` reference in the title does **not** close anything — only a `Fixes #NN` / `Closes #NN` / `Resolves #NN` line in the PR *body* auto-closes the issue on merge. Every implemented-fix PR must carry one such line per issue it resolves (e.g. `Fixes #84`, or `Fixes #84, fixes #85` for a combined PR — each issue needs its own keyword; a comma-joined `#84, #85` after one `Fixes` only closes the first). Don't close issues manually for implemented fixes — fix the PR body instead.
+**The closing keyword is mandatory and goes in the body, not the title.** A bare `(#NN)` reference in the title registers nothing — put a `Fixes #NN` / `Closes #NN` / `Resolves #NN` line in the PR *body*. Every implemented-fix PR must carry one such line per issue it resolves (e.g. `Fixes #84`, or `Fixes #84, fixes #85` for a combined PR — each issue needs its own keyword; a comma-joined `#84, #85` after one `Fixes` only closes the first). The keyword is what `docs-pr-sweep` parses to know which issues to close when the PR merges, and what closes them when `next` reaches `main` at publish — so a well-formed body matters even though nothing closes at open time.
 
-**Verify the link before declaring the PR done.** GitHub records closing references only when the keyword is well-formed, so confirm it registered rather than trusting the wording:
-
-```bash
-gh pr view <MM> --json closingIssuesReferences --jq '[.closingIssuesReferences[].number]'   # must list every issue this PR fixes
-```
-
-If the list is missing an issue, the body is malformed — `gh pr edit <MM> --body` to add the `Fixes #NN` line, then re-check. An empty list on an implemented-fix PR means **nothing will close on merge**; that is a defect to fix now, not after.
+**Don't verify via `closingIssuesReferences` — it's structurally empty here.** GitHub registers closing references (and fires the keyword) only for PRs targeting the repo's **default branch (`main`)**. These PRs target `next`, so `gh pr view <MM> --json closingIssuesReferences` comes back **empty for every PR** no matter how well-formed the body is — that's not a malformed keyword, so don't "fix" a body that's already correct. The issue does **not** auto-close when the PR merges to `next`: it's closed by hand at merge time (`docs-pr-sweep` Step 4 parses the `Fixes #NN` line and runs `gh issue close`), and again, harmlessly, when `next` publishes to `main`. Your job here ends at a well-formed body — eyeball that a `Fixes #NN` line is present and names every issue the PR resolves.
 
 Final report, covering **every** issue scanned (silence must be a decision, not an oversight):
 

@@ -4,8 +4,8 @@
     "platform": "web"
   },
   "builtAgainst": {
-    "stampedAt": "2026-06-23",
-    "channel": "production",
+    "stampedAt": "2026-06-24",
+    "channel": "next",
     "packages": {
       "js-bao-wss-client": "2.0.2",
       "js-bao": "0.5.1",
@@ -480,6 +480,7 @@
       "prerequisites": [],
       "relatedGuides": [
         "prompts",
+        "scripts",
         "integrations",
         "databases",
         "blobs",
@@ -495,6 +496,55 @@
           "language": "swift",
           "file": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.swift.md"
         }
+      ]
+    },
+    {
+      "topic": "scripts",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_SCRIPTS.md",
+      "description": "Sandboxed Rhai scripts for workflow transforms — input/output contract, parse_json gotcha, limits",
+      "keywords": [
+        "scripts",
+        "Rhai",
+        "transforms",
+        "script step",
+        "parse_json",
+        "JSON transform",
+        "ScriptConfig",
+        "sandbox",
+        "deterministic",
+        "limits",
+        "transforms/*.rhai"
+      ],
+      "useCases": [
+        "Reshaping nested JSON in a workflow",
+        "Computing derived fields from step output",
+        "Mapping, filtering, and reducing arrays in a script step",
+        "Parsing JSON-string database/document fields",
+        "Working around the parse_json top-level-array error",
+        "Bounding a script step with per-run limits",
+        "Testing a script via workflow test cases"
+      ],
+      "concepts": [
+        "script",
+        "Rhai",
+        "ScriptConfig",
+        "activeConfigId",
+        "ref",
+        "configId",
+        "input",
+        "ctx",
+        "with",
+        "parse_json",
+        "limits",
+        "scriptMetrics",
+        "non-retryable error"
+      ],
+      "prerequisites": [
+        "workflows"
+      ],
+      "relatedGuides": [
+        "workflows",
+        "configuration"
       ]
     },
     {

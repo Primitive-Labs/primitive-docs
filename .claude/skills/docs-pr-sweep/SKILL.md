@@ -109,15 +109,27 @@ The one situation this skill can't drive to merge by itself is a PR from a **for
 
 ## Step 4 — Merge the passing set into `next`
 
-Once a PR is green on every count in Step 2 (after any Step 3 fixes), merge it — no approval checkpoint is needed for landing on `next`. Before each merge, **assert the base** so this skill can never publish, and **assert the issue link** so a fix-PR actually closes the issue it resolves:
+Once a PR is green on every count in Step 2 (after any Step 3 fixes), merge it — no approval checkpoint is needed for landing on `next`. Before each merge, **assert the base** so this skill can never publish:
 
 ```bash
 test "$(gh pr view <NN> --json baseRefName -q .baseRefName)" = "next" || { echo "REFUSING: base is not next"; exit 1; }
-gh pr view <NN> --json closingIssuesReferences --jq '[.closingIssuesReferences[].number]'   # see below
 gh pr merge <NN> --squash --delete-branch
 ```
 
-**Closing-keyword check.** A PR that fixes a tracked issue must carry a working closing keyword in its **body** (`Fixes #NN` / `Closes #NN` / `Resolves #NN`) — a bare `(#NN)` in the *title* does not close anything. If the PR cites an issue (title `(#NN)`, "Fixes #NN" prose, or a linked issue) but `closingIssuesReferences` comes back empty or missing that number, the link is broken: `gh pr edit <NN> --body` to add the keyword line before merging, so the issue auto-closes on merge instead of lingering open. (This is the defect that stranded #133–136 open after their PRs merged.) Don't manually close as a substitute — fix the link so the merge does it. After the sweep, any issue whose fix-PR merged should be **closed**; spot-check with `gh issue list --state open` and close with evidence anything left dangling.
+**Close the fixed issues by hand — merging to `next` does not auto-close them.** GitHub only runs a PR's closing keywords (`Fixes #NN` / `Closes #NN` / `Resolves #NN`) when the PR merges into the repo's **default branch (`main`)**. These PRs target `next`, so the keywords never fire on merge, and `gh pr view --json closingIssuesReferences` comes back **empty for every `next`-based PR** — that is structural, not a malformed body, so don't treat the empty list as a defect or try to "fix the link." Keep the `Fixes #NN` line in each PR body regardless: it's the machine-readable record of what the PR resolves, and it *will* close the issue when `next` reaches `main` at publish. But to keep the tracker honest on `next`, close each fixed issue manually right after its PR merges, citing the PR:
+
+```bash
+# Parse the issues this PR claims to fix from its body/title, then close each with a back-reference.
+gh pr view <NN> --json body,title --jq '[.body, .title] | join("\n")' \
+  | grep -oiE '(fix(e[sd])?|close[sd]?|resolve[sd]?)[[:space:]]+#[0-9]+' \
+  | grep -oE '#[0-9]+' | tr -d '#' | sort -u \
+  | while read -r ISSUE; do
+      gh issue close "$ISSUE" --reason completed \
+        --comment "Fixed by #<NN>, merged into \`next\`. Closing manually — \`next\` isn't the default branch, so the PR's closing keyword won't fire until this reaches \`main\` at publish."
+    done
+```
+
+(Relying on the keyword alone is the defect that stranded #133–136 open after their PRs merged — the fix is to close them on `next`-merge, not to chase a keyword that can't fire here.) After the sweep, spot-check with `gh issue list --state open` and close with evidence anything a merged PR resolved that's still dangling.
 
 Merge the flagged same-file PRs **one at a time**, newest-validated first or in whatever order minimizes rework; after each merge, rebase the next conflicting PR on the updated `next` and re-run its Step 2 gates before merging it — a clean validation against a stale base isn't a clean merge. Keep `next` green at every step: the source-stamp gate must still pass after each merge. A `docs-next-sync` PR moving a submodule is expected (that is the whole point of it) — its bundled `docs-sources.json` re-stamp keeps the gate green; what must never happen is a submodule move *backward* (Step 2 ancestry check) or a stamp that disagrees with the pinned HEAD.
 
