@@ -11,6 +11,22 @@
 # firing on every push. Production releases are a separate tier — they trigger
 # `docs-publish-release` via receive-production-release.yml, not this workflow.
 #
+# ROLLING PR, not one-per-night. The PR is opened on a FIXED branch
+# (`docs-next-sync/auto`), so when a prior pass hasn't merged yet the next run
+# force-pushes the same branch and updates that one PR in place rather than
+# opening a second, overlapping one. Each update is a complete, gate-green,
+# independently-mergeable superset of everything new since the last MERGE (the
+# branch is recreated from `next` every run — no accumulation, no chain). On
+# merge, `next`'s stamp advances and the next run starts fresh and small.
+#
+# The scan step (below) picks its baseline accordingly: if that rolling PR
+# branch already exists, it scans against the branch's docs-sources.json stamp
+# (the tips the LAST RUN trued to) rather than next's merged stamp — so an
+# un-merged PR doesn't make us re-derive the same window every night. We only
+# pay for a Claude run when the library tips have actually moved past the last
+# attempt. The agent itself still trues from next's merged baseline, keeping the
+# PR a complete superset; only the cheap has_work gate uses the branch stamp.
+#
 # NOTE: repository_dispatch only triggers workflows that live on the default
 # branch (main), so this file must stay on main even though the work it does
 # targets `next`.
@@ -123,9 +139,34 @@ jobs:
         # tips actually moved past what the docs were last trued against. Keeps
         # no-op dispatches (and manual re-tests) to seconds instead of minutes.
         id: scan
+        env:
+          PR_BRANCH: docs-next-sync/auto
         run: |
           git submodule foreach 'git fetch -q origin || true' || true
+
+          # Baseline selection. By default the scan reads next's docs-sources.json
+          # (the last MERGED stamp). But if the rolling PR branch already exists,
+          # an earlier pass is still un-merged — scan against THAT branch's stamp
+          # (the tips the last run trued to) so we don't re-derive the same window
+          # every night. We only re-run when the library tips moved past the last
+          # attempt. This overlays the branch's docs-sources.json just for the
+          # scan, then restores next's so the agent step trues from the merged
+          # baseline (keeping the PR a complete superset).
+          BASELINE="next (last merged stamp)"
+          if git fetch -q origin "$PR_BRANCH" 2>/dev/null \
+             && git show "FETCH_HEAD:docs-sources.json" > /tmp/pr-sources.json 2>/dev/null; then
+            cp docs-sources.json /tmp/next-sources.json
+            cp /tmp/pr-sources.json docs-sources.json
+            BASELINE="open PR branch $PR_BRANCH (last attempt)"
+          fi
+          echo "Scan baseline: $BASELINE" | tee -a "$GITHUB_STEP_SUMMARY"
+
           node scripts/stamp-sources.mjs --changes | tee /tmp/scan.txt || true
+
+          # Restore next's stamp if we overlaid the PR branch's, so every later
+          # step (including the agent) sees next's merged baseline.
+          [ -f /tmp/next-sources.json ] && cp /tmp/next-sources.json docs-sources.json || true
+
           if [ "${{ github.event.inputs.force }}" = "true" ]; then
             echo "Forced run — exercising the agent path regardless of the scan." | tee -a "$GITHUB_STEP_SUMMARY"
             echo "has_work=true" >> "$GITHUB_OUTPUT"
@@ -133,7 +174,7 @@ jobs:
             echo "has_work=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_work=false" >> "$GITHUB_OUTPUT"
-            echo "No library commits since the last stamp — nothing to true." >> "$GITHUB_STEP_SUMMARY"
+            echo "No library commits since the last attempt — nothing new to true." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Run docs-next-sync with Claude Code CLI
@@ -271,13 +312,21 @@ jobs:
         with:
           token: ${{ secrets.DOCS_REPO_PAT }}
           base: next
-          branch: docs-next-sync/auto-${{ github.run_number }}
-          delete-branch: true
+          # FIXED branch (no run number): rolling PR. If a prior pass is still
+          # un-merged this force-pushes the same branch and updates that one PR in
+          # place instead of opening a second, overlapping one. The branch is
+          # recreated from `next` each run, so every update is a complete superset
+          # — never a chain. delete-branch:false keeps the branch alive between
+          # runs so the scan step above can read its stamp as the baseline.
+          branch: docs-next-sync/auto
+          delete-branch: false
           commit-message: |
             docs-next-sync: true next against ${{ steps.ctx.outputs.submodule }} (automated)
           title: "docs-next-sync: ${{ steps.ctx.outputs.submodule }} changes (automated)"
           body: |
             Automated `docs-next-sync` pass against the library main tips, triggered by the nightly release ${{ steps.ctx.outputs.submodule }}#${{ steps.ctx.outputs.issue }}.
+
+            > **Rolling PR.** This PR is updated in place each night until it merges — every update is a complete, gate-green superset of everything new since the last merge (branched fresh from `next`, not stacked). Merge it to advance the baseline; the next nightly then starts fresh and small.
 
             ${{ steps.report.outputs.body }}
 
