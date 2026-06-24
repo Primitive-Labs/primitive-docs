@@ -450,7 +450,7 @@ A document is both the unit of sync and the unit of sharing, so "how many docume
 
 **One document per sharing context.** Anything shared as a unit — a project, a company's books, a household shopping list — gets its own document, shared with exactly the people in that context. Users work in one at a time: list them with the [`me` listing APIs](#finding-documents-a-user-can-access), open the selected one, and close it when they switch.
 
-**Many documents, queried together.** Apps like chat read across several sharing contexts at once — each channel is its own document, all open simultaneously. Tag documents at creation (`tags: ["channel"]`) so you can fetch the set with `me.ownedDocuments({ tag })`, then open each one. A model query then spans all open documents. To share a set of documents as one unit, use [Collections](#collections) rather than sharing each individually.
+**Many documents, queried together.** Apps like chat read across several sharing contexts at once — each channel is its own document, all open simultaneously. Tag documents at creation (`tags: ["channel"]`) so you can fetch the set with a tag-filtered `me.ownedDocuments`, then open each one. A model query then spans all open documents. To share a set of documents as one unit, use [Collections](#collections) rather than sharing each individually.
 
 Whether a feature belongs in documents at all — versus a server-side database — is its own decision: see [Choosing Your Data Model](./choosing-your-data-model.md).
 
@@ -678,7 +678,7 @@ Documents carry presentation fields you can update at any time.
 
 :::
 
-`thumbnailBlobId` points at a blob you've already uploaded; the platform makes the thumbnail readable to anyone with access to the document. `metadata` is a small JSON blob (4KB cap) for UI hints — pass `null` to clear either field.
+`thumbnailBlobId` points at a blob you've already uploaded; the platform makes the thumbnail readable to anyone with access to the document. `metadata` is a small JSON blob (4KB cap) for UI hints. To clear either field, JavaScript passes `null`; Swift uses `thumbnailBlobId: .clear` and `metadata: .null`. Omitting a field leaves it unchanged.
 
 ## Document Access Requests
 
