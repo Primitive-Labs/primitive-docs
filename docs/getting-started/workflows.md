@@ -37,7 +37,7 @@ htmlBody = "{{ steps.generate-message.content }}"
 Push it to the server:
 
 ```bash
-primitive sync push --dir ./config
+primitive sync push
 ```
 
 `sync push` creates and updates the workflow's active configuration in place. Once `status = "active"`, the workflow can be invoked.
@@ -344,19 +344,19 @@ primitive workflows runs steps <workflow-id> <run-id>
 ## Syncing Workflow Config
 
 ```bash
-# Initialize config
-primitive sync init --dir ./config
+# Initialize config (sync dir auto-resolves to .primitive/sync/<env>/<appId>/)
+primitive sync init
 
 # Pull current server config
-primitive sync pull --dir ./config
+primitive sync pull
 
 # Edit TOML files locally...
 
 # See what changed
-primitive sync diff --dir ./config
+primitive sync diff
 
 # Push changes
-primitive sync push --dir ./config
+primitive sync push
 ```
 
 When a workflow needs flags `sync push` doesn't carry (`requiresClientApply`, `syncCallable`, queue caps), set them with `primitive workflows update`.

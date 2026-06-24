@@ -434,10 +434,10 @@ See [Invoking Workflows: On a Schedule](./workflows.md#on-a-schedule-cron-trigge
 Generate TypeScript types from your database-type TOML schemas:
 
 ```bash
-primitive databases codegen --sync-dir ./config --output ./src/generated/db
+primitive databases codegen -o ./src/generated/db
 ```
 
-Reads `[models.*]` schema blocks and `[[operations]]` from your database-type TOML and emits typed record interfaces, operation param types, and result types. Keeps client-side types aligned with the server-authoritative schema.
+Reads from the database-type TOML in the auto-resolved sync directory; pass `--sync-dir <path>` to override it. Reads `[models.*]` schema blocks and `[[operations]]` from your database-type TOML and emits typed record interfaces, operation param types, and result types. Keeps client-side types aligned with the server-authoritative schema.
 
 ### Blob Buckets
 
