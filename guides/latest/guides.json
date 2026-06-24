@@ -4,12 +4,12 @@
     "platform": "web"
   },
   "builtAgainst": {
-    "stampedAt": "2026-06-23",
+    "stampedAt": "2026-06-24",
     "channel": "next",
     "packages": {
-      "js-bao-wss-client": "2.0.1",
+      "js-bao-wss-client": "2.0.2",
       "js-bao": "0.5.1",
-      "primitive-admin": "1.0.50",
+      "primitive-admin": "1.0.51",
       "primitive-app": "3.0.1"
     }
   },
