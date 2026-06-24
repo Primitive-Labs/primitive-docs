@@ -5,11 +5,11 @@
   },
   "builtAgainst": {
     "stampedAt": "2026-06-24",
-    "channel": "next",
+    "channel": "production",
     "packages": {
-      "js-bao-wss-client": "2.0.2",
+      "js-bao-wss-client": "2.0.3",
       "js-bao": "0.5.1",
-      "primitive-admin": "1.0.51",
+      "primitive-admin": "1.0.52",
       "primitive-app": "3.0.1"
     }
   },
