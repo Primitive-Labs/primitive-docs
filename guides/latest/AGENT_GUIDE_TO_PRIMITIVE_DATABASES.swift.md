@@ -21,7 +21,8 @@ Guidelines for building apps with Primitive's server-side database storage.
   // Databases where you're owner or manager
   let databases = try await client.databases.list()
 
-  // Any authenticated user can resolve a database by id
+  // Resolve a database by id — gated on owner/manager permission, an effective
+  // group permission, or app-admin access; otherwise the server returns 403.
   let db = try await client.databases.get(databaseId: databaseId)
 ```
 
@@ -48,7 +49,7 @@ A **database** is:
 **Properties:**
 
 - Each database is an isolated instance with its own SQLite storage — strong consistency, zero-config scaling
-- All data access goes through **registered operations** with per-operation authorization
+- End-user scoped app access goes through **registered operations** with per-operation authorization; owners, managers, and app admins additionally have direct record-access APIs (schemaless save/patch/find/query/delete/count, atomic increment and StringSet ops, batch writes, aggregation, and index management) for administrative access
 - Databases can be organized by **type** — a named configuration shared across many database instances
 - Supports queries, mutations, counts, aggregates, multi-step pipelines, atomic operations, batch writes, apply-to-query, and real-time subscriptions
 
@@ -304,6 +305,8 @@ A **database type** is a named configuration shared across many databases. It pr
 - **`defaultAccess`** — fallback CEL access rule applied to operations that omit their own `access`
 - **`[models.*]` schema** — optional server-enforced model declaration. When present, every op edit (and the schema edit itself) is checked against it; see [Schema gate](#schema-gate)
 - **Rule set attachment** — controls who can edit the type config and its operations
+
+Swift `executeOperation` can call **any** registered operation regardless of its `type` (it returns `JSONValue`). Operation *management* is narrower: Swift's `DatabaseOperationType` enum — used by `createOperation` / `listOperations` — models only `query`, `mutation`, `count`, and `aggregate`. Define and manage `pipeline` and `applyToQuery` operations through TOML and the `primitive` CLI rather than the typed Swift management API.
 
 
 ### Triggers

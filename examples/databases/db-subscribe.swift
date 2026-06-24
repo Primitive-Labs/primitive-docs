@@ -8,7 +8,7 @@ func watchOpenTickets(
   databaseId: String,
   removeTicket: @escaping (String) -> Void,
   upsertTicket: @escaping (Any?) -> Void
-) throws {
+) throws -> () -> Void {
   // #region example
   let unsub = try client.databases.subscribe(
     databaseId: databaseId,
@@ -28,7 +28,7 @@ func watchOpenTickets(
     })
   )
 
-  // Later — required for cleanup
-  unsub()
+  // Return the teardown handle — call it on unmount to stop receiving deltas.
+  return unsub
   // #endregion example
 }
