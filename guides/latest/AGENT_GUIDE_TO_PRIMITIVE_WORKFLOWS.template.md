@@ -499,7 +499,7 @@ saveAs = "billingUpgrades"
 
 ### `script`
 
-Runs a sandboxed [Rhai](https://rhai.rs/) script over JSON input and returns JSON. Use it for transforms too involved for a templated `transform` step (nested reshaping, derived fields, array map/filter/reduce). The sandbox is **deterministic and side-effect-free** — no network, clock, or storage access — so script steps are safe to retry and easy to test.
+Runs a sandboxed [Rhai](https://rhai.rs/) script over JSON input and returns JSON. Use it for transforms too involved for a templated `transform` step (nested reshaping, derived fields, array map/filter/reduce). The sandbox is **deterministic and side-effect-free** — no network, clock, or storage access — so script steps are safe to retry and easy to test. The [Scripts guide](AGENT_GUIDE_TO_PRIMITIVE_SCRIPTS.md) covers the script model, input/output contract, limits, error codes, and gotchas in full; this section is the step-level reference.
 
 ```toml
 [[steps]]
@@ -533,6 +533,7 @@ Given `steps.fetch.body = { "items": [{ "sku": "a1", "qty": 2, "price": 5.0 }, {
 - **Result nesting.** A script step's return value lands under `steps.<id>.output.*` (alongside `scriptMetrics` and the engine's `ok`) — unlike `transform`, whose result is the templated table directly (`steps.<id>.<field>`). Wire downstream templates/`runIf` as `{{ steps.normalize.output.total }}`, not `{{ steps.normalize.total }}`.
 - **Script bodies resolve live at run time.** The runner looks up the script's active config body on each execution; there is no publish-time snapshot. Pushing a changed `.rhai` file (`primitive sync push`) creates a new config and activates it — referencing workflows pick up the new body on their next run with no re-publish step. Pin a specific config with `configId = "..."` on the step to bypass the active-config lookup when determinism is required.
 - Handy patterns: `parse_json(input.someJsonString)` for JSON-string fields (e.g. payload columns stored as strings); missing keys read as `()` (test with `h.symbol != ()`); `NaN`/`Infinity` can't survive JSON output — they serialize as `null`, so return a sentinel instead.
+- **`parse_json` is object-only.** Handed a string whose top-level JSON value is an **array**, it raises `output type mismatch: want map, got array` — the "output type" is `parse_json`'s expected output, not the step's, so it reads like an output-shape problem even when the script returns a map. Wrap the array first: `parse_json("{\"a\":" + raw + "}").a`. Top-level objects need no workaround.
 - `limits` (optional) lets a step lower the per-run ceilings (`maxOperations`, `wallMsHint`, `maxOutputBytes`, `maxArrayLength`, `maxObjectKeys`, `maxNestingDepth`, `maxStringSize`, `maxCallDepth`, `maxLogBytes`); requested values are clamped at the app ceiling, never raised.
 - Deterministic failures (parse / compile / runtime / limit / validation) come back as a non-retryable step error so durable retries don't re-run a guaranteed failure; transient/transport errors throw and retry normally. The runtime fails closed — it never silently passes input through.
 - Each execution records per-step telemetry on the `WorkflowRun.scriptMetrics` array (operation counts, input/output byte sizes, runtime version), visible in run detail.
