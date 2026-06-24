@@ -108,32 +108,15 @@ After that, device installs and archives both work.
 
 You need a paired iPhone connected over USB (run `xcrun devicectl list devices` to verify it shows up as `paired`). The script auto-picks the first paired device, builds with `-allowProvisioningUpdates` (so Xcode requests provisioning profiles for you), installs via `devicectl`, and launches with `--console` so `print` and NSLog output stream to your terminal.
 
-### 3. Install Fastlane
+### 3. Set up Fastlane
 
-The iOS template doesn't include Fastlane by default — it's a few minutes to add and you get one-command builds to TestFlight, internal tester provisioning, and version bumping in the bargain.
-
-Add a `Gemfile` to your project root:
-
-```ruby
-source "https://rubygems.org"
-gem "fastlane"
-```
-
-Then:
+The iOS template **ships Fastlane** — the project already has a root `Gemfile`, plus `fastlane/Appfile`, `fastlane/Fastfile`, and `fastlane/.env.example`. That gets you one-command builds to TestFlight and the App Store, plus version bumping. Install the gem:
 
 ```bash
 bundle install
-bundle exec fastlane init
 ```
 
-Pick **manual setup** when asked. Fastlane creates `fastlane/Appfile` and `fastlane/Fastfile`.
-
-`fastlane/Appfile`:
-
-```ruby
-app_identifier "com.yourcompany.myapp"  # must match PRODUCT_BUNDLE_IDENTIFIER in project.yml
-team_id "2J4V27W63D"                    # same Team ID as DEVELOPMENT_TEAM
-```
+`fastlane/Appfile` is generic — it reads the app identifier and Team ID from `project.yml` at runtime, so there's nothing to edit there. Set the Team ID with `primitive apple set-team-id <id>`, which writes `DEVELOPMENT_TEAM` in `project.yml`.
 
 ### 4. App Store Connect API Key
 
@@ -143,135 +126,39 @@ The lanes below authenticate with App Store Connect using an API key.
 2. Create a new key with role **App Manager**.
 3. Download the `.p8` file (you can only download it once) and save it to `fastlane/api_key.p8`.
 4. Note the **Key ID** and **Issuer ID** from the same page.
-5. Add a `.env` next to `fastlane/`:
+5. Copy the shipped template and fill in the three values:
 
    ```bash
+   cp fastlane/.env.example fastlane/.env
+   ```
+
+   ```bash
+   # fastlane/.env
    ASC_KEY_ID=ABC123XYZ
    ASC_ISSUER_ID=00000000-0000-0000-0000-000000000000
    ASC_KEY_PATH=./fastlane/api_key.p8
    ```
 
 ::: warning Don't commit the key
-Add `fastlane/api_key.p8` and `.env` to `.gitignore`. The `.p8` is a private key — leaking it lets anyone upload builds as your team.
+Add `fastlane/api_key.p8` and `fastlane/.env` to `.gitignore`. The `.p8` is a private key — leaking it lets anyone upload builds as your team.
 :::
 
-### 5. Fastfile
+If you run a lane before these are set, the Fastfile prints the exact setup steps and stops.
 
-Drop this into `fastlane/Fastfile`. It mirrors the lanes used by shipping apps on the template — `beta` for TestFlight, `release` for App Store review, `add_testers` to invite people without clicking through App Store Connect, `bump` for version/build numbers.
+### 5. The shipped lanes
 
-```ruby
-default_platform(:ios)
+You don't write the Fastfile — the template ships it, parameterized off `project.yml` so it works for any app. List the lanes with `bundle exec fastlane lanes`:
 
-def load_api_key
-  app_store_connect_api_key(
-    key_id: ENV["ASC_KEY_ID"],
-    issuer_id: ENV["ASC_ISSUER_ID"],
-    key_filepath: ENV["ASC_KEY_PATH"] || "./fastlane/api_key.p8",
-    in_house: false
-  )
-end
+| Lane | What it does |
+|------|--------------|
+| `fastlane ios beta` | Archive, export, and upload an iOS build to TestFlight |
+| `fastlane ios release` | Archive, export, and submit an iOS build to App Store review (sets `skip_metadata` / `skip_screenshots`) |
+| `fastlane mac beta` | Upload a macOS build to TestFlight |
+| `fastlane mac dmg` | Build a notarized DMG for direct distribution |
+| `fastlane bump type:patch` | Bump the marketing + build version in `project.yml` and regenerate the xcodeproj (`major` / `minor` / `patch`) |
+| `fastlane status` | Print the app version, bundle ID, Team ID, signing certificates, and whether the API key is configured |
 
-def current_version
-  yml = File.read("../project.yml")
-  v = yml.match(/MARKETING_VERSION:\s*"?([^"\n]+)"?/)&.captures&.first || "1.0"
-  b = yml.match(/CURRENT_PROJECT_VERSION:\s*"?([^"\n]+)"?/)&.captures&.first || "1"
-  { version: v, build: b.to_i }
-end
-
-platform :ios do
-  desc "Build and upload iOS app to TestFlight"
-  lane :beta do
-    api_key = load_api_key
-
-    # Optional: read TestFlight "What to Test" notes from fastlane/changelog.txt
-    changelog_path = File.expand_path("changelog.txt", __dir__)
-    changelog = File.exist?(changelog_path) ? File.read(changelog_path).strip : nil
-
-    build_app(
-      project: "MyApp.xcodeproj",
-      scheme: "MyApp_iOS",
-      destination: "generic/platform=iOS",
-      export_method: "app-store",
-      export_options: { signingStyle: "automatic" },
-      xcargs: "-allowProvisioningUpdates",
-      output_directory: ".build/archives",
-      output_name: "MyApp-iOS.ipa",
-      clean: true,
-    )
-
-    upload_to_testflight(
-      api_key: api_key,
-      skip_waiting_for_build_processing: true,
-      skip_submission: true,
-      changelog: changelog,
-    )
-  end
-
-  desc "Build and submit iOS app to App Store review"
-  lane :release do
-    api_key = load_api_key
-
-    build_app(
-      project: "MyApp.xcodeproj",
-      scheme: "MyApp_iOS",
-      destination: "generic/platform=iOS",
-      export_method: "app-store",
-      export_options: { signingStyle: "automatic" },
-      xcargs: "-allowProvisioningUpdates",
-      output_directory: ".build/archives",
-      output_name: "MyApp-iOS.ipa",
-      clean: true,
-    )
-
-    upload_to_app_store(
-      api_key: api_key,
-      skip_metadata: true,
-      skip_screenshots: true,
-      precheck_include_in_app_purchases: false,
-    )
-  end
-
-  desc "Add emails as internal TestFlight testers"
-  lane :add_testers do |options|
-    api_key = load_api_key
-    emails = (options[:emails] || "").split(",").map(&:strip).reject(&:empty?)
-    UI.user_error!('Pass emails: fastlane ios add_testers emails:"a@x.com,b@y.com"') if emails.empty?
-
-    emails.each do |email|
-      pilot(
-        api_key: api_key,
-        app_identifier: "com.yourcompany.myapp",
-        email: email,
-        first_name: email.split("@").first,
-        last_name: "Tester",
-      )
-    end
-  end
-end
-
-desc "Bump version (type: major, minor, patch)"
-lane :bump do |options|
-  type = (options[:type] || "patch").to_s
-  v = current_version
-  parts = v[:version].split(".").map(&:to_i)
-  parts.push(0) while parts.length < 3
-  case type
-  when "major" then parts[0] += 1; parts[1] = 0; parts[2] = 0
-  when "minor" then parts[1] += 1; parts[2] = 0
-  when "patch" then parts[2] += 1
-  end
-  new_version = parts.join(".")
-  new_build = v[:build] + 1
-
-  yml = File.read("../project.yml")
-  yml.gsub!(/MARKETING_VERSION:\s*"?[^"\n]+"?/, "MARKETING_VERSION: \"#{new_version}\"")
-  yml.gsub!(/CURRENT_PROJECT_VERSION:\s*"?[^"\n]+"?/, "CURRENT_PROJECT_VERSION: \"#{new_build}\"")
-  File.write("../project.yml", yml)
-
-  sh("xcodegen generate --quiet")
-  UI.success("#{v[:version]} (#{v[:build]}) → #{new_version} (#{new_build})")
-end
-```
+Each build lane reads the Team ID from `project.yml` (it stops with the `primitive apple set-team-id` fix if it's unset) and loads the API key from `fastlane/.env`. The lanes export with automatic signing and `-allowProvisioningUpdates`, so Xcode requests the provisioning profiles for you.
 
 ### 6. Register the App on App Store Connect
 
@@ -290,7 +177,7 @@ bundle exec fastlane ios beta             # archives, exports, uploads
 
 A first upload takes 10–20 minutes between "Fastlane finished" and the build appearing in TestFlight (Apple processes the binary, runs export compliance, etc.). Subsequent uploads are usually 5 minutes.
 
-Internal testers (added via `add_testers` or in the App Store Connect UI) get builds immediately — no separate review. External testers and groups need a one-time Beta App Review per major version.
+Internal testers (added in the App Store Connect UI under TestFlight) get builds immediately — no separate review. External testers and groups need a one-time Beta App Review per major version.
 
 ### 8. Submit to the App Store
 
