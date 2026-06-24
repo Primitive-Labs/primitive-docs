@@ -86,7 +86,13 @@ Every event (auto or custom) gets these populated automatically:
 
 ### Offline Persistence and Rate Limiting
 
-Events are buffered on the device and persisted locally while offline; persisted events are flushed automatically when the WebSocket reconnects. A rate limiter caps emission at **300 events/minute with a 60-token burst** — events over the cap are dropped silently. No special code needed.
+Events are buffered on the device and persisted locally while offline; persisted events are flushed automatically when the WebSocket reconnects.
+{{#lang ts}}
+A rate limiter caps emission at **300 events/minute with a 60-token burst** — events over the cap are dropped silently. No special code needed.
+{{/lang}}
+{{#lang swift}}
+A rate limiter caps emission at **300 events per 60-second window, with no more than 60 events in the first 10 seconds** — events over the cap are dropped silently. No special code needed.
+{{/lang}}
 
 The offline buffer is persisted with a **~1 MiB** cap; when it exceeds the cap the **oldest** events are dropped.
 
@@ -204,7 +210,7 @@ Pre-existing browser hooks (added by the client itself):
 So **don't** add your own `beforeunload → flush` listener — it's redundant and `session_end` is already handled.
 {{/lang}}
 {{#lang swift}}
-The queue auto-flushes every **100ms** (or earlier when batched). `client.destroy()` cancels the flush timer and triggers a final flush before storage closes, so you don't need a manual flush on teardown.
+The queue auto-flushes every **100ms** (or earlier when batched). `await client.destroy()` cancels the flush timer and triggers a final flush before storage closes, so you don't need a manual flush on teardown.
 {{/lang}}
 
 ---
