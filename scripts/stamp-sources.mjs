@@ -102,6 +102,7 @@ if (MODE === "write") {
   const manifest = readJson(GUIDES_JSON);
   const out = {
     defaults: manifest.defaults,
+    platforms: manifest.platforms,
     builtAgainst: { stampedAt: stamp.stampedAt, channel: CHANNEL, packages: mergedPackages(libraries) },
     guides: manifest.guides,
   };

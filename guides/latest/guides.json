@@ -3,6 +3,17 @@
     "language": "ts",
     "platform": "web"
   },
+  "platforms": {
+    "web": {
+      "language": "ts"
+    },
+    "ios": {
+      "language": "swift"
+    },
+    "macos": {
+      "language": "swift"
+    }
+  },
   "builtAgainst": {
     "stampedAt": "2026-06-25",
     "channel": "next",

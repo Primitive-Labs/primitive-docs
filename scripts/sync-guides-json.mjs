@@ -5,6 +5,9 @@
 //
 //   {
 //     "defaults": { "language": "ts", "platform": "web" },
+//     "platforms": {                                        // platform→language
+//       "web": { "language": "ts" }, "ios": { "language": "swift" }, ...
+//     },
 //     "guides": [
 //       { "topic": "...",
 //         "file": "<BASE>.ts.md",                       // default variant, always present
@@ -26,7 +29,7 @@
 import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
-import { VARIANTS, DEFAULT_VARIANT_ID, MANIFEST_DEFAULTS, manifestVariant } from "./variants.mjs";
+import { VARIANTS, DEFAULT_VARIANT_ID, MANIFEST_DEFAULTS, MANIFEST_PLATFORMS, manifestVariant } from "./variants.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const GUIDES_DIR = join(ROOT, "guides", "latest");
@@ -49,6 +52,15 @@ if (JSON.stringify(manifest.defaults) !== JSON.stringify(MANIFEST_DEFAULTS)) {
     problems.push(`✘ guides.json "defaults" doesn't match variants.mjs MANIFEST_DEFAULTS`);
   } else {
     manifest.defaults = MANIFEST_DEFAULTS;
+    changed++;
+  }
+}
+
+if (JSON.stringify(manifest.platforms) !== JSON.stringify(MANIFEST_PLATFORMS)) {
+  if (CHECK) {
+    problems.push(`✘ guides.json "platforms" doesn't match variants.mjs MANIFEST_PLATFORMS`);
+  } else {
+    manifest.platforms = MANIFEST_PLATFORMS;
     changed++;
   }
 }
@@ -116,8 +128,9 @@ if (problems.length) {
   process.exit(1);
 }
 if (!CHECK && changed) {
-  // `defaults` first, then `guides` — the manifest's documented key order.
-  const out = { defaults: manifest.defaults, ...manifest };
+  // `defaults`, then `platforms`, then the rest — the manifest's documented
+  // key order (guides last).
+  const out = { defaults: manifest.defaults, platforms: manifest.platforms, ...manifest };
   writeFileSync(JSON_PATH, JSON.stringify(out, null, 2) + "\n");
 }
 console.log(CHECK ? "guides.json is current." : `Updated ${changed} guides.json entr${changed === 1 ? "y" : "ies"}.`);
