@@ -257,7 +257,7 @@ The client wraps Apple's `AuthenticationServices` in two one-call helpers on `cl
 `signInWithPasskey` runs the discoverable-credential flow — the system sheet lists the passkeys saved for the app, the user picks one, and the call applies the session token (cause `"passkey"`, emitting `.authSuccess` / `.authState`) and re-authenticates the WebSocket. It works without an existing session.
 
 ```swift
-let result = try await client.auth.signInWithPasskey()   // PasskeySignInResult(userId, isNewUser)
+let result = try await client.auth.signInWithPasskey()   // PasskeySignInResult(user, isNewUser)
 ```
 
 - `signInWithPasskey(presentationAnchor:preferImmediatelyAvailableCredentials:)` — pass `preferImmediatelyAvailableCredentials: true` to restrict the prompt to passkeys already on the device and fail fast (no QR/cross-device fallback). Throws `PasskeyError.canceled` when the user dismisses the sheet; server-side failures surface as `HttpError`.
