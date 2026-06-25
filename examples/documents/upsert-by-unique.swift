@@ -14,7 +14,7 @@ func upsertCategory(documentId: String) throws {
     parentId: "root",
     color: "blue"
   )
-  // "name_parentId" is the named constraint declared in schema.toml. `mode`
+  // "name_parentId" is the named constraint declared in models.toml. `mode`
   // defaults to .either (create-or-update); pass .mustExist / .mustNotExist to
   // require a single path.
   let resolved = try category.upsertByUnique("name_parentId", in: documentId)

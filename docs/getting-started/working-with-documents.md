@@ -28,7 +28,7 @@ Models define the typed shape of the data your app stores in documents — like 
 
 | | Web (Vue) | iOS (SwiftUI) |
 |---|---|---|
-| Schema file | `src/models/models.toml` | `Sources/<App>/Models/schema.toml` |
+| Schema file | `src/models/models.toml` | `Sources/<App>/Models/models.toml` |
 | Codegen | `pnpm codegen` (run after editing) | Automatic on build (`./run-ios.sh` regenerates first; `swift build` runs the SPM plugin) |
 | Output | `*.generated.ts` classes + `@/models` barrel | `PrimitiveModel` structs in `Models/Generated/` |
 
@@ -61,7 +61,7 @@ pnpm codegen
 ```
 
 ```bash [iOS (SwiftUI)]
-# 1. Edit Sources/<App>/Models/schema.toml
+# 1. Edit Sources/<App>/Models/models.toml
 # 2. Regenerate — codegen is wired into both build paths:
 ./run-ios.sh        # regenerates, then builds + launches (Xcode path)
 swift build         # the SPM plugin regenerates automatically
@@ -77,7 +77,7 @@ The codegen output — `*.generated.ts` + the `src/models/index.ts` barrel on we
 :::
 
 ::: warning iOS: build through run-ios.sh after schema changes
-If you edit `schema.toml` and then hit **Run in Xcode directly**, Xcode compiles whatever stale files are already in `Models/Generated/` with no error pointing at the cause. Build through `./run-ios.sh` (it regenerates first), or run `swift build` once before the Xcode build.
+If you edit `models.toml` and then hit **Run in Xcode directly**, Xcode compiles whatever stale files are already in `Models/Generated/` with no error pointing at the cause. Build through `./run-ios.sh` (it regenerates first), or run `swift build` once before the Xcode build.
 :::
 
 ### Authoring `models.toml`
@@ -342,6 +342,18 @@ Group-by with `count` / `avg` / `sum` / `min` / `max`, an optional pre-filter, s
 :::
 
 When you group by a `stringset` field (like `tags`), each member value becomes its own group — a tag-facet count. To split records by whether the set contains one specific value instead, use a membership `groupBy` entry (the `urgentSplit` call above). One stringset facet field is allowed per aggregation.
+
+### Loading Related Data
+
+Pass `include` in a query to load related records alongside the results, instead of running a follow-up query for each row. Loading the parent a record points to (`refersTo`) and the children that point back at it (`hasMany`):
+
+::: code-group
+
+<<< ../../examples/documents/includes.ts#example{ts} [JavaScript]
+
+<<< ../../examples/documents/includes.swift#example{swift} [Swift]
+
+:::
 
 ## Reacting to Changes
 

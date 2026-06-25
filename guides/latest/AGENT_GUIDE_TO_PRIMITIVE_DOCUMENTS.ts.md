@@ -764,9 +764,30 @@ const activeCount = await Task.count({ completed: false });
 const totalCount = await Task.count({});
 ```
 
+
 ### Loading Related Data (Includes)
 
-Use `include` in query options to load related records alongside results. Related records are attached under `._related` on each result row (rows live on `.data`).
+Pass `include` in a query to batch-load related records alongside the rows, instead of following each relationship one row at a time. A `refersTo` relationship attaches its single parent; a `hasMany` attaches the matching children.
+
+```typescript
+  // refersTo — each Post's Author (the `authorId` FK lives on Post):
+  const posts = await Post.query({}, {
+    include: [{ model: "authors", type: "refersTo", sourceField: "authorId", as: "author" }],
+  });
+  for (const post of posts.data as (Post & { _related?: { author?: Author } })[]) {
+    console.log(post.title, post._related?.author?.name);
+  }
+
+  // hasMany — every Post that points back at each Author, newest first:
+  const authors = await Author.query({}, {
+    include: [{ model: "posts", type: "hasMany", foreignKey: "authorId", as: "posts", sort: { createdAt: -1 }, limit: 10 }],
+  });
+  for (const author of authors.data as (Author & { _related?: { posts?: Post[] } })[]) {
+    console.log(author.name, (author._related?.posts ?? []).length);
+  }
+```
+
+In JavaScript the include is a plain spec object: related records are attached under `._related` on each result row (rows live on `.data`), keyed by the include's `as` (defaults to the model name). The full set of include shapes — including `refersToMany` (StringSet-backed) and nesting — is:
 
 **Include types:**
 

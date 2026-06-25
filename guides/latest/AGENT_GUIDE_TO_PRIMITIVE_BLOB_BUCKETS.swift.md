@@ -56,7 +56,7 @@ Admin/owner only. Deleting a bucket cascades to every blob inside it.
     bucketKey: "uploads",
     name: "User uploads",
     ttlTier: .twentyEightDays,
-    accessPolicy: .authenticated
+    preset: .authenticated
   ))
 
   let buckets = try await client.blobBuckets.listBuckets()
@@ -99,7 +99,7 @@ preset = "authenticated"                    # public | authenticated | admin-onl
                                             # is governed entirely by the rule set (see below)
 ```
 
-The TOML root table is `[bucket]` (not `[blobBucket]`). The CLI's `primitive sync` reads from `config/blob-buckets/<key>.toml`. Give a bucket a `preset` or a `ruleSetId`, not both. To change either later, edit the TOML and `primitive sync push` again.
+The TOML root table is `[bucket]` (not `[blobBucket]`). The CLI's `primitive sync` reads from `config/blob-buckets/<key>.toml`. Give a bucket a `preset` or a `ruleSetId`, not both. To change either later, edit the TOML and `primitive sync push` again, or change it at runtime with `updateBucket` (see [Update a bucket's access](#update-a-buckets-access)).
 
 Or via CLI:
 
@@ -123,6 +123,24 @@ Presets govern blob ops at the granularity of `read` (download/getMeta), `write`
 `public` is the only preset that serves **anonymous reads** — an unauthenticated request can `read`/`list` it directly (no signed URL needed).
 
 For access no preset expresses, set `ruleSetId` to make a `custom` bucket: the rule set is the authority for member access (resource type `blob_bucket`), evaluated per op (`read`/`write`/`list`/`delete`/`share`; in a configured rule set `list`/`share` fall back to `read` and `delete` to `write`). Admins/owners always pass; a missing/orphaned rule set denies closed. Rule CEL exposes `isAnonymous()` and `record.blobCreatedBy` (the uploader's id; null for bucket-level `list`).
+
+### Update a bucket's access
+
+Change a bucket's access at runtime without recreating it (admin/owner only) with `updateBucket`. Setting a named `preset` switches it and clears any attached rule set; setting a `ruleSetId` makes the bucket `custom`.
+
+```swift
+  // Switch the bucket to a different preset.
+  _ = try await client.blobBuckets.updateBucket(
+    bucketIdOrKey: "uploads",
+    params: UpdateBlobBucketParams(preset: .adminOnly)
+  )
+
+  // Attach a custom rule set (makes the bucket `custom`); use .clear to remove it.
+  _ = try await client.blobBuckets.updateBucket(
+    bucketIdOrKey: "uploads",
+    params: UpdateBlobBucketParams(ruleSetId: .value("rule-set-id"))
+  )
+```
 
 ### TTL tiers
 
