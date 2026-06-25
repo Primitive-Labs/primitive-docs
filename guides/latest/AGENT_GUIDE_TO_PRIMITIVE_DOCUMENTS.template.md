@@ -1680,7 +1680,7 @@ Pick the call that answers the question you're actually asking:
 
 `options:` takes a `PaginationOptions(limit:cursor:)`; the paginated reads return `PaginatedResult` (`.data`, `.nextCursor`, `.hasMore`).
 
-For the permission / collection reads — `documents.getPermissions(_:)`, `collections.getAccess(_:)`, `documents`/`collections.listPendingInvitations(_:)` — prefer the typed `*Summaries` companions ([above](#typed-summaries-for-permission--collection-reads)) when rendering a UI: `permissionSummaries` / `accessSummary` / `pendingInvitationSummaries` resolve `email`/`name` and do the owned + shared merge, so display screens don't reassemble the raw rows. Reach for the raw reads only when you need the unresolved server shape.
+For the permission / collection reads — `documents.getPermissions(_:)`, `collections.getAccess(_:)`, `documents`/`collections.listPendingInvitations(_:)` — prefer the typed `*Summaries` companions ([above](#typed-summaries-for-permission--collection-reads)) when rendering a UI: `permissionSummaries` / `accessSummary` / `pendingInvitationSummaries` return display-ready types (resolving `email`/`name` on permission rows), so display screens don't reassemble the raw rows. Reach for the raw reads only when you need the unresolved server shape.
 {{/lang}}
 
 **Anti-patterns:**
