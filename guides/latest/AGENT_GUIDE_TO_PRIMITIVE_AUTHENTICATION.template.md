@@ -288,6 +288,86 @@ await client.passkeyUpdate(passkeyId, { deviceName: "Work Laptop" });
 await client.passkeyDelete(passkeyId);
 ```
 {{/lang}}
+{{#lang swift}}
+## Passkeys
+
+The client wraps Apple's `AuthenticationServices` in two one-call helpers on `client.auth` (iOS/macOS), so app code never touches the WebAuthn challenge handshake directly.
+
+### Sign in
+
+`signInWithPasskey` runs the discoverable-credential flow — the system sheet lists the passkeys saved for the app, the user picks one, and the call applies the session token (cause `"passkey"`, emitting `.authSuccess` / `.authState`) and re-authenticates the WebSocket. It works without an existing session.
+
+```swift
+let result = try await client.auth.signInWithPasskey()   // PasskeySignInResult(user, isNewUser)
+```
+
+- `signInWithPasskey(presentationAnchor:preferImmediatelyAvailableCredentials:)` — pass `preferImmediatelyAvailableCredentials: true` to restrict the prompt to passkeys already on the device and fail fast (no QR/cross-device fallback). Throws `PasskeyError.canceled` when the user dismisses the sheet; server-side failures surface as `HttpError`.
+
+### Register (must be authenticated)
+
+`registerPasskey` adds a passkey to the **currently signed-in** user — sign in by another method first.
+
+```swift
+let reg = try await client.auth.registerPasskey(deviceName: "My iPhone")
+```
+
+- `registerPasskey(deviceName:inviteToken:presentationAnchor:)` — `deviceName` labels the credential (server default `"Unknown device"` when omitted). Pass `inviteToken` to fold invitation acceptance into registration. Throws `PasskeyError.canceled` on dismissal.
+
+### Manage
+
+The management methods match the JS client:
+
+```swift
+let list = try await client.auth.passkeyList()                              // PasskeyListResult
+try await client.auth.passkeyUpdate(passkeyId: id, deviceName: "Work iPad")  // rename
+try await client.auth.passkeyDelete(passkeyId: id)                          // remove
+```
+
+Passkey sign-in requires `passkeyEnabled` plus a non-empty `passkeyRpConfig`, and the app's associated-domains entitlement must list the RP domain (see [Deep links and universal links](#deep-links-and-universal-links)). Gate the UI on `getAuthConfig()`'s `passkeyEnabled` rather than catching a failure.
+
+---
+
+## Deep links and universal links
+
+A native app receives Primitive URLs through universal links (an `NSUserActivity`) or a custom scheme — an invitation accept link, a shared-document link, or a magic-link callback. `client.links` turns an incoming URL into a typed `LinkTarget` so the app can route it without parsing query strings by hand, and builds the canonical outbound URLs.
+
+Point it at the app's base URL once (the same value as the server's `app.baseUrl`); the builders return `nil` until it is set, and the host is automatically trusted for resolution:
+
+```swift
+client.links.appBaseURL = URL(string: "https://app.example.com")
+// Optional: extra http(s) hosts to accept when resolving incoming links
+client.links.trustedLinkHosts = ["links.example.com"]
+```
+
+### Resolve an incoming link
+
+```swift
+// From a universal link (e.g. .onContinueUserActivity / scene delegate)
+let target = try await client.links.resolve(userActivity: activity)
+
+switch target {
+case .document(let id):              openDocument(id)
+case .documentAlias(let ref):        openDocument(/* ref resolved server-side */)
+case .invitation(let token):         acceptInvite(token)
+case .magicLink(let token, _):       try await client.auth.magicLinkVerify(token: token)
+case .unknown(let url):              route(url)   // not a Primitive link — hand to your own router
+}
+```
+
+- `resolve(url:)` / `resolve(userActivity:)` are `async throws` — they hit the network only to resolve a document **alias** to its ID (`GET /document-aliases/...`), throwing `JsBaoError(.aliasNotFound)` if it doesn't resolve, or `.invalidArgument` when an activity carries no URL.
+- `parse(url:)` is the synchronous, offline counterpart — same `LinkTarget` shapes, but a `.documentAlias` comes back unresolved (no network). Use it when you only need to branch on the kind.
+
+`LinkTarget` cases: `.document(id:)`, `.documentAlias(_:)`, `.invitation(token:)`, `.magicLink(token:purpose:)`, `.unknown(_:)`.
+
+### Build outbound links
+
+```swift
+let share  = client.links.shareURL(forDocument: documentId)        // {appBaseURL}/document/{id}
+let invite = client.links.inviteAcceptURL(inviteToken: token)      // {appBaseURL}/invite/accept?inviteToken=...
+```
+
+Both return `URL?` and are `nil` until `appBaseURL` is configured. `inviteAcceptURL` produces the same URL shape Primitive's default invitation emails use, so a share sheet and an emailed invite land on the same route.
+{{/lang}}
 
 ---
 

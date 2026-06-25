@@ -845,7 +845,7 @@ Set `accessRule` once in the `[workflow]` TOML block and it sticks: `primitive s
 
 ## Execution identity (`runAs`, system workflows)
 
-`runAs` declares the principal a run executes as. Top-level `[workflow]` field, round-tripped by `primitive sync push`, validated at save time (`runAs` must be `caller` | `system`; absent → `caller`).
+`runAs` declares the principal a run executes as — `caller` (default) or `system`. It's a top-level `[workflow]` field.
 
 - `runAs = "caller"` (default) — the run executes as the invoking user. Every step acts with that member's permissions: `document.*` steps enforce the caller's per-document ACL, group/data ops are checked against their roles. `accessRule` gates who may start it.
 - `runAs = "system"` — the run executes as the app's synthetic per-app principal (`sys:<appId>`, also the `WorkflowRun` partition key). App-privileged: the data baseline (document/database read/write/delete/manage) is unconditional.
