@@ -12,6 +12,10 @@ Implementing auth flows for Primitive apps. All methods live on `JsBaoClient` (p
 {{#lang ts}}
 | Passkey | WebAuthn for returning users (requires existing account) |
 {{/lang}}
+{{#lang swift}}
+| Sign in with Apple | Native one-call sign-in (`signInWithApple`); gate on `hasApple` |
+| Passkey | Native one-call sign-in/registration via `AuthenticationServices`; for returning users |
+{{/lang}}
 
 Each method must be enabled in the Admin Console. Check availability with `getAuthConfig()` before showing UI.
 
