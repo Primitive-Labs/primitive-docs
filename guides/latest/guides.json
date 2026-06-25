@@ -4,7 +4,7 @@
     "platform": "web"
   },
   "builtAgainst": {
-    "stampedAt": "2026-06-24",
+    "stampedAt": "2026-06-25",
     "channel": "next",
     "packages": {
       "js-bao-wss-client": "2.0.2",

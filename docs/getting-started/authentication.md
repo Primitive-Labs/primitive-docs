@@ -110,6 +110,8 @@ That's it — the template's login component automatically shows a "Sign in with
 
 Passkeys let returning users sign in with biometrics (fingerprint, face) or hardware security keys. The web template's `PrimitiveLogin` flow supports passkeys automatically — users can register a passkey after signing in, then use it for future logins.
 
+On iOS, the client wraps Apple's `AuthenticationServices` in two one-call helpers — `client.auth.signInWithPasskey()` and `client.auth.registerPasskey(deviceName:)` — and the iOS template offers passkey enrollment after a first sign-in by another method, then lists and manages saved passkeys from the profile screen. Passkeys require the app's associated-domains entitlement to list your RP domain; see [Deep links and universal links](#deep-links-and-universal-links).
+
 ## Email Template Customization
 
 Customize the emails sent for magic links and OTP codes:
@@ -131,6 +133,24 @@ primitive email-templates test magic-link
 ## Invitations and Pending Shares
 
 Signing in is what resolves anything waiting on a user's email — a pending app invitation, plus any document shares, group adds, or collection adds addressed to them. On first sign-in, with any method, it's all applied automatically; there's no manual "accept invitation" step, so the things other people invited them into are already there. See [Invitations](./invitations.md) for how those shares are created and the full resolution rules.
+
+## Deep links and universal links
+
+On iOS, an app receives Primitive URLs through universal links or a custom scheme — an invitation to accept, a shared document to open, or a magic-link callback. `client.links` turns an incoming URL (or the `NSUserActivity` a universal link delivers) into a typed target, so you route it without parsing query strings:
+
+```swift
+client.links.appBaseURL = URL(string: "https://app.example.com")
+
+let target = try await client.links.resolve(userActivity: activity)
+switch target {
+case .document(let id):        openDocument(id)
+case .invitation(let token):   try await client.invitations.accept(inviteToken: token)
+case .magicLink(let token, _): try await client.auth.magicLinkVerify(token: token)
+default:                       break
+}
+```
+
+The same API builds the outbound links — `client.links.shareURL(forDocument:)` and `client.links.inviteAcceptURL(inviteToken:)` produce the canonical URLs (the invite URL matches what Primitive's default invitation emails use). Configuring the app's associated domains for universal links is also what passkeys require; the iOS template ships the entitlement and a link router. The agent guide covers the full `LinkTarget` shapes and the offline `parse` variant.
 
 ## Disabling a User Per App
 

@@ -276,6 +276,8 @@ primitive sync revert
 
 Every `pull` snapshots the sync directory before writing; `sync revert` restores the most recent snapshot, `--list` enumerates the available ones, and `--snapshot <id>` picks a specific one.
 
+`push` is safe to re-run: an entity that already exists on the server but is missing from local sync state — a workflow or cron trigger created out of band, or one left behind by a push that aborted before recording it — is adopted by its key and updated in place rather than failing the push. A failed push converges on the next run.
+
 Pass `--dir <path>` to override and use a fixed directory:
 
 ```bash
