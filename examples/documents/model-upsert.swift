@@ -11,7 +11,7 @@ func upsertUser(documentId: String) throws {
     email: "alice@example.com",
     name: "Alice"
   )
-  // "email" must have a single-field unique constraint in schema.toml.
+  // "email" must have a single-field unique constraint in models.toml.
   // On merge, the returned record carries the existing record's id.
   let resolved = try user.save(in: documentId, upsertOn: "email")
   // #endregion example

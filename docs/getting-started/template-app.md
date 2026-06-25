@@ -131,7 +131,7 @@ my-app/
 │   ├── TemplateAppState.swift          # PrimitiveAppState subclass: client lifecycle, documents
 │   ├── Views/                          # SwiftUI views (ContentView wraps AuthGateView)
 │   └── Models/
-│       ├── schema.toml                 # Your data model schemas
+│       ├── models.toml                 # Your data model schemas
 │       └── Generated/                  # swift-bao-codegen output
 ├── docs/                               # Agent guides for AI coding assistants
 ├── Package.swift                       # SwiftPM manifest (pulls in PrimitiveApp)
@@ -148,7 +148,7 @@ Key configuration files:
 | | Web (Vue) | iOS (SwiftUI) |
 |---|---|---|
 | App config | `src/config/envConfig.ts` (API URLs, App ID) | `primitive.json` (App ID + server URLs) |
-| Data models (start here!) | `src/models/models.toml` — run `pnpm codegen` after editing | `Sources/…/Models/schema.toml` — codegen is wired into both build paths |
+| Data models (start here!) | `src/models/models.toml` — run `pnpm codegen` after editing | `Sources/…/Models/models.toml` — codegen is wired into both build paths |
 | Agent guides | `docs/` | `docs/` |
 
 On iOS, the `PrimitiveApp` package does the heavy lifting: `PrimitiveAppState` owns the `JsBaoClient` lifecycle (your app subclasses it, like the template's `TemplateAppState`), `AuthGateView` presents `PrimitiveLoginView` until the user is signed in and connected, and `BaoDataLoader` binds queries to SwiftUI views — the counterparts of the web template's client service, `PrimitiveLogin`, and `useJsBaoDataLoader`. `appState.initialize()` reads `primitive.json`, creates the client, attaches the auth manager, and in dev mode auto-signs you in with your CLI token from `~/.primitive/credentials.json` so you don't log in on every rebuild.

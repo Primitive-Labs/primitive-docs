@@ -8,7 +8,7 @@ func adminBuckets(client: JsBaoClient) async throws {
     bucketKey: "uploads",
     name: "User uploads",
     ttlTier: .twentyEightDays,
-    accessPolicy: .authenticated
+    preset: .authenticated
   ))
 
   let buckets = try await client.blobBuckets.listBuckets()

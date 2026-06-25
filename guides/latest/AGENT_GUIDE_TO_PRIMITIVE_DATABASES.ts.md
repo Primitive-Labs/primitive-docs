@@ -269,7 +269,7 @@ autoAddCreator = true          # auto-add creator as member (default: true)
 Beyond sync, the CLI exposes commands for one-off ops (use `--help` for full flags):
 
 ```bash
-primitive database-types list | get <type> | operations list <type>
+primitive database-types list | get <type> | delete <type> | operations list <type>
 primitive databases list | get <id> | create "Title" --type <type> [--cel-context '{...}'] | delete <id>
 primitive databases cel-context update <id> --data '{"teamId":"team-1"}'
 
@@ -288,6 +288,8 @@ primitive databases import-csv <database-id> <file.csv> --model <name> \
   [--types '{"price":"number"}'] [--id-column <col>] [--batch-size 5000] \
   [--delimiter ,] [--dry-run] [--stop-on-error] [--json]
 ```
+
+`database-types delete <type>` refuses with a 409 when live database instances of that type still exist — delete the instances first (`primitive databases delete <id>`) or pass `--force` to delete the type anyway (this orphans the instances). `-y`/`--yes` only skips the confirmation prompt; it does not bypass the guard.
 
 Generate TypeScript record interfaces and op param/result types from the database-type TOML:
 

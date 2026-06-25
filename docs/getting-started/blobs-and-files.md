@@ -86,7 +86,15 @@ When no preset fits, attach a **rule set** to the bucket — set `ruleSetId` in 
 - `isAnonymous()` — true when the caller has no account, so `!isAnonymous()` means "any signed-in member."
 - `record.blobCreatedBy` — the id of the member who uploaded the blob, for owner-scoped rules like `record.blobCreatedBy == user.userId`.
 
-See [Access Control](./access-control.md#rule-sets-governing-management-operations) for the rule-set model. To change a bucket's preset or attached rule set later, edit its TOML and run `primitive sync push` again.
+See [Access Control](./access-control.md#rule-sets-governing-management-operations) for the rule-set model. To change a bucket's preset or attached rule set later, edit its TOML and run `primitive sync push` again — or change it at runtime from your app with `updateBucket` (admin/owner only). Setting a named preset clears any attached rule set:
+
+::: code-group
+
+<<< ../../examples/blobs/bucket-update.ts#example{ts} [JavaScript]
+
+<<< ../../examples/blobs/bucket-update.swift#example{swift} [Swift]
+
+:::
 
 ## TTL Tiers
 

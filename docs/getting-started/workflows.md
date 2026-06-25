@@ -359,8 +359,11 @@ The subject-user steps:
 | `document.getOrCreateWithAliasForUser` | Ensure a per-subject document exists (created by the system actor, with the alias and a default `write` grant to the subject): `{ documentId, aliasKey, userId, created }` |
 | `database.*ForUser` | `queryForUser` / `mutateForUser` / `countForUser` / `aggregateForUser` / `pipelineForUser` / `applyToQueryForUser` — the matching `database.*` step, run under the subject's access rules and trigger context |
 | `analytics.writeForUser` | Emit an analytics event attributed to the subject |
+| `document.listForGroup` | Documents a group can access — direct grants and those reaching the group through a collection, resolved in one query — as `{ items, cursor }`; each item carries the group's grant level and where it came from. Optionally filter by `permission` |
+| `document.listForCollection` | Documents contained in a collection (its membership, not any one user's access) as `{ items, cursor }` |
+| `document.getRootForUser` | The subject's root document id, or `null` if they have none. Pass `create = true` to assign one (the subject gets read-write access) |
 
-`document.listForUser` covers the subject's direct and root-document grants; documents reachable only through a group or collection aren't included yet.
+`document.listForUser` covers the subject's direct and root-document grants; to enumerate documents a group or collection reaches, use `document.listForGroup` or `document.listForCollection`.
 
 Once a subject method hands back a concrete `documentId`, the ordinary `document.query` / `save` / `patch` / `delete` steps read and write it app-privileged — there are no separate `*ForUser` write kinds. Those CRUD steps also accept an inline subject alias, `documentAlias = { scope = "user", aliasKey = "...", userId = "..." }`, which resolves the subject's alias in place and fails the step if it doesn't exist.
 
