@@ -240,7 +240,7 @@ Cron-fired runs are persistent workflow runs like any other — `meta.triggerId`
 
 ### Via Inbound Webhooks
 
-Inbound webhooks let external services (Stripe, GitHub, Slack, etc.) trigger workflows automatically. Each webhook has a public URL, signature verification, and automatic workflow triggering. Define them in your sync directory:
+Inbound webhooks let external services (Stripe, GitHub, Slack, etc.) trigger workflows automatically. Each webhook has a public URL, signature verification, and automatic workflow triggering. This is the **inbound** half of a third-party integration; the **outbound** half — your app calling the provider's API — is a configured [integration](./api-integrations.md). Most integrations use both. Define webhooks in your sync directory:
 
 ```toml
 # config/webhooks/stripe-payments.toml
