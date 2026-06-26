@@ -50,6 +50,21 @@ export const DEFAULT_VARIANT_ID = "ts";
 // platform) the CLI assumes when a project declares neither.
 export const MANIFEST_DEFAULTS = { language: "ts", platform: "web" };
 
+// Top-level `platforms` block emitted into guides.json — declares which
+// platforms the CLI's `--platform` flag accepts and the default language each
+// maps to. The CLI (js-bao-wss#1219) validates `--platform P` against these
+// keys and, when only `--platform` is given, infers the language from
+// `platforms[P].language` (so `--platform ios` serves the Swift guide even
+// though no guide ships a platform-gated variant). Per-platform objects rather
+// than a flat string→string map leave room for more metadata later without a
+// schema change. These are the CLI-facing platform names (web/ios/macos), a
+// separate vocabulary from the `PLATFORMS` filename-infix tokens above.
+export const MANIFEST_PLATFORMS = {
+  web: { language: "ts" },
+  ios: { language: "swift" },
+  macos: { language: "swift" },
+};
+
 export const variantById = new Map(VARIANTS.map((v) => [v.id, v]));
 
 // Languages that have a platform-agnostic ("base") variant. Corpus parity is
