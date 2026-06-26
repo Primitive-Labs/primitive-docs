@@ -67,30 +67,16 @@ The script's return value is its last expression. Given `steps.fetch.body = { "i
 - **`NaN`/`Infinity` can't survive JSON output** — they serialize as `null`. Return a sentinel value instead of relying on them.
 - **Map key order is normalized** at serialization, so output is byte-stable regardless of insertion order.
 
-## The `parse_json` top-level-array gotcha
+## `parse_json`
 
-`parse_json(...)` parses a JSON **object** string into a map. It is **object-only**: handed a string whose top-level JSON value is an **array**, it raises a type error that surfaces as:
-
-```
-output type mismatch: want map, got array
-```
-
-The wording is misleading — "output type" refers to what `parse_json` expected to produce (a map), **not** the script step's output. The error fires from the `parse_json` call, but because the message reads like an output-shape complaint, it's easy to misread as a problem with the script's return value even when the script clearly returns a map. A common trigger is a database or document field that stores a JSON **array** as a string (a weights array, a composition list).
-
-Wrap the array in an object before parsing, then extract:
+`parse_json(str)` parses a strict-JSON string into the matching Rhai value: a JSON object becomes a map, an array becomes an array, and primitives and `null` map to their Rhai equivalents. A database or document field that stores a JSON **array** as a string (a weights array, a composition list) parses straight into an array — no wrapper needed.
 
 ```
-fn parse_json_array(raw) {
-  if raw == () || type_of(raw) != "string" || raw == "" { return []; }
-  let wrapped = parse_json("{\"a\":" + raw + "}");
-  if type_of(wrapped) == "map" && type_of(wrapped.a) == "array" { return wrapped.a; }
-  []
-}
-
-// let weights = parse_json_array(input.weightsJson);
+let weights = parse_json(input.weightsJson);   // "[0.2, 0.5, 0.3]" → [0.2, 0.5, 0.3]
+let config  = parse_json(input.configJson);    // "{\"limit\": 10}" → #{ "limit": 10 }
 ```
 
-`parse_json` on a top-level **object** string needs no workaround.
+Input must be **strict JSON**. Trailing commas, `//` or `/* */` comments, single-quoted strings, and hex literals are rejected. Invalid input fails the step with a non-retryable `SCRIPT_RUNTIME_ERROR` carrying a positioned message — `parse_json: invalid JSON at line N column M: …` — and, when the input matches one of those non-standard forms, a hint pointing at strict JSON. Map keys are sorted at output, so a parsed-then-returned object is byte-stable.
 
 ## Per-step limits
 
@@ -126,7 +112,7 @@ Deterministic failures (the script will fail the same way every time) come back 
 |---|---|---|
 | `SCRIPT_PARSE_ERROR` | Input or source JSON failed to parse | No |
 | `SCRIPT_COMPILE_ERROR` | Rhai source failed to compile | No |
-| `SCRIPT_TYPE_ERROR` | Type mismatch — includes the `parse_json` array gotcha above | No |
+| `SCRIPT_TYPE_ERROR` | Type mismatch in the script body (a string used where a number is required, etc.) | No |
 | `SCRIPT_RUNTIME_ERROR` | Arithmetic error, stack overflow, or other runtime fault | No |
 | `SCRIPT_OPERATION_LIMIT` | Exceeded `maxOperations` | No |
 | `SCRIPT_OUTPUT_LIMIT` | Exceeded an output size/shape cap | No |

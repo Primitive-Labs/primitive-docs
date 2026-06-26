@@ -92,6 +92,17 @@ Every step output carries an engine-managed `ok` boolean (and `skipped: true` wh
 
 CEL optional types are enabled in every workflow context, so you can collapse multi-conjunct null guards: `steps.fetch.?data.?items.orValue([]).size() > 0`.
 
+When a step reads a value from an upstream step that can itself be skipped, list that upstream in `skipWhenSkipped` so the dependent skips too instead of failing on the missing output:
+
+```toml
+[[steps]]
+id = "summarize"
+kind = "llm.chat"
+skipWhenSkipped = ["fetch"]   # if "fetch" was skipped, skip this step without evaluating runIf
+```
+
+The skip cascades — a step skipped this way will in turn skip its own `skipWhenSkipped` dependents. List only earlier step ids. A step that *errored* under `continueOnError` does not trigger the skip; only a genuinely skipped upstream does.
+
 ## The Run Lifecycle
 
 Every invocation creates a persistent **workflow run**. A run moves through `queued` → `running` → a terminal state (`completed`, `failed`, or `terminated`). Workflows that apply their results into local-first documents add two more states — `apply_pending` and `apply_claimed` — between the last step and completion (see [Applying Results to Local Data](#applying-results-to-local-data-client-apply)).

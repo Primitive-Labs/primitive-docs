@@ -50,6 +50,7 @@ All steps support these in addition to their own:
 | `concurrency` | Parallel forEach lanes (integer 1-100; default 1 = sequential). Results preserve insertion order. |
 | `successWhen` | CEL predicate evaluated per forEach iteration to classify the result as functionally succeeded vs empty (see `forEach` below) |
 | `continueOnError` | Capture errors as `{ error, errorDetails, ok: false, errored: true }` instead of failing the workflow |
+| `skipWhenSkipped` | Array of earlier step ids. Before this step's own `runIf` is evaluated, skip this step (with the same `{ ok: false, skipped: true }` stub) if any listed upstream was skipped. Transitive; reacts only to `skipped: true`, not `errored: true`. Unknown/forward ids are tolerated at run time and warned at save time. |
 | `strict` | Throw if any template expression in this step is unresolved |
 
 ## Data flow
@@ -280,6 +281,8 @@ Read and write records in a document's models server-side. All take `documentId`
 | `document.delete` | `recordId` | `{ deleted: true, id }` |
 
 `filter` uses the same operator syntax as client-side model queries; empty or omitted matches all records. `options` supports `sort` (`{ field = 1 }` / `-1`), `limit`, and cursor pagination (`uniqueStartKey` — feed it the previous page's `nextCursor`).
+
+Writing a `stringset` field (which also backs `refersToMany`) in `save`/`patch` `data` takes either a plain array — `{ tagNames: ["a", "b"] }`, which **replaces** the whole set — or a per-member delta op-object `{ $add?: [...], $remove?: [...], $clear?: true }`. The delta applies `$clear` first, then `$remove`, then `$add` (so `$add` wins a tie), touching only the named members, so it merges cleanly with concurrent client `.add()` / `.delete()`. A returned stringset field reads back as a member array. The op-object is rejected on a non-collection field; a declared stringset given a non-array, non-op value also fails.
 
 ```toml
 [[steps]]
@@ -533,7 +536,7 @@ Given `steps.fetch.body = { "items": [{ "sku": "a1", "qty": 2, "price": 5.0 }, {
 - **Result nesting.** A script step's return value lands under `steps.<id>.output.*` (alongside `scriptMetrics` and the engine's `ok`) — unlike `transform`, whose result is the templated table directly (`steps.<id>.<field>`). Wire downstream templates/`runIf` as `{{ steps.normalize.output.total }}`, not `{{ steps.normalize.total }}`.
 - **Script bodies resolve live at run time.** The runner looks up the script's active config body on each execution; there is no publish-time snapshot. Pushing a changed `.rhai` file (`primitive sync push`) creates a new config and activates it — referencing workflows pick up the new body on their next run with no re-publish step. Pin a specific config with `configId = "..."` on the step to bypass the active-config lookup when determinism is required.
 - Handy patterns: `parse_json(input.someJsonString)` for JSON-string fields (e.g. payload columns stored as strings); missing keys read as `()` (test with `h.symbol != ()`); `NaN`/`Infinity` can't survive JSON output — they serialize as `null`, so return a sentinel instead.
-- **`parse_json` is object-only.** Handed a string whose top-level JSON value is an **array**, it raises `output type mismatch: want map, got array` — the "output type" is `parse_json`'s expected output, not the step's, so it reads like an output-shape problem even when the script returns a map. Wrap the array first: `parse_json("{\"a\":" + raw + "}").a`. Top-level objects need no workaround.
+- **`parse_json` parses any strict-JSON value** — object→map, array→array, plus primitives and `null` — so a field storing a JSON array string parses straight into an array. Input must be strict JSON (no trailing commas, comments, single quotes, or hex literals); invalid input fails the step with a non-retryable `SCRIPT_RUNTIME_ERROR` and a positioned message.
 - `limits` (optional) lets a step lower the per-run ceilings (`maxOperations`, `wallMsHint`, `maxOutputBytes`, `maxArrayLength`, `maxObjectKeys`, `maxNestingDepth`, `maxStringSize`, `maxCallDepth`, `maxLogBytes`); requested values are clamped at the app ceiling, never raised.
 - Deterministic failures (parse / compile / runtime / limit / validation) come back as a non-retryable step error so durable retries don't re-run a guaranteed failure; transient/transport errors throw and retry normally. The runtime fails closed — it never silently passes input through.
 - Each execution records per-step telemetry on the `WorkflowRun.scriptMetrics` array (operation counts, input/output byte sizes, runtime version), visible in run detail.
@@ -817,7 +820,7 @@ Every entry in `steps[id]` carries a reserved verdict namespace alongside the ru
 | Field | When set |
 |---|---|
 | `ok: boolean` | Always. `true` if the step ran and the runner classified it as successful; `false` for skipped, errored, or kind-specific failures (e.g. an `integration.call` that returned HTTP 5xx) |
-| `skipped: true` | The step's `runIf` evaluated falsy. The runner did NOT execute. |
+| `skipped: true` | The step's `runIf` evaluated falsy, or a step listed in its `skipWhenSkipped` was itself skipped. The runner did NOT execute. |
 | `errored: true` | The step threw but was captured by `continueOnError = true` |
 | `error`, `errorDetails` | Companion fields populated when `errored: true` |
 
@@ -827,6 +830,8 @@ Every entry in `steps[id]` carries a reserved verdict namespace alongside the ru
 runIf = "steps.fetch.ok"
 runIf = "!steps.fetch.skipped && !steps.fetch.errored"
 ```
+
+When a step reads `steps.<upstream>.output.*` and that upstream can be skipped, a skipped upstream leaves no `output` key and an unguarded multi-segment read throws `No such key: output`. Two structural fixes: guard the read with safe navigation (`steps.fetch.?output.?items`), or declare `skipWhenSkipped = ["fetch"]` so the dependent auto-skips whenever `fetch` skips — its `runIf` is never evaluated. The skip is transitive and reacts only to `skipped: true` (an upstream that errored under `continueOnError` does not trigger it). List only earlier step ids; a save-time warning flags an unguarded skippable read or a `skipWhenSkipped` entry naming an unknown or forward step id.
 
 ## Access control
 
@@ -931,7 +936,9 @@ status = "active"
 
 Receive endpoint: `POST /app/{appId}/webhook/{webhookKey}`. The platform verifies the signature per `verificationScheme`, then starts `workflowKey` with the event payload as input; `inputMapping` (e.g. `"data.object"`) extracts a nested path first. Always pair a webhook-triggered workflow with `accessRule = "hasRole('owner')"` (see Access control above) so clients can't start it directly with a crafted payload.
 
-CLI: `primitive webhooks list | get | create | update | delete | rotate-secret | test | events <webhook-key>` — `events` lists recent deliveries (accepted / rejected / duplicate).
+CLI: `primitive webhooks list | get | create | update | delete | rotate-secret | test | events <webhook-key>` — `events` lists recent deliveries (accepted / rejected / duplicate / `workflow_not_active`).
+
+A `workflow_not_active` delivery means the bound workflow was draft or archived when the event arrived: the request is acked with HTTP 202 `{ received: true }` (so the sender doesn't retry) but the workflow is **not dispatched**. Activate the workflow and resend — these events are excluded from deduplication, so the resend isn't dropped as a duplicate. Binding a webhook to a not-yet-active workflow succeeds and returns a non-blocking `warning` carrying `WORKFLOW_NOT_ACTIVE`.
 
 ## Cron triggers
 
@@ -1135,10 +1142,12 @@ Trigger states:
 
 - `active` — scheduled, alarm armed.
 - `paused` — manual pause; alarm cancelled until `resume`.
-- `error_paused` — set automatically when the workflow start fails or the cron expression becomes unparseable. `lastError` is populated. Call `resume` to clear and reschedule.
+- `error_paused` — set automatically when a fire fails hard (the target workflow is **not found**, or a binding/runtime error), when the cron expression becomes unparseable, or after 50 consecutive skips against a **not-active** target. `lastError` is populated (carrying `WORKFLOW_NOT_FOUND` or `WORKFLOW_NOT_ACTIVE`). Call `resume` to clear and reschedule.
 - `archived` — soft-deleted; never returns from list.
 
-`skippedCount` increments when `overlapPolicy: "skip"` blocks a fire because the prior run is still active.
+A target workflow that is draft or archived (**not active**) does NOT error-pause on the first fire: the fire is skipped and rescheduled, `lastError` is set to `WORKFLOW_NOT_ACTIVE`, and `consecutiveNotActiveCount` increments. It auto-recovers once the workflow is activated (the counter resets and `lastError` clears); only after 50 consecutive not-active skips does it escalate to `error_paused`. A target that is **not found**, by contrast, error-pauses immediately.
+
+`skippedCount` increments when `overlapPolicy: "skip"` blocks a fire because the prior run is still active — distinct from `consecutiveNotActiveCount`.
 
 ### Driving subscriptions from cron
 
