@@ -2,6 +2,8 @@
 
 Integrations let tenant apps call third-party APIs through a server-side proxy without exposing credentials to clients. The proxy enforces an allowlist of methods and paths, injects credentials from App Secrets, and returns the upstream response to the caller.
 
+This is the **outbound** half of a third-party integration. The **inbound** half — a webhook the provider calls to trigger a workflow, configured with a verification scheme — is in the Workflows guide ("Inbound webhooks"). Most third-party integrations need both: outbound calls plus an inbound webhook that triggers a workflow.
+
 ## Call an integration
 
 ```swift

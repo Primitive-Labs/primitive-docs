@@ -115,7 +115,11 @@ primitive integrations test my-api       # Test the integration
 primitive integrations logs my-api       # View recent call logs
 ```
 
+## The Inbound Half: Webhooks
+
+An integration is the **outbound** half — your app calling a third-party API. Most real integrations also need the **inbound** half: a webhook the provider calls when something happens on their side (a payment succeeds, a repo is pushed), which triggers a workflow. The two are configured separately — the outbound call here, the inbound webhook as a [webhook trigger](./workflows.md#via-inbound-webhooks) on a workflow, with signature verification. Integrating a service like Stripe or GitHub usually means setting up both.
+
 ## Next Steps
 
-- **[Workflows](./workflows.md)** — Call integrations from a pipeline with the `integration.call` step
+- **[Workflows](./workflows.md)** — Call integrations from a pipeline with the `integration.call` step, and trigger workflows from [inbound webhooks](./workflows.md#via-inbound-webhooks)
 - **[Primitive CLI](./primitive-cli.md)** — Full CLI command reference

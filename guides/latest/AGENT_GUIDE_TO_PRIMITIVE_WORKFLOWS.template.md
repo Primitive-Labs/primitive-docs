@@ -920,7 +920,7 @@ Once a subject method returns a concrete `documentId`, the app-privileged `docum
 
 ## Inbound webhooks
 
-External services trigger workflows via inbound webhooks. Define them as `webhooks/*.toml` in the sync directory and push with `primitive sync push`:
+External services trigger workflows via inbound webhooks. This is the **inbound** half of a third-party integration; the **outbound** half — calling the provider's API — is a configured integration (see the Integrations guide). Most integrations need both. Define webhooks as `webhooks/*.toml` in the sync directory and push with `primitive sync push`:
 
 ```toml
 # config/webhooks/stripe-payments.toml
