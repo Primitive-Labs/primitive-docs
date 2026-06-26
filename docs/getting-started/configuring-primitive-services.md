@@ -61,6 +61,14 @@ config/
 
 Every feature page in these docs that shows a TOML block — [Workflows](./workflows.md), [Prompts](./prompts.md), [API Integrations](./api-integrations.md), [Working with Databases](./working-with-databases.md), [Blobs and Files](./blobs-and-files.md) — is describing one of these files. Define the entity in TOML, `primitive sync push`, and it's live.
 
+`app.toml` holds the app-level settings, and pushing it is the preferred way to change them — the imperative `primitive apps update --flag` calls mutate the server directly and drift from the checked-in TOML, so a later `sync push` reverts them. The TOML-syncable settings are:
+
+- `[app]` — `name`, `mode`, `waitlistEnabled`, `baseUrl`
+- `[auth]` — `googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled`, and `[auth.passkeys]` relying-party config
+- `[cors]` (when `mode = "custom"`) — `allowedOrigins`, `allowCredentials`, `allowedMethods`, `maxAge`
+
+Two app settings are not part of `app.toml`: **OTP** is toggled with `primitive apps update --otp <bool>` only, and **redirect URIs** are set with `primitive apps update --redirect-uris "<uri1>,<uri2>"` or in the [Admin Console](https://admin.primitiveapi.com/login) (no TOML key).
+
 Credentials never go in these files: config that needs an API key references it as <span v-pre>`{{ secrets.KEY }}`</span>, with the value stored server-side. See [App Secrets](./app-secrets.md).
 
 ## Environments

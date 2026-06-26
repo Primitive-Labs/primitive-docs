@@ -31,7 +31,7 @@ Look up users by id or email from the client. The current signed-in user lives o
 
 :::
 
-To list **all** users in your app, use the CLI or admin console (there's no client-side "list every user" call):
+To list **all** users in your app, use the CLI or admin console:
 
 ```bash
 primitive users list
@@ -87,7 +87,7 @@ primitive groups members list <group-type> <group-id>
 primitive groups members remove <group-type> <group-id> <user-id>
 ```
 
-The CLI takes user IDs. Email-based adds and removes (including pending-signup handling) are client-API features — see `addMember` above.
+These CLI commands take user IDs. The client's `addMember` (above) also accepts email addresses and handles the pending-signup case.
 
 ## Groups and Documents
 
@@ -101,7 +101,7 @@ Grant document access to an entire group instead of individual users:
 
 :::
 
-All members of the group receive the specified permission level. When membership changes, document access updates automatically.
+All members of the group receive the specified permission level, and access tracks membership automatically. See [Sharing Documents](./working-with-documents.md#sharing-documents) for the full grant API and the members-and-pending view.
 
 ## Groups in Access Rules
 

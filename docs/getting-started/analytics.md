@@ -168,7 +168,7 @@ windowDays = 7
 limit = 25
 ```
 
-The runner is **default-deny** — non-admin callers are rejected before the upstream call. Lock down workflows that contain `analytics.query` steps with `accessRule = "hasRole('admin')"` (or fire them via cron). Each run is capped at 50 analytics queries.
+The runner is admin-only, so lock down workflows that contain `analytics.query` steps with `accessRule = "hasRole('admin')"` (or fire them via cron). The [step reference](./workflows.md#analytics-steps) covers the query runner's default-deny behavior and per-run limits.
 
 ### From the Admin Console
 

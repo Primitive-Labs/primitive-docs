@@ -472,11 +472,9 @@ Each operation has an `access` field — a CEL expression evaluated at call time
 "user.userId == params.userId"                     // only your own data
 ```
 
-**CEL context variables:** `user.userId`, `user.role`, `database.id`, `database.celContext`, `database.metadata`, `params.*`
+The shared identity context (`user.*`, `hasRole`, `isMemberOf`, `memberGroups`, `fromWorkflow`) is documented in the [Access Control guide](AGENT_GUIDE_TO_PRIMITIVE_ACCESS_CONTROL.md). **Database-specific CEL context:** `database.id`, `database.celContext`, `database.metadata`, `params.*`.
 
 Only `database.id` and the CEL context object are available in CEL — other database fields like `createdBy` are not exposed. `database.celContext` and `database.metadata` are aliases for the same object; prefer `database.celContext` in new code. To check ownership, store the creator's ID in metadata at creation time or use group membership.
-
-**CEL functions:** `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`, `hasRole(role)`, `fromWorkflow()`, `fromWorkflow(workflowKey)`
 
 `fromWorkflow()` is true when the call originated from a workflow step (any workflow); `fromWorkflow("key")` restricts to a specific workflow. Use it to lock down ops that should only be invoked by an internal workflow:
 

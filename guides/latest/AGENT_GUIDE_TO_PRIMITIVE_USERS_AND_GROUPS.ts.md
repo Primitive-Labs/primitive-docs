@@ -22,7 +22,7 @@ The key client calls, compiled against the real clients as part of the docs buil
   const me = await client.me.get();
 ```
 
-There is no client-side `users.list()` / `users.get()`; the current user lives on `client.me`. Enumerate users via the CLI or admin REST surface.
+Per-user lookups use `client.users.getBasic(id)`, `client.users.getProfiles([ids])`, and `client.users.lookup(email)`; the current user lives on `client.me`. Enumerate all users via the CLI (`primitive users list`) or the admin REST surface.
 
 ### Manage group membership
 

@@ -253,87 +253,26 @@ When working with an AI coding assistant, point it to these guides before asking
 
 ## Configuration Sync
 
-The CLI supports exporting and importing app configuration as TOML files, enabling version control for your app settings.
-
-When using **project-scoped environments** (set up via `primitive env add`), the sync directory is resolved automatically as `.primitive/sync/<env>/<appId>/` — each environment gets its own isolated slot so a `pull --env staging` never touches production state:
+`primitive sync` round-trips your app's configuration between the server and a directory of TOML files. [Configuring Primitive Services](./configuring-primitive-services.md#the-sync-loop) covers the loop, the directory layout, and the `app.toml` settings in full — this is the command reference.
 
 ```bash
-# Initialize (auto-resolves .primitive/sync/<env>/<appId>/)
-primitive sync init
-
-# Pull current configuration from server
-primitive sync pull
-
-# See what's changed
-primitive sync diff
-
-# Push local changes to server
-primitive sync push
-
-# Restore the sync directory from a pre-pull snapshot
-primitive sync revert
+primitive sync init            # create the directory (auto-resolves .primitive/sync/<env>/<appId>/)
+primitive sync pull            # download current server config as TOML
+primitive sync diff            # preview entities that would be created, changed, or removed
+primitive sync push            # apply local changes
+primitive sync push --dry-run  # walk the full push, reported but not applied
+primitive sync revert          # restore the sync directory from a pre-pull snapshot
 ```
 
-Every `pull` snapshots the sync directory before writing; `sync revert` restores the most recent snapshot, `--list` enumerates the available ones, and `--snapshot <id>` picks a specific one.
+Pass `--dir <path>` to any of these to override the auto-resolved directory with a fixed path. `sync revert --list` enumerates snapshots and `--snapshot <id>` restores a specific one. `diff` and `push --dry-run` run the same validate-first gate as a real push, so the preview is faithful — what it reports is what the push will do.
 
-`push` is safe to re-run: an entity that already exists on the server but is missing from local sync state — a workflow or cron trigger created out of band, or one left behind by a push that aborted before recording it — is adopted by its key and updated in place rather than failing the push. A failed push converges on the next run.
+`push` is safe to re-run: an entity that exists on the server but is missing from local sync state — created out of band, or left behind by a push that aborted before recording it — is adopted by its key and updated in place. A failed push converges on the next run.
 
-Pass `--dir <path>` to override and use a fixed directory:
+**Workflow fragments.** `workflow-fragments/<name>.toml` lets several workflows share a common run of `[[steps]]`. Reference them from a workflow file with `include = ["<name>"]`; the CLI expands fragments client-side before push (the server stores only the flattened step list). Use `primitive workflows expand <workflow.toml>` to inspect the expanded result.
 
-```bash
-primitive sync init --dir ./config
-primitive sync pull --dir ./config
-primitive sync push --dir ./config
-```
+**Validation errors.** `sync push` validates every TOML file before applying anything — one error aborts the whole push with no changes applied, so a typo can't leave a half-pushed configuration behind. For workflows the CLI checks operation params at push time: every `$params.X` substitution must match a declared `[[operations.params]]` entry, and the error names the file and line of the operation block — catching typos like `$params.proectId` that would otherwise no-op at runtime. When validation passes but the server rejects an entity, the error names the entity so you can jump straight to the file.
 
-This creates one subdirectory per kind of configuration, rooted at the auto-resolved `.primitive/sync/<env>/<appId>/` (or the `--dir` path you pass). See [Configuring Primitive Services](./configuring-primitive-services.md#what-lives-in-the-config-directory) for the full directory layout.
-
-`workflow-fragments/<name>.toml` lets several workflows share a common run of `[[steps]]`. Reference them from a workflow file with `include = ["<name>"]`; the CLI expands fragments client-side before push (the server only stores the canonical flattened step list). Use `primitive workflows expand <workflow.toml>` to inspect the expanded result.
-
-`app.toml` holds the app-level settings, and pushing it is the preferred way to change them — the imperative `primitive apps update --flag` calls mutate the server directly and drift from the checked-in TOML, so a later `sync push` reverts them. The TOML-syncable settings are:
-
-- `[app]` — `name`, `mode`, `waitlistEnabled`, `baseUrl`
-- `[auth]` — `googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled`, and `[auth.passkeys]` relying-party config
-- `[cors]` (when `mode = "custom"`) — `allowedOrigins`, `allowCredentials`, `allowedMethods`, `maxAge`
-
-Two app settings are not part of `app.toml`: **OTP** is toggled with `primitive apps update --otp <bool>` only, and **redirect URIs** are set with `primitive apps update --redirect-uris "<uri1>,<uri2>"` or in the [Admin Console](https://admin.primitiveapi.com/login) (no TOML key). For everything else, edit `app.toml` and `primitive sync push`.
-
-### Previewing a push
-
-Two commands preview a push without touching the server:
-
-```bash
-primitive sync diff             # entities that would be created, changed, or removed
-primitive sync push --dry-run   # the full push, reported but not applied
-```
-
-Both run the **same** validate-first gate a real `sync push` runs — file validation followed by the server-side checks — so the preview is faithful: what it reports is what the push will do. Schema-validation rejections in particular surface identically, before any change is applied:
-
-- an operation whose database type has no schema set,
-- a `$params.X` or other reference that doesn't resolve,
-- a schema change that would break an existing registered operation.
-
-A previewed (or genuinely blocked) entity records no sync state, so it stays visible as pending on the next `sync diff` rather than being marked "in sync" — a rejected change can't quietly disappear from the diff. Pipe `primitive sync diff --json | jq` for machine-readable output.
-
-### When `sync push` fails
-
-`sync push` validates every TOML file before applying anything — a validation error in any file aborts the whole push with no changes applied, so a typo in one workflow can't leave a half-pushed configuration behind:
-
-```
-Aborting push: 2 TOML validation error(s) — no changes were applied.
-```
-
-For workflows in particular, the CLI validates referenced operation params at push time: every `$params.X` substitution inside a workflow's database operations must match a declared `[[operations.params]]` entry, and the error names the file and line of the operation block where the bad reference appears. This catches typos like `$params.proectId` that would otherwise silently no-op at runtime.
-
-When validation passes but the server rejects an entity, the error names the entity being applied, so you can jump straight to the offending file:
-
-```
-Failed to update workflow "send-digest": Workflow contains sync-incompatible steps
-```
-
-Re-running a failed push converges: if a cron trigger with the same key already exists on the server but isn't recorded in your local sync state (say, from an interrupted earlier push), `sync push` adopts the existing trigger and updates it in place instead of failing on the conflict.
-
-CLI diagnostics (success/warning/info messages) are written to stderr; only structured data (e.g. `--json` output) goes to stdout, so piping `primitive sync diff --json | jq` works without any extra redirects.
+CLI diagnostics (success/warning/info messages) are written to stderr; only structured data (`--json` output) goes to stdout, so `primitive sync diff --json | jq` works without any extra redirects.
 
 ## Claude Code Skill
 
@@ -448,13 +387,9 @@ Manage general-purpose blob storage:
 ```bash
 primitive blob-buckets list
 primitive blob-buckets create --key avatars --preset authenticated --ttl permanent
-primitive blob-buckets list-blobs avatars
-primitive blob-buckets upload avatars ./file.png --content-type image/png
-primitive blob-buckets signed-url avatars <blobId> --expires 3600
-primitive blob-buckets delete avatars -y
 ```
 
-See [Blobs and Files](./blobs-and-files.md).
+See [Blobs and Files](./blobs-and-files.md#cli-reference) for the full command set — uploading, signed URLs, and blob/bucket deletion.
 
 ### Email Templates
 

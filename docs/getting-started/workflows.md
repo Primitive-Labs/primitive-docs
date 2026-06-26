@@ -923,7 +923,7 @@ limit = 25
 saveAs = "topUsers"
 ```
 
-Query types are dotted strings — `overview.dau`, `daily-active`, `cohort-retention`, `users.top`, `events.grouped`, `workflows.top`, and friends. The query runner is **default-deny**: non-admin callers are rejected, so keep analytics workflows locked down with `accessRule = "hasRole('admin')"` (or fire them via cron).
+Query types are dotted strings — `overview.dau`, `daily-active`, `cohort-retention`, `users.top`, `events.grouped`, `workflows.top`, and friends. The query runner is **default-deny**: non-admin callers are rejected, so keep analytics workflows locked down with `accessRule = "hasRole('admin')"` (or fire them via cron). Each run is capped at 50 analytics queries.
 
 For the full picture — what events are emitted, the client-side `logEvent` API, and how to read metrics back — see [Analytics](./analytics.md).
 

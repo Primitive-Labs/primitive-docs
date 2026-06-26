@@ -188,40 +188,23 @@ Pipelines support `query`, `count`, and `aggregate` steps only. For read-then-mu
 
 ## Access Control with CEL
 
-Every operation is gated by a CEL expression — the same access-control language used across the platform (see [Access Control](./access-control.md) for the concept and the identity context). On this page: the database-specific context and patterns.
-
-```toml novalidate
-# Anyone can access
-access = "true"
-
-# Only authenticated users
-access = "user.userId != ''"
-
-# Only app admins
-access = "hasRole('admin')"
-
-# Only members of a specific group
-access = "isMemberOf('team', database.celContext.teamId)"
-
-# Only the record owner
-access = "params.createdBy == user.userId"
-```
-
-### Available CEL Variables
+Every operation is gated by a CEL expression — the same access-control language used across the platform. See [Access Control](./access-control.md#the-identity-context) for the expression syntax and the shared identity context (`user.*`, `hasRole`, `isMemberOf`, `memberGroups`, `fromWorkflow`). This section covers what a database operation's rule sees on top of that.
 
 | Variable | Description |
 |---|---|
-| `user.userId` | The authenticated user's ID |
-| `user.role` | The user's app role |
 | `database.id` | The database instance ID |
-| `database.celContext` | The database's CEL context object |
+| `database.celContext` | The database's CEL context object (e.g. `database.celContext.teamId`) |
 | `params.*` | Operation parameters |
-| `isMemberOf(groupType, groupId)` | Check group membership |
-| `memberGroups(groupType)` | List groups of a type the user belongs to |
-| `hasRole(role)` | Check if the user has a specific app role |
-| `fromWorkflow()` / `fromWorkflow(workflowKey)` | True when the call originated from a workflow (optionally a specific one) |
 
-Use `fromWorkflow(...)` to gate an operation so only a specific workflow can invoke it — useful for cron-fired refreshes that no user, including admins, should call directly. The workflow identity is injected only by the internal workflow runner; clients cannot spoof it. An operation's `access` rule is evaluated on every call, including from [system workflow](./workflows.md#system-workflows) runs — `runAs = "system"` doesn't bypass it. So reserve a workflow-only operation with `fromWorkflow('key')` rather than setting `access = "false"` and expecting a system run to reach it.
+```toml novalidate
+# Members of the database's team, from its CEL context
+access = "isMemberOf('team', database.celContext.teamId)"
+
+# The record's owner, by operation param
+access = "params.createdBy == user.userId"
+```
+
+Use `fromWorkflow(...)` to gate an operation so only a specific workflow can invoke it — useful for cron-fired refreshes that no user, including admins, should call directly. An operation's `access` rule is evaluated on every call, including from [system workflow](./workflows.md#system-workflows) runs — `runAs = "system"` doesn't bypass it. So reserve a workflow-only operation with `fromWorkflow('key')` rather than setting `access = "false"` and expecting a system run to reach it.
 
 ### Per-Parameter Access
 
