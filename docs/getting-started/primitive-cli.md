@@ -447,7 +447,7 @@ Manage general-purpose blob storage:
 
 ```bash
 primitive blob-buckets list
-primitive blob-buckets create --key avatars --access authenticated --ttl permanent
+primitive blob-buckets create --key avatars --preset authenticated --ttl permanent
 primitive blob-buckets list-blobs avatars
 primitive blob-buckets upload avatars ./file.png --content-type image/png
 primitive blob-buckets signed-url avatars <blobId> --expires 3600

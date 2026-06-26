@@ -150,7 +150,7 @@ default:                       break
 }
 ```
 
-The same API builds the outbound links — `client.links.shareURL(forDocument:)` and `client.links.inviteAcceptURL(inviteToken:)` produce the canonical URLs (the invite URL matches what Primitive's default invitation emails use). Configuring the app's associated domains for universal links is also what passkeys require; the iOS template ships the entitlement and a link router. The agent guide covers the full `LinkTarget` shapes and the offline `parse` variant.
+The same API builds the outbound links — `client.links.shareURL(forDocument:)` and `client.links.inviteAcceptURL(inviteToken:)` produce the canonical URLs (the invite URL matches what Primitive's default invitation emails use). Configuring the app's associated domains for universal links is also what passkeys require; the iOS template ships the entitlement and a link router.
 
 ## Disabling a User Per App
 
