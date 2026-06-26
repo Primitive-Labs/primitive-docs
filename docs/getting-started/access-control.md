@@ -34,6 +34,18 @@ Group membership is the workhorse: model teams, roles, and relationships as [gro
 
 Each place a rule appears adds its own context on top — operation `params.*`, the `database.*` being accessed, the `record.*` being written. The feature pages document their specific variables.
 
+### A Rule Sees Identity, Not Stored Data
+
+Every function above answers a question about the *caller* — their role, their group memberships, the operation's params. A rule has no way to read a database record. So an entitlement you want the server to enforce — a paid feature, a role gate — can't live as a flag on a row: storing `isSubscribed = true` and checking it in a rule doesn't work, because the rule can't read the row, and a flag no rule can check isn't enforced server-side (a client can call the operation regardless).
+
+Model the entitlement as **group membership** instead, which a rule *can* check:
+
+```toml novalidate
+access = "isMemberOf('subscription', 'trialing') || isMemberOf('subscription', 'active')"
+```
+
+Maintain that membership from your billing source — add a member when a subscription starts, remove them when it lapses — and every rule that gates a paid feature becomes a one-line membership check.
+
 ## Where Rules Appear
 
 | Surface | What the rule gates | Details |
@@ -78,6 +90,28 @@ primitive rule-sets debug --user <userId> --group-type team --category member --
 ```
 
 The same is available from the client as `client.ruleSets.test()` and `client.ruleSets.debug()`. For database operations, the fastest loop is running the operation as different test users — see [Test Users for Automated Testing](./primitive-cli.md#test-users-for-automated-testing).
+
+**Test gated states as a plain member.** App owners and admins bypass access rules and rule sets — they pass every gate — so you can't exercise a locked or entitlement-gated state while signed in as one. A paywalled feature reads as open to an admin even when the gate is correct. Verify that a gate actually denies using a `member` test user.
+
+## Trusting External Identifiers
+
+When the server later acts on an identifier — opening a billing portal from a payment `customer_id`, calling a provider API on a user's behalf — it must not trust a value the client supplied. A user-writable document holding `customerId` is unsafe: a caller could substitute someone else's id and act on their account.
+
+Keep the authoritative user-to-external-id mapping in a store only the server writes, with reads scoped to the owning user:
+
+- **Writes come from server-side automation only.** Gate the write operation to the workflow that maintains the mapping — `access = "fromWorkflow('billing-webhook')"` — so no client can set it.
+- **Reads return only the caller's own row.** Filter the read on `$user.userId`, so a caller can never name another user's id:
+
+```toml
+[[operations]]
+name = "my-billing-profile"
+type = "query"
+modelName = "billingProfile"
+access = "user.userId != ''"
+definition = '{"filter":{"userId":"$user.userId"}}'
+```
+
+When a server action needs the external id, resolve it from the authenticated user through this operation — never accept it as a parameter from the client.
 
 ## Patterns That Hold Up
 

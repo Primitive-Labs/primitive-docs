@@ -15,6 +15,8 @@ Guidelines for AI agents writing access rules. Server-evaluated authorization ac
 
 Prefer membership checks over user-ID comparisons: `isMemberOf('team', params.teamId)`, `params.teamId in memberGroups('team')`.
 
+A rule reads caller identity and operation params only — it cannot read a database record. So a server-enforced entitlement (paid feature, role gate) can't be a flag on a row (`isSubscribed = true`): no rule can check it, so it isn't enforced. Model the entitlement as group membership, which a rule can check — `isMemberOf('subscription', 'active')` — and maintain that membership from your billing source.
+
 ## Surfaces and their extra context
 
 | Surface | Field(s) | Extra context | Notes |
@@ -54,7 +56,7 @@ primitive rule-sets debug --user <userId> --group-type <type> --category <group|
 primitive rule-sets schema                                   # available context variables/functions
 ```
 
-Client equivalents: `client.ruleSets.test()`, `client.ruleSets.debug()`, `client.ruleSets.schema()`. For end-to-end checks of operation rules, sign in as `+primitivetest` derived users with different roles/memberships and execute the operation.
+Client equivalents: `client.ruleSets.test()`, `client.ruleSets.debug()`, `client.ruleSets.schema()`. For end-to-end checks of operation rules, sign in as `+primitivetest` derived users with different roles/memberships and execute the operation. Owners and admins bypass every rule, so a gated or entitlement-gated state reads as open to them even when the gate is correct — test that a gate actually denies as a plain `member`.
 
 ## Patterns
 
@@ -70,3 +72,4 @@ access = "fromWorkflow('refresh-prices')"                      # only the named 
 - Default-deny, widen deliberately. Missing rules deny (database ops) or allow any member (workflows) — know which surface you're on.
 - One group type per concept (`team`, `org`, `team-admin`); group-level "admin" is modeled as its own group type, not a built-in.
 - Parameterize the resource (`params.teamId`) so one operation serves every team.
+- External identifiers: never trust a client-supplied provider id (a payment `customer_id`) for a server-side action — a caller could substitute another user's id. Keep the user→external-id mapping in a system-write store (write op gated `access = "fromWorkflow('key')"`) with reads scoped to the caller (`definition` filter on `$user.userId`), and resolve the id server-side from the authenticated user.
