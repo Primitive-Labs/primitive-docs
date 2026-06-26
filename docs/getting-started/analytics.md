@@ -43,7 +43,7 @@ Every event — auto or custom — gets these fields populated automatically: `t
 
 ### Offline Persistence
 
-Events are persisted on the device while offline and flushed on reconnect. A rate limiter caps emission at 300 events/minute with a 60-token burst. No code required.
+Events are persisted on the device while offline and flushed on reconnect. A rate limiter caps emission at roughly 300 events per minute, with a short burst allowance of about 60. No code required.
 
 ## Emitting Custom Events
 

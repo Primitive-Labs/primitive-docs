@@ -82,7 +82,8 @@ Every event (auto or custom) gets these populated automatically:
 
 ### Offline Persistence and Rate Limiting
 
-Events are buffered on the device and persisted locally while offline; persisted events are flushed automatically when the WebSocket reconnects. A rate limiter caps emission at **300 events/minute with a 60-token burst** — events over the cap are dropped silently. No special code needed.
+Events are buffered on the device and persisted locally while offline; persisted events are flushed automatically when the WebSocket reconnects.
+A rate limiter caps emission at **300 events/minute with a 60-token burst** — events over the cap are dropped silently. No special code needed.
 
 The offline buffer is persisted with a **~1 MiB** cap; when it exceeds the cap the **oldest** events are dropped.
 

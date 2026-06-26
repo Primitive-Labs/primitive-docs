@@ -19,7 +19,8 @@ Guidelines for building apps with Primitive's server-side database storage.
   // Databases where you're owner or manager
   const databases = await client.databases.list();
 
-  // Any authenticated user can resolve a database by id
+  // Resolve a database by id — gated on owner/manager permission, an effective
+  // group permission, or app-admin access; otherwise the server returns 403.
   const db = await client.databases.get(databaseId);
 ```
 
@@ -45,7 +46,7 @@ A **database** is:
 **Properties:**
 
 - Each database is an isolated instance with its own SQLite storage — strong consistency, zero-config scaling
-- All data access goes through **registered operations** with per-operation authorization
+- End-user scoped app access goes through **registered operations** with per-operation authorization; owners, managers, and app admins additionally have direct record-access APIs (schemaless save/patch/find/query/delete/count, atomic increment and StringSet ops, batch writes, aggregation, and index management) for administrative access
 - Databases can be organized by **type** — a named configuration shared across many database instances
 - Supports queries, mutations, counts, aggregates, multi-step pipelines, atomic operations, batch writes, apply-to-query, and real-time subscriptions
 
@@ -268,7 +269,7 @@ autoAddCreator = true          # auto-add creator as member (default: true)
 Beyond sync, the CLI exposes commands for one-off ops (use `--help` for full flags):
 
 ```bash
-primitive database-types list | get <type> | operations list <type>
+primitive database-types list | get <type> | delete <type> | operations list <type>
 primitive databases list | get <id> | create "Title" --type <type> [--cel-context '{...}'] | delete <id>
 primitive databases cel-context update <id> --data '{"teamId":"team-1"}'
 
@@ -287,6 +288,8 @@ primitive databases import-csv <database-id> <file.csv> --model <name> \
   [--types '{"price":"number"}'] [--id-column <col>] [--batch-size 5000] \
   [--delimiter ,] [--dry-run] [--stop-on-error] [--json]
 ```
+
+`database-types delete <type>` refuses with a 409 when live database instances of that type still exist — delete the instances first (`primitive databases delete <id>`) or pass `--force` to delete the type anyway (this orphans the instances). `-y`/`--yes` only skips the confirmation prompt; it does not bypass the guard.
 
 Generate TypeScript record interfaces and op param/result types from the database-type TOML:
 
@@ -310,6 +313,7 @@ A **database type** is a named configuration shared across many databases. It pr
 - **`[models.*]` schema** — optional server-enforced model declaration. When present, every op edit (and the schema edit itself) is checked against it; see [Schema gate](#schema-gate)
 - **Subscriptions** — type-scoped real-time subscription definitions (managed via `[[subscriptions]]` blocks in the TOML)
 - **Rule set attachment** — controls who can edit the type config and its operations
+
 
 Real-time subscriptions are also part of the type config — see [Real-Time Subscriptions](#real-time-subscriptions). One subscription definition serves every database of that type. Define them as `[[subscriptions]]` blocks in the same TOML file; `primitive sync push` manages them alongside operations.
 
@@ -1307,8 +1311,8 @@ The two phases see different contexts:
     },
   });
 
-  // Later — required for cleanup
-  unsub();
+  // Return the teardown handle — call it on unmount to stop receiving deltas.
+  return unsub;
 ```
 
 Parameterized:

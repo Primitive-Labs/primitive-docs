@@ -8,7 +8,7 @@ export async function adminBuckets(client: JsBaoClient) {
     bucketKey: "uploads",
     name: "User uploads",
     ttlTier: "28d",
-    accessPolicy: "authenticated",
+    preset: "authenticated",
   });
 
   const buckets = await client.blobBuckets.listBuckets();

@@ -41,7 +41,7 @@ See the [Data Modeling guide](AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.md) for a f
 3. **NEVER remove fields from models.** Add a deprecation comment instead.
 
 4. **ALWAYS declare new models in the schema and regenerate.**
-   Add the model to `schema.toml`; codegen runs on every build (regenerate by hand with `swift build` or the `run-ios.sh` codegen step if you edited the schema between builds).
+   Add the model to `models.toml`; codegen runs on every build (regenerate by hand with `swift build` or the `run-ios.sh` codegen step if you edited the schema between builds).
 
 5. **Prefer query filtering over in-memory filtering.** Push filter conditions into the query itself rather than fetching everything and filtering on the client.
 
@@ -115,7 +115,7 @@ There is **no single "my documents" list**. A user reaches documents through **f
   let items = page.items
 ```
 
-Each shared document in the result extends the base `DocumentInfo` (`title`, `createdBy`, `createdAt`, `lastModified`, plus `tags`/`metadata`/`thumbnailBlobId` when set) with the share-only extras `permission` (never `"owner"`), `source` (`"permission"` | `"invitation"`), `grantedBy`, `invitationId` (invitation rows only).
+Swift can't inherit a struct, so each row from `sharedDocuments` is a `SharedDocument` that holds the base fields under `.document` (a `DocumentInfo`, including `permission` — never `.owner`) alongside the share-only extras `grantedBy`, `source` (`"permission"` | `"invitation"`), and `invitationId` (invitation rows only). Group and collection rows have their own shapes — `groups.listDocuments` returns `GroupDocumentInfo`, and `collections.listDocuments` returns flat `CollectionDocumentInfo` (`documentId`, `title`, `permission`, `addedBy`, `addedAt`, …).
 
 
 ## Core data operations
@@ -180,7 +180,7 @@ The generated model statics route through the process-wide default client — ca
     email: "alice@example.com",
     name: "Alice"
   )
-  // "email" must have a single-field unique constraint in schema.toml.
+  // "email" must have a single-field unique constraint in models.toml.
   // On merge, the returned record carries the existing record's id.
   let resolved = try user.save(in: documentId, upsertOn: "email")
 ```
@@ -194,7 +194,7 @@ The generated model statics route through the process-wide default client — ca
     parentId: "root",
     color: "blue"
   )
-  // "name_parentId" is the named constraint declared in schema.toml. `mode`
+  // "name_parentId" is the named constraint declared in models.toml. `mode`
   // defaults to .either (create-or-update); pass .mustExist / .mustNotExist to
   // require a single path.
   let resolved = try category.upsertByUnique("name_parentId", in: documentId)
@@ -345,17 +345,16 @@ List with `me.ownedDocuments()` and `open()` the selected document; create a new
   let result = try await client.documents.create(
     options: CreateDocumentOptions(title: "New Project", tags: ["workspace"])
   )
+  // The generated id lives inside the returned metadata.
   let documentId = result.metadata?["documentId"]?.stringValue
-  if let documentId {
-    _ = try await client.documents.open(documentId)
-  }
+  // The new document is already open — query or save into it right away.
 ```
 
 ### Pattern 3: Multiple Documents
 
 **Best for:** Apps that query across many documents, each with its own sharing context — chat (per channel), multi-tenant dashboards, collaborative workspaces with distinct collections.
 
-All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with `me.ownedDocuments({ tag })` (and `me.sharedDocuments({ tag })` if the user can also be a non-owner), open each, and track per-document readiness yourself. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over local tracking.
+All documents that need live updates or cross-document queries must be open. Tag documents so you can fetch a set with a tag-filtered `me.ownedDocuments` (and `me.sharedDocuments` if the user can also be a non-owner), open each, and track per-document readiness yourself. For collective sharing of multiple documents as a unit, prefer the server-side Collections API (`client.collections.*` — see [Collections](#collections) below) over local tracking.
 
 ```swift
   // Open every document with a given tag
@@ -414,7 +413,7 @@ final class MyAppState: PrimitiveAppState {
 
 For per-document setup beyond models, override the `onDocumentOpened(doc:documentId:)` hook — the base class opens the doc once and hands you the live `YDocument`, so don't call `openDocument(...)` again just to get one.
 
-For a **fresh doc you'll write immediately**, use `client.createDocument(options:)` — it returns a `CreateDocumentResult` with `metadata: JSONValue?`; extract `metadata?["documentId"]?.stringValue` to get the new document's id. Re-opening a freshly-created empty doc with `waitForLoad: .network` parks ~15s waiting for a sync event that never has anything to deliver.
+For a **fresh doc you'll write immediately**, use `client.createDocument(options:)` — it returns a `CreateDocumentResult` with `metadata: JSONValue?`; extract `metadata?["documentId"]?.stringValue` to get the new document's id. The new document is already open and writable, so write through it directly rather than reopening. If you do reopen with `waitForLoad: .network`, Swift retries sync availability until the background create commit lands; healthy cases resolve after the handshake, with the fallback bounded by `availabilityWaitMs` (default 30s).
 
 **Multi-doc apps (one ambient library doc + N per-item docs).** `selectDocumentAwaiting(_:)` is the *single*-selected-doc lifecycle — it closes the previously selected doc first, so using it for a per-item detail view closes your library/index doc. For one ambient doc plus transient detail docs, use `appState.openAuxiliaryDoc(_:)` from the detail view's `.task` and `appState.closeAuxiliaryDoc(_:)` from `.onDisappear`. These register the doc for sync, but they don't touch `selectedDocId` or fire `onDocumentOpened`. Once open, read the doc's records through the facade scoped to that document — the same scoped query as [Open Documents Before Querying](#1-open-documents-before-querying). The view is framework glue around `openAuxiliaryDoc` + that scoped query:
 
@@ -437,15 +436,15 @@ struct ItemDetailView: View {
 }
 ```
 
-**Watch for access loss in detail views.** When a peer revokes your access or hard-deletes a doc you have open, the server collapses both to the same wire shape. The client emits a derived `.documentDeleted` (typed `DocumentDeletedEvent`) — subscribe to it (not `.documentMetadataChanged` filtered on `action == "deleted"`) and dismiss the view on either signal. Retain the returned `EventSubscription` on a property and `[weak self]` the closure, or the handler is dropped:
+**Watch for access loss in detail views.** When a peer revokes your access or hard-deletes a doc you have open, the server collapses both to the same wire shape: a `.documentMetadataChanged` event with `action == "deleted"` (and `metadata == nil`). Subscribe to it, filter on `action == "deleted"`, and dismiss the view. Retain the returned `EventSubscription` on a property and `[weak self]` the closure, or the handler is dropped:
 
 ```swift
 private var deletedSub: EventSubscription?
 
 .task {
-    deletedSub = client.events.on(.documentDeleted) { [weak self] (ev: DocumentDeletedEvent) in
+    deletedSub = client.events.on(.documentMetadataChanged) { [weak self] (ev: DocumentMetadataChangedEvent) in
         Task { @MainActor in
-            guard let self, ev.documentId == self.openDocId else { return }
+            guard let self, ev.action == "deleted", ev.documentId == self.openDocId else { return }
             self.dismiss()
         }
     }
@@ -498,9 +497,9 @@ You can also create a tagged document and filter locally:
 Models are declared in a TOML schema and the client model types are generated from it by codegen. The field types and options are the same across platforms; the schema file, codegen command, and generated artifacts differ.
 
 
-### `schema.toml` + codegen + the model facade
+### `models.toml` + codegen + the model facade
 
-Define models in `Sources/MyApp/Models/schema.toml`; `swift-bao-codegen` emits one `PrimitiveModel` struct per `[models.X]` block into a gitignored `Models/Generated/`. The generated type IS the API: static reads across all open documents (`TodoItem.query(...)`, `find`, `findAll`, `count`, `aggregate`, `subscribe`), instance writes targeting one document (`try record.save(in: documentId)`, `try record.delete(in: documentId)`), backed by the process-wide default client.
+Define models in `Sources/MyApp/Models/models.toml`; `swift-bao-codegen` emits one `PrimitiveModel` struct per `[models.X]` block into a gitignored `Models/Generated/`. The generated type IS the API: static reads across all open documents (`TodoItem.query(...)`, `find`, `findAll`, `count`, `aggregate`, `subscribe`), instance writes targeting one document (`try record.save(in: documentId)`, `try record.delete(in: documentId)`), backed by the process-wide default client.
 
 ```toml
 [models.todos]
@@ -538,7 +537,7 @@ indexed = true
 
 `required = true` makes the emitted `init?(record:)` reject construction without that field; `indexed = true` registers a SQLite index for query-path filtering.
 
-**Codegen is wired on both build paths by the scaffold.** `swift build` / `swift test` run `JsBaoCodegenPlugin` automatically. The Xcode app path (`./run-ios.sh`, archives) compiles its source list from `.pbxproj`, so the SPM plugin never fires there — `run-ios.sh` runs the codegen tool before `xcodegen generate`, writing into `Models/Generated/`. The SPM target carries `exclude: ["Models/Generated"]` so the two producers don't collide. The footgun: editing `schema.toml` and then hitting **Run in Xcode directly** compiles stale `Generated/` files with no error pointing at the cause — build through `./run-ios.sh` (which regenerates first) or run the codegen step by hand.
+**Codegen is wired on both build paths by the scaffold.** `swift build` / `swift test` run `JsBaoCodegenPlugin` automatically. The Xcode app path (`./run-ios.sh`, archives) compiles its source list from `.pbxproj`, so the SPM plugin never fires there — `run-ios.sh` runs the codegen tool before `xcodegen generate`, writing into `Models/Generated/`. The SPM target carries `exclude: ["Models/Generated"]` so the two producers don't collide. The footgun: editing `models.toml` and then hitting **Run in Xcode directly** compiles stale `Generated/` files with no error pointing at the cause — build through `./run-ios.sh` (which regenerates first) or run the codegen step by hand.
 
 `Models/Generated/` is **gitignored** (regenerated every build; only its `README.md` is tracked). The codegen sweep only deletes files carrying the `// Generated by swift-bao-codegen` banner, so a hand-written companion (`TodoItem+Extensions.swift`) for `Identifiable` conformance, computed helpers, camelCase aliases, or convenience inits survives every regen.
 
@@ -566,7 +565,7 @@ public extension TodoItem {
 - **IDs are `String`** — supply `UUID().uuidString` (or a ULID) when not provided.
 - Register models with `client.registerModels([TodoItem.self])` at connect time (or rely on the facade's lazy registration on first read) — registered models are mirrored into the client's shared store and listed in the in-app debug inspector automatically.
 
-CRUD through the facade is local-first (applied to the CRDT immediately, synced in the background). Writes throw — `try record.save(in: documentId)` inserts or updates in place; `save(in:upsertOn:)` matches on a single-field unique constraint instead of `id` and returns the resolved record; `try record.delete(in: documentId)`; all three throw if the target document isn't open. Reads: `query(...)`, `queryOne`, `count`, and `aggregate` are **synchronous**, span every open document by default (scope with `QueryOptions(documents: [...])`), and are `@MainActor`-isolated. `find(_ id:)` and `findAll()` are **`async throws`** — use `try await TodoItem.find(id)`. Predicate operators: equality, `$gt`/`$gte`/`$lt`/`$lte`, `$containsText`, `$or`/`$and`/`$not`.
+CRUD through the facade is local-first (applied to the CRDT immediately, synced in the background). Writes throw — `try record.save(in: documentId)` inserts or updates in place; `save(in:upsertOn:)` matches on a single-field unique constraint instead of `id` and returns the resolved record; `try record.delete(in: documentId)`; all three throw if the target document isn't open. Reads: `query(...)`, `queryOne`, `count`, and `aggregate` are **synchronous** local reads against the CRDT and span every open document by default (scope with `QueryOptions(documents: [...])`). The generated facade methods are not annotated `@MainActor` — they're commonly called from MainActor-bound SwiftUI glue (`BaoDataLoader` / your `PrimitiveAppState` subclass), but the methods themselves carry no actor isolation. `find(_ id:)` and `findAll()` are **`async throws`** — use `try await TodoItem.find(id)`. Predicate operators: equality, `$gt`/`$gte`/`$lt`/`$lte`, `$containsText`, `$or`/`$and`/`$not`.
 
 > **SourceKit footgun, first time only.** Editing the companion before codegen has ever run shows a red `No such module 'PrimitiveApp'` underline. The real cause is that the generated type doesn't exist yet — run `swift build` once (or the `run-ios.sh` codegen step) and it clears. Only the very first scaffold hits this.
 
@@ -730,6 +729,27 @@ Dates are stored as ISO-8601 strings. Convert for comparisons:
 ## Querying Data
 
 
+### Loading Related Data (Includes)
+
+Pass `include` in a query to batch-load related records alongside the rows, instead of following each relationship one row at a time. A `refersTo` relationship attaches its single parent; a `hasMany` attaches the matching children.
+
+```swift
+  // refersTo — each Post's Author (the `authorId` FK lives on Post):
+  let posts = try Post.query(include: [Post.includeAuthor()])
+  for post in posts {
+    let author = post.relatedAuthor          // Author?
+    print(post.title, author?.name ?? "—")
+  }
+
+  // hasMany — every Post that points back at each Author, newest first:
+  let authors = try Author.query(include: [Author.includePosts(limit: 10)])
+  for author in authors {
+    let authored = author.relatedPosts       // [Post]
+    print(author.name, authored.count)
+  }
+```
+
+
 ### View-data binding with `BaoDataLoader`
 
 The data a view renders is a plain facade query — `TodoItem.findAll()` / `TodoItem.query(...)` (see [Read](#read-find--query--first--count)) — re-run whenever the records change, which you observe with `TodoItem.subscribe` (see [Subscribe to changes](#subscribe-to-changes)). `BaoDataLoader<[T]>` is the **SwiftUI glue** (PrimitiveApp package) that wires that re-run into a view: bind it rather than subscribing to `client.events.on(...)` directly or rolling a `@Published var items` + manual `refresh()`. The loader owns its subscription lifecycle (cancelled on deinit), debounces bursts (~50ms), runs the first load immediately, and re-runs a synchronous `load` closure on every trigger.
@@ -786,7 +806,7 @@ struct TodoListView: View {
 
 ## Saving Data
 
-Writes go through record instances and are local-first — applied to the CRDT immediately and synced in the background (see [`schema.toml` + codegen + the model facade](#schematoml--codegen--the-model-facade) for the save/delete contract). `try record.save(in: documentId)` uses merge semantics: `nil` optional fields are not written, so fields you didn't set are preserved on update.
+Writes go through record instances and are local-first — applied to the CRDT immediately and synced in the background (see [`models.toml` + codegen + the model facade](#modelstoml--codegen--the-model-facade) for the save/delete contract). `try record.save(in: documentId)` uses merge semantics: `nil` optional fields are not written, so fields you didn't set are preserved on update.
 
 
 ## Design Patterns
@@ -844,11 +864,11 @@ Reserve random `UUID()` ids for records *born* in the CRDT with no external iden
 
 **Tombstone instead of hard-delete.** Soft-delete with a `deletedAt` field and filter at query time (`LibraryItemRef.query(["deletedAt": ""])`). Setting `deletedAt` rather than calling `.delete(in:)` avoids the race where a reconcile pass recreates a just-deleted ref because the server still reports the entity as accessible.
 
-**Reconcile server access → local refs in one pass.** "Shared-with-me" lists are *not* reactive — `me.accessibleDocumentSummaries`, `collections.list`, `documents.getPermissions`, and the invitation reads are plain server queries with no change feed, so nothing fires on the user's open docs when someone shares with them. Run an explicit reconcile on the triggers you control (app launch / `connectClient`, foreground via `scenePhase` → `.active`, pull-to-refresh) that: enumerates every access channel, computes the **max** permission across channels, upserts a ref per server entity keyed by entity id, and tombstones/deletes refs whose `id` is no longer in the server set. Because refs are keyed by entity id the prune is `where !serverIds.contains(ref.id)` and a double-run can't duplicate.
+**Reconcile server access → local refs in one pass.** "Shared-with-me" lists are *not* reactive — `me.ownedDocuments`, `me.sharedDocuments`, `collections.list`, `documents.getPermissions`, and the invitation reads are plain server queries with no change feed, so nothing fires on the user's open docs when someone shares with them. Run an explicit reconcile on the triggers you control (app launch / `connectClient`, foreground via `scenePhase` → `.active`, pull-to-refresh) that: enumerates every access channel, computes the **max** permission across channels, upserts a ref per server entity keyed by entity id, and tombstones/deletes refs whose `id` is no longer in the server set. Because refs are keyed by entity id the prune is `where !serverIds.contains(ref.id)` and a double-run can't duplicate.
 
-> **Guard freshly-created docs from the prune.** `createDocument(...)` is local-first — it returns a `documentId` immediately but commits to the server in the background, so a doc you just created is **not yet** in `me.accessibleDocumentSummaries`. A reconcile firing in that window deletes the brand-new ref and the item vanishes until a later reconcile re-adds it. Track locally-created ids in a `pendingCreateIds: Set<String>` (add on create, remove once the id appears in the server set) and exclude them from the prune: `where !serverIds.contains(ref.id) && !pendingCreateIds.contains(ref.id)`.
+> **Guard freshly-created docs from the prune.** `createDocument(...)` is local-first — it returns a `CreateDocumentResult` (metadata only; read the id from `metadata?["documentId"]?.stringValue`) immediately but commits to the server in the background, so a doc you just created is **not yet** in `me.ownedDocuments`. A reconcile firing in that window deletes the brand-new ref and the item vanishes until a later reconcile re-adds it. Track locally-created ids in a `pendingCreateIds: Set<String>` (add on create, remove once the id appears in the server set) and exclude them from the prune: `where !serverIds.contains(ref.id) && !pendingCreateIds.contains(ref.id)`.
 
-For the reconcile reads, prefer the `*Summaries` wrappers — they merge owned + shared and resolve user fields in one call; see [the typed summary wrappers](#typed-summaries-for-permission--collection-reads) below.
+For the reconcile reads, the "shared with me" set is the union of `me.ownedDocuments(tag:limit:)` and `me.sharedDocuments(tag:limit:)` — merge them yourself (the same entity can surface in both), then dedupe by document id.
 
 ## Sharing Documents
 
@@ -897,11 +917,15 @@ When your app opens many documents over a session (e.g., viewing individual item
   // Close and stop syncing
   await client.documents.close(documentId)
 
-  // Close and remove the local cached copy
-  await client.documents.close(
+  // Close and remove the local cached copy. `close` returns a
+  // CloseDocumentResult — inspect `.evicted` when eviction matters.
+  let result = await client.documents.close(
     documentId,
     options: CloseDocumentOptions(evictLocal: true)
   )
+  if !result.evicted {
+    // Server was not fully in sync — the local copy was retained.
+  }
 ```
 
 When `evictLocal: true` is passed, the client performs a state vector check against the server before removing local data. If the server hasn't received all local writes (e.g. due to a brief network interruption), eviction is skipped and `evicted: false` is returned. This prevents data loss during WebSocket instability.
@@ -926,7 +950,11 @@ The point-in-time checks accept a `timeoutMs` (default 5s). For a cheap synchron
 
 ### Updating Document Metadata
 
-Update a document's title, thumbnail, and presentation metadata — see [Update thumbnail / metadata](#update-thumbnail--metadata) above for the compiled call. Each field is optional; pass `null` to clear `thumbnailBlobId` or `metadata`. `documents.isOpen(documentId)` reports whether a document is currently open.
+Update a document's title, thumbnail, and presentation metadata — see [Update thumbnail / metadata](#update-thumbnail--metadata) above for the compiled call. Each field is optional; omit one to leave it unchanged.
+
+`thumbnailBlobId` and `metadata` are clearable: pass `thumbnailBlobId: .clear` (an `Updatable<String>`) and `metadata: .null` (a `JSONValue`) to null them out; passing `nil` or omitting the argument leaves the field unchanged.
+
+`documents.isOpen(documentId)` reports whether a document is currently open.
 
 `thumbnailBlobId` points at a blob you've already uploaded; the platform marks the referenced blob readable to anyone with access to the document. `metadata` is a JSON-serializable object with a 4KB cap on its serialized UTF-8 form — keep it to the kind of presentation hints that need to travel with the document (cover image references, badge colors, list layout). Failures return:
 
@@ -977,7 +1005,7 @@ When `sendEmail: true`, the server delivers per-recipient emails:
 
 Both branches share two preconditions when `sendEmail: true`: `documentUrl` must be supplied in the request, and the app must have `baseUrl` configured (so the deferred branch can compose its accept URL). Either missing returns HTTP 400 (`"documentUrl is required when sendEmail is true"` or `"Cannot send share email: app baseUrl is not configured"`). Customize either email type with `primitive email-templates set document-share ...` or `primitive email-templates set document-share-deferred ...`.
 
-Repeated email-based calls are idempotent: a second `updatePermissions(documentId, { email })` with the same email updates the existing pending `DeferredDocumentPermission` in place rather than creating a duplicate row, so the latest `permission` value wins at signup-time resolution and `client.documents.listPendingInvitations(documentId)` shows one entry per pending recipient.
+Repeated email-based calls are idempotent: a second `updatePermissions` call for the same email updates the existing pending `DeferredDocumentPermission` in place rather than creating a duplicate row, so the latest `permission` value wins at signup-time resolution and `client.documents.listPendingInvitations(documentId)` shows one entry per pending recipient.
 
 **There is no `permission: null` to remove.** Removal is a separate call (`removePermission` by userId or by email; `transferOwnership` to hand a document to a new owner):
 
@@ -1131,11 +1159,11 @@ Additional collection calls:
 Collections accept email-based members exactly like documents and groups — a deferred grant that resolves on signup:
 
 
-The deferred-grant flow on `collections.addMember({ email })` mirrors the document share path: `app.baseUrl` must be configured, `sendEmail: true` requires `collectionUrl`, and `client.invitations.delete(invitationId)` cancels every pending collection add (plus any pending document shares and group adds) attached to the invitation. See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-grants) for the resolution lifecycle.
+The deferred-grant flow when adding a collection member by email (`collections.addMember`) mirrors the document share path: `app.baseUrl` must be configured, `sendEmail: true` requires `collectionUrl`, and `client.invitations.delete(invitationId)` cancels every pending collection add (plus any pending document shares and group adds) attached to the invitation. See the [Invitations guide](AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.md#deferred-grants) for the resolution lifecycle.
 
 For per-context CEL rules using `collectionType` + `contextId` (and the `hasCollectionAccess` helper), see [Rule Sets for Collection Management](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md#rule-sets-for-collection-management) in the Users and Groups guide.
 
-`collections.addDocument`/`removeDocument` are idempotent, and the same max-wins cascade applies. The template's local app-state pattern assumes one collection per doc (`ListRef.collectionId`); for multi-membership, model a `[String]` field or query `collections.listCollectionsForDocument(documentId:)` on demand. Read collection lists/members through the typed `collections.listSummaries(...)` / `accessSummary(...)` wrappers (see [the typed summary wrappers](#typed-summaries-for-permission--collection-reads) below).
+`collections.addDocument`/`removeDocument` are idempotent, and the same max-wins cascade applies. The template's local app-state pattern assumes one collection per doc (`ListRef.collectionId`); for multi-membership, model a `[String]` field or query `collections.listCollectionsForDocument(documentId:)` on demand. Read collection lists with `collections.list(options:)` and members with `collections.getAccess(collectionId:)` (see [Permission / collection reads](#permission--collection-reads) below).
 
 **CLI:**
 
@@ -1155,22 +1183,22 @@ primitive collections access <collection-id>
 The canonical sharing panel: people with access + people invited but not yet signed up. Use the per-resource `listPendingInvitations` endpoints — each shareable resource exposes a denormalized list so callers don't have to filter the app-level invitation list. Don't reach into `client.invitations.listDeferredGrants(...)` (admin-debug) or `client.invitations.list(...)` (app-level, admin/owner only) for product UI — the per-resource endpoints are the source. Removing yourself from a document also evicts the local copy.
 
 
-#### Typed `*Summaries` for permission / collection reads {#typed-summaries-for-permission--collection-reads}
+#### Permission / collection reads {#permission--collection-reads}
 
-`PrimitiveApp` (`TypedReadSummaries`) ships a convenience companion for each permission / collection read. Beyond the field contract (verified against the server handlers), they do the assembly the raw reads leave to you — merging owned + shared into one set, resolving `email`/`name` on permission rows — so sharing screens don't reimplement it:
+The permission and collection reads return the raw server rows — they do **no** client-side assembly, so merging and field resolution are yours to do in the sharing screens that need them:
 
-| Raw read | Typed companion | Returns |
-|---|---|---|
-| `me.ownedDocuments` + `me.sharedDocuments` | `me.accessibleDocumentSummaries(tag:)` | `[DocumentSummary]` (`.isOwned`, `.title`, `.tags`) — does the owned + shared merge for you |
-| `collections.list(options:)` | `collections.listSummaries(options:)` | `[CollectionSummary]` |
-| `collections.listDocuments(_:)` | `collections.listDocumentSummaries(_:)` | `[DocumentSummary]` |
-| `documents.getPermissions(_:)` | `documents.permissionSummaries(_:)` | `[PermissionEntry]` (`email`/`name` resolved) |
-| `collections.getAccess(_:)` | `collections.accessSummary(_:)` | `CollectionAccess` (`.members: [MemberAccess]` — userId + permission, no email/name) |
-| `documents`/`collections.listPendingInvitations(_:)` | `…pendingInvitationSummaries(_:)` | `[PendingInvitation]` |
+| Read | Returns |
+|---|---|
+| `me.ownedDocuments(tag:limit:cursor:)` | `[DocumentInfo]` — documents the user owns |
+| `me.sharedDocuments(tag:limit:cursor:)` | `SharedDocumentListResult` (`.items`, `.cursor`) — documents shared with the user |
+| `collections.list(options:)` | `PaginatedResult<CollectionInfo>` |
+| `collections.listDocuments(collectionId:options:)` | `PaginatedResult<CollectionDocumentInfo>` |
+| `documents.getPermissions(documentId:)` | `[DocumentPermissionEntry]` — each row carries `userId`; resolve `email`/`name` yourself if you need them |
+| `collections.getAccess(collectionId:)` | `CollectionAccessInfo` — collection members and their permission levels |
 
-`accessibleDocumentSummaries` does the merged owned + shared set in one call.
+The "accessible documents" set is the **union** of `me.ownedDocuments` and `me.sharedDocuments`: call both and dedupe by document id (the same doc can surface in both).
 
-For **writes**, use the typed params factories — `documents.updatePermissions(documentId:params: .email("…", permission: "read-write", sendEmail: false, documentUrl: …))` (or `.user(…)` / `.batch([…])`) and `collections.addMember(collectionId:params: .email("…", permission: .readWrite))` (or `.user(…)`). To cancel a pending email invite on a document, call `documents.removePermission(documentId:, .email("…"))`; alternatively, read the row's `deferredId` via `pendingInvitationSummaries(...)` and call `client.invitations.revokeDeferredGrant(deferredId:type:)` (`.document` for a per-doc invite, `.group` for a collection one).
+For **writes**, use the typed params factories — `documents.updatePermissions(documentId:params: .email("…", permission: "read-write", sendEmail: false, documentUrl: …))` (or `.user(…)` / `.batch([…])`) and `collections.addMember(collectionId:params: .email("…", permission: .readWrite))` (or `.user(…)`). To cancel a pending email invite on a document, call `documents.removePermission(documentId:, .email("…"))`; alternatively, read the row's `deferredId` via `client.invitations.listDeferredGrants(...)` and call `client.invitations.revokeDeferredGrant(deferredId:type:)` (`.document` for a per-doc invite, `.group` for a collection one).
 
 ### Sharing Discovery Cheat Sheet
 
@@ -1178,19 +1206,23 @@ Pick the call that answers the question you're actually asking:
 
 | Question | Call |
 |----------|------|
-| Documents the user owns | `client.me.ownedDocuments({ tag?, limit?, cursor?, returnPage? })` |
-| Documents directly shared with the user (`DocumentPermission` + pending `DocumentInvitation`) | `client.me.sharedDocuments({ tag?, cursor?, limit? })` → `{ items, cursor }` |
-| Pending document invitations the user can accept | `client.me.pendingDocumentInvitations()` |
-| Documents inside a collection | `client.collections.listDocuments(collectionId, { limit?, cursor? })` |
-| Documents shared with a group | `client.groups.listDocuments(groupType, groupId)` |
-| Collections the user is a direct member of | `client.collections.list({ limit?, cursor? })` |
-| Members + groups on a collection | `client.collections.getAccess(collectionId)` |
-| Group permissions on a document | `client.documents.listGroupPermissions(documentId)` |
-| Pending email invites on a document / group / collection | `client.{documents\|groups\|collections}.listPendingInvitations(...)` |
+| Documents the user owns | `client.me.ownedDocuments(cursor:limit:tag:)` → `[DocumentInfo]` (or `ownedDocumentsPage(cursor:limit:tag:)` → `DocumentListPage` for the `{ items, cursor }` envelope) |
+| Documents directly shared with the user (`DocumentPermission` + pending `DocumentInvitation`) | `client.me.sharedDocuments(cursor:limit:tag:)` → `SharedDocumentListResult` (`{ items, cursor }`) |
+| Pending document invitations the user can accept | `client.me.pendingDocumentInvitations()` → `[PendingDocumentInvitation]` |
+| Documents inside a collection | `client.collections.listDocuments(collectionId:options:)` → `PaginatedResult<CollectionDocumentInfo>` |
+| Documents shared with a group | `client.groups.listDocuments(groupType:groupId:)` → `[GroupDocumentInfo]` |
+| Collections the user is a direct member of | `client.collections.list(options:)` → `PaginatedResult<CollectionInfo>` |
+| Members + groups on a collection | `client.collections.getAccess(collectionId:)` |
+| Group permissions on a document | `client.documents.listGroupPermissions(documentId:)` |
+| Pending email invites on a document / group / collection | `client.documents.listPendingInvitations(documentId:)` / `groups.listPendingInvitations(groupType:groupId:)` / `collections.listPendingInvitations(collectionId:)` |
+
+`options:` takes a `PaginationOptions(limit:cursor:)`; the paginated reads return `PaginatedResult` (`.data`, `.nextCursor`, `.hasMore`).
+
+The permission / collection reads — `documents.getPermissions(_:)`, `collections.getAccess(_:)`, `collections.listPendingInvitations(_:)` — return the raw server rows ([Permission / collection reads](#permission--collection-reads) above). Permission rows carry `userId`, not `email`/`name`, so a UI that shows who has access resolves those fields itself.
 
 **Anti-patterns:**
 
-- Calling a method that doesn't exist: `setPermissions`, `setGroupPermission`, `client.users.lookup({ email })`. The correct names are `updatePermissions`, `grantGroupPermission`, `client.users.lookup(email)`.
+- Calling a method that doesn't exist: `setPermissions`, `setGroupPermission`. The correct names are `updatePermissions(documentId:params:)` and `grantGroupPermission(documentId:params:)`; resolve a user by email with `client.users.lookup(email:)`.
 - Passing `permission: null` to remove a grant — there is no null form. Use `removePermission`.
 - Lowering a user's direct permission while they still have a higher one via group — the group wins (effective = MAX).
 - Assuming `me.sharedDocuments()` includes group- or collection-shared docs — it only carries direct `DocumentPermission` rows and pending `DocumentInvitation`s. Combine with `collections.list()` / `groups.listUserMemberships(...)` for a complete picture.

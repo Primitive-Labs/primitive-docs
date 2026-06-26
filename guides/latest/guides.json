@@ -3,13 +3,24 @@
     "language": "ts",
     "platform": "web"
   },
+  "platforms": {
+    "web": {
+      "language": "ts"
+    },
+    "ios": {
+      "language": "swift"
+    },
+    "macos": {
+      "language": "swift"
+    }
+  },
   "builtAgainst": {
-    "stampedAt": "2026-06-24",
+    "stampedAt": "2026-06-26",
     "channel": "production",
     "packages": {
-      "js-bao-wss-client": "2.0.3",
+      "js-bao-wss-client": "2.0.4",
       "js-bao": "0.5.1",
-      "primitive-admin": "1.0.52",
+      "primitive-admin": "1.0.53",
       "primitive-app": "3.0.1"
     }
   },

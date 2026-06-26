@@ -9,6 +9,8 @@ Implementing auth flows for Primitive apps. All methods live on `JsBaoClient` (p
 | OAuth (Google) | Primary auth, redirect-based |
 | Magic Link | Passwordless email link |
 | OTP | 6-digit email code (10 min expiry) |
+| Sign in with Apple | Native one-call sign-in (`signInWithApple`); gate on `hasApple` |
+| Passkey | Native one-call sign-in/registration via `AuthenticationServices`; for returning users |
 
 Each method must be enabled in the Admin Console. Check availability with `getAuthConfig()` before showing UI.
 
@@ -248,6 +250,84 @@ The same `AuthError` codes apply to `magicLinkRequest`/`magicLinkVerify`.
 
 ---
 
+## Passkeys
+
+The client wraps Apple's `AuthenticationServices` in two one-call helpers on `client.auth` (iOS/macOS), so app code never touches the WebAuthn challenge handshake directly.
+
+### Sign in
+
+`signInWithPasskey` runs the discoverable-credential flow — the system sheet lists the passkeys saved for the app, the user picks one, and the call applies the session token (cause `"passkey"`, emitting `.authSuccess` / `.authState`) and re-authenticates the WebSocket. It works without an existing session.
+
+```swift
+let result = try await client.auth.signInWithPasskey()   // PasskeySignInResult(user, isNewUser)
+```
+
+- `signInWithPasskey(presentationAnchor:preferImmediatelyAvailableCredentials:)` — pass `preferImmediatelyAvailableCredentials: true` to restrict the prompt to passkeys already on the device and fail fast (no QR/cross-device fallback). Throws `PasskeyError.canceled` when the user dismisses the sheet; server-side failures surface as `HttpError`.
+
+### Register (must be authenticated)
+
+`registerPasskey` adds a passkey to the **currently signed-in** user — sign in by another method first.
+
+```swift
+let reg = try await client.auth.registerPasskey(deviceName: "My iPhone")
+```
+
+- `registerPasskey(deviceName:inviteToken:presentationAnchor:)` — `deviceName` labels the credential (server default `"Unknown device"` when omitted). Pass `inviteToken` to fold invitation acceptance into registration. Throws `PasskeyError.canceled` on dismissal.
+
+### Manage
+
+The management methods match the JS client:
+
+```swift
+let list = try await client.auth.passkeyList()                              // PasskeyListResult
+try await client.auth.passkeyUpdate(passkeyId: id, deviceName: "Work iPad")  // rename
+try await client.auth.passkeyDelete(passkeyId: id)                          // remove
+```
+
+Passkey sign-in requires `passkeyEnabled` plus a non-empty `passkeyRpConfig`, and the app's associated-domains entitlement must list the RP domain (see [Deep links and universal links](#deep-links-and-universal-links)). Gate the UI on `getAuthConfig()`'s `passkeyEnabled` rather than catching a failure.
+
+---
+
+## Deep links and universal links
+
+A native app receives Primitive URLs through universal links (an `NSUserActivity`) or a custom scheme — an invitation accept link, a shared-document link, or a magic-link callback. `client.links` turns an incoming URL into a typed `LinkTarget` so the app can route it without parsing query strings by hand, and builds the canonical outbound URLs.
+
+Point it at the app's base URL once (the same value as the server's `app.baseUrl`); the builders return `nil` until it is set, and the host is automatically trusted for resolution:
+
+```swift
+client.links.appBaseURL = URL(string: "https://app.example.com")
+// Optional: extra http(s) hosts to accept when resolving incoming links
+client.links.trustedLinkHosts = ["links.example.com"]
+```
+
+### Resolve an incoming link
+
+```swift
+// From a universal link (e.g. .onContinueUserActivity / scene delegate)
+let target = try await client.links.resolve(userActivity: activity)
+
+switch target {
+case .document(let id):              openDocument(id)
+case .documentAlias(let ref):        openDocument(/* ref resolved server-side */)
+case .invitation(let token):         acceptInvite(token)
+case .magicLink(let token, _):       try await client.auth.magicLinkVerify(token: token)
+case .unknown(let url):              route(url)   // not a Primitive link — hand to your own router
+}
+```
+
+- `resolve(url:)` / `resolve(userActivity:)` are `async throws` — they hit the network only to resolve a document **alias** to its ID (`GET /document-aliases/...`), throwing `JsBaoError(.aliasNotFound)` if it doesn't resolve, or `.invalidArgument` when an activity carries no URL.
+- `parse(url:)` is the synchronous, offline counterpart — same `LinkTarget` shapes, but a `.documentAlias` comes back unresolved (no network). Use it when you only need to branch on the kind.
+
+`LinkTarget` cases: `.document(id:)`, `.documentAlias(_:)`, `.invitation(token:)`, `.magicLink(token:purpose:)`, `.unknown(_:)`.
+
+### Build outbound links
+
+```swift
+let share  = client.links.shareURL(forDocument: documentId)        // {appBaseURL}/document/{id}
+let invite = client.links.inviteAcceptURL(inviteToken: token)      // {appBaseURL}/invite/accept?inviteToken=...
+```
+
+Both return `URL?` and are `nil` until `appBaseURL` is configured. `inviteAcceptURL` produces the same URL shape Primitive's default invitation emails use, so a share sheet and an emailed invite land on the same route.
 
 ---
 
@@ -370,7 +450,7 @@ Optional — opt in through the client's `auth` options so a relaunch reuses the
   let info = client.getAuthPersistenceInfo()
 ```
 
-The token is stored in the Keychain; `storageKeyPrefix` namespaces it. `waitForAuthBootstrap()` restores any persisted session, so an authenticated user stays signed in on relaunch. `getAuthPersistenceInfo()` returns `["mode": "persisted" | "memory", "prefix": <storageKeyPrefix>]`. Tokens within ~2 min of expiry are not reused, and are cleared on logout and on `authFailed`.
+The token is persisted through the client's storage provider (SQLite by default); `storageKeyPrefix` namespaces it. The Keychain holds offline-access grants, not the JWT session. `waitForAuthBootstrap()` restores any persisted session, so an authenticated user stays signed in on relaunch. `getAuthPersistenceInfo()` returns `["mode": "persisted" | "memory", "prefix": <storageKeyPrefix>]`. Tokens within ~2 min of expiry are not reused; an expired persisted token triggers a cookie-based refresh on startup and is cleared if that refresh fails. `logout(wipeLocal: true)` clears the persisted JWT.
 
 ---
 
@@ -498,7 +578,7 @@ Overrides are tracked by `primitive sync` (TOML in `email-templates/`). Custom t
 1. Call `getAuthConfig()` to discover enabled methods before rendering UI.
 2. Implement at least one primary method (OAuth or Magic Link).
 3. Handle the OAuth callback (`code` + `state`) and the Magic Link `magic_token`.
-4. Listen to `authFailed` and `onlineAuthRequired` (minimum) to prompt re-login.
+4. Listen to `.authFailed` and `.authOnlineRequired` (minimum) to prompt re-login.
 5. Catch `AuthError` and switch on `error.code`.
 6. Gate your app layout on `isAuthenticated` (via `AuthGateView`) so child views can assume an authenticated user.
 7. Observe `authManager.$isAuthenticated` in downstream state (it changes both directions).

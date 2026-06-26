@@ -457,9 +457,9 @@ If your app relies on `databases.list()` to populate a dashboard, invited team m
 
 :::
 
-### `databases.get()` — Any Authenticated User
+### `databases.get()` — Permission-Gated Resolution
 
-Unlike `list()`, `databases.get(databaseId)` works for any authenticated user who knows the database ID — no owner/manager permission required. It also resolves **group-based** access, so users who only have access through a shared group can still load database metadata.
+`databases.get(databaseId)` resolves a database by id for users with owner or manager permission, an effective **group-based** permission, or app-admin access — otherwise the server returns `403`. It reaches wider than `list()` (which only surfaces direct `owner`/`manager` grants) because it also resolves group-based access, so a user who has access through a shared group can still load database metadata. Operation-only CEL access does **not** grant `databases.get`.
 
 ### Group-Based Database Access
 

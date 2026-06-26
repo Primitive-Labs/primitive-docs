@@ -128,7 +128,12 @@ The current authenticated user has its own namespace. Use it for "me"-scoped rea
 
 {{ example: users-and-groups/me-documents }}
 
+{{#lang ts}}
 - `ownedDocuments()` is cache-backed and offline-aware. Pass `returnPage: true` to get a paginated `DocumentListPage`; the root document is excluded by default (`includeRoot: false`).
+{{/lang}}
+{{#lang swift}}
+- `ownedDocuments()` is cache-backed and offline-aware and returns `[DocumentInfo]`. Use `ownedDocumentsPage(...)` when you need a paginated `DocumentListPage`; the root document is excluded by default (`includeRoot: false`).
+{{/lang}}
 - `sharedDocuments()` returns the unified `{ items, cursor }` envelope (raw-JSON cursor, NOT base64url). Group- and collection-scoped shares do NOT appear here — those are accessed via the group or collection. Each `SharedDocument` extends `DocumentInfo`, so rows carry the base document fields plus the share extras (`permission`, `source`, `grantedBy`, `invitationId`).
 - `pendingDocumentInvitations()` returns `[{ invitationId, documentId, title?, email, permission, invitedAt, invitedBy, expiresAt?, accepted, document?: {...} }, ...]`.
 
@@ -626,7 +631,12 @@ CEL can check any level: `"isMemberOf('org', database.metadata.orgId)"`, `"isMem
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
+{{#lang ts}}
 | `addMember` returns `status: "pending_signup"` | Email isn't an app user yet | Expected. Membership resolves when they sign up or accept via `inviteToken`. Render a pending-members UI; cancel via `removeMember({ email })` or `invitations.revokeDeferredGrant(deferredId, "group")`. |
+{{/lang}}
+{{#lang swift}}
+| `addMember` returns `status: "pending_signup"` | Email isn't an app user yet | Expected. Membership resolves when they sign up or accept via `inviteToken`. Render a pending-members UI; cancel via `removeMemberByEmail(groupType:groupId:email:)` or `invitations.revokeDeferredGrant(deferredId:type: .group)`. |
+{{/lang}}
 | `addMember` returns `status: "already_member"` | User already in the group | Idempotent — no error. |
 | 409 on `groups.create` | A group with that `(groupType, groupId)` already exists | Use a different `groupId` or call `groups.get` first. |
 | 403 on `groups.create` (member role) | The group type has a `GroupTypeConfig` row with no rule set attached (explicit opt-out), OR a configured `group.create` rule denied the caller | Either delete the `GroupTypeConfig` row to fall back to the permissive default (`group.create = "true"`), attach a rule set with a permissive `group.create`, or call as an owner/admin. |

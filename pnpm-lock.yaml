@@ -21,11 +21,11 @@ importers:
         specifier: 0.5.1
         version: 0.5.1(yjs@13.6.31)
       js-bao-wss-client:
-        specifier: 2.0.3
-        version: 2.0.3(better-sqlite3@12.10.0)(js-bao@0.5.1(yjs@13.6.31))(lib0@0.2.117)(yjs@13.6.31)
+        specifier: 2.0.4
+        version: 2.0.4(better-sqlite3@12.10.0)(js-bao@0.5.1(yjs@13.6.31))(lib0@0.2.117)(yjs@13.6.31)
       primitive-admin:
-        specifier: ^1.0.52
-        version: 1.0.52(@types/node@25.0.9)(yjs@13.6.31)
+        specifier: ^1.0.53
+        version: 1.0.53(@types/node@25.0.9)(yjs@13.6.31)
       typedoc:
         specifier: ^0.28.15
         version: 0.28.15(typescript@5.9.3)
@@ -1136,8 +1136,8 @@ packages:
   isomorphic.js@0.2.5:
     resolution: {integrity: sha512-PIeMbHqMt4DnUP3MA/Flc0HElYjMXArsw1qwJZcm9sqR8mq3l8NYizFMty0pWwE/tzIGH3EKK5+jes5mAr85yw==}
 
-  js-bao-wss-client@2.0.3:
-    resolution: {integrity: sha512-OJ9picQGNUqDLjTBuhpPdU7OggUow63TFObgab3KIvJLJAfYPPw/XTypdGPGRyGEcm4JW8og289IznnRRwzwxA==}
+  js-bao-wss-client@2.0.4:
+    resolution: {integrity: sha512-aTLDhXtcSMzld6fcol9CtKpxkTfjDK/g71gZNjj1VmjtT5wlXlKympyQly+Wys+eyFQvZhyEkaOBZDOnVQ+lYQ==}
     peerDependencies:
       better-sqlite3: ^11.0.0
       js-bao: '>=0.5.0'
@@ -1363,8 +1363,8 @@ packages:
     engines: {node: '>=10.13.0'}
     hasBin: true
 
-  primitive-admin@1.0.52:
-    resolution: {integrity: sha512-EO7Hkm+C9+4csSfadTPJ/xrMxdOy3ZHUVuuQwUBbX+pc+x8UwCmdVdm4CIwIFG9M1ukcgeeDS0OTpgcL8w228w==}
+  primitive-admin@1.0.53:
+    resolution: {integrity: sha512-Kp+iyoZHVA1h123RphrVKJJVo08P7B4Lvs32DKt5EBvP0RTLuWcEts04bKu5tGSvRrDqnuZeoYnmCSlHuTEr2g==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
@@ -2762,7 +2762,7 @@ snapshots:
 
   isomorphic.js@0.2.5: {}
 
-  js-bao-wss-client@2.0.3(better-sqlite3@12.10.0)(js-bao@0.5.1(yjs@13.6.31))(lib0@0.2.117)(yjs@13.6.31):
+  js-bao-wss-client@2.0.4(better-sqlite3@12.10.0)(js-bao@0.5.1(yjs@13.6.31))(lib0@0.2.117)(yjs@13.6.31):
     dependencies:
       js-bao: 0.5.1(yjs@13.6.31)
       lib0: 0.2.117
@@ -2988,7 +2988,7 @@ snapshots:
 
   prettier@2.8.8: {}
 
-  primitive-admin@1.0.52(@types/node@25.0.9)(yjs@13.6.31):
+  primitive-admin@1.0.53(@types/node@25.0.9)(yjs@13.6.31):
     dependencies:
       '@iarna/toml': 2.2.5
       '@inquirer/prompts': 7.10.1(@types/node@25.0.9)

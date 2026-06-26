@@ -8,7 +8,7 @@ export function watchOpenTickets(
   databaseId: string,
   removeTicket: (id: string) => void,
   upsertTicket: (data: unknown) => void
-) {
+): () => void {
   // #region example
   const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
     onChange: (event) => {
@@ -27,7 +27,7 @@ export function watchOpenTickets(
     },
   });
 
-  // Later — required for cleanup
-  unsub();
+  // Return the teardown handle — call it on unmount to stop receiving deltas.
+  return unsub;
   // #endregion example
 }

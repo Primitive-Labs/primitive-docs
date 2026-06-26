@@ -1,9 +1,10 @@
 import JsBaoClient
 
 // Opt in to JWT persistence so a relaunch can reuse the short-lived token while
-// it is still valid, instead of forcing a fresh sign-in. The token is stored in
-// the Keychain under `storageKeyPrefix`. `waitForAuthBootstrap()` restores any
-// persisted session before the client is used.
+// it is still valid, instead of forcing a fresh sign-in. The token is persisted
+// through the client's storage provider (SQLite by default), namespaced by
+// `storageKeyPrefix`. `waitForAuthBootstrap()` restores any persisted session
+// before the client is used.
 func setupPersistedClient() async throws -> JsBaoClient {
   // #region example
   let client = JsBaoClient(options: JsBaoClientOptions(
