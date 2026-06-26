@@ -469,6 +469,8 @@ access = "fromWorkflow('refresh-security-prices')"
 
 This is the cleanest expression of "only the named cron-fired workflow can call this — no user, not even an admin, can call it directly with a hand-crafted request." The workflow identity is only injected when the caller is the internal workflow step runner; external HTTP clients cannot spoof it.
 
+An operation's `access` rule is evaluated on every call, including from a `runAs = "system"` workflow run — system runs are app-privileged on the raw document/record baseline but do **not** bypass a registered operation's own `access` CEL. So a workflow-only op must be `access = "fromWorkflow('key')"`; setting `access = "false"` denies the system run too (`403`).
+
 For group-based access patterns, per-parameter access, and detailed CEL examples, see the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md).
 
 ### Parameters
