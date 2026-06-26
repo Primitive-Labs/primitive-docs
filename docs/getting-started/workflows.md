@@ -309,6 +309,12 @@ A system run executes with the app's own privileges — which is what lets a sch
 
 Runs are attributed to the app's system principal, and every system run records who set it off — the admin who started it, or the trigger that fired it — for the audit trail.
 
+**A registered operation's `access` rule still applies.** The app-privileged baseline covers *raw* reads and writes — the documents and records a run touches directly, skipping the per-caller permission checks a [caller run](#system-workflows) is bound by. It does **not** override a registered [database operation](./working-with-databases.md#access-control-with-cel)'s own `access` rule: a `database.query` or `database.mutate` step evaluates that operation's CEL whether the run is `caller` or `system`, and an operation whose `access` is `"false"` fails with `403 Access denied` even from a system workflow. To reserve an operation for server-side automation, authorize it by workflow identity rather than disabling access:
+
+```toml novalidate
+access = "fromWorkflow('billing-webhook')"   # not "false"
+```
+
 ### Sensitive capabilities
 
 A system run can always read and write the app's documents and data. Anything beyond that baseline is **opt-in**: declare it in `capabilities` so a privileged workflow does only what you intend.

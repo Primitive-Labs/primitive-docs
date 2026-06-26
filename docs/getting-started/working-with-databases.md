@@ -221,7 +221,7 @@ access = "params.createdBy == user.userId"
 | `hasRole(role)` | Check if the user has a specific app role |
 | `fromWorkflow()` / `fromWorkflow(workflowKey)` | True when the call originated from a workflow (optionally a specific one) |
 
-Use `fromWorkflow(...)` to gate an operation so only a specific workflow can invoke it — useful for cron-fired refreshes that no user, including admins, should call directly. The workflow identity is injected only by the internal workflow runner; clients cannot spoof it.
+Use `fromWorkflow(...)` to gate an operation so only a specific workflow can invoke it — useful for cron-fired refreshes that no user, including admins, should call directly. The workflow identity is injected only by the internal workflow runner; clients cannot spoof it. An operation's `access` rule is evaluated on every call, including from [system workflow](./workflows.md#system-workflows) runs — `runAs = "system"` doesn't bypass it. So reserve a workflow-only operation with `fromWorkflow('key')` rather than setting `access = "false"` and expecting a system run to reach it.
 
 ### Per-Parameter Access
 

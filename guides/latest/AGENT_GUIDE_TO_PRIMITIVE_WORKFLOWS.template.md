@@ -853,7 +853,7 @@ Set `accessRule` once in the `[workflow]` TOML block and it sticks: `primitive s
 `runAs` declares the principal a run executes as — `caller` (default) or `system`. It's a top-level `[workflow]` field.
 
 - `runAs = "caller"` (default) — the run executes as the invoking user. Every step acts with that member's permissions: `document.*` steps enforce the caller's per-document ACL, group/data ops are checked against their roles. `accessRule` gates who may start it.
-- `runAs = "system"` — the run executes as the app's synthetic per-app principal (`sys:<appId>`, also the `WorkflowRun` partition key). App-privileged: the data baseline (document/database read/write/delete/manage) is unconditional.
+- `runAs = "system"` — the run executes as the app's synthetic per-app principal (`sys:<appId>`, also the `WorkflowRun` partition key). App-privileged on the **raw** data baseline: direct document/record read/write/delete/manage skips the per-caller ACL. It does **not** bypass a registered database operation's own `access` CEL — a `database.*` step evaluates that rule on every call, system run included (`access = "false"` → `403`; reserve a workflow-only op with `fromWorkflow('key')`, not `"false"`).
 
 The invocation gate is enforced once at top-level start (HTTP start/run-sync, cron, webhook, admin test) — never silently downgraded:
 
@@ -866,7 +866,7 @@ The invocation gate is enforced once at top-level start (HTTP start/run-sync, cr
 
 Nested/child runs (`workflow.call`, durable `forEach` batches) never re-resolve identity — they inherit the parent's verbatim. Every system run records attribution (`initiatedByUserId` + `initiatorKind` of `admin`/`cron`/`webhook`/`test`) for audit; it is not a security control.
 
-**Sensitive capabilities.** A system run gets the data baseline unconditionally. Sensitive operations are opt-in via `capabilities` (StringSet, allowlist-validated at save time):
+**Sensitive capabilities.** A system run gets the raw data baseline unconditionally (registered-operation `access` rules still evaluate — above). Sensitive operations are opt-in via `capabilities` (StringSet, allowlist-validated at save time):
 
 ```toml
 [workflow]
