@@ -70,7 +70,7 @@ A bucket's **preset** decides who can use its blobs. App admins and owners alway
 
 | Preset | Access for everyone else | Use case |
 |---|---|---|
-| `public` | Anyone — including visitors with no account — can read and list. Only admins write. | Logos, brand images, assets served without auth |
+| `public` | Anyone — including visitors with no account — can read and list. Only admins and owners write. | Logos, brand images, assets served without auth |
 | `authenticated` | Any signed-in member can read, write, list, delete, and share | User avatars, app-wide shared assets |
 | `admin-only` | No one but admins and owners | Internal artifacts, workflow outputs you serve out selectively via signed URLs |
 | `personal-uploads` | Any member uploads; each member reads, deletes, and shares **only their own** blobs (the bucket isn't enumerable) | User file uploads where everyone keeps their own |
