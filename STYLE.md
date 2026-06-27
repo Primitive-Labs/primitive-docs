@@ -6,7 +6,7 @@ The canonical editorial standards for this repo. Two documentation products buil
 
 ### Human docs (`docs/`) — a technical developer new to Primitive
 
-Write for a competent developer who has never used Primitive. **Don't talk down** — never explain what OAuth, a cron expression, or a CRDT-style merge is. **Don't explain everything** — exhaustive parameter coverage is the agent guides' and generated reference's job. The job of a human doc is to build the right mental model and show the concept in practice: introduce the concept clearly, give the initial use case, show an example of applying it.
+Write for a competent developer who has never used Primitive. **Don't talk down** — never explain what OAuth, a cron expression, or a WebSocket is. **Don't explain everything** — exhaustive parameter coverage is the agent guides' and generated reference's job. The job of a human doc is to build the right mental model and show the concept in practice: introduce the concept clearly, give the initial use case, show an example of applying it.
 
 ### Agent guides (`guides/latest/`) — an LLM mid-implementation
 
@@ -52,6 +52,7 @@ Each of these reads as a small helpful aside and is actually a policy violation:
 - **Nothing that doesn't work or is missing.** Docs show what's there, not what isn't. No "not yet supported", no "coming soon", no feature-gap callouts. If a capability exists on one platform only, document it with the example that exists and stop — the absence speaks for itself.
 - **No prior behavior or change history.** Describe how the platform works today, with current best practices. No "previously", "now supports", migration guides, version comparisons, or "legacy" labels.
 - **No infrastructure internals.** Never name Cloudflare, Workers, R2, Durable Objects, or storage engines. Describe developer-facing behavior ("isolated, server-side data store"), not implementation. The one exception: *Deploying to Production* necessarily names the deployment target (the web template deploys to Cloudflare Workers) — that page only.
+- **No "CRDT" (or other esoteric implementation jargon).** Documents merge concurrent edits automatically — describe *that*, not the data structure behind it: "simultaneous edits merge cleanly, with no conflicts." Where you need a noun, the plain word is "document data" / "local document state," not "CRDT" or a merge-algorithm name. Same principle as infrastructure internals: name the developer-facing behavior, not the implementation.
 - **No links into `guides/latest/`.** Human docs are self-sufficient.
 - **Nothing ahead of the channel's surface.** Each branch documents its channel's platform (see CLAUDE.md): `main` describes the *published* clients and CLI; `next` describes the library `main` tips. The validation gates run against the matching surface (`scripts/channel.mjs`), so "is this documentable here?" has a mechanical answer — never describe something the channel's gates can't see.
 - **No private repo links.** Only link repos a new user can open (`primitive-app-template` is public; the `*-dev` repos are not).

@@ -13,7 +13,7 @@ The essentials you're most likely to violate mid-draft:
 2. **Structure pages as a ramp.** Simple at the top (concept → first use → example), advanced and esoteric below. Nothing advanced above anything basic.
 3. **Stay at your tier's altitude.** Overview pages name capabilities, never mechanisms. Concept pages show usage, not exhaustive option matrices.
 4. **Concepts on their own terms.** One page per concept; never frame feature A as an appendage of feature B; a concept's capabilities live on its own page.
-5. **The never-say list** — asides about CLI/console gaps, anything missing or not-yet-supported (including platform-gap callouts — docs show what's there, not what isn't), prior behavior or change history, infra internals, unreleased features, guides/ links, private repos. These arrive one innocuous sentence at a time. Platform differences are shown by parallel examples, never narrated.
+5. **The never-say list** — asides about CLI/console gaps, anything missing or not-yet-supported (including platform-gap callouts — docs show what's there, not what isn't), prior behavior or change history, infra internals, esoteric implementation jargon (no "CRDT" in human docs — say documents merge concurrent edits automatically), unreleased features, guides/ links, private repos. These arrive one innocuous sentence at a time. Platform differences are shown by parallel examples, never narrated.
 6. **Verify every fact** (API names, flags, limits) against the published CLI and `library_repos/js-bao-wss` source; fiction has shipped before.
 
 Mechanics:

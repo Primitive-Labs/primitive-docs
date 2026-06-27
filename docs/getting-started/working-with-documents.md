@@ -14,7 +14,7 @@ Documents belong to a user and are private until explicitly shared. Sharing gran
 | `owner` | Yes | Yes | Yes | Yes |
 
 ### Real-Time Sync
-When multiple users have access to the same document, changes sync instantly. The system uses conflict-free data structures (CRDTs), so simultaneous edits merge cleanly.
+When multiple users have access to the same document, changes sync instantly. Simultaneous edits merge cleanly and automatically, with no conflicts.
 
 ### Offline Access
 Data lives in a local database on the device. Your app works without a network connection — changes queue and sync when connectivity returns.
@@ -202,9 +202,9 @@ After `pnpm codegen`, the generated interfaces include typed traversal methods:
 
 You're free to evolve the schema as the app grows. A few rules of thumb:
 
-- **Add new fields freely** — documents are stored as CRDTs, so adding an optional field is a no-op for existing records.
+- **Add new fields freely** — a document's data isn't a rigid schema, so adding an optional field is a no-op for existing records.
 - **Adding `default` doesn't backfill** — existing records keep their absent values; `default` only applies to records created after the change. Read sites should treat the field as optional.
-- **Don't remove fields** — the underlying CRDT data is still there. Mark unused fields with a TOML comment instead, and stop reading them.
+- **Don't remove fields** — the underlying document data is still there. Mark unused fields with a TOML comment instead, and stop reading them.
 - **Renaming a field is a breaking change** — pick a new field with a new name, write to both during a migration window, then stop writing the old one. Add `default` only for the new field.
 - **Adding a `unique = true` constraint to an existing field** can fail at save time if existing records collide. Inspect the data before tightening uniqueness.
 
@@ -286,7 +286,7 @@ Save-or-update by a **named** constraint — single- or multi-field — declared
 :::
 
 ::: tip iOS semantics
-`Task.query(...)`, `queryOne`, `count`, and `aggregate` are **synchronous** (no `await`) — they read the in-process CRDT and span every open document by default; scope with `QueryOptions(documents: [docId])`. `Task.find(_:)` and `Task.findAll()` are **`async throws`** — use `try await Task.find(id)`. Writes target one document — `save(in:)` inserts or updates in place and `throws`; `save(in:upsertOn:)` matches by unique field; `delete(in:)` throws only if the document isn't open. Writes are local-first: visible to local reads on the next line, synced to peers in the background.
+`Task.query(...)`, `queryOne`, `count`, and `aggregate` are **synchronous** (no `await`) — they read the in-process document data and span every open document by default; scope with `QueryOptions(documents: [docId])`. `Task.find(_:)` and `Task.findAll()` are **`async throws`** — use `try await Task.find(id)`. Writes target one document — `save(in:)` inserts or updates in place and `throws`; `save(in:upsertOn:)` matches by unique field; `delete(in:)` throws only if the document isn't open. Writes are local-first: visible to local reads on the next line, synced to peers in the background.
 :::
 
 ## Querying

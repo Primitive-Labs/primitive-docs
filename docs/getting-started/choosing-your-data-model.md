@@ -10,7 +10,7 @@ Primitive offers two storage systems — **Documents** and **Databases** — eac
 | **Connectivity** | Offline access, instant local reads | Requires network connectivity |
 | **Collaboration** | Real-time concurrent editing with conflict-free merging | Live change feeds via registered subscriptions |
 | **Access model** | All-or-nothing sharing per document | Per-operation CEL access rules |
-| **Schema** | Schemaless CRDT structures | Schemaless — save any JSON records |
+| **Schema** | Schemaless document structures | Schemaless — save any JSON records |
 | **Size limit** | ~10 MB per document | ~5 GB per instance |
 | **Server logic** | N/A | Server-enforced triggers and computed fields |
 
