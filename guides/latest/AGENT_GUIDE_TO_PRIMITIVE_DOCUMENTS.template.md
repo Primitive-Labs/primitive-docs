@@ -150,7 +150,7 @@ const collections = await jsBaoClient.collections.list();
 Every example below is compiled against the real client as part of the docs build. The [Querying Data](#querying-data) and [Saving Data](#saving-data) sections below go deeper on projections, includes, and save options.
 
 {{#lang swift}}
-The generated model statics route through the process-wide default client — call `JsBaoClient.configureDefault(client)` once at startup, before the first read or write. `query`, `queryOne`, `count`, and `aggregate` are synchronous against the local CRDT; `find` and `findAll` are `async throws` (use `try await`). All reads span every open document by default (scope with `QueryOptions(documents: [docId])`); writes target one document — `save(in:)` inserts or updates in place and throws (it validates the write and requires the document to be open), `delete(in:)` throws only if the document isn't open.
+The generated model statics route through the process-wide default client — call `JsBaoClient.configureDefault(client)` once at startup, before the first read or write. `query`, `queryOne`, `count`, and `aggregate` are synchronous against the local document store; `find` and `findAll` are `async throws` (use `try await`). All reads span every open document by default (scope with `QueryOptions(documents: [docId])`); writes target one document — `save(in:)` inserts or updates in place and throws (it validates the write and requires the document to be open), `delete(in:)` throws only if the document isn't open.
 {{/lang}}
 
 ### Create
@@ -465,14 +465,14 @@ public extension TodoItem {
 }
 ```
 
-**Value-type / CRDT semantics (load-bearing):**
+**Value-type / merge semantics (load-bearing):**
 
-- **No `nil` in CRDT-backed fields** — the CRDT layer doesn't model `nil`. Use `""` for absent strings, `0` for absent numbers, sentinel timestamps for "never", and check those values explicitly.
+- **No `nil` in document-backed fields** — the document store doesn't model `nil`. Use `""` for absent strings, `0` for absent numbers, sentinel timestamps for "never", and check those values explicitly.
 - **Wire field names are forever.** TOML keys are the wire field names; renaming a key after data is on disk orphans every existing record (Swift *and* JS clients reading the same doc). **snake_case is the cross-client convention** when web/Node and Swift read the same doc; **camelCase is fine for Swift-only docs**. The tool preserves whatever you write — add camelCase aliases in the companion if snake_case wire keys read awkwardly.
 - **IDs are `String`** — supply `UUID().uuidString` (or a ULID) when not provided.
 - Register models with `client.registerModels([TodoItem.self])` at connect time (or rely on the facade's lazy registration on first read) — registered models are mirrored into the client's shared store and listed in the in-app debug inspector automatically.
 
-CRUD through the facade is local-first (applied to the CRDT immediately, synced in the background). Writes throw — `try record.save(in: documentId)` inserts or updates in place; `save(in:upsertOn:)` matches on a single-field unique constraint instead of `id` and returns the resolved record; `try record.delete(in: documentId)`; all three throw if the target document isn't open. Reads: `query(...)`, `queryOne`, `count`, and `aggregate` are **synchronous** local reads against the CRDT and span every open document by default (scope with `QueryOptions(documents: [...])`). The generated facade methods are not annotated `@MainActor` — they're commonly called from MainActor-bound SwiftUI glue (`BaoDataLoader` / your `PrimitiveAppState` subclass), but the methods themselves carry no actor isolation. `find(_ id:)` and `findAll()` are **`async throws`** — use `try await TodoItem.find(id)`. Predicate operators: equality, `$gt`/`$gte`/`$lt`/`$lte`, `$containsText`, `$or`/`$and`/`$not`.
+CRUD through the facade is local-first (applied to the document store immediately, synced in the background). Writes throw — `try record.save(in: documentId)` inserts or updates in place; `save(in:upsertOn:)` matches on a single-field unique constraint instead of `id` and returns the resolved record; `try record.delete(in: documentId)`; all three throw if the target document isn't open. Reads: `query(...)`, `queryOne`, `count`, and `aggregate` are **synchronous** local reads against the document store and span every open document by default (scope with `QueryOptions(documents: [...])`). The generated facade methods are not annotated `@MainActor` — they're commonly called from MainActor-bound SwiftUI glue (`BaoDataLoader` / your `PrimitiveAppState` subclass), but the methods themselves carry no actor isolation. `find(_ id:)` and `findAll()` are **`async throws`** — use `try await TodoItem.find(id)`. Predicate operators: equality, `$gt`/`$gte`/`$lt`/`$lte`, `$containsText`, `$or`/`$and`/`$not`.
 
 > **SourceKit footgun, first time only.** Editing the companion before codegen has ever run shows a red `No such module 'PrimitiveApp'` underline. The real cause is that the generated type doesn't exist yet — run `swift build` once (or the `run-ios.sh` codegen step) and it clears. Only the very first scaffold hits this.
 {{/lang}}
@@ -860,7 +860,7 @@ The view below is framework glue; the only Primitive calls in it are the `findAl
 
 `loader.phase` is a trinary: `.loading` (first load not complete), `.empty` (first load complete, data conforms to `LoaderEmptiness` and is empty), `.loaded(Data)`. `[T]`, `String`, and `Optional` get `LoaderEmptiness` out of the box.
 
-> **Empty-vs-pending when a local index is hydrated by an async server fetch.** If the loader reads a local CRDT mirror that a `reconcile()` fills from the server *after* the view binds, the first load completes against an empty store → `.empty` → the placeholder flashes before the server data arrives. `loader.phase` can't tell "genuinely empty" from "fetch still pending" — gate the empty state on a "first reconcile attempted" flag (set on attempt, success or failure, so an offline brand-new user still reaches the empty state instead of spinning forever):
+> **Empty-vs-pending when a local index is hydrated by an async server fetch.** If the loader reads a local document mirror that a `reconcile()` fills from the server *after* the view binds, the first load completes against an empty store → `.empty` → the placeholder flashes before the server data arrives. `loader.phase` can't tell "genuinely empty" from "fetch still pending" — gate the empty state on a "first reconcile attempted" flag (set on attempt, success or failure, so an offline brand-new user still reaches the empty state instead of spinning forever):
 >
 > ```swift
 > case .empty:
@@ -872,7 +872,7 @@ The view below is framework glue; the only Primitive calls in it are the `findAl
 ## Saving Data
 
 {{#lang swift}}
-Writes go through record instances and are local-first — applied to the CRDT immediately and synced in the background (see [`models.toml` + codegen + the model facade](#modelstoml--codegen--the-model-facade) for the save/delete contract). `try record.save(in: documentId)` uses merge semantics: `nil` optional fields are not written, so fields you didn't set are preserved on update.
+Writes go through record instances and are local-first — applied to the document store immediately and synced in the background (see [`models.toml` + codegen + the model facade](#modelstoml--codegen--the-model-facade) for the save/delete contract). `try record.save(in: documentId)` uses merge semantics: `nil` optional fields are not written, so fields you didn't set are preserved on update.
 {{/lang}}
 
 {{#lang ts}}
@@ -1070,7 +1070,7 @@ For documents that should exist exactly once (default document, settings), use `
 
 The most common multi-doc shape is one library document per user (alias-resolved on launch) holding an index of refs to per-item documents (each shareable independently). Three patterns make it converge correctly:
 
-**Key refs by the entity id, never a random `UUID()`.** A ref's CRDT row id is the map key, and `save(in:)` is an upsert on that key. Set `id` to the document/collection id the ref points at, so two writes for the same entity (your create path and a reconcile pass, possibly on another device) converge on one row instead of producing a permanent visible duplicate:
+**Key refs by the entity id, never a random `UUID()`.** A ref's row id in the document store is the map key, and `save(in:)` is an upsert on that key. Set `id` to the document/collection id the ref points at, so two writes for the same entity (your create path and a reconcile pass, possibly on another device) converge on one row instead of producing a permanent visible duplicate:
 
 ```swift
 public extension LibraryItemRef {
@@ -1085,7 +1085,7 @@ public extension LibraryItemRef {
 }
 ```
 
-Reserve random `UUID()` ids for records *born* in the CRDT with no external identity (todos, notes, messages).
+Reserve random `UUID()` ids for records *born* in the document store with no external identity (todos, notes, messages).
 
 **Tombstone instead of hard-delete.** Soft-delete with a `deletedAt` field and filter at query time (`LibraryItemRef.query(["deletedAt": ""])`). Setting `deletedAt` rather than calling `.delete(in:)` avoids the race where a reconcile pass recreates a just-deleted ref because the server still reports the entity as accessible.
 

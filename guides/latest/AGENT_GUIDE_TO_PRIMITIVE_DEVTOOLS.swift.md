@@ -205,18 +205,18 @@ with the models that became available on that document.
 A live browser and ad-hoc query runner over the in-memory SQLite that backs
 `model.query()` / `count` / `aggregate` / `queryPaged` / `findByUnique`. The engine
 is per-(model, document) and lives entirely in RAM, kept in sync with the
-document's CRDT via an update observer.
+document's data via an update observer.
 
 - **Model picker + context strip** — the model name and the `documentId` the
   projection is bound to.
 - **Schema strip** — `PRAGMA table_info` for the active table (name, type, PK, NOT
   NULL), so you can see what an indexed query actually hits.
 - **Table view** — a true SQL table; each row has a `del` button that routes through
-  the model's delete (CRDT → engine projection), not a raw SQL DELETE.
+  the model's delete (document-store → engine projection), not a raw SQL DELETE.
 - **Create row** — a `+ new row` modal, inputs dispatched by field `kind`.
 - **Custom query box** — a SQL textarea (Cmd/Ctrl+Enter to run). Accepts only
   `SELECT`, `PRAGMA`, and `WITH` (CTE) statements; direct DML is rejected because
-  it would desync the projection from its CRDT source of truth.
+  it would desync the projection from its document-store source of truth.
 - **Polling** — while the tab is active, the catalog + active table refresh every
   ~2s; a button pauses/resumes (useful for a stable result set).
 
@@ -228,7 +228,7 @@ Documents tab, and how a filter/index translates to SQL.
 
 Read-only browser over the client's on-disk durability store — the file at
 `<Documents>/JsBaoClient/<appId>:<userId>/jsbao_storage.sqlite`. This is the
-durability layer (encoded CRDT blobs, `meta`, `kv`, `auth`), not the query layer;
+durability layer (encoded document blobs, `meta`, `kv`, `auth`), not the query layer;
 for per-model SQL tables use Memory SQL. Table tabs along the top show each store
 with its row count; clicking loads rows (key, value, metadata, updatedAt),
 most-recently-updated first.

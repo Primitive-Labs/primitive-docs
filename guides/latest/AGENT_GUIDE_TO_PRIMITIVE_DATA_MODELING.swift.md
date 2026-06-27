@@ -6,10 +6,10 @@ How to choose between **documents** and **databases**, and how to combine them. 
 
 | | **Documents** (js-bao) | **Databases** (js-bao-wss) |
 |---|---|---|
-| Backed by | Yjs CRDT, cached on-device and synced over WebSocket | Isolated server-side store (SQLite), called over HTTPS |
+| Backed by | On-device document store (Yjs), synced over WebSocket | Isolated server-side store (SQLite), called over HTTPS |
 | Where data lives | On every client that has access, plus the server | Server only |
 | Reads | Local, synchronous after `documents.open()` | Network round-trip per call |
-| Writes | Local first, async sync to server, automatic CRDT merge | Network round-trip; last-write-wins per field |
+| Writes | Local first, async sync to server, automatic conflict-free merge | Network round-trip; last-write-wins per field |
 | Concurrent edits | Merge cleanly (Yjs) — true collaborative editing | No merge; concurrent writers race |
 | Real-time updates | Built in for everyone with the doc open | Opt-in via registered subscriptions (CEL filter per change) |
 | Offline | Yes — reads/writes work offline, sync resumes on reconnect (`offline: true` on the client) | No — every call requires the network |
@@ -196,7 +196,7 @@ Documents only. One document per workspace. Owner shares with teammates via grou
 
 ### Chat / messaging
 
-- **Documents** per channel for messages — real-time CRDT sync handles concurrent posting and edits, full history available offline.
+- **Documents** per channel for messages — real-time merge-based sync handles concurrent posting and edits, full history available offline.
 - **Database** (app-wide) for the channel directory and user profiles, with `searchUsers`/`createChannel` operations.
 
 ## Design principles

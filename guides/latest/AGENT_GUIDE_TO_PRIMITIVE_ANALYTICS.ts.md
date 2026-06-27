@@ -48,7 +48,7 @@ The platform emits these from the server. No client code at all.
 | `document.created` | `documents` | Document created |
 | `document.viewed` | `documents` | Document info fetched — fires on every open (the client fetches info as part of opening) |
 | `document.opened` | `documents` | Document opened via alias resolution; plain `documents.open(id)` does not fire it |
-| `document.updated` | `documents` | Document metadata updated (title/thumbnail/metadata) — CRDT content edits are not individually evented |
+| `document.updated` | `documents` | Document metadata updated (title/thumbnail/metadata) — document content edits are not individually evented |
 | `document.deleted` | `documents` | Document deleted |
 | `document.tag_added` | `documents` | Tag added |
 | `document.tag_removed` | `documents` | Tag removed |
