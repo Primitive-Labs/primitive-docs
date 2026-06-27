@@ -68,9 +68,9 @@ git checkout publish/<YYYY-MM-DD>-<sha8>   # audit what's about to publish, not 
 Run **docs-set-audit** end to end: its mechanical sweeps (orphans, build + anchors, example-parity inventory, structure mirror, manifest integrity) and its cross-page judgment passes (duplication, inconsistency, boundary, set-level ramp).
 
 - **Outright breakage is this skill's to fix before landing** — a dead link, a stamp/parity failure, two pages that now contradict each other. Fix it on the publish branch, then re-run `pnpm check:examples` and `npx vitepress build docs`.
-- **Cross-page restructures are proposals**, per docs-set-audit. Don't block the release on optional consolidations: surface them in the report and leave them for a follow-up `next` pass unless they're outright breakage. Anything fixed here must also flow back to `next` (Step 8's back-merge carries it).
+- **Cross-page restructures are proposals** — don't block the release on optional consolidations. But don't merely mention them in the report either: **file each as its own standalone GitHub issue** in `Primitive-Labs/primitive-docs` so it can be evaluated and scheduled on its own. One issue per restructure — no rollup/checklist that bundles several (per `.claude/ISSUE_FILING.md`'s one-issue-per-problem rule); link related ones to each other instead. A pure doc reorganization is a docs-repo task, so it files here, not in a source repo. Anything you *do* fix on the publish branch must also flow back to `next` (Step 8's back-merge carries it).
 
-Fold the audit result into the report (clean bill, or the findings and which were fixed vs. deferred).
+Fold the audit result into the report: clean bill, or the breakage fixed here plus the issue numbers filed for each deferred restructure.
 
 ## Step 7 — Summarize the docs delta
 
