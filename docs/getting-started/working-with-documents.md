@@ -202,9 +202,9 @@ After `pnpm codegen`, the generated interfaces include typed traversal methods:
 
 You're free to evolve the schema as the app grows. A few rules of thumb:
 
-- **Add new fields freely** — js-bao stores documents as Yjs CRDTs, so adding an optional field is a no-op for existing records.
+- **Add new fields freely** — documents are stored as CRDTs, so adding an optional field is a no-op for existing records.
 - **Adding `default` doesn't backfill** — existing records keep their absent values; `default` only applies to records created after the change. Read sites should treat the field as optional.
-- **Don't remove fields** — the underlying Yjs data is still there. Mark unused fields with a TOML comment instead, and stop reading them.
+- **Don't remove fields** — the underlying CRDT data is still there. Mark unused fields with a TOML comment instead, and stop reading them.
 - **Renaming a field is a breaking change** — pick a new field with a new name, write to both during a migration window, then stop writing the old one. Add `default` only for the new field.
 - **Adding a `unique = true` constraint to an existing field** can fail at save time if existing records collide. Inspect the data before tightening uniqueness.
 

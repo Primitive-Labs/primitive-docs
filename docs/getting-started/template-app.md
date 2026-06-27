@@ -42,7 +42,7 @@ cd my-app
 
 **Congratulations!** You now have a working Primitive app with:
 
-- Authentication with a drop-in login flow (OAuth, Magic Link, OTP, and Passkeys on web; one-time email code and OAuth on iOS)
+- Authentication with a drop-in login flow (OAuth, Magic Link, OTP, and Passkeys on web; one-time email code, Google and Apple sign-in, and Passkeys on iOS)
 - Local-first data storage with real-time sync
 - Server-side databases with access control
 - Blob storage for files and images
@@ -84,7 +84,7 @@ When deploying to production, you'll add your production domain to these setting
 
 ### 2. Enable Google OAuth in Primitive Admin
 
-Go to the [Primitive Admin Console](https://admin.primitiveapi.com/login) and navigate to your app's settings:
+Go to the [Primitive Admin Console](https://admin.primitiveapi.com) and navigate to your app's settings:
 
 1. Open the **Google OAuth** section
 2. Enable Google OAuth as a sign-in method

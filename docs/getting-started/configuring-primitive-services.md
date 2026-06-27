@@ -4,7 +4,7 @@ Everything Primitive does for your app — which sign-in methods are enabled, wh
 
 There are two equivalent ways to manage that configuration:
 
-1. **The [Admin Console](https://admin.primitiveapi.com/login)** — interactive and visual. Best for exploring, testing, and one-off changes.
+1. **The [Admin Console](https://admin.primitiveapi.com)** — interactive and visual. Best for exploring, testing, and one-off changes.
 2. **TOML files in your repo, synced via the CLI** — configuration as code. Best for anything you want versioned, reviewed, reproduced across environments, or managed by an AI coding agent.
 
 Both edit the same underlying configuration. Most teams explore in the console and commit the result as TOML.
@@ -67,7 +67,7 @@ Every feature page in these docs that shows a TOML block — [Workflows](./workf
 - `[auth]` — `googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled`, and `[auth.passkeys]` relying-party config
 - `[cors]` (when `mode = "custom"`) — `allowedOrigins`, `allowCredentials`, `allowedMethods`, `maxAge`
 
-Two app settings are not part of `app.toml`: **OTP** is toggled with `primitive apps update --otp <bool>` only, and **redirect URIs** are set with `primitive apps update --redirect-uris "<uri1>,<uri2>"` or in the [Admin Console](https://admin.primitiveapi.com/login) (no TOML key).
+Two app settings are not part of `app.toml`: **OTP** is toggled with `primitive apps update --otp <bool>` only, and **redirect URIs** are set with `primitive apps update --redirect-uris "<uri1>,<uri2>"` or in the [Admin Console](https://admin.primitiveapi.com) (no TOML key).
 
 Credentials never go in these files: config that needs an API key references it as <span v-pre>`{{ secrets.KEY }}`</span>, with the value stored server-side. See [App Secrets](./app-secrets.md).
 

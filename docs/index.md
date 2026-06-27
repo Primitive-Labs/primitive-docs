@@ -65,7 +65,7 @@ Automatic lifecycle event tracking (daily active users, session activity, featur
 
 Your app runs on the user's device — in the browser or on an iPhone — and talks to the platform through a client library that exposes the same features in JavaScript (any framework) and Swift. Optional starter templates for web (Vue) and iOS (SwiftUI) wrap the client with login UI, data-binding helpers, and dev tooling — the fastest start, covered in the [Quick Start](./getting-started/template-app.md).
 
-The Primitive Platform itself is a managed service. You operate your app's backend through the CLI — as version-controlled configuration that lives in your repo, and the interface AI coding agents use — or interactively through the web [Admin Console](https://admin.primitiveapi.com/login). You never touch the underlying infrastructure.
+The Primitive Platform itself is a managed service. You operate your app's backend through the CLI — as version-controlled configuration that lives in your repo, and the interface AI coding agents use — or interactively through the web [Admin Console](https://admin.primitiveapi.com). You never touch the underlying infrastructure.
 
 ## Next Steps
 

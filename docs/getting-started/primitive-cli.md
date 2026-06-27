@@ -207,7 +207,7 @@ primitive users admin-invitations delete <invitation-id>
 
 ### OAuth Configuration
 
-Configure OAuth providers for your app (client credentials are entered in the [Admin Console](https://admin.primitiveapi.com/login) under the app's Google OAuth settings). The provider toggle and CORS origins are app settings synced from `app.toml`, so the drift-free path is to edit the TOML and push:
+Configure OAuth providers for your app (client credentials are entered in the [Admin Console](https://admin.primitiveapi.com) under the app's Google OAuth settings). The provider toggle and CORS origins are app settings synced from `app.toml`, so the drift-free path is to edit the TOML and push:
 
 ```toml
 # config/app.toml

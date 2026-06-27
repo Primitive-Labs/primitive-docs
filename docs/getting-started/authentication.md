@@ -88,7 +88,7 @@ When deploying to production, add your production domain to these settings along
 
 ### 2. Configure in Primitive
 
-Enter your **Client ID** and **Client Secret** in the [Admin Console](https://admin.primitiveapi.com/login) under your app's Google OAuth settings, then enable the provider and allow your dev origin (see [Server App Settings](#server-app-settings-must-match-your-apps-origin) — the OAuth callback URL must also be in the app's **Redirect URIs** — set via `primitive apps update --redirect-uris` or the Admin Console). Set the provider toggle and origin in `app.toml` and push:
+Enter your **Client ID** and **Client Secret** in the [Admin Console](https://admin.primitiveapi.com) under your app's Google OAuth settings, then enable the provider and allow your dev origin (see [Server App Settings](#server-app-settings-must-match-your-apps-origin) — the OAuth callback URL must also be in the app's **Redirect URIs** — set via `primitive apps update --redirect-uris` or the Admin Console). Set the provider toggle and origin in `app.toml` and push:
 
 ```toml
 # config/app.toml
