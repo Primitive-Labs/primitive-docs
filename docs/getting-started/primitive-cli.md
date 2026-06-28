@@ -245,10 +245,22 @@ primitive guides get workflows
 primitive guides get authentication
 ```
 
+Guides come in TypeScript and Swift variants. By default you get the TypeScript guide; pass `--language swift` to fetch the Swift variant, or `--platform ios` (or `--platform macos`) to select the language that platform targets:
+
+```bash
+# Fetch the Swift variant of a guide
+primitive guides get documents --language swift
+
+# ...or let the platform choose the language (iOS and macOS target Swift)
+primitive guides get documents --platform ios
+```
+
+`primitive guides list` takes the same flags. An unknown `--language` or `--platform` value is rejected rather than silently served as TypeScript, so a typo surfaces immediately.
+
 Guides are cached locally at `~/.primitive/guides/`.
 
 :::tip For AI Agents
-When working with an AI coding assistant, point it to these guides before asking it to implement features. For example: "Read `primitive guides get workflows` and then create a workflow that sends a welcome email when a user signs up." The agent will fetch the guide, learn the patterns, and implement your request correctly.
+When working with an AI coding assistant, point it to these guides before asking it to implement features. For example: "Read `primitive guides get workflows` and then create a workflow that sends a welcome email when a user signs up." The agent will fetch the guide, learn the patterns, and implement your request correctly. Building for iOS or macOS? Tell the agent to pass `--platform ios` so it fetches the Swift guides instead of the TypeScript default.
 :::
 
 ## Configuration Sync
