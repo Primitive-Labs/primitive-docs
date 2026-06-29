@@ -62,6 +62,8 @@ Not in `app.toml` (see [What sync does NOT carry](#what-sync-does-not-carry)): `
 
 Every command resolves its target environment in order: `--env <name>` flag → `PRIMITIVE_ENV` env var → `defaultEnvironment` in `.primitive/config.json` → the only defined environment → error. Manage environments with `primitive env add|list|show|use|remove`. Tokens are stored per-environment in `.primitive/credentials.json` (gitignored); `.primitive/config.json` is committed.
 
+`primitive env add` writes only the environment entry into `.primitive/config.json` — it seeds no credentials, and project mode does **not** fall back to the global `~/.primitive/credentials.json`. A freshly-added environment therefore starts logged-out: project-scoped commands report "not logged in" until you run `primitive login` for that environment, even when a global `primitive whoami` succeeds. Agents and CI can log in without a browser by piping a refresh token — `primitive token --refresh | primitive login -s <url> --token-stdin` (see [Headless auth](#headless-auth-ci)).
+
 ## Previewing a push
 
 `primitive sync diff` lists entities that would be created, changed, or removed; `primitive sync push --dry-run` reports the full push without applying it. Both run the **same** validate-first gate as a real push — local TOML validation followed by the server-side checks via the validate-first pass — so the preview is faithful: what it reports is what the push applies. Schema-gate rejections surface identically in the preview and in a real push: an operation whose database type has no schema set, an unresolved `$params.X`/reference, or a schema change that would break an existing registered operation. A previewed or blocked entity records no content hash in sync state, so it stays pending on the next `sync diff` rather than reading "in sync" — a server-rejected change cannot silently disappear from the diff. `primitive sync diff --json` emits machine-readable output on stdout.
@@ -95,7 +97,7 @@ primitive secrets delete OPENAI_API_KEY
 
 ## Headless auth (CI)
 
-Interactive `primitive login` doesn't work in CI. Create a long-lived API token and target an environment explicitly:
+Browser-based `primitive login` doesn't work in CI. Either log in non-interactively by piping a refresh token — `primitive token --refresh | primitive login -s <url> --token-stdin` — or create a long-lived API token and target an environment explicitly:
 
 ```bash
 primitive tokens create --name "CI deploys" --ttl 90d    # m/h/d/w/mo/y units; omit for non-expiring
