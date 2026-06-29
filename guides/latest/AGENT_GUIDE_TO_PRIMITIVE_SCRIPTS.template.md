@@ -56,13 +56,13 @@ for i in items { total += i.qty * i.price; }
 }
 ```
 
-The script's return value is its last expression. Given `steps.fetch.body = { "items": [{ "sku": "a1", "qty": 2, "price": 5.0 }, { "sku": "b2", "qty": 0, "price": 9.0 }] }` and `input.currency = "USD"`, this records `steps.normalize.output = { "currency": "USD", "itemCount": 1, "total": 10.0 }`.
+The script's return value is its last expression. Given `steps.fetch.body = { "items": [{ "sku": "a1", "qty": 2, "price": 5.0 }, { "sku": "b2", "qty": 0, "price": 9.0 }] }` and `input.currency = "USD"`, this records `steps.normalize.output = { "result": { "currency": "USD", "itemCount": 1, "total": 10.0 }, "ok": true }` — the return value is wrapped under `result` (see Result nesting below).
 
 **Contract rules to write to:**
 
 - **`input.*` only.** `let x = payload;` fails with `Variable not found: payload` — write `input.payload`.
 - **`with` is a reserved Rhai keyword** — a script can't declare a variable named `with`.
-- **Result nesting.** A script step's return value lands under `steps.<id>.output.*` (alongside `scriptMetrics` and `ok`) — unlike `transform`, whose result is the templated table directly. Wire downstream templates and `runIf` as `{{ steps.normalize.output.total }}`, not `{{ steps.normalize.total }}`.
+- **Result nesting.** A script step's output is an envelope: `steps.<id>.output = { result: <return value>, ok: <bool> }`. The return value lives at `steps.<id>.output.result.*` and the success verdict at `steps.<id>.output.ok` (also mirrored at `steps.<id>.ok`); per-run telemetry sits in a sibling `steps.<id>.scriptMetrics`, not inside `output`. Unlike `transform`, whose result is the templated table directly (`steps.<id>.<field>`), wire downstream templates and `runIf` as `{{ steps.normalize.output.result.total }}` — not `{{ steps.normalize.output.total }}` or `{{ steps.normalize.total }}`.
 - **Missing keys read as `()`** (Rhai unit). Test with `input.h.symbol != ()` before using a possibly-absent field.
 - **`NaN`/`Infinity` can't survive JSON output** — they serialize as `null`. Return a sentinel value instead of relying on them.
 - **Map key order is normalized** at serialization, so output is byte-stable regardless of insertion order.

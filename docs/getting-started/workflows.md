@@ -526,7 +526,7 @@ Given `steps.fetch.body` of `{ "items": [ { "sku": "a1", "qty": 2, "price": 5.0 
 { "currency": "USD", "itemCount": 1, "total": 10.0 }
 ```
 
-One wiring detail: a script's return value lands under `steps.<id>.output.*` — later steps read <span v-pre>`{{ steps.normalize.output.total }}`</span>, not <span v-pre>`{{ steps.normalize.total }}`</span> (unlike `transform`, whose result is the table directly).
+One wiring detail: a script's output is wrapped in an envelope, `steps.<id>.output = { result: <return value>, ok: <bool> }`. The return value lives under `result`, so later steps read <span v-pre>`{{ steps.normalize.output.result.total }}`</span> — not <span v-pre>`{{ steps.normalize.output.total }}`</span> or <span v-pre>`{{ steps.normalize.total }}`</span> (unlike `transform`, whose result is the table directly). The success verdict is at <span v-pre>`{{ steps.normalize.output.ok }}`</span>.
 
 Pushing a changed `.rhai` file (`primitive sync push`) creates a new script version and activates it — every workflow that references the script by name picks up the new body on its next run, with no re-publish step needed.
 
