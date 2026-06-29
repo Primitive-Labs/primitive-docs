@@ -867,6 +867,8 @@ The view below is framework glue; the only Primitive calls in it are the `findAl
 >     if appState.hasReconciled { EmptyState() }
 >     else { ProgressView() }
 > ```
+
+**Building the views themselves** — layout, navigation, platform gating, list affordances — is governed by the `ios-design` skill bundled in the Swift starter template (at `.claude/skills/ios-design/` in the scaffolded project). It triggers on SwiftUI edits inside the project, so consult it explicitly before writing views; UI decisions made around scaffolding time can otherwise miss it.
 {{/lang}}
 
 ## Saving Data

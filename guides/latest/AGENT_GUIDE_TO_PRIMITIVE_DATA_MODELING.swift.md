@@ -266,3 +266,4 @@ Where the data should live instead: a record inside the database itself. Read it
 - [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md) — full document API, sharing, sync, patterns
 - [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md) — full database API, operations, triggers, subscriptions, pipelines
 - [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md) — group membership, CEL functions, role-based access
+- **`ios-design` skill** — the iOS/SwiftUI UI-convention skill bundled in the Swift starter template (at `.claude/skills/ios-design/` in the scaffolded project). It governs the view layer the data-side rules here don't cover — platform gating, navigation, list affordances. It only activates once you're editing SwiftUI files inside the scaffolded project, so consult it explicitly before building any UI; architecture decisions made around scaffolding time can otherwise miss it.
