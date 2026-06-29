@@ -254,17 +254,17 @@ status = "active"
 
 The receive endpoint is `POST /app/{appId}/webhook/{webhookKey}`. When an event arrives, the webhook verifies the signature and starts the configured workflow with the event payload as input. Supported verification schemes are `stripe`, `github`, `slack`, `custom`, and `none`. Use `inputMapping` to extract a nested path from the payload before passing it to the workflow (e.g. `"data.object"`).
 
-**Securing webhook workflows:** add an `accessRule` so clients can't bypass signature verification by starting the workflow directly with a crafted payload:
+**Securing webhook workflows:** a webhook-triggered workflow must run as the system identity (`runAs = "system"` — webhooks can only fire [system workflows](#system-workflows)):
 
 ```toml
 [workflow]
 key = "handle-payment"
 name = "Handle Payment"
 status = "active"
-accessRule = "hasRole('owner')"  # Only webhook triggers can start this — clients are blocked
+runAs = "system"  # required — webhooks can only fire system workflows
 ```
 
-The `accessRule` is evaluated on `client.workflows.start()` calls but **not** on webhook triggers (which have their own signature verification), so `hasRole('owner')` restricts direct starts while webhooks flow normally.
+That identity *is* the security boundary: members can't start a system workflow — a direct `client.workflows.start()` from a member is refused with a `403` — so, together with the webhook's signature verification, a client can't invoke the workflow with a crafted payload. An `accessRule` adds nothing here: it isn't evaluated on webhook triggers, and admins and owners bypass it, so `hasRole('owner')`, `"false"`, and omitting it behave identically. Reserve `accessRule` for [caller workflows](#controlling-access-to-workflows), where it gates who may start a run.
 
 Inspect webhooks and their recent deliveries (accepted, rejected, duplicate) from the CLI:
 
@@ -285,7 +285,7 @@ name = "Generate Report"
 accessRule = "hasRole('admin') || isMemberOf('team', 'ops')"
 ```
 
-With no rule, any signed-in member of the app can start the workflow; admins and owners always pass regardless of the rule. The rule is evaluated on every client invocation — asynchronous or synchronous — and when another workflow invokes this one through a `workflow.call` step. Cron triggers and inbound webhooks have their own controls and skip it; that's what makes the [webhook lock-down pattern](#via-inbound-webhooks) work.
+With no rule, any signed-in member of the app can start the workflow; admins and owners always pass regardless of the rule. The rule is evaluated on every client invocation — asynchronous or synchronous — and when another workflow invokes this one through a `workflow.call` step. Cron triggers and inbound webhooks skip it entirely (they have their own controls). Because those triggers run [system workflows](#system-workflows) — which members can't start at all — `accessRule` is effectively inert on a system workflow; it genuinely gates only **caller** workflows, deciding who may start a run.
 
 Push the rule with `primitive sync push` like any other workflow config, or change it in place with `primitive workflows update <id> --access-rule "<CEL>"`. For the rule language and the identity context available to it (`hasRole`, `isMemberOf`, `memberGroups`), see [Access Control](./access-control.md).
 
