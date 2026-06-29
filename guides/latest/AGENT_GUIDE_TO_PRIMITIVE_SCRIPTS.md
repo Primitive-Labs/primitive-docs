@@ -123,7 +123,7 @@ Deterministic failures (the script will fail the same way every time) come back 
 
 ## Telemetry
 
-Each execution records per-step telemetry on the run's `scriptMetrics` array — operation count, input/output byte sizes, and the pinned runtime version — visible in run detail alongside every step's input and output.
+Each execution records per-step telemetry at `steps.<id>.scriptMetrics` — a sibling of the step's `output` (persisted on `WorkflowStepRun.scriptMetrics`), carrying the operation count, input/output byte sizes, and the pinned runtime version — visible in run detail alongside every step's input and output.
 
 ## Testing
 
