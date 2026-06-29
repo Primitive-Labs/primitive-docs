@@ -804,6 +804,8 @@ struct TodoListView: View {
 >     else { ProgressView() }
 > ```
 
+**Building the views themselves** — layout, navigation, platform gating, list affordances — is governed by the `ios-design` skill bundled in the Swift starter template (at `.claude/skills/ios-design/` in the scaffolded project). It triggers on SwiftUI edits inside the project, so consult it explicitly before writing views; UI decisions made around scaffolding time can otherwise miss it.
+
 ## Saving Data
 
 Writes go through record instances and are local-first — applied to the document store immediately and synced in the background (see [`models.toml` + codegen + the model facade](#modelstoml--codegen--the-model-facade) for the save/delete contract). `try record.save(in: documentId)` uses merge semantics: `nil` optional fields are not written, so fields you didn't set are preserved on update.
