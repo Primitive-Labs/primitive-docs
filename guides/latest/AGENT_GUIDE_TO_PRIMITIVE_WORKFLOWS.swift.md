@@ -839,7 +839,7 @@ When a step reads `steps.<upstream>.output.*` and that upstream can be skipped, 
 - A client calls `workflows.start()`.
 - A `workflow.call` step invokes the workflow from another workflow.
 
-NOT evaluated for inbound webhook triggers (those handle their own auth — e.g., Stripe signature). For webhook-triggered workflows, set `accessRule = "hasRole('owner')"` to prevent direct client invocation.
+NOT evaluated for inbound webhook or cron triggers (those bypass it entirely — a webhook handles its own auth, e.g. a Stripe signature). A webhook- or cron-triggered workflow must be `runAs: "system"` (see [Execution identity](#execution-identity-runas-system-workflows)), and on a system workflow `accessRule` is **inert**: it isn't evaluated on the trigger, members are already blocked by the system-invocation gate (403), and admin/owner bypass it — so `hasRole('owner')`, `"false"`, and omitting it behave identically. What prevents direct client invocation of a webhook workflow is the system-invocation gate plus the webhook's signature verification, not `accessRule`. Reserve `accessRule` for `runAs: "caller"` workflows, where it genuinely gates who may start a run.
 
 Behavior:
 - No rule → any authenticated app member can start.
@@ -934,7 +934,7 @@ status = "active"
 # secretGracePeriodMs, [webhook.allowedIps] cidrs, [webhook.inputMapping]
 ```
 
-Receive endpoint: `POST /app/{appId}/webhook/{webhookKey}`. The platform verifies the signature per `verificationScheme`, then starts `workflowKey` with the event payload as input; `inputMapping` (e.g. `"data.object"`) extracts a nested path first. Always pair a webhook-triggered workflow with `accessRule = "hasRole('owner')"` (see Access control above) so clients can't start it directly with a crafted payload.
+Receive endpoint: `POST /app/{appId}/webhook/{webhookKey}`. The platform verifies the signature per `verificationScheme`, then starts `workflowKey` with the event payload as input; `inputMapping` (e.g. `"data.object"`) extracts a nested path first. A webhook-triggered workflow is `runAs: "system"`, so what stops a client from starting it directly with a crafted payload is the system-invocation gate (members get a 403) plus the signature verification — not `accessRule`, which a system workflow doesn't evaluate on the trigger (see [Access control](#access-control)).
 
 CLI: `primitive webhooks list | get | create | update | delete | rotate-secret | test | events <webhook-key>` — `events` lists recent deliveries (accepted / rejected / duplicate / `workflow_not_active`).
 
