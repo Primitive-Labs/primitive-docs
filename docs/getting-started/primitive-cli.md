@@ -106,6 +106,8 @@ primitive env remove staging
 
 `--app-id` is optional. If you omit it, the environment pins only an `apiUrl` and the app is chosen per-session via `primitive use <appId>`.
 
+A freshly-added environment starts **logged-out**. `primitive env add` writes only the config entry — it seeds no credentials, and project mode does not borrow the global `~/.primitive/credentials.json`. So right after `env add`, project-scoped commands report "not logged in" even if `primitive whoami` works globally; run `primitive login` with that environment active to sign it in. For agents and CI, sign in without a browser by piping a refresh token — see [API Tokens for CI and Servers](#api-tokens-for-ci-and-servers).
+
 ### How the Active Environment Is Resolved
 
 Every command resolves an active environment in this order — the first match wins:
@@ -503,7 +505,15 @@ primitive token
 
 ### API Tokens for CI and Servers
 
-For headless environments where an interactive `primitive login` isn't possible — CI pipelines, deploy scripts, server-side jobs — create a long-lived API token instead:
+For headless environments where a browser-based `primitive login` isn't possible — CI pipelines, deploy scripts, server-side jobs — you have two non-interactive paths.
+
+To sign in as yourself, pipe a refresh token into `login --token-stdin`:
+
+```bash
+primitive token --refresh | primitive login -s <url> --token-stdin
+```
+
+Or create a long-lived API token, which isn't tied to a user session:
 
 ```bash
 primitive tokens create --name "CI deploys" --ttl 90d
