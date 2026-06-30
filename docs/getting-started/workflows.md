@@ -249,7 +249,7 @@ key = "stripe-payments"
 displayName = "Stripe Payments"
 workflowKey = "handle-payment"
 verificationScheme = "stripe"
-status = "active"
+status = "active"  # active | paused
 ```
 
 The receive endpoint is `POST /app/{appId}/webhook/{webhookKey}`. When an event arrives, the webhook verifies the signature and starts the configured workflow with the event payload as input. Supported verification schemes are `stripe`, `github`, `slack`, `custom`, and `none`. Use `inputMapping` to extract a nested path from the payload before passing it to the workflow (e.g. `"data.object"`).
