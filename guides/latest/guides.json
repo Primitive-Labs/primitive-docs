@@ -914,14 +914,19 @@
         "rule sets",
         "rule-sets",
         "defaultAccess",
-        "fromWorkflow"
+        "fromWorkflow",
+        "subscription",
+        "entitlement",
+        "billing",
+        "paywall"
       ],
       "useCases": [
         "Writing access rules for database operations",
         "Gating who can subscribe to database changes",
         "Restricting who can start a workflow",
         "Governing who can create groups or manage members",
-        "Testing and debugging CEL rules"
+        "Testing and debugging CEL rules",
+        "Building a subscription-entitlement (Stripe billing) gate end to end"
       ]
     },
     {
