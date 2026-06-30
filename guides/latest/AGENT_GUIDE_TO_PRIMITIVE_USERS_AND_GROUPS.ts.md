@@ -674,7 +674,7 @@ Per-op fallback applies — configured ops always win, missing ops resolve again
 | `user.role` | yes | App role (`"owner"` / `"admin"` / `"member"`) |
 | `collection.collectionType` | yes | Collection's type (matches the `CollectionTypeConfig` this rule set is bound to) |
 | `collection.collectionId` | yes (after create) | Collection's ID |
-| `collection.contextId` | yes | Per-instance identifier — parallels `AppGroup.groupId`. Set at create time and immutable. `null` for collections with no context. Use it to express "caller belongs to the group this collection represents." |
+| `collection.contextId` | yes | Per-instance identifier — parallels a group's `groupId`. Set at create time and immutable. `null` for collections with no context. Use it to express "caller belongs to the group this collection represents." |
 | `collection.name` | yes | Display name |
 | `collection.createdBy` | yes (after create) | userId of the collection's creator |
 | `target.userId` | only `category: "member"`, ops `add` / `remove` | The user being added or removed. Absent for `member.list`. |
