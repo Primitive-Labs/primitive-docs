@@ -929,14 +929,14 @@ key = "stripe-payments"
 displayName = "Stripe Payments"
 workflowKey = "process-stripe"
 verificationScheme = "stripe"     # stripe | github | slack | custom | none
-status = "active"
+status = "active"                 # active | paused; create defaults to active
 # Optional: toleranceSeconds, deduplicationEnabled, deduplicationWindowMs,
 # secretGracePeriodMs, [webhook.allowedIps] cidrs, [webhook.inputMapping]
 ```
 
 Receive endpoint: `POST /app/{appId}/webhook/{webhookKey}`. The platform verifies the signature per `verificationScheme`, then starts `workflowKey` with the event payload as input; `inputMapping` (e.g. `"data.object"`) extracts a nested path first. A webhook-triggered workflow is `runAs: "system"`, so what stops a client from starting it directly with a crafted payload is the system-invocation gate (members get a 403) plus the signature verification — not `accessRule`, which a system workflow doesn't evaluate on the trigger (see [Access control](#access-control)).
 
-CLI: `primitive webhooks list | get | create | update | delete | rotate-secret | test | events <webhook-key>` — `events` lists recent deliveries (accepted / rejected / duplicate / `workflow_not_active`).
+CLI: `primitive webhooks list | get | create | update | delete | rotate-secret | test | events <webhook-key>` — `events` lists recent deliveries (accepted / rejected / duplicate / `workflow_not_active`). `active` and `paused` are the settable statuses (`create` and `update` reject anything else, and `create` defaults to `active`); `archived` is reserved for delete and only appears on read — `list --status` filters by `active`, `paused`, or `archived`.
 
 A `workflow_not_active` delivery means the bound workflow was draft or archived when the event arrived: the request is acked with HTTP 202 `{ received: true }` (so the sender doesn't retry) but the workflow is **not dispatched**. Activate the workflow and resend — these events are excluded from deduplication, so the resend isn't dropped as a duplicate. Binding a webhook to a not-yet-active workflow succeeds and returns a non-blocking `warning` carrying `WORKFLOW_NOT_ACTIVE`.
 
@@ -1216,7 +1216,9 @@ A workflow needs `status = "active"` AND one of (active configuration | publishe
 
 Setting `status = "active"` without an active config or revision returns: `Cannot activate workflow without a configuration`.
 
-`primitive sync push` creates a default configuration automatically when a workflow is first created and updates it on subsequent pushes. Each push of `[[steps]]` updates the active configuration's steps in place.
+`primitive workflows delete <id>` (the default) is a **soft delete**: it archives the workflow and keeps its `workflowKey` reserved, so recreating a workflow under the same key fails with `workflowKey already exists (held by an archived workflow <id>)`. Free the key for reuse with a hard delete — `primitive workflows delete <id> --hard` — which also cascades to the workflow's configurations, runs, step runs, and test cases.
+
+`primitive sync push` creates a default configuration automatically when a workflow is first created and updates it on subsequent pushes. Each push of `[[steps]]` updates the active configuration's steps in place. `primitive workflows update <id> --from-file <toml>` pushes a revised body (metadata + steps) to an existing workflow the same way without the full sync directory — it overwrites the active configuration in place and is live immediately; explicit `update` flags override the TOML's metadata.
 
 ### Configurations vs revisions
 
@@ -1238,8 +1240,9 @@ primitive workflows list [--status active] [--json]
 primitive workflows get <workflow-id>
 primitive workflows create --from-file workflow.toml [--requires-client-apply false]
 primitive workflows update <workflow-id> --status active
-primitive workflows delete <workflow-id>           # archive
-primitive workflows delete <workflow-id> --hard --yes
+primitive workflows update <workflow-id> --from-file workflow.toml   # push a revised body (metadata + steps) in place, live immediately; explicit flags above override TOML values
+primitive workflows delete <workflow-id>           # archive (soft delete; the workflowKey stays reserved)
+primitive workflows delete <workflow-id> --hard --yes   # also frees the workflowKey for reuse
 
 # Expand fragment includes (for debugging)
 primitive workflows expand <workflow.toml>
@@ -1287,6 +1290,8 @@ primitive workflows analytics top --days 7
 ```
 
 All inspection commands take `--json`.
+
+A run that aborts during **setup** — before any step executes (resolving its config/revision, loading steps, or validating `input` against `inputSchema`) — is still marked `failed` with the real error message, and records one synthetic step with id `__setup__` and kind `setup`. So `runs steps` is never empty and `runs error` always names the failure, even when no author-defined step ran.
 
 ### Reusable step fragments
 
