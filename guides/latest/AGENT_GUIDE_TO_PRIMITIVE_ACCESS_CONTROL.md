@@ -73,3 +73,47 @@ access = "fromWorkflow('refresh-prices')"                      # only the named 
 - One group type per concept (`team`, `org`, `team-admin`); group-level "admin" is modeled as its own group type, not a built-in.
 - Parameterize the resource (`params.teamId`) so one operation serves every team.
 - External identifiers: never trust a client-supplied provider id (a payment `customer_id`) for a server-side action — a caller could substitute another user's id. Keep the user→external-id mapping in a system-write store (write op gated `access = "fromWorkflow('key')"`) with reads scoped to the caller (`definition` filter on `$user.userId`), and resolve the id server-side from the authenticated user.
+
+## Recipe: subscription entitlement
+
+A paid-SaaS feature gate (Stripe-style billing) ties together four pieces — the rule, the membership that backs it, the provider-id store, and the user-facing checkout. The whole shape:
+
+**1. The entitlement is a group; the rule checks membership.** A rule can't read a row (above), so the paid-feature gate is membership in an entitlement group, never an `isSubscribed` column. Put the check on every gated operation:
+
+```toml novalidate
+# on each operation behind the paywall
+access = "isMemberOf('subscription', 'active')"
+```
+
+**2. A verified webhook maintains that membership.** The billing provider posts subscription-lifecycle events to an inbound webhook bound to a `runAs = "system"` workflow that holds the `membership` capability; the workflow flips the entitlement with `group.addMember` / `group.removeMember`:
+
+```toml novalidate
+# config/workflows/process-stripe.toml — see the Workflows guide for the full step shape
+[workflow]
+key = "process-stripe"
+runAs = "system"                # webhook-triggered workflows are always system
+capabilities = ["membership"]   # required for group.addMember/removeMember in a system run
+```
+
+The webhook declaration (`verificationScheme = "stripe"`, `workflowKey = "process-stripe"`) and the group step kinds live in the [Workflows guide](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md). What stops a forged client call is the signature check plus the system-invocation gate (members get a 403) — not `accessRule`, which a system workflow doesn't evaluate on a webhook trigger.
+
+**3. Provider ids live in a system-write store, read back per user.** Map the provider's `customer_id` to the user in a database whose **write** op is workflow-only and whose **read** op is scoped to the caller, so only the webhook writes it and a caller sees only their own row:
+
+```toml novalidate
+[[operations]]                  # webhook records the mapping
+name = "recordBillingCustomer"
+type = "save"
+access = "fromWorkflow('process-stripe')"
+
+[[operations]]                  # caller reads only their own — filter, not trust
+name = "myBillingCustomer"
+type = "query"
+access = "true"
+definition = '{"filter":{"userId":"$user.userId"},"limit":1}'
+```
+
+Resolve the provider id server-side from the authenticated user — never accept a client-supplied `customer_id` (see External identifiers, above).
+
+**4. Checkout and customer-portal are caller-run workflows.** "Start a subscription" and "manage billing" are ordinary `runAs = "caller"` workflows that call the provider's API (the outbound integration — see the [Integrations guide](AGENT_GUIDE_TO_PRIMITIVE_INTEGRATIONS.md)) to mint a Checkout or Billing-Portal session URL for the signed-in user and return it. They grant no access themselves; membership changes only when the provider's webhook (step 2) reports the subscription started or ended.
+
+Net: the rule (1) trusts only group membership; membership (2) is written only by the verified webhook; the provider id (3) is never client-trusted; the checkout/portal calls (4) never grant access directly.
