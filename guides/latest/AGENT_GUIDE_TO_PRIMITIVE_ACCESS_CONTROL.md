@@ -100,9 +100,9 @@ The webhook declaration (`verificationScheme = "stripe"`, `workflowKey = "proces
 **3. Provider ids live in a system-write store, read back per user.** Map the provider's `customer_id` to the user in a database whose **write** op is workflow-only and whose **read** op is scoped to the caller, so only the webhook writes it and a caller sees only their own row:
 
 ```toml novalidate
-[[operations]]                  # webhook records the mapping
+[[operations]]                  # webhook records the mapping (a save mutation)
 name = "recordBillingCustomer"
-type = "save"
+type = "mutation"
 access = "fromWorkflow('process-stripe')"
 
 [[operations]]                  # caller reads only their own — filter, not trust
