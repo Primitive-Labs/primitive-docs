@@ -19,7 +19,7 @@ func dateHandling(documentId: String, taskId: String) async throws {
   }
 
   // Query with date comparison
-  let overdue = Task.query(["dueDate": ["$lt": now]])
+  let overdue = try Task.query(["dueDate": ["$lt": now]])
   // #endregion example
   _ = overdue
 }

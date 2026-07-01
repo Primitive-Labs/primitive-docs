@@ -52,12 +52,13 @@ All steps support these in addition to their own:
 | `continueOnError` | Capture errors as `{ error, errorDetails, ok: false, errored: true }` instead of failing the workflow |
 | `skipWhenSkipped` | Array of earlier step ids. Before this step's own `runIf` is evaluated, skip this step (with the same `{ ok: false, skipped: true }` stub) if any listed upstream was skipped. Transitive; reacts only to `skipped: true`, not `errored: true`. Unknown/forward ids are tolerated at run time and warned at save time. |
 | `strict` | Throw if any template expression in this step is unresolved |
+| `strictParams` | Array of top-level param names to treat as strict-on-missing while others stay null-tolerant (a resolved `null` is still tolerated). `strict = true` covers everything and wins when both are set |
 
 ## Data flow
 
 A run threads one JSON context through every step:
 
-1. **Input**: one JSON object per run — the `start()`/`runSync()` input, the webhook's mapped payload, or the cron trigger's configured input. Validated against `inputSchema` when declared.
+1. **Input**: one JSON object per run — the `start()`/`runSync()` input, the webhook's mapped payload, or the cron trigger's configured input. Validated against `inputSchema` when declared. Top-level scalar properties are coerced to the declared type before the strict check where it's safe: number→`string` via `String()`, numeric string→`number`/`integer` via `Number()` (rejects `""`/NaN), number→`integer` only when integral, `"true"`/`"false"` (case-insensitive)→`boolean`. A non-coercible value (e.g. `"abc"`→number) fails the run with a clear type error. Per-property `coerce: false` opts out; unions/enums/null/nested are not coerced. Applies at every input site (durable run, `start`, `run-sync`, admin preview/run, and `workflow.call` child input), which makes explicit `| string`/`| number` filters at typed call sites optional no-ops.
 2. **Step config is templated at execution time**: steps have no implicit input argument — `{{ ... }}` expressions in config strings resolve against the run context (`input`, `steps.<id>`, `outputs.<saveAs>`, `secrets`, `meta`, forEach vars) just before the step runs (see [Templating](#templating)).
 3. **Output recording**: each step's JSON result is stored as `steps[id]`; `saveAs = "name"` also registers it as `outputs.name` — a stable alias that survives step-id renames. The engine stamps the uniform verdict (`ok`, plus `skipped`/`errored`) on every entry.
 4. **Final result**: `outputs.output` if any step used `saveAs = "output"`, otherwise the full `outputs` map (see [Output contract](#output-contract)). Every step's input and output stays on the run record.
@@ -220,9 +221,14 @@ city = "{{ input.city }}"
 
 [steps.request.headers]
 X-Custom = "value"
+
+[steps.request.form]                # application/x-www-form-urlencoded body
+grant_type = "client_credentials"
 ```
 
 Optional: `attachments`, `multipartFields` (for `bodyMode = "multipart"`).
+
+`[steps.request.form]` sends an `application/x-www-form-urlencoded` body — a table of `{{ }}`-templated key/value pairs the platform URL-encodes (null/undefined/empty values omitted; array values repeat the key; the platform sets `Content-Type: application/x-www-form-urlencoded` unless a header already sets it). It's mutually exclusive with `body` and with `bodyMode = "raw"|"multipart"`; combining them is rejected at push time by the TOML validator and at runtime with `REQUEST_BODY_CONFLICT` (400). (This is a workflow-step surface only — the typed client `integrations.call` request has no `form` field.)
 
 Integration `defaultHeaders` and `staticQuery` resolve `{{secrets.KEY}}` from app secrets — workflow steps cannot put secrets into `request.headers` directly without exposing them in step output snapshots. Put secrets in the integration config.
 
@@ -565,6 +571,8 @@ reason = "preferences backfill"
 
 - **Bounded memory**: users are paged (`pageSize`) rather than loaded all at once, so the step scales to large user counts.
 - **Singleton per app**: a per-app lock (`iterationName` keys it) guarantees only one iteration runs at a time and tracks aggregate progress, so a restarted run resumes where it left off instead of starting over. `onConflict` decides whether a second start `skip`s or `refuse`s while one is live.
+- **`iterationName` is templated**: `{{ ... }}` is interpolated once when the step runs. A plain string keys one persistent singleton; a date template (e.g. `"digest-{{ today }}"`) makes each day a distinct iteration; `{{ now }}` or `{{ uuid }}` makes every fire unique, disabling the resume-a-singleton behavior.
+- **Inspect / reset from the CLI**: `primitive workflows iterations list` shows each iteration's status, acquire mode, and processed/failed counts; `... get <name>` shows one in detail (run/instance ids, lock expiry, succeeded/failed/skipped, last error, a sample of failed user ids); `... reset <name>` clears a **terminal** (completed/failed) iteration so its next trigger runs fresh — a running iteration is refused (409). No `--force`.
 - Each user is processed by the `perUser.workflowKey` child workflow. The iterated user's id is injected into the child as `input.userId` automatically, so a child with no `perUser.input` block still reads `{{ input.userId }}`. `onPartialFailure` controls whether per-user failures stop the whole iteration or are tallied and skipped.
 - `perUser.input` values are rendered per user against a `user` binding (`user.userId`, `user.role`) with full template syntax — filters and fallbacks included (`{{ user.userId | upper }}`, `{{ user.role || 'member' }}`). A key set in `perUser.input` overrides the injected `userId` default (author-wins).
 - Prefer `iterate-users` over a hand-rolled `forEach` across a `users.list` query when the fan-out is app-wide and long-running; `forEach` is better for bounded, in-run collections.
@@ -637,7 +645,7 @@ Available filters (see `src/workflows/runner/templates.ts` for full list):
 
 Templates have **no arithmetic** (`{{ a + b }}` won't work). Move math into a step or filter chain.
 
-**Missing path sentinel.** In interpolation mode (`"prefix-{{ steps.x.y }}-suffix"`), an unresolved path renders as `<missing: steps.x.y>` so it's visible in step output and logs. In single-expression mode (`"{{ steps.x.y }}"` alone) the raw value is `null` so downstream `runIf`/comparisons work naturally. A resolved `null` interpolates as `"null"`; a resolved empty string interpolates as `""`. Set `strict = true` on the step to throw on any unresolved path instead.
+**Missing path sentinel.** In interpolation mode (`"prefix-{{ steps.x.y }}-suffix"`), an unresolved path renders as `<missing: steps.x.y>` so it's visible in step output and logs. In single-expression mode (`"{{ steps.x.y }}"` alone) the raw value is `null` so downstream `runIf`/comparisons work naturally. A resolved `null` interpolates as `"null"`; a resolved empty string interpolates as `""`. Set `strict = true` on the step to throw on any unresolved path instead, or `strictParams = ["userId", ...]` to make only the named top-level params strict-on-missing (a resolved `null` is still tolerated); `strict = true` covers everything and wins when both are set. When a template references a root outside the five valid roots (`input`, `steps`, `outputs`, `meta`, `secrets`), the strict-mode error lists them — catching typos like `{{ inputs.userId }}`.
 
 ## `runIf` (CEL, not templates)
 
@@ -839,7 +847,7 @@ When a step reads `steps.<upstream>.output.*` and that upstream can be skipped, 
 - A client calls `workflows.start()`.
 - A `workflow.call` step invokes the workflow from another workflow.
 
-NOT evaluated for inbound webhook or cron triggers (those bypass it entirely — a webhook handles its own auth, e.g. a Stripe signature). A webhook- or cron-triggered workflow must be `runAs: "system"` (see [Execution identity](#execution-identity-runas-system-workflows)), and on a system workflow `accessRule` is **inert**: it isn't evaluated on the trigger, members are already blocked by the system-invocation gate (403), and admin/owner bypass it — so `hasRole('owner')`, `"false"`, and omitting it behave identically. What prevents direct client invocation of a webhook workflow is the system-invocation gate plus the webhook's signature verification, not `accessRule`. Reserve `accessRule` for `runAs: "caller"` workflows, where it genuinely gates who may start a run.
+NOT evaluated for inbound webhook or cron triggers (those bypass it entirely — a webhook handles its own auth, e.g. a Stripe signature). A webhook- or cron-triggered workflow must be `runAs: "system"` (see [Execution identity](#execution-identity-runas-system-workflows)), and a system workflow takes **no** `accessRule` — the rule is never evaluated on a system run, so a non-empty one is rejected at save/push time (see below). What prevents direct client invocation of a webhook workflow is the system-invocation gate plus the webhook's signature verification. Reserve `accessRule` for `runAs: "caller"` workflows, where it genuinely gates who may start a run.
 
 Behavior:
 - No rule → any authenticated app member can start.
@@ -879,11 +887,11 @@ capabilities = ["membership"]
 
 **`iterate-users` is system-only.** A workflow containing an `iterate-users` step must set `runAs = "system"` — otherwise it's rejected at save time (`'iterate-users' is system-only and may appear only in a runAs:"system" workflow`).
 
-**No `user`-referencing `accessRule` on a system workflow.** A `runAs:"system"` workflow whose `accessRule` references the `user` principal is rejected at save time (`runAs:"system" workflows do not evaluate accessRule (there is no caller principal) — remove the accessRule`), because a system run has no caller principal to evaluate against. A role- or group-only rule (e.g. `hasRole('admin')`) is inert but accepted.
+**No `accessRule` on a system workflow.** A `runAs:"system"` workflow with any non-empty `accessRule` is rejected at save time (`runAs:"system" workflows do not evaluate accessRule — remove the accessRule`) — a system run skips the rule entirely, so a constant (`"false"`), a role/group rule (`hasRole('admin')`), or a `user`-principal reference are all equally dead config. The only fix is to remove it. An absent/empty rule is fine. Enforced on every save path (create, version-create, metadata PATCH on the merged effective state, workflow-config create, and `sync push`).
 
 ### Subject-user methods (system workflows)
 
-A system run can act **about** a specific app user without impersonating them — the run's actor stays `sys:<appId>` for audit; `userId` is an explicit **subject** parameter. The `*ForUser` step kinds are **system-only** (calling one from a `runAs: "caller"` run throws non-retryably: `<kind> is only supported in runAs:"system" workflows`). In each, `userId` may be set on the step or inherited from `input.userId` (e.g. the iterated subject under `iterate-users`). The subject must be an `AppUser` of the app, or the step fails non-retryably (`Subject user <id> is not a member of app <appId>`). These reads need no `capabilities` grant — being a system run is the gate.
+A system run can act **about** a specific app user without impersonating them — the run's actor stays `sys:<appId>` for audit; `userId` is an explicit **subject** parameter. The `*ForUser` step kinds are **system-only** (calling one from a `runAs: "caller"` run throws non-retryably: `<kind> is only supported in runAs:"system" workflows`). In each, the subject is the step's `userId` when set, otherwise `input.userId` (e.g. the iterated subject under `iterate-users`) — an empty or whitespace-only `userId` falls back to `input.userId` rather than shadowing it (`step.userId ?? input.userId`). A subject that resolves to empty fails the step with a remediation error (`<kind>: userId is required but resolved to empty — check input.userId or the iterate-users subject`). The subject must be a member of the app, or the step fails non-retryably (`Subject user <id> is not a member of app <appId>`). These reads need no `capabilities` grant — being a system run is the gate.
 
 | Kind | Key fields | Output |
 |---|---|---|
@@ -929,10 +937,13 @@ key = "stripe-payments"
 displayName = "Stripe Payments"
 workflowKey = "process-stripe"
 verificationScheme = "stripe"     # stripe | github | slack | custom | none
+signingSecret = "{{secrets.STRIPE_WEBHOOK_SECRET}}"  # raw value, or a {{secrets.KEY}} reference
 status = "active"                 # active | paused; create defaults to active
 # Optional: toleranceSeconds, deduplicationEnabled, deduplicationWindowMs,
 # secretGracePeriodMs, [webhook.allowedIps] cidrs, [webhook.inputMapping]
 ```
+
+`signingSecret` is required unless `verificationScheme = "none"`. It may be a raw value or a `{{secrets.KEY}}` reference (uppercase-led key, no spaces — the tighter form) into the app secret store; the reference is stored and re-emitted verbatim (never returned as a real secret) and resolved server-side against the app secrets immediately before HMAC verification. The referenced key must exist at create/update or the write is rejected. It **fails closed**: if the reference can't be resolved at delivery (secret deleted, or encryption key unset) the request is rejected with `401` (`rejectionReason: secret_unresolved`) rather than verifying against the literal reference; an unresolvable grace-window `previousSigningSecret` reference is dropped.
 
 Receive endpoint: `POST /app/{appId}/webhook/{webhookKey}`. The platform verifies the signature per `verificationScheme`, then starts `workflowKey` with the event payload as input; `inputMapping` (e.g. `"data.object"`) extracts a nested path first. A webhook-triggered workflow is `runAs: "system"`, so what stops a client from starting it directly with a crafted payload is the system-invocation gate (members get a 403) plus the signature verification — not `accessRule`, which a system workflow doesn't evaluate on the trigger (see [Access control](#access-control)).
 
@@ -1237,6 +1248,11 @@ primitive workflows update <workflow-id> --status active
 primitive workflows update <workflow-id> --from-file workflow.toml   # push a revised body (metadata + steps) in place, live immediately; explicit flags above override TOML values
 primitive workflows delete <workflow-id>           # archive (soft delete; the workflowKey stays reserved)
 primitive workflows delete <workflow-id> --hard --yes   # also frees the workflowKey for reuse
+
+# Inspect / reset iterate-users iterations
+primitive workflows iterations list [--app <id>] [--json]
+primitive workflows iterations get <iteration-name> [--json]
+primitive workflows iterations reset <iteration-name>   # only a completed/failed iteration; a running one is refused (409)
 
 # Expand fragment includes (for debugging)
 primitive workflows expand <workflow.toml>

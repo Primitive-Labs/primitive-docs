@@ -120,6 +120,20 @@ params = '{"id":{"type":"string","required":true},"name":{"type":"string","requi
 
 **Response:** `{ results: [{ success: boolean, id: string }] }`
 
+Instead of spelling out each field, a parameter can be typed as one of the type's models — the caller passes the whole record object and the server validates it field-by-field against that model. Write it directly with `"data": "$params.row"`, or merge it into a write with the `$spread` directive so you can stamp trusted fields alongside it:
+
+```toml
+[[operations]]
+name = "create-product"
+type = "mutation"
+modelName = "product"
+access = "hasRole('admin')"
+definition = '{"operations":[{"op":"save","data":{"$spread":"$params.row","createdBy":"$user.userId"}}]}'
+params = '{"row":{"type":"product","required":true}}'
+```
+
+Explicit fields you set alongside the spread — and server-stamped fields — always win over the caller's object, so `createdBy` here can't be spoofed from `row`.
+
 ### Counts
 Return a single count value (`type = "count"`). **Response:** `{ count: number }`
 

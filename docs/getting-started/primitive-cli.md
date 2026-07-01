@@ -351,6 +351,14 @@ primitive workflows publish my-workflow
 primitive workflows runs list
 ```
 
+Inspect and clear the restartable iterations of an [`iterate-users`](./workflows.md#iterate-users) workflow:
+
+```bash
+primitive workflows iterations list             # status + progress of each iteration
+primitive workflows iterations get <name>       # one iteration in detail
+primitive workflows iterations reset <name>     # clear a finished iteration so its next trigger runs fresh
+```
+
 ### Webhooks
 
 Manage inbound webhooks that trigger workflows when external services (Stripe, GitHub, Slack, …) send events. Define them as `webhooks/*.toml` in your sync directory, then inspect from the terminal:

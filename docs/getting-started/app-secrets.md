@@ -27,6 +27,7 @@ Server-side config refers to a secret as <span v-pre>`{{ secrets.KEY }}`</span>,
 |---|---|
 | [API Integrations](./api-integrations.md) | `requestConfig.defaultHeaders` and `requestConfig.staticQuery` — resolved when the request is proxied |
 | [Workflows](./workflows.md) | Step config templates and CEL expressions (`runIf`), via the `secrets.*` context variable |
+| [Inbound webhooks](./workflows.md#via-inbound-webhooks) | A webhook's `signingSecret` — resolved server-side when an incoming event is verified |
 | [Databases](./working-with-databases.md) | CEL access expressions on operations and trigger stamp values can read `secrets.*` |
 
 For example, an integration authenticates with a header that names the secret:

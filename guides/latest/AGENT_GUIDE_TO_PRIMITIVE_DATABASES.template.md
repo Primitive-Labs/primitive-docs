@@ -481,12 +481,25 @@ params = '{"projectId":{"type":"string","required":true},"status":{"type":"strin
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `type` | yes | One of `"string"`, `"number"`, `"boolean"`, `"object"` |
+| `type` | yes | One of `"string"`, `"number"`, `"boolean"`, `"object"`, or the name of a model declared in the type's `schema` |
 | `required` | no | Default `false`. If `true`, request fails 400 when missing |
 | `access` | no | CEL expression evaluated against the caller's value (bound as `value`); false → 403 |
-| `coerce` | no | Default `true`. If `false`, type-mismatched inputs are rejected instead of being coerced |
+| `coerce` | no | Default `true`. If `false`, type-mismatched inputs are rejected instead of being coerced. Only valid on a scalar param — setting it on a model-typed param is rejected at registration |
 
 By default, scalar mismatches are coerced where safe (`"42"` → `42` for type `"number"`, `"true"` → `true` for type `"boolean"`, etc.). Undeclared params (not in the schema) are rejected with 400.
+
+**Model-typed params.** A param's `type` can name a model declared in the type's `schema`, and the param arrives as an object validated field-by-field against that model — an unknown field is rejected (`UNKNOWN_FIELD`), a wrong field type is rejected (`FIELD_TYPE_MISMATCH`), and on a `save` op every required field must be present (`MISSING_REQUIRED_FIELD`; a `patch` validates only the fields present). The model must exist in the type's `schema` or registration is rejected (`PARAM_TYPE_SCHEMA_REQUIRED` / `PARAM_TYPE_UNKNOWN_MODEL`). A save/patch op writes the whole object with `"data": "$params.row"`, or merges its fields with the `$spread` directive:
+
+```toml
+[[operations]]
+name = "createTask"
+type = "mutation"
+modelName = "tasks"
+definition = '{"operations":[{"op":"save","data":{"$spread":"$params.row","userId":"$user.userId"}}]}'
+params = '{"row":{"type":"Task","required":true}}'
+```
+
+`$spread` expands the object's fields into the write; at most one `$spread` per data object, and it's not available inside an `applyToQuery` action's `data`. Explicit sibling keys and server-managed stamps (auto-populated fields, timestamps) always win over spread values, order-independent — so a server-stamped `userId` can't be spoofed from the caller's object. A `$spread` of a non-object value fails at execute time (`SPREAD_NON_OBJECT`).
 
 **Per-parameter access control** restricts what value a caller may pass:
 
@@ -565,7 +578,7 @@ This also works with `$steps.*` references in pipelines (see [Settings record pa
 
 ### Operation types
 
-Operations are defined in the `[[operations]]` array in the database type TOML file. The `definition` and `params` fields are JSON strings.
+Operations are defined in the `[[operations]]` array in the database type TOML file. The `definition` and `params` fields are JSON strings. A `definition` may equivalently be written as an inline TOML table (`definition = { filter = { "$in" = [...] } }`); both forms round-trip stably through `sync push`/`pull`. `sync push` warns (does not block) on an unrecognized filter operator — the supported set is `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$exists`, `$contains`, `$startsWith`, `$endsWith`, `$containsText`, plus logical `$and`/`$or`.
 
 #### Query — read records
 

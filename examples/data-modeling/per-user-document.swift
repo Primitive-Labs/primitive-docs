@@ -15,7 +15,7 @@ func loadPersonalData(client: JsBaoClient) async throws {
   _ = try await client.documents.open(result.documentId)
 
   // Reads run against local state after open()
-  let openTasks = Task.query(["completed": false])
+  let openTasks = try Task.query(["completed": false])
   // #endregion example
   _ = openTasks
 }

@@ -57,7 +57,7 @@ Documents must be opened before querying or modifying data within them.
 
 ```swift
   _ = try await client.documents.open(documentId)
-  let result = Task.query([:], options: QueryOptions(documents: [documentId]))
+  let result = try Task.query([:], options: QueryOptions(documents: [documentId]))
 ```
 
 Documents are ready to be queried once the `.open()` call finishes. Applications should wait for all required documents to be opened and show a loading state until then, then track document-specific readiness explicitly. `open()` is idempotent — calling it on an already-open document is a no-op. Handle open failures explicitly: surface an error or redirect; don't silently continue.
@@ -143,16 +143,16 @@ The generated model statics route through the process-wide default client — ca
   let task = try await Task.find("task-id")
 
   // Query with filters (synchronous — query/count/queryOne are synchronous)
-  let urgent = Task.query(["priority": ["$gte": 2], "completed": false])
+  let urgent = try Task.query(["priority": ["$gte": 2], "completed": false])
 
   // First match (with a sort)
-  let topTask = Task.query(
+  let topTask = try Task.query(
     ["completed": false],
     options: QueryOptions(sort: ["priority": -1])
   ).first
 
   // Count
-  let remaining = Task.count(["completed": false])
+  let remaining = try Task.count(["completed": false])
 ```
 
 ### Update
@@ -203,7 +203,7 @@ The generated model statics route through the process-wide default client — ca
 ### Logical query operators
 
 ```swift
-  let result = Task.query([
+  let result = try Task.query([
     "$or": [
       ["priority": 3],
       ["dueDate": ["$lt": "2026-06-02T00:00:00Z"]],
@@ -231,7 +231,7 @@ The generated model statics route through the process-wide default client — ca
 ### Aggregation
 
 ```swift
-  let stats = Task.aggregate(AggregateOptions(
+  let stats = try Task.aggregate(AggregateOptions(
     groupBy: ["category"],
     operations: [
       AggregateOperation(type: .count),
@@ -244,14 +244,14 @@ The generated model statics route through the process-wide default client — ca
   ))
 
   // Grouping by a stringset field counts per member value (facet):
-  let tagCounts = Task.aggregate(AggregateOptions(
+  let tagCounts = try Task.aggregate(AggregateOptions(
     groupBy: ["tags"],
     operations: [AggregateOperation(type: .count)]
   ))
 
   // Group by whether the set contains a value (membership) — rows carry
   // a "has_tags_urgent" key of "true" / "false":
-  let urgentSplit = Task.aggregate(AggregateOptions(
+  let urgentSplit = try Task.aggregate(AggregateOptions(
     groupBy: [.stringSetMembership(field: "tags", contains: "urgent")],
     operations: [AggregateOperation(type: .count)]
   ))
@@ -364,7 +364,7 @@ All documents that need live updates or cross-document queries must be open. Tag
   }
 
   // Query runs across all open documents by default
-  let messages = Message.query([:])
+  let messages = try Message.query([:])
 ```
 
 
@@ -429,7 +429,7 @@ struct ItemDetailView: View {
         }
         .task {
             _ = try? await appState.openAuxiliaryDoc(documentId)
-            todos = TodoItem.query([:], options: QueryOptions(documents: [documentId]))
+            todos = try? TodoItem.query([:], options: QueryOptions(documents: [documentId]))
         }
         .onDisappear { Task { await appState.closeAuxiliaryDoc(documentId) } }
     }
@@ -723,7 +723,7 @@ Dates are stored as ISO-8601 strings. Convert for comparisons:
   }
 
   // Query with date comparison
-  let overdue = Task.query(["dueDate": ["$lt": now]])
+  let overdue = try Task.query(["dueDate": ["$lt": now]])
 ```
 
 ## Querying Data
