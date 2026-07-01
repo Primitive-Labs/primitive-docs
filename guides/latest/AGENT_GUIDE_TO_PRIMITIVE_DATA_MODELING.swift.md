@@ -65,7 +65,7 @@ If you cannot answer one of these from context, ask before building:
   _ = try await client.documents.open(result.documentId)
 
   // Reads run against local state after open()
-  let openTasks = Task.query(["completed": false])
+  let openTasks = try Task.query(["completed": false])
 ```
 
 Use for: task managers, journals, settings, preferences. Root document also works for a single per-user doc with no sharing.

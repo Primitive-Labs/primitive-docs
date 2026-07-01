@@ -12,7 +12,7 @@ func openTaggedDocuments(client: JsBaoClient) async throws {
   }
 
   // Query runs across all open documents by default
-  let messages = Message.query([:])
+  let messages = try Message.query([:])
   // #endregion example
   _ = messages
 }

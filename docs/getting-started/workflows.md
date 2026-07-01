@@ -62,7 +62,7 @@ The full catalog — branching, delays, fan-out to child workflows, blob and ana
 
 A run carries a single growing JSON context from the first step to the last:
 
-1. **Every run starts with one JSON object — the input.** It's the `input` passed to `start()` or `runSync()`, a webhook's (mapped) payload, or a cron trigger's configured input. If the workflow declares an `inputSchema`, the input is validated against it first.
+1. **Every run starts with one JSON object — the input.** It's the `input` passed to `start()` or `runSync()`, a webhook's (mapped) payload, or a cron trigger's configured input. If the workflow declares an `inputSchema`, the input is validated against it first. A value bound to a scalar input property is coerced to the declared type where that's safe — a number into a `string` field, a numeric string into a `number` or `integer` field, `"true"`/`"false"` into a `boolean` — so a templated value carried in as text lands as the right type. A value that can't convert (a non-numeric string into a `number`) fails the run with a clear type error. Set `coerce = false` on a property to opt it out.
 
 2. **Steps read from the context through templates.** A step has no implicit input argument. Just before it runs, the <span v-pre>`{{ ... }}`</span> expressions in its config strings are resolved against the run context — `input.*` plus the recorded output of every step that already ran — and the step executes with that filled-in config. An email step's <span v-pre>`to = "{{ input.userEmail }}"`</span> and an LLM message's <span v-pre>`content = "Summarize: {{ steps.fetch.body }}"`</span> are both reading the context this way.
 
@@ -249,10 +249,13 @@ key = "stripe-payments"
 displayName = "Stripe Payments"
 workflowKey = "handle-payment"
 verificationScheme = "stripe"
+signingSecret = "{{secrets.STRIPE_WEBHOOK_SECRET}}"
 status = "active"  # active | paused
 ```
 
 The receive endpoint is `POST /app/{appId}/webhook/{webhookKey}`. When an event arrives, the webhook verifies the signature and starts the configured workflow with the event payload as input. Supported verification schemes are `stripe`, `github`, `slack`, `custom`, and `none`. Use `inputMapping` to extract a nested path from the payload before passing it to the workflow (e.g. `"data.object"`).
+
+Reference the signing secret from your [app secret store](./app-secrets.md) as <span v-pre>`{{secrets.KEY}}`</span> so it stays out of version control; the platform resolves it server-side when it verifies an incoming event. The referenced secret must already exist when you push the webhook. If it can't be resolved at delivery time, the webhook rejects the request with a `401` rather than verifying against the literal reference.
 
 **Securing webhook workflows:** a webhook-triggered workflow must run as the system identity (`runAs = "system"` — webhooks can only fire [system workflows](#system-workflows)):
 
@@ -264,7 +267,7 @@ status = "active"
 runAs = "system"  # required — webhooks can only fire system workflows
 ```
 
-That identity *is* the security boundary: members can't start a system workflow — a direct `client.workflows.start()` from a member is refused with a `403` — so, together with the webhook's signature verification, a client can't invoke the workflow with a crafted payload. An `accessRule` adds nothing here: it isn't evaluated on webhook triggers, and admins and owners bypass it, so `hasRole('owner')`, `"false"`, and omitting it behave identically. Reserve `accessRule` for [caller workflows](#controlling-access-to-workflows), where it gates who may start a run.
+That identity *is* the security boundary: members can't start a system workflow — a direct `client.workflows.start()` from a member is refused with a `403` — so, together with the webhook's signature verification, a client can't invoke the workflow with a crafted payload. A system workflow takes no `accessRule` — the rule is never evaluated on a system run, so declaring one is an error: a non-empty `accessRule` on a `runAs = "system"` workflow is rejected when you save or push it (`runAs:"system" workflows do not evaluate accessRule — remove the accessRule`). Reserve `accessRule` for [caller workflows](#controlling-access-to-workflows), where it gates who may start a run.
 
 Inspect webhooks and their recent deliveries (accepted, rejected, duplicate) from the CLI:
 
@@ -285,7 +288,7 @@ name = "Generate Report"
 accessRule = "hasRole('admin') || isMemberOf('team', 'ops')"
 ```
 
-With no rule, any signed-in member of the app can start the workflow; admins and owners always pass regardless of the rule. The rule is evaluated on every client invocation — asynchronous or synchronous — and when another workflow invokes this one through a `workflow.call` step. Cron triggers and inbound webhooks skip it entirely (they have their own controls). Because those triggers run [system workflows](#system-workflows) — which members can't start at all — `accessRule` is effectively inert on a system workflow; it genuinely gates only **caller** workflows, deciding who may start a run.
+With no rule, any signed-in member of the app can start the workflow; admins and owners always pass regardless of the rule. The rule is evaluated on every client invocation — asynchronous or synchronous — and when another workflow invokes this one through a `workflow.call` step. Cron triggers and inbound webhooks skip it entirely (they have their own controls). Because those triggers run [system workflows](#system-workflows) — which members can't start at all — a system workflow takes no `accessRule` at all: a non-empty rule on a `runAs = "system"` workflow is rejected when you save or push it. `accessRule` gates only **caller** workflows, deciding who may start a run.
 
 Push the rule with `primitive sync push` like any other workflow config, or change it in place with `primitive workflows update <id> --access-rule "<CEL>"`. For the rule language and the identity context available to it (`hasRole`, `isMemberOf`, `memberGroups`), see [Access Control](./access-control.md).
 
@@ -335,7 +338,7 @@ capabilities = ["membership"]
 
 A system run acts as the app, not as any one member — but a per-user job often needs to work *about* a specific user: read the documents they can see, run a database operation under their access rules, or attribute an event to them. The `*ForUser` step variants do exactly that. Each takes an explicit `userId` **subject** and operates as if it were checking that user, while the run's actor stays the system principal for the audit trail — the workflow acts *about* the user, never *as* them.
 
-These steps are **system-only** — a `runAs = "caller"` workflow that calls one is rejected — and the subject must be a member of the app, or the step fails. `userId` can be set on the step or inherited from `input.userId`, so a child workflow fanned out by [`iterate-users`](#iterate-users) gets the iterated user as its subject with no wiring:
+These steps are **system-only** — a `runAs = "caller"` workflow that calls one is rejected — and the subject must be a member of the app, or the step fails. The subject is the step's `userId` when set, otherwise `input.userId` — an empty or whitespace-only `userId` falls back to `input.userId` rather than shadowing it, so a child workflow fanned out by [`iterate-users`](#iterate-users) gets the iterated user as its subject with no wiring. A subject that resolves to empty fails the step with a remediation error naming `input.userId` and the iterate-users subject:
 
 ```toml
 [[steps]]
@@ -562,6 +565,8 @@ reason = "preferences backfill"        # static values pass through unchanged
 
 A key you set in `perUser.input` wins over the injected default, so <span v-pre>`userId = "{{ user.userId }}"`</span> is redundant but harmless.
 
+`iterationName` is itself templated: a plain string keys a single restartable singleton, while a date template like <span v-pre>`"digest-{{ today }}"`</span> makes each day's run its own iteration, and <span v-pre>`{{ now }}`</span> or <span v-pre>`{{ uuid }}`</span> makes every fire unique (turning off the resume-a-singleton behavior). Inspect and clear iterations from the CLI — `primitive workflows iterations list` shows each iteration's status and progress, `... get <name>` shows one in detail (including the failed-user sample), and `... reset <name>` clears a finished (completed or failed) iteration so its next trigger runs fresh. A still-running iteration can't be reset.
+
 ### `switch`
 
 First-match branching: `when` cases are CEL expressions evaluated top-to-bottom, and the first truthy case's `output` is returned:
@@ -686,6 +691,24 @@ path = "/current"
 
 [steps.request.query]
 city = "{{ input.city }}"
+```
+
+To send an `application/x-www-form-urlencoded` body, declare `[steps.request.form]` — a table of key/value pairs the platform URL-encodes, with the same <span v-pre>`{{ ... }}`</span> templating as the rest of the step. `form` is mutually exclusive with a raw `body` and with `bodyMode = "raw"` or `"multipart"`:
+
+```toml
+[[steps]]
+id = "token"
+kind = "integration.call"
+integrationKey = "oauth-provider"
+saveAs = "token"
+
+[steps.request]
+method = "POST"
+path = "/oauth/token"
+
+[steps.request.form]
+grant_type = "client_credentials"
+scope = "read:data"
 ```
 
 Keep credentials in the integration config (where <span v-pre>`{{ secrets.* }}`</span> resolves server-side) rather than passing them through `request.headers` — that way secrets never appear in workflow step output snapshots.
@@ -996,7 +1019,7 @@ Templates have **no arithmetic** — <span v-pre>`{{ a + b }}`</span> won't reso
 
 ### Unresolved Paths
 
-In interpolation mode an unresolved path renders as `<missing: steps.x.y>`, so the gap is visible in step output and logs. In single-expression mode it resolves to `null`, so downstream `runIf` comparisons work naturally. Set `strict = true` on a step to make any unresolved template path fail the step instead.
+In interpolation mode an unresolved path renders as `<missing: steps.x.y>`, so the gap is visible in step output and logs. In single-expression mode it resolves to `null`, so downstream `runIf` comparisons work naturally. Set `strict = true` on a step to make any unresolved template path fail the step instead. To be strict about only some params while leaving others null-tolerant, list them in `strictParams = ["userId", ...]` — a listed top-level param fails on a missing path but still tolerates a resolved `null`. When a template names a root that doesn't exist, the error lists the valid ones (`input`, `steps`, `outputs`, `meta`, `secrets`), which catches typos like <span v-pre>`{{ inputs.userId }}`</span>.
 
 ## Next Steps
 

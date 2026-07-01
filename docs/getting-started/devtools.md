@@ -107,6 +107,8 @@ export default tests;
 
 `createTestDocument()` creates an isolated local-only document and sets it as the default for all model operations; `destroyTestDocument()` closes and evicts it. Tests that don't touch the database — pure logic, validation — skip the document lifecycle and just use the `(log) => ...` signature.
 
+For a test that performs server-side operations on the document — a blob upload or collection membership, which fail against a local-only document — pass `createTestDocument({ networkSync: true })` for a server-resident document; `destroyTestDocument()` then deletes it server-side so test documents don't pile up.
+
 To run: open the dev tools overlay, select **Test Harness**, choose tests, and click **Run Selected Tests**. Results show real-time log output, pass/fail status, and execution time.
 
 Best practices:
@@ -114,6 +116,18 @@ Best practices:
 - Keep business logic in `src/lib/` (not embedded in components) so it's easy to test
 - Test real behavior — don't mock browser APIs
 - Only create test documents when your test actually needs database operations, and always clean them up in a `finally` block
+- Scope queries to the test document. `createTestDocument()` sets its document as the default, but a model query spans every open document and test documents aren't reliably evicted between tests — so an unscoped `Task.query({ ... })` can pick up other tests' records and return more than the test created. Pass `{ documents: doc.docId }` (a single id or an array) so the assertion sees only its own data:
+
+```ts
+const doc = await createTestDocument();
+try {
+  await new Task({ title: "High priority", priority: 2 }).save();
+  const highPriority = await Task.query({ priority: 2 }, { documents: doc.docId });
+  // highPriority sees only this test's records
+} finally {
+  await destroyTestDocument(doc);
+}
+```
 
 ## iOS: The Debug Inspector
 

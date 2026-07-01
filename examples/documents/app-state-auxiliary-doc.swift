@@ -18,7 +18,7 @@ struct ItemDetailView: View {
         }
         .task {
             _ = try? await appState.openAuxiliaryDoc(documentId)
-            todos = TodoItem.query([:], options: QueryOptions(documents: [documentId]))
+            todos = try? TodoItem.query([:], options: QueryOptions(documents: [documentId]))
         }
         .onDisappear { Task { await appState.closeAuxiliaryDoc(documentId) } }
     }

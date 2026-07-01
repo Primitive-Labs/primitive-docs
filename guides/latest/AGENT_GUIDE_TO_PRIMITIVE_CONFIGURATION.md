@@ -53,10 +53,10 @@ config/
 App-level settings sync from `app.toml`; editing the TOML and `sync push` is the default path. The equivalent `primitive apps update --flag` calls mutate the server imperatively and drift from the checked-in TOML — the next `sync push` reverts them unless mirrored back. TOML-syncable settings:
 
 - `[app]` — `name`, `mode`, `waitlistEnabled`, `baseUrl`
-- `[auth]` — `googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled`, `[auth.passkeys]` relying-party config
+- `[auth]` — `googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled`, `appleSignInEnabled`, `otpEnabled`, `appleAudiences` (string array), `[auth.passkeys]` relying-party config
 - `[cors]` (serialized only when `mode = "custom"`) — `allowedOrigins`, `allowCredentials`, `allowedMethods`, `maxAge`
 
-Not in `app.toml` (see [What sync does NOT carry](#what-sync-does-not-carry)): `otp` (set via `--otp <bool>` only) and `redirectUris` (set via `--redirect-uris "<uri1>,<uri2>"` or the Admin Console — no TOML key).
+Push forwards only recognized `[auth]` keys and only those present: an omitted key is left untouched on the server (not cleared), an explicit `false` is forwarded, and `appleAudiences = []` clears the audiences. An unrecognized `[auth]` key is ignored with a warning (`Unrecognized [auth] key "<key>" in app.toml — ignored. Recognized keys: …`). Not in `app.toml` (see [What sync does NOT carry](#what-sync-does-not-carry)): `redirectUris` (set via `--redirect-uris "<uri1>,<uri2>"` or the Admin Console — no TOML key).
 
 ## Environment resolution
 
@@ -79,7 +79,6 @@ Some settings are set with dedicated update commands rather than TOML (app-level
 ```bash
 primitive workflows update <id> --requires-client-apply false
 primitive workflows update <id> --sync-callable true
-primitive apps update --otp true                                          # no TOML key
 primitive apps update --member-invitations-enabled true --member-invitation-limit 5
 primitive apps update --test-account-bases alice@example.com
 primitive apps update --redirect-uris "https://app.example.com/auth/callback"  # no TOML key

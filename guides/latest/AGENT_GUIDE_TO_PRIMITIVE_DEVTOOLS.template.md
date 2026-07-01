@@ -238,18 +238,32 @@ host app. Key invariants:
    `===TEST=== {timestamp}-{random}`, opens it with
    `enableNetworkSync: false`, and calls `client.setDefaultDocumentId(docId)`.
    Model operations like `.save()`, `.find()`, `.query()` use it implicitly.
+   Pass `createTestDocument({ networkSync: true })` for a **server-resident**
+   document — required for server-side operations (blob upload, collection
+   membership) that return `404 Document not found` against a local-only doc.
 2. **Pure-logic tests skip documents.** Tests that only use in-memory model
    instances, utility functions, or validation logic don't need a test
    document — they just use the simple `(log) => ...` signature.
-3. **Document cleanup via try/finally.** `destroyTestDocument()` closes and
-   `evict()`s the document (no server round-trip — they are local-only).
-   Always call it in a `finally` block.
-4. **Host-app docs are quiesced.** `beginTestRun()` closes every currently
+3. **Document cleanup via try/finally.** `destroyTestDocument()` cleans up the
+   document: a local-only doc is closed and `evict()`ed (no server round-trip);
+   a `networkSync: true` doc is deleted server-side
+   (`documents.delete(id, { forceCloseIfOpen: true })`) so test docs don't
+   accumulate. Always call it in a `finally` block.
+4. **Scope queries to the test document.** `createTestDocument()` sets its
+   document as the default, but a model query spans every open document and
+   test docs aren't reliably evicted between tests — an unscoped
+   `Task.query({ ... })` can pick up other tests' records. Pass
+   `{ documents: doc.docId }` (a single id or an array) so the assertion sees
+   only its own data:
+   ```ts
+   const highPriority = await Task.query({ priority: 2 }, { documents: doc.docId });
+   ```
+5. **Host-app docs are quiesced.** `beginTestRun()` closes every currently
    open host document; `endTestRun()` re-opens them after the run.
-5. **Leftover cleanup.** `deleteAllTestDocuments()` runs on app start, when
+6. **Leftover cleanup.** `deleteAllTestDocuments()` runs on app start, when
    the overlay opens, and at the start of each run — anything titled with
    `===TEST===` is evicted.
-6. **No timeout.** A test can hang indefinitely; the runner won't kill it.
+7. **No timeout.** A test can hang indefinitely; the runner won't kill it.
 
 ### UI
 

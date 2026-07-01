@@ -20,6 +20,7 @@ primitive secrets delete OPENAI_API_KEY
 |---|---|---|
 | Integrations | `requestConfig.defaultHeaders`, `requestConfig.staticQuery` | Per request, when the proxy executes the call |
 | Workflows | Any step-config template string; CEL contexts (`runIf`, `switch` `when`) expose `secrets.*` | Just before the step runs |
+| Inbound webhooks | A webhook's `signingSecret` (a `{{secrets.KEY}}` reference — the tighter no-space form) | Server-side, immediately before HMAC verification of an incoming event. Referenced key must exist at create/update; **fails closed** with a `401` (`rejectionReason: secret_unresolved`) if unresolvable at delivery |
 | Databases | Operation `access` / per-param `access` CEL; trigger stamp `value` CEL | When the operation executes (secrets load only when the expression references `secrets.`) |
 
 There is no client-side surface: apps cannot read secret values through any API.

@@ -1,9 +1,9 @@
 import JsBaoClient
 
 // Group-by aggregation with count/avg/sum, an optional filter, sort, and limit.
-func taskStats() {
+func taskStats() throws {
   // #region example
-  let stats = Task.aggregate(AggregateOptions(
+  let stats = try Task.aggregate(AggregateOptions(
     groupBy: ["category"],
     operations: [
       AggregateOperation(type: .count),
@@ -16,14 +16,14 @@ func taskStats() {
   ))
 
   // Grouping by a stringset field counts per member value (facet):
-  let tagCounts = Task.aggregate(AggregateOptions(
+  let tagCounts = try Task.aggregate(AggregateOptions(
     groupBy: ["tags"],
     operations: [AggregateOperation(type: .count)]
   ))
 
   // Group by whether the set contains a value (membership) — rows carry
   // a "has_tags_urgent" key of "true" / "false":
-  let urgentSplit = Task.aggregate(AggregateOptions(
+  let urgentSplit = try Task.aggregate(AggregateOptions(
     groupBy: [.stringSetMembership(field: "tags", contains: "urgent")],
     operations: [AggregateOperation(type: .count)]
   ))

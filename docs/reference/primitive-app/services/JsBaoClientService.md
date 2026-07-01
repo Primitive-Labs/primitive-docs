@@ -68,7 +68,7 @@ const client = await jsBaoClientService.getClientAsync();
 
 // Use client methods
 await client.auth.signIn();
-const docs = await client.documents.list();
+const docs = await client.me.ownedDocuments();
 ```
 
 ### Environment Variables

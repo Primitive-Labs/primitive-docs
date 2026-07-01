@@ -5,7 +5,7 @@ import JsBaoClient
 func openThenQuery(client: JsBaoClient, documentId: String) async throws {
   // #region example
   _ = try await client.documents.open(documentId)
-  let result = Task.query([:], options: QueryOptions(documents: [documentId]))
+  let result = try Task.query([:], options: QueryOptions(documents: [documentId]))
   // #endregion example
   _ = result
 }

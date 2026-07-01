@@ -44,4 +44,4 @@ Optional description; omitted when the group has no description set.
 
 > **name**: `string`
 
-Display name of the group (joined from AppGroup at call time).
+Display name of the group (joined from the group record at call time).

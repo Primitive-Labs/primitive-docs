@@ -64,10 +64,10 @@ Every feature page in these docs that shows a TOML block — [Workflows](./workf
 `app.toml` holds the app-level settings, and pushing it is the preferred way to change them — the imperative `primitive apps update --flag` calls mutate the server directly and drift from the checked-in TOML, so a later `sync push` reverts them. The TOML-syncable settings are:
 
 - `[app]` — `name`, `mode`, `waitlistEnabled`, `baseUrl`
-- `[auth]` — `googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled`, and `[auth.passkeys]` relying-party config
+- `[auth]` — `googleOAuthEnabled`, `magicLinkEnabled`, `passkeyEnabled`, `appleSignInEnabled`, `appleAudiences`, `otpEnabled`, and `[auth.passkeys]` relying-party config
 - `[cors]` (when `mode = "custom"`) — `allowedOrigins`, `allowCredentials`, `allowedMethods`, `maxAge`
 
-Two app settings are not part of `app.toml`: **OTP** is toggled with `primitive apps update --otp <bool>` only, and **redirect URIs** are set with `primitive apps update --redirect-uris "<uri1>,<uri2>"` or in the [Admin Console](https://admin.primitiveapi.com) (no TOML key).
+Only the keys listed above are pushed — an omitted `[auth]` key leaves the server value untouched (it isn't cleared), and an unrecognized `[auth]` key is ignored with a warning on push. **Redirect URIs** are the one app setting not part of `app.toml`: set them with `primitive apps update --redirect-uris "<uri1>,<uri2>"` or in the [Admin Console](https://admin.primitiveapi.com).
 
 Credentials never go in these files: config that needs an API key references it as <span v-pre>`{{ secrets.KEY }}`</span>, with the value stored server-side. See [App Secrets](./app-secrets.md).
 

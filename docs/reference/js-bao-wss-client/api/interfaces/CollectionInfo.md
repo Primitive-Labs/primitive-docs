@@ -34,7 +34,7 @@ at create time. Immutable after create.
 
 > **contextId**: `string` \| `null`
 
-Per-instance context identifier. Parallels `AppGroup.groupId`. Used by
+Per-instance context identifier. Parallels a group's `groupId`. Used by
 CEL rules (`collection.contextId`) to identify the external entity the
 collection is bound to (e.g. a class ID, project ID). `null` for
 collections not bound to any context. Immutable after create.

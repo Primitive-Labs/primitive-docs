@@ -7,16 +7,16 @@ func readTasks() async throws {
   let task = try await Task.find("task-id")
 
   // Query with filters (synchronous — query/count/queryOne are synchronous)
-  let urgent = Task.query(["priority": ["$gte": 2], "completed": false])
+  let urgent = try Task.query(["priority": ["$gte": 2], "completed": false])
 
   // First match (with a sort)
-  let topTask = Task.query(
+  let topTask = try Task.query(
     ["completed": false],
     options: QueryOptions(sort: ["priority": -1])
   ).first
 
   // Count
-  let remaining = Task.count(["completed": false])
+  let remaining = try Task.count(["completed": false])
   // #endregion example
   _ = (task, urgent, topTask, remaining)
 }
