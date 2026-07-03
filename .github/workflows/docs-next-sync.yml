@@ -79,7 +79,7 @@ permissions:
 jobs:
   next-sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
     steps:
       - name: Checkout primitive-docs (next)
         uses: actions/checkout@v5
@@ -245,13 +245,14 @@ jobs:
             echo "${NOTES:-(none)}"
           } >> /tmp/prompt.txt
 
-          # Opus, not Sonnet: this pass does careful source-verification and
-          # drafts new doc/guide prose — capability matters more than the small
-          # per-run cost of a once-nightly job. The budget covers the full
-          # truing pass including the required whole-set audit.
+          # Sonnet, not Opus: the nightly is deliberately scoped to the changed
+          # window (no whole-set audit — that deep pass runs at publish time in
+          # receive-production-release.yml, which stays on Opus). The gates
+          # enforce correctness mechanically and a human reviews the PR, so
+          # Sonnet's cost profile fits the nightly cadence.
           set +e
-          timeout 100m claude -p "$(cat /tmp/prompt.txt)" \
-            --model opus \
+          timeout 60m claude -p "$(cat /tmp/prompt.txt)" \
+            --model sonnet \
             --permission-mode bypassPermissions \
             --output-format json \
             > /tmp/claude_out.json 2> /tmp/claude_err.log

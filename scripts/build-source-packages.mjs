@@ -24,18 +24,30 @@ if (!existsSync(join(WSS, "package.json"))) {
   process.exit(1);
 }
 
+// js-bao-wss pins its own pnpm (the `packageManager` field) and keeps its
+// workspace settings (overrides, onlyBuiltDependencies) in pnpm-workspace.yaml
+// — a location older pnpm versions can't read, which makes a frozen install
+// fail with ERR_PNPM_LOCKFILE_CONFIG_MISMATCH when driven by this repo's pnpm.
+// Run every pnpm command for that workspace through corepack from inside it,
+// so the submodule's own pinned pnpm does the work.
+const wssPnpm = (args) =>
+  run("corepack", ["pnpm", ...args], {
+    cwd: WSS,
+    env: { ...process.env, COREPACK_ENABLE_DOWNLOAD_PROMPT: "0" },
+  });
+
 console.log("Installing js-bao-wss workspace dependencies…");
-run("pnpm", ["install", "--frozen-lockfile"], { cwd: WSS });
+wssPnpm(["install", "--frozen-lockfile"]);
 
 // js-bao first: the client and CLI may resolve it from the workspace.
 console.log("\nBuilding js-bao (packages/js-bao)…");
-run("pnpm", ["--dir", join(WSS, "packages", "js-bao"), "build"]);
+wssPnpm(["--dir", join(WSS, "packages", "js-bao"), "build"]);
 
 console.log("\nBuilding js-bao-wss-client (src/client)…");
-run("pnpm", ["--dir", join(WSS, "src", "client"), "build:esm"]);
+wssPnpm(["--dir", join(WSS, "src", "client"), "build:esm"]);
 
 console.log("\nBuilding primitive-admin (cli)…");
-run("pnpm", ["--dir", join(WSS, "cli"), "build"]);
+wssPnpm(["--dir", join(WSS, "cli"), "build"]);
 
 // js-bao's build runs its codegen, which rewrites tracked demo fixtures inside
 // the submodule. library_repos/* are read-only source mirrors — restore any
