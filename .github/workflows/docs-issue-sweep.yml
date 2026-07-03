@@ -134,9 +134,12 @@ jobs:
             not committed).
           PROMPT
 
+          # Sonnet: issue fixes are scoped, gate-validated, and human-reviewed
+          # on their PRs — same cost posture as the nightly tier. The publish
+          # tier (receive-production-release.yml) stays on Opus.
           set +e
           timeout 100m claude -p "$(cat /tmp/prompt.txt)" \
-            --model opus \
+            --model sonnet \
             --permission-mode bypassPermissions \
             --output-format json \
             > /tmp/claude_out.json 2> /tmp/claude_err.log
