@@ -41,7 +41,7 @@ In the starter template this wiring is owned for you by `PrimitiveAppState.initi
   let config = try await client.auth.getAuthConfig()
   // AuthConfigInfo: appId, name, mode, waitlistEnabled,
   //   googleOAuthEnabled, googleClientId, hasOAuth, redirectUris,
-  //   passkeyEnabled, passkeyRpId, passkeyRpName, hasPasskey,
+  //   passkeyEnabled, passkeyRpId, passkeyRpName, passkeyRpConfig, hasPasskey,
   //   appleSignInEnabled, hasApple, magicLinkEnabled, otpEnabled
 
   let methods = (

@@ -291,6 +291,8 @@ type = "number"
 indexed = true
 ```
 
+When you push a schema that newly marks a field `indexed` or `unique`, the server provisions that index across every existing database of the type automatically — there's no manual per-database reindex step to run first.
+
 To add a schema to an existing type with live data, scaffold it from the server — it infers field types from your operations and the live records, ready to review and push:
 
 ```bash

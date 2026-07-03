@@ -338,7 +338,7 @@ Triggers are computed fields that run server-side before a record is saved. Conf
 | `record.*` | The record being saved (current field values) |
 | `database.id` | The database ID |
 | `database.celContext.*` | The database's CEL context object (also accessible as `database.metadata.*`) |
-| `secrets.*` | App secrets (loaded only when expression references `secrets.`) |
+| `secrets.*` | App secrets — binds only the keys declared in the config's `secrets` manifest (loaded when the expression references `secrets.`) |
 | `now()` | Current ISO 8601 timestamp |
 | `lookup(modelName, id)` | Load another record by ID; returns `null` if missing |
 | `isMemberOf(groupType, groupId)`, `memberGroups(groupType)`, `hasRole(role)` | Membership/role checks |
@@ -664,7 +664,7 @@ params = '{"email":{"type":"string","required":true},"name":{"type":"string","re
 Two failure modes to know:
 
 - `"upsertOn": "$params.email"` gets **value-substituted** like any other definition string, so the server receives the email *value* as the field name and rejects with `upsertOn field 'alice@example.com' must be present in data and not null/empty`.
-- `upsertOn` requires a **unique index** on the field — declare `unique = true` on the field in the type schema. Databases created from the type provision the index automatically; a static `upsertOn` naming a field that isn't declared `unique = true` is rejected at push time. For a database created before the field was declared unique, back-provision with `primitive databases reindex <database-id> --from-schema` (idempotent) — without the index, saves fail with `upsertOn field '<field>' does not have a registered unique index`.
+- `upsertOn` requires a **unique index** on the field — declare `unique = true` on the field in the type schema. Databases created from the type provision the index automatically; a static `upsertOn` naming a field that isn't declared `unique = true` is rejected at push time. When you push a schema that newly declares a field `unique = true` (or `indexed = true`), the server back-provisions that index across every existing database of the type — the `sync push` / type-PATCH response carries a `reindexFanout` handle (`{ runId, instanceCount, statusUrl }`) you can poll at `.../databases/types/<type>/reindex-status?runId=...` for `{ status, total, completed, failed }`. Opt out with `?reindexInstances=false`. To back-provision a single database by hand (or after opting out), run `primitive databases reindex <database-id> --from-schema` (idempotent). Without the index, saves fail with `upsertOn field '<field>' does not have a registered unique index`.
 
 #### Count — count matching records
 

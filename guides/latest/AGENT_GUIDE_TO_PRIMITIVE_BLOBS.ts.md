@@ -111,7 +111,7 @@ Uploading the same `blobId` twice with **identical** `sha256` and `size` returns
 
 ## Listing
 
-See **List / metadata / delete** above for the basic call. Each item carries `blobId`, `filename`, `contentType`, `numBytes`, `sha256`, and `createdAt`. `cursor` is an opaque pagination token; only present when more results exist — follow it to page through results.
+See **List / metadata / delete** above for the basic call. Each item carries `blobId`, `filename`, `contentType`, `numBytes`, `sha256`, and `createdAt`. `cursor` is an opaque pagination token; only present when more results exist — follow it to page through results. `limit` accepts `1`–`100`; a larger value is clamped to `100`, and a zero, negative, or non-integer `limit` is rejected with a `400`. Page through the `cursor` for more than 100 blobs rather than asking for a bigger page.
 
 ```typescript
   const page1 = await blobs.list({ limit: 50 });
@@ -350,7 +350,7 @@ A **web walkthrough** composing [List](#listing), `prefetch` ([Offline & the upl
 ```typescript
 async function loadGallery(client: JsBaoClient, documentId: string) {
   const blobs = client.document(documentId).blobs();
-  const { items } = await blobs.list({ limit: 200 });
+  const { items } = await blobs.list({ limit: 100 });
   const images = items.filter((b: any) => b.contentType?.startsWith("image/"));
 
   await blobs.prefetch(images.map((b: any) => b.blobId), { concurrency: 4 });

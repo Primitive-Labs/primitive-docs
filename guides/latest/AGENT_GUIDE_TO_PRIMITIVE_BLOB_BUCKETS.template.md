@@ -81,6 +81,8 @@ Change a bucket's access at runtime without recreating it (admin/owner only) wit
 
 {{ example: blobs/bucket-update }}
 
+From the CLI: `primitive blob-buckets update <id-or-key> --preset <preset>` switches the preset (clearing any attached rule set); `--rule-set-id <id>` attaches a rule set (making the bucket `custom`). `--name` and `--description` update those fields. At least one flag is required; `--preset` and `--rule-set-id` are mutually exclusive, and clearing a rule set requires moving to a preset in the same call.
+
 ### TTL tiers
 
 The storage layer automatically expires objects based on the bucket's `ttlTier`. Pick the shortest tier that fits.

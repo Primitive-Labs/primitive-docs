@@ -38,6 +38,13 @@ primitive login
 
 This opens your browser for OAuth authentication. Tokens are stored per-environment so dev and prod can stay signed in independently — see [Project Configuration and Environments](#project-configuration-and-environments) below for where they land.
 
+`login` authenticates against the active environment's server. Inside a project it uses the selected environment's `apiUrl` — pick the environment with `-e <env>`. Outside a project it uses the default server, which you can point at a local or custom server with the `PRIMITIVE_SERVER_URL` environment variable:
+
+```bash
+primitive -e prod login                                       # a named environment's server
+PRIMITIVE_SERVER_URL=http://localhost:8787 primitive login    # a custom server, no project config
+```
+
 To check your current authentication status:
 
 ```bash
@@ -341,6 +348,16 @@ primitive prompts create my-prompt
 primitive prompts execute my-prompt
 ```
 
+### Scripts
+
+Inspect Rhai [scripts](./workflows.md#script) (transforms) and manage their test cases. Script bodies are authored through `primitive sync` (`transforms/<name>.rhai`); this command reads them and drives their tests:
+
+```bash
+primitive scripts list
+primitive scripts get normalize-order
+primitive scripts tests run-all normalize-order
+```
+
 ### Workflows
 
 Build and manage multi-step workflows:
@@ -515,10 +532,10 @@ primitive token
 
 For headless environments where a browser-based `primitive login` isn't possible — CI pipelines, deploy scripts, server-side jobs — you have two non-interactive paths.
 
-To sign in as yourself, pipe a refresh token into `login --token-stdin`:
+To sign in as yourself, pipe a refresh token into `login --token-stdin`. Select the environment with `-e <env>` so login targets the right server (or, without a project config, point it at one with `PRIMITIVE_SERVER_URL`):
 
 ```bash
-primitive token --refresh | primitive login -s <url> --token-stdin
+primitive token --refresh | primitive -e <env> login --token-stdin
 ```
 
 Or create a long-lived API token, which isn't tied to a user session:

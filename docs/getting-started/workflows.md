@@ -330,7 +330,7 @@ runAs = "system"
 capabilities = ["membership"]
 ```
 
-`membership` lets the workflow change group membership — the `group.addMember` and `group.removeMember` steps. Without the grant, those steps in a system workflow are refused. Read-only group checks never need it.
+`membership` lets the workflow change group membership — the `group.addMember`, `group.removeMember`, and `group.removeAll` steps. Without the grant, those steps in a system workflow are refused. Read-only group checks never need it.
 
 [`iterate-users`](#iterate-users) is system-only — it fans out across the entire user roster, which no single caller has the standing to do. A workflow that uses it must set `runAs = "system"`, or the server rejects it when you push.
 
@@ -455,9 +455,10 @@ Every step has an `id` (unique within the workflow) and a `kind` (the step type)
 | `database.query` / `mutate` / `count` / `aggregate` / `pipeline` / `applyToQuery` | Run registered database operations |
 | `document.query` / `queryOne` / `count` / `save` / `patch` / `delete` | Read and write records in a document's models |
 | `document.resolveAlias` | Resolve a document alias to its id (or null) for conditional branching |
-| `group.addMember` / `removeMember` / `checkMembership` / `listMembers` / `listUserMemberships` | Group membership operations |
+| `group.addMember` / `removeMember` / `removeAll` / `checkMembership` / `listMembers` / `listUserMemberships` | Group membership operations |
 | `collect` | Auto-paginate any step that returns `{ items, cursor }` |
 | `workflow.call` | Run a child workflow synchronously, inline (use `forEach` to fan out) |
+| `block.call` | Invoke a prompt, integration, script, or workflow block selected by `blockType` — a unified wrapper over the four steps above |
 | `email.send` | Send an email (template-based or inline) |
 | `blob.upload` / `blob.download` / `blob.signedUrl` | Read, write, or sign blob URLs |
 | `analytics.write` / `analytics.query` | Emit analytics events or query server-side aggregates |
@@ -800,7 +801,7 @@ saveAs = "tracker"
 
 ### Group Steps
 
-`group.addMember`, `group.removeMember`, `group.checkMembership`, `group.listMembers`, and `group.listUserMemberships` manage [groups](./users-and-groups.md) from a workflow:
+`group.addMember`, `group.removeMember`, `group.removeAll`, `group.checkMembership`, `group.listMembers`, and `group.listUserMemberships` manage [groups](./users-and-groups.md) from a workflow:
 
 ```toml
 [[steps]]
@@ -810,6 +811,18 @@ groupType = "team"
 groupId = "{{ input.teamId }}"
 userId = "{{ input.userId }}"   # or email = "...", not both
 ```
+
+`group.removeAll` clears every membership a user holds within one group type — the building block for a "clear then set" pattern, such as resetting a user's `subscription` tier before adding exactly one:
+
+```toml
+[[steps]]
+id = "clear-tiers"
+kind = "group.removeAll"
+groupType = "subscription"
+userId = "{{ input.userId }}"
+```
+
+It takes a `groupType` and a `userId` (no `groupId` — it removes the user from every group of that type) and returns `{ removed, groupIds }`. It is strictly type-scoped, so clearing `sub` never touches `subscription`, and it removes at most 1000 memberships per run. In a caller run the group type's `member.delete` rule is checked for every affected group before anything is removed, so authorization is all-or-nothing.
 
 Group steps evaluate the group type's rule sets like any other caller; rules can match workflow-issued operations with `fromWorkflow("workflowKey")` — see [Access Control](./access-control.md). In a [system run](#system-workflows), `addMember` and `removeMember` record the app's system principal as the member's `addedBy` — not the admin or trigger that started the run.
 

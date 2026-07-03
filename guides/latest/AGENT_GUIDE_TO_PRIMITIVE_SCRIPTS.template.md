@@ -12,7 +12,7 @@ A script converges on the same shape as managed prompts:
 - Versioned **`ScriptConfig`** rows each hold a Rhai body plus that config's `limits`.
 - The active body is the `ScriptConfig` that `activeConfigId` points at.
 
-You never edit these records directly. A script body lives in your sync directory as `transforms/<name>.rhai`, where `<name>` (the filename without `.rhai`) is the script's unique name. `primitive sync push` mirrors the file to the server — creating a new `ScriptConfig` and activating it — and `primitive sync pull` writes it back. There is no separate `transforms` CLI command; scripts ride the normal sync flow.
+You never edit these records directly. A script body lives in your sync directory as `transforms/<name>.rhai`, where `<name>` (the filename without `.rhai`) is the script's unique name. `primitive sync push` mirrors the file to the server — creating a new `ScriptConfig` and activating it — and `primitive sync pull` writes it back. Authoring is sync-only: no CLI command writes a script body. The `primitive scripts` command is read/inspect plus test-case management on top of that — list scripts, inspect a script's versions, and create or run its test cases (see [Testing](#testing)).
 
 ### Live resolution at run time
 
@@ -127,7 +127,20 @@ Each execution records per-step telemetry at `steps.<id>.scriptMetrics` — a si
 
 ## Testing
 
-Determinism is what makes scripts testable: same input, same output, no hidden state. Put the script in a workflow and drive it with workflow test cases — fix the input variables, run, and assert on `steps.<id>.output`:
+Determinism is what makes scripts testable: same input, same output, no hidden state.
+
+Test a script directly with `primitive scripts tests` — fix the input variables and assert on the returned JSON. A test case names a script, carries input `--vars`, and expresses expectations with `--pattern` (a regex over the output), `--contains` (a JSON array of required substrings), and/or `--json-subset` (a JSON object the result must include); `--config` pins the case to a specific version:
+
+```bash
+primitive scripts list
+primitive scripts tests create normalize-order --name "drops zero-qty" \
+  --vars '{"raw":{"items":[{"qty":0}]},"currency":"USD"}' --contains '["USD"]'
+primitive scripts tests run-all normalize-order
+```
+
+Test cases round-trip through sync in the `transforms/<name>.tests/*.toml` layout, so they live beside the script body in your sync directory.
+
+You can also drive a script end-to-end from the workflow that uses it, with workflow test cases that assert on `steps.<id>.output`:
 
 ```bash
 primitive workflows tests create <workflow-id> --name "normalize: drops zero-qty" \

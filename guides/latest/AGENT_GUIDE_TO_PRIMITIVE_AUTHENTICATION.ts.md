@@ -40,8 +40,8 @@ In the starter template this wiring is owned for you by the template's `userStor
   // {
   //   appId, name, mode, waitlistEnabled,
   //   googleOAuthEnabled, googleClientId, hasOAuth, redirectUris,
-  //   passkeyEnabled, passkeyRpId, passkeyRpName, hasPasskey,
-  //   magicLinkEnabled, otpEnabled
+  //   passkeyEnabled, passkeyRpId, passkeyRpName, passkeyRpConfig, hasPasskey,
+  //   appleSignInEnabled, hasApple, magicLinkEnabled, otpEnabled
   // }
 
   const methods = {
