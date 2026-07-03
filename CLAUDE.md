@@ -9,6 +9,7 @@ Documentation site for the Primitive platform, built with VitePress.
 - `examples/` — The compiled per-language example corpus shared by both doc products
 - `library_repos/` — Git submodules for source-of-truth library code
 - `STYLE.md` — The canonical editorial standards (altitude tiers, tone, never-say rules, platform treatment, fact verification). Read it before writing or reviewing any doc.
+- `AUTOMATION.md` — The current state of the automated pipeline: which workflows run which skills, on what trigger and model, and what they produce. **Whenever an automation changes — anything under `.github/workflows/`, a skill an automated workflow invokes, its model, cadence, or output — update `AUTOMATION.md` in the same change.** It is the map humans read to know what runs unattended; a stale map is worse than none.
 
 ## How the Docs Are Built (per-language examples)
 
