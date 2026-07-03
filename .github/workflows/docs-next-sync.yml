@@ -11,24 +11,24 @@
 # firing on every push. Production releases are a separate tier — they trigger
 # `docs-publish-release` via receive-production-release.yml, not this workflow.
 #
-# ROLLING PR, not one-per-night. The PR is opened on a FIXED branch
-# (`docs-next-sync/auto`), so when a prior pass hasn't merged yet the next run
-# force-pushes the same branch and updates that one PR in place rather than
-# opening a second, overlapping one. Each update is a complete, gate-green,
-# independently-mergeable superset of everything new since the last MERGE (the
-# branch is recreated from `next` every run — no accumulation, no chain). On
-# merge, `next`'s stamp advances and the next run starts fresh and small.
+# INDIVIDUAL DELTA PRs, one per night. Each run opens its own PR on a fresh
+# per-run branch (`docs-next-sync/auto-<date>-<run>`), covering ONLY the
+# library window since the last attempt — never a re-derivation of earlier
+# unmerged PRs' work (the old rolling-superset design re-trued the whole
+# window every night, which multiplied cost while a PR sat unmerged).
 #
-# The scan step (below) picks its baseline accordingly: if the rolling PR is
-# still OPEN, it scans against the branch's docs-sources.json stamp (the tips
-# the LAST RUN trued to) rather than next's merged stamp — so an un-merged PR
-# doesn't make us re-derive the same window every night. We only pay for a
-# Claude run when the library tips have actually moved past the last attempt.
-# The gate checks the PR's state, not just the branch's existence: a PR closed
-# UNMERGED (rejected/superseded) must not suppress re-deriving its window, so a
-# closed PR falls back to next's merged stamp. The agent itself always trues
-# from next's merged baseline, keeping the PR a complete superset; only the
-# cheap has_work gate uses the branch stamp.
+# The scan step (below) picks the baseline: the stamp of the NEWEST OPEN sync
+# PR if one exists (so we only pay for a Claude run when the tips moved past
+# the last attempt), else next's merged stamp. That baseline stamp is left in
+# place for the agent too — its Step 1 scan then surfaces exactly the delta
+# window. A PR closed UNMERGED (rejected) doesn't count as a baseline: its
+# window gets re-derived by the next run.
+#
+# Consequence: sync PRs form an oldest-first chain — a newer PR does NOT
+# contain an older one's content, and consecutive PRs both move the submodule
+# pin + stamp, so they conflict by construction. docs-pr-sweep merges them
+# oldest-target-first, rebasing each onto the updated next (see that skill's
+# sync-PR handling). Merging promptly keeps the queue shallow.
 #
 # NOTE: repository_dispatch only triggers workflows that live on the default
 # branch (main), so this file must stay on main even though the work it does
@@ -134,6 +134,9 @@ jobs:
             echo "submodule=$SUBMODULE"
             echo "issue=$ISSUE"
             echo "url=$URL"
+            echo "date=$(date -u +%F)"
+            # Fresh branch per run → one individual PR per nightly pass.
+            echo "branch=docs-next-sync/auto-$(date -u +%Y%m%d)-r${GITHUB_RUN_NUMBER}"
             echo "notes<<EOF"; echo "$NOTES"; echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -143,38 +146,31 @@ jobs:
         # no-op dispatches (and manual re-tests) to seconds instead of minutes.
         id: scan
         env:
-          PR_BRANCH: docs-next-sync/auto
           GH_TOKEN: ${{ secrets.DOCS_REPO_PAT }}
         run: |
           git submodule foreach 'git fetch -q origin || true' || true
 
           # Baseline selection. By default the scan reads next's docs-sources.json
-          # (the last MERGED stamp). But if the rolling PR is still OPEN, an
-          # earlier pass is awaiting review — scan against THAT branch's stamp
-          # (the tips the last run trued to) so we don't re-derive the same window
-          # every night. We only re-run when the library tips moved past the last
-          # attempt. The branch alone isn't enough (delete-branch:false keeps it
-          # after close): a PR closed UNMERGED must not suppress re-deriving its
-          # window, so we require an open PR before overlaying its stamp. This
-          # overlays the branch's docs-sources.json just for the scan, then
-          # restores next's so the agent step trues from the merged baseline
-          # (keeping the PR a complete superset).
+          # (the last MERGED stamp). But if sync PRs are still open, the newest
+          # one's stamp is the last ATTEMPT — overlay it so this pass scans (and
+          # the agent trues) only the window nobody has attempted yet. The
+          # overlay is deliberately left in place for the agent step: its Step 1
+          # scan then surfaces exactly the delta window, making tonight's PR an
+          # individual delta on top of the open chain, not a re-derivation of
+          # it. Only OPEN PRs count — a PR closed unmerged must have its window
+          # re-derived by the next run.
           BASELINE="next (last merged stamp)"
-          OPEN_PRS="$(gh pr list --head "$PR_BRANCH" --base next --state open --json number --jq 'length' 2>/dev/null || echo 0)"
-          if [ "${OPEN_PRS:-0}" -gt 0 ] \
-             && git fetch -q origin "$PR_BRANCH" 2>/dev/null \
+          PR_HEAD="$(gh pr list --base next --state open --json headRefName,createdAt \
+            --jq '[.[] | select(.headRefName | startswith("docs-next-sync/auto"))] | sort_by(.createdAt) | last | .headRefName // empty' 2>/dev/null || true)"
+          if [ -n "$PR_HEAD" ] \
+             && git fetch -q origin "$PR_HEAD" 2>/dev/null \
              && git show "FETCH_HEAD:docs-sources.json" > /tmp/pr-sources.json 2>/dev/null; then
-            cp docs-sources.json /tmp/next-sources.json
             cp /tmp/pr-sources.json docs-sources.json
-            BASELINE="open PR branch $PR_BRANCH (last attempt)"
+            BASELINE="newest open sync PR branch $PR_HEAD (last attempt)"
           fi
           echo "Scan baseline: $BASELINE" | tee -a "$GITHUB_STEP_SUMMARY"
 
           node scripts/stamp-sources.mjs --changes | tee /tmp/scan.txt || true
-
-          # Restore next's stamp if we overlaid the PR branch's, so every later
-          # step (including the agent) sees next's merged baseline.
-          [ -f /tmp/next-sources.json ] && cp /tmp/next-sources.json docs-sources.json || true
 
           if [ "${{ github.event.inputs.force }}" = "true" ]; then
             echo "Forced run — exercising the agent path regardless of the scan." | tee -a "$GITHUB_STEP_SUMMARY"
@@ -183,6 +179,8 @@ jobs:
             echo "has_work=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_work=false" >> "$GITHUB_OUTPUT"
+            # Leave the tree clean when we stop here (the overlay dirtied it).
+            git checkout -- docs-sources.json
             echo "No library commits since the last attempt — nothing new to true." >> "$GITHUB_STEP_SUMMARY"
           fi
 
@@ -232,7 +230,8 @@ jobs:
             skill's unattended section specifies. Its FIRST line MUST be
             `SYNC_STATUS: ready` or `SYNC_STATUS: blocked — <reason>`. If the
             pass made no doc changes, write `SYNC_STATUS: ready`, say so, and
-            reset the submodules so the tree is clean.
+            leave the tree clean: reset the submodules AND restore the seeded
+            baseline (`git checkout -- docs-sources.json`).
           PROMPT
 
           # Append the (untrusted) payload context as plain data.
@@ -324,22 +323,23 @@ jobs:
           # recreated from `next` each run, so every update is a complete superset
           # — never a chain. delete-branch:false keeps the branch alive between
           # runs so the scan step above can read its stamp as the baseline.
-          branch: docs-next-sync/auto
-          delete-branch: false
+          # Fresh branch per run → one individual PR per nightly pass; the
+          # branch is deleted on merge (the scan keys off OPEN PRs, not
+          # branches).
+          branch: ${{ steps.ctx.outputs.branch }}
+          delete-branch: true
           # Blocked runs open as a draft so a best-effort tree is never
-          # mistaken for a certified-green pass. (Draft state is applied when
-          # the PR is created; a later `ready` update to an existing draft PR
-          # still needs a human to mark it ready for review.)
+          # mistaken for a certified-green pass.
           draft: ${{ steps.report.outputs.status != 'ready' }}
           commit-message: |
             docs-next-sync: true next against ${{ steps.ctx.outputs.submodule }} (automated)
-          title: "docs-next-sync: ${{ steps.ctx.outputs.submodule }} changes (automated)"
+          title: "docs-next-sync: ${{ steps.ctx.outputs.submodule }} changes (automated, ${{ steps.ctx.outputs.date }})"
           body: |
             Automated `docs-next-sync` pass against the library main tips, triggered by the nightly release ${{ steps.ctx.outputs.submodule }}#${{ steps.ctx.outputs.issue }}.
 
             ${{ steps.report.outputs.status != 'ready' && '> ⚠️ **Blocked / best-effort.** The unattended pass could not certify green gates — see the SYNC_STATUS line in the report below. Resolve before merging.' || '' }}
 
-            > **Rolling PR.** This PR is updated in place each night until it merges — every update is a complete, gate-green superset of everything new since the last merge (branched fresh from `next`, not stacked). Merge it to advance the baseline; the next nightly then starts fresh and small.
+            > **Delta PR.** This PR covers only the library window since the previous sync PR (or since the last merge, if none is open) — it does not contain earlier open sync PRs' content. Merge sync PRs **oldest first**; consecutive ones conflict on the stamp/submodule pin by construction, and `docs-pr-sweep` knows how to rebase and land the chain.
 
             ${{ steps.report.outputs.body }}
 
