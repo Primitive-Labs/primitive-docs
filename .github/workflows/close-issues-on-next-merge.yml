@@ -1,0 +1,57 @@
+# Close issues fixed by PRs merged into `next`.
+#
+# GitHub only fires a PR's closing keywords (`Fixes #NN`) when the PR merges
+# into the repo's DEFAULT branch (main). Doc work merges into `next`, so the
+# keywords never fire there and resolved issues stay open until publish — the
+# defect that once stranded #133–136 open after their PRs merged. This
+# workflow mechanizes what docs-pr-sweep otherwise does by hand: on any PR
+# merged into `next`, parse the closing keywords from its title/body and close
+# each referenced issue with a back-reference. It covers every merge path —
+# pr-sweep, a human merging the nightly rolling PR from the UI, one-offs.
+#
+# The keyword fires again, harmlessly, when `next` reaches `main` at publish
+# (the issue is already closed).
+#
+# NOTE: a `pull_request` workflow runs the file version on the PR's BASE
+# branch, so this must exist on `next` to fire (it flows there via the
+# main→next back-merge).
+
+name: Close issues on merge into next
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [next]
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  close:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Close issues referenced by closing keywords
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr view "$PR" -R "$REPO" --json body,title --jq '[.body, .title] | join("\n")' \
+            | grep -oiE '(fix(e[sd])?|close[sd]?|resolve[sd]?)[[:space:]]+#[0-9]+' \
+            | grep -oE '#[0-9]+' | tr -d '#' | sort -u \
+            | while read -r ISSUE; do
+                # Close only OPEN issues; a reference may name a PR or an
+                # already-closed issue — skip those, loudly.
+                state="$(gh issue view "$ISSUE" -R "$REPO" --json state --jq .state 2>/dev/null || echo NOT_AN_ISSUE)"
+                if [ "$state" = "OPEN" ]; then
+                  gh issue close "$ISSUE" -R "$REPO" --reason completed \
+                    --comment "Fixed by #$PR, merged into \`next\`. Closed automatically — \`next\` isn't the default branch, so GitHub's closing keyword won't fire until this reaches \`main\` at publish."
+                  echo "- closed #$ISSUE" >> "$GITHUB_STEP_SUMMARY"
+                else
+                  echo "- skipped #$ISSUE (state: $state)" >> "$GITHUB_STEP_SUMMARY"
+                fi
+              done
+          echo "Done. (No closing keywords in the PR body/title means nothing to do.)"

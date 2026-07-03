@@ -16,10 +16,10 @@
 # Pairs with the nightly tier (docs-next-sync.yml): nightlies true `next`,
 # production releases publish a slice of `next` to `main`.
 #
-# POST-MERGE FOLLOW-UP (not automated): after the publish PR merges, the skill's
-# Step 7.2 back-merge (`main` -> `next`, keeping the next channel) still has to
-# run so `next ⊇ main`. The PR body calls this out; it is a deliberate, separate
-# step (there is no main->next automation in this repo).
+# POST-MERGE FOLLOW-UP: when the publish PR merges, backmerge-main-to-next.yml
+# fires and re-establishes `next ⊇ main` automatically (channel-preserving).
+# The PR body tells the merger to verify that run went green; a manual
+# back-merge is only needed if it failed.
 #
 # NOTE: repository_dispatch only triggers workflows on the default branch (main),
 # so this file must stay on main.
@@ -69,7 +69,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - name: Checkout primitive-docs (next)
         # Check out `next` with full history: the skill walks `next` to pick the
@@ -159,7 +159,8 @@ jobs:
           PUBLISH_BRANCH: ${{ steps.ctx.outputs.publish_branch }}
           NOTES: ${{ steps.ctx.outputs.notes }}
         run: |
-          npm install -g @anthropic-ai/claude-code
+          # Pinned: a bad CLI release must not break the publish tier. Bump deliberately.
+          npm install -g @anthropic-ai/claude-code@2.1.199
 
           # Static instructions (quoted heredoc → no shell interpolation).
           cat > /tmp/prompt.txt <<'PROMPT'
@@ -170,51 +171,35 @@ jobs:
           publish branch that merges `next` into `main` AT THE RELEASE SHA, drive
           it to green gates, and leave it ready for a human to merge. Begin now by
           invoking the docs-publish-release skill (the `/docs-publish-release`
-          command) for the release described at the end of this prompt, and carry
-          it through Step 6 under the rules below.
+          command) for the release described at the end of this prompt.
 
-          CRITICAL unattended-run rules:
-          - The release to publish is the SHA + summary appended below. Treat the
-            summary as a coverage hint only; verify every fact against the
-            submodule source at the release SHA (never trust the summary).
+          The skill's "Unattended mode (CI)" section governs this run — read it
+          first and follow it exactly. Hard boundaries (the skill section
+          elaborates; these are absolute):
           - Build the publish branch named EXACTLY the branch printed below as
-            "Publish branch". Create it off `main` (Step 3), merging the correct
-            merge point from `next` (Step 2 selects it from next's stamp vs the
-            release SHA), pin js-bao-wss to the release SHA, repin packages and
-            restamp onto the PRODUCTION channel (Step 4), verify the summary is
-            covered (Step 5), and write the docs-delta summary (Step 6).
-          - You MAY create the branch and run `git commit` / `git merge` LOCALLY —
-            that is how the publish branch is built. You must NOT run `git push`,
-            `gh pr create`, `gh pr merge`, or anything that publishes. The workflow
-            pushes the branch and opens the PR into `main`.
-          - Do NOT perform Step 7 (opening the PR, and the `main`->`next`
-            backflow). The workflow opens the PR; the backflow is a separate
-            post-merge step. Stop after Step 6 with the publish branch checked out
-            and ALL changes committed on it.
-          - Drive the gates to GREEN against the production surface: repin the
-            published packages (Step 4), then run `pnpm check:examples` and
-            `npx vitepress build docs`. A slice that relies on a merged-but-
-            unpublished package API is NOT publishable this release — revert those
-            doc changes on the publish branch (they stay on `next`) and record the
-            held items in the report. The gates are the arbiter of what `main` can
-            state.
-          - Non-interactive: NEVER ask a question or wait for input. For a
-            genuinely ambiguous editorial call, pick the most conservative option
-            and note it. FILE parity/platform-gap issues per
-            `.claude/ISSUE_FILING.md` (the `ios` label for Swift-client gaps, no
-            assignee) and record the numbers in the report.
+            "Publish branch". You MAY create it and run `git commit` /
+            `git merge` LOCALLY — that is how the branch is built. You must NOT
+            run `git push`, `gh pr create`, `gh pr merge`, or anything that
+            publishes. The workflow pushes the branch and opens the PR into
+            `main`.
+          - Carry the skill through "Summarize the docs delta", INCLUDING the
+            full-set-audit step, then STOP with the publish branch checked out
+            and ALL changes committed on it. Do NOT perform "Land and backflow"
+            — the workflow opens the PR, and CI back-merges `main` into `next`
+            after it merges.
+          - Treat the release summary appended below as a coverage hint only;
+            verify every fact against the submodule source at the release SHA.
+          - Drive the gates to GREEN against the production surface. A slice
+            that relies on a merged-but-unpublished package API is NOT
+            publishable this release — revert it on the publish branch (it
+            stays on `next`) and record it as held.
+          - Non-interactive: NEVER ask a question or wait for input.
           - Finish by writing your complete report to
-            `.docs-publish-release-report.md` at the repo root. Its FIRST line MUST
-            be a status line:
-              * `PUBLISH_STATUS: ready`   — the publish branch is built, committed,
-                and all gates are green: a human can merge it as-is.
-              * `PUBLISH_STATUS: blocked` — followed by the blocker, if you could
-                NOT produce a clean mergeable branch. Even when blocked, leave the
-                best-effort branch committed so a human can take it over.
-            After the status line, include: the Step 5 release-coverage table, the
-            Step 6 docs-delta summary (developer audience — NO branches/channels/
-            stamps/truing mechanics), any held/unpublishable items, and the parity
-            issues you filed.
+            `.docs-publish-release-report.md` at the repo root, in the format
+            the skill's unattended section specifies. Its FIRST line MUST be
+            `PUBLISH_STATUS: ready` or `PUBLISH_STATUS: blocked — <reason>`.
+            Even when blocked, leave the best-effort branch committed so a
+            human can take it over.
           PROMPT
 
           # Append the (untrusted) payload context as plain data.
@@ -229,9 +214,10 @@ jobs:
             echo "${NOTES:-(none)}"
           } >> /tmp/prompt.txt
 
-          # Opus, not Sonnet: source-verification + coverage judgement.
+          # Opus, not Sonnet: source-verification + coverage judgement. The
+          # budget covers the full pass including the required set audit.
           set +e
-          timeout 50m claude -p "$(cat /tmp/prompt.txt)" \
+          timeout 100m claude -p "$(cat /tmp/prompt.txt)" \
             --model opus \
             --permission-mode bypassPermissions \
             --output-format json \
@@ -319,7 +305,7 @@ jobs:
             printf '%s\n' "$REPORT"
             echo
             echo "---"
-            echo "**After merging**, run the skill's Step 7.2 back-merge so \`next ⊇ main\` (\`git checkout next && git merge main\`, then \`pnpm stamp:sources --channel next\` and re-init submodules). This is not automated."
+            echo "**After merging**, the *Back-merge main into next* workflow re-establishes \`next ⊇ main\` automatically — verify that run went green. Only back-merge by hand (docs-publish-release, \"Land and backflow\") if it failed."
             echo
             echo "> Generated unattended by the Claude Code CLI. Verify facts against source before merging."
           } > /tmp/pr-body.md
