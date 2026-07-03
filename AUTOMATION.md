@@ -16,7 +16,10 @@ skills they invoke must be reflected here (CLAUDE.md enforces this rule).
 The unattended posture for each skill lives in that skill's **"Unattended
 mode (CI)"** section (`.claude/skills/*/SKILL.md`) — the single source of
 truth; workflow prompts only restate the hard boundaries. The Claude Code CLI
-version is pinned in each workflow — bump deliberately.
+version is pinned in each workflow — bump deliberately. All CI jobs take their
+pnpm from `package.json`'s `packageManager` field (pnpm 10; settings live in
+`pnpm-workspace.yaml`), and the js-bao-wss workspace builds run under that
+submodule's own pinned pnpm via corepack.
 
 ## Non-agent plumbing
 
