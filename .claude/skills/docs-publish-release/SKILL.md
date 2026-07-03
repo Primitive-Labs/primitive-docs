@@ -57,7 +57,22 @@ If a gate fails because a doc relies on a merged-but-unpublished package API (th
 
 Walk every row of every summary table (New Features, Bug Fixes, Cleanup, Performance, Dependencies, Model Changes, Notes for users) and confirm its disposition in what's being published: documented (where?), or internal/not developer-facing (why?). This should be a checklist pass — the writing happened on `next`. Any gap is a missed `docs-next-sync` triage: fix it now on the publish branch using that skill's triage classes and STYLE.md rules, and note the miss so the next-sync cadence can improve.
 
-## Step 6 — Summarize the docs delta
+## Step 6 — Run the full set audit (required)
+
+Coverage (Step 5) only confirms the released window is *documented*; it can't see cross-page problems that accumulate as many `docs-next-sync` and PR-sweep passes land between releases — the same fact stated two ways, a concept taught twice, a dead anchor that only breaks on the merged tip, an orphaned page. Every production push runs a full **docs-set-audit** over the publish branch — the exact tree about to become `main`:
+
+```bash
+git checkout publish/<YYYY-MM-DD>-<sha8>   # audit what's about to publish, not next's tip
+```
+
+Run **docs-set-audit** end to end: its mechanical sweeps (orphans, build + anchors, example-parity inventory, structure mirror, manifest integrity) and its cross-page judgment passes (duplication, inconsistency, boundary, set-level ramp).
+
+- **Outright breakage is this skill's to fix before landing** — a dead link, a stamp/parity failure, two pages that now contradict each other. Fix it on the publish branch, then re-run `pnpm check:examples` and `npx vitepress build docs`.
+- **Cross-page restructures are proposals** — don't block the release on optional consolidations. But don't merely mention them in the report either: **file each as its own standalone GitHub issue** in `Primitive-Labs/primitive-docs` so it can be evaluated and scheduled on its own. One issue per restructure — no rollup/checklist that bundles several (per `.claude/ISSUE_FILING.md`'s one-issue-per-problem rule); link related ones to each other instead. A pure doc reorganization is a docs-repo task, so it files here, not in a source repo. Anything you *do* fix on the publish branch must also flow back to `next` (Step 8's back-merge carries it).
+
+Fold the audit result into the report: clean bill, or the breakage fixed here plus the issue numbers filed for each deferred restructure.
+
+## Step 7 — Summarize the docs delta
 
 The publish PR carries a standalone summary of what the documentation now covers that it didn't at the last published release. **Audience: platform developers** — people who build Primitive, not external users and not docs-repo maintainers. The summary must stand on its own: no mention of branches, truing passes, channels, stamps, or any other publishing mechanics. Write "X is now documented" / "examples for Y now compile on both platforms", never "merged from next" or "trued against main".
 
@@ -72,12 +87,12 @@ Read the underlying commits (and their diffs where the subject isn't enough), th
 
 Skip mechanical noise entirely: source stamps, lockfiles, rendered guide builds, skill/process edits, regenerated reference pages (mention the regeneration once if its *content* changed meaningfully).
 
-## Step 7 — Land and backflow
+## Step 8 — Land and backflow
 
-1. PR the publish branch into `main` with the release-coverage table (Step 5) **and** the docs-delta summary (Step 6); merging publishes the site (publish-docs.yml verifies the channel is `production`).
+1. PR the publish branch into `main` with the release-coverage table (Step 5), the set-audit result (Step 6), **and** the docs-delta summary (Step 7); merging publishes the site (publish-docs.yml verifies the channel is `production`).
 2. Backflow so `next` contains everything `main` does. **`next` is never recreated from `main`** — it carries trued-but-unreleased work a reset would destroy; you *merge* `main` into it. This release-time back-merge is the primary mechanism that keeps `next ⊇ main` (an interactive `docs-next-sync` run can optionally drain sooner, but the unattended nightly never does — it only opens PRs).
 
-   **CI normally does this for you.** `backmerge-main-to-next.yml` fires when the publish PR (head `publish/**`) merges into `main` — whether you opened it or the automated publisher did — and performs this back-merge channel-preservingly: it takes `main`'s new content but forces `next`'s channel/stamp/pins, runs the next gates, and pushes `next` directly. So after the publish PR merges, **check that workflow succeeded** rather than running anything by hand.
+   **CI normally does this for you.** `backmerge-main-to-next.yml` fires when **any** PR merges into `main` — the publish PR included, whether you opened it or the automated publisher did — and performs this back-merge channel-preservingly: it takes `main`'s new content but forces `next`'s channel/stamp/pins, runs the next gates, and pushes `next` directly. So after the publish PR merges, **check that workflow succeeded** rather than running anything by hand.
 
    Only run the back-merge manually if that workflow **failed or aborted** (it aborts and goes red on a content conflict outside the channel/stamp/pin files — exactly the case a human must resolve):
 
@@ -88,4 +103,14 @@ Skip mechanical noise entirely: source stamps, lockfiles, rendered guide builds,
    ```
 
    Commit and push `next`.
-3. Report: release SHA published, merge point used, packages repinned, the summary-coverage table, the docs-delta summary, and any held (unpublished-API) or gap items.
+3. Report: release SHA published, merge point used, packages repinned, the summary-coverage table, the set-audit result, the docs-delta summary, and any held (unpublished-API) or gap items.
+
+## Unattended mode (CI)
+
+The production-release workflow (`receive-production-release.yml`) runs this skill unattended when a release deploys. Everything above applies, with these deltas — this section is the single source of truth for the unattended posture (the workflow prompt only restates the hard boundaries):
+
+- **Scope: Steps 1–7 only.** Build the publish branch (named exactly as the workflow instructs), carry it through the full set audit (Step 6) and the docs-delta summary (Step 7), and stop with the branch checked out and all changes committed on it. Step 8 belongs to CI: the workflow pushes the branch and opens the PR into `main`, and `backmerge-main-to-next.yml` does the backflow after it merges.
+- **Local git only.** `git branch`/`merge`/`commit` locally are how the publish branch is built; never `git push`, `gh pr create`, or `gh pr merge` — nothing that publishes.
+- **Never ask or wait.** A genuinely ambiguous editorial call takes the most conservative option, noted in the report. The release summary in the payload is a coverage hint only — verify every fact against the submodule source at the release SHA.
+- **Gates arbitrate.** Drive them green against the production surface (Step 4's repin first). A slice relying on a merged-but-unpublished package API is reverted on the publish branch (it stays on `next`) and recorded as held. File Step 6's deferred restructures and any parity gaps as issues per `.claude/ISSUE_FILING.md`, and record the numbers.
+- **The report is the PR body.** Write it to `.docs-publish-release-report.md` at the repo root. FIRST line: `PUBLISH_STATUS: ready` (branch built, committed, gates green — mergeable as-is) or `PUBLISH_STATUS: blocked — <reason>` (leave the best-effort branch committed for a human to take over; the workflow opens it as a draft PR). Then: the Step 5 release-coverage table, the Step 6 set-audit result with issue numbers filed, the Step 7 docs-delta summary (developer audience — no branches/channels/stamps/truing mechanics), and any held or gap items.

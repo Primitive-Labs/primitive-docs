@@ -10,6 +10,11 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Two merges to main in quick succession must not race the gh-pages push.
+concurrency:
+  group: publish-docs
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -39,7 +44,10 @@ jobs:
             if git submodule update --single-branch -- "$sm_path" 2>/dev/null; then
               echo "✓ Checked out pinned commit"
             else
-              echo "⚠ Pinned commit $pinned_sha not found, cloning latest branch HEAD"
+              # Publishing shouldn't hard-block on a lost pin (unlike the
+              # Checks gate, which refuses) — but say so loudly; the stamp
+              # gate below will fail if the substitution matters.
+              echo "::warning::Submodule $name: pinned commit $pinned_sha unreachable — falling back to the latest branch tip for this publish."
               branch=$(git config -f .gitmodules "submodule.${name}.branch" || echo "main")
               url=$(git config -f .gitmodules "submodule.${name}.url")
               rm -rf "$sm_path"

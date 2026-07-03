@@ -116,10 +116,10 @@ test "$(gh pr view <NN> --json baseRefName -q .baseRefName)" = "next" || { echo 
 gh pr merge <NN> --squash --delete-branch
 ```
 
-**Close the fixed issues by hand — merging to `next` does not auto-close them.** GitHub only runs a PR's closing keywords (`Fixes #NN` / `Closes #NN` / `Resolves #NN`) when the PR merges into the repo's **default branch (`main`)**. These PRs target `next`, so the keywords never fire on merge, and `gh pr view --json closingIssuesReferences` comes back **empty for every `next`-based PR** — that is structural, not a malformed body, so don't treat the empty list as a defect or try to "fix the link." Keep the `Fixes #NN` line in each PR body regardless: it's the machine-readable record of what the PR resolves, and it *will* close the issue when `next` reaches `main` at publish. But to keep the tracker honest on `next`, close each fixed issue manually right after its PR merges, citing the PR:
+**Issue closing at `next`-merge is automated — verify it, don't redo it.** GitHub only runs a PR's closing keywords (`Fixes #NN` / `Closes #NN` / `Resolves #NN`) when the PR merges into the repo's **default branch (`main`)**. These PRs target `next`, so the keywords never fire on merge, and `gh pr view --json closingIssuesReferences` comes back **empty for every `next`-based PR** — that is structural, not a malformed body, so don't treat the empty list as a defect or try to "fix the link." Keep the `Fixes #NN` line in each PR body regardless: it's what the `close-issues-on-next-merge` workflow parses — on every PR merged into `next` it closes each referenced open issue with a back-reference comment (and the keyword fires again, harmlessly, at publish). So after each merge, **spot-check the workflow did its job** (each closed issue carries its comment) rather than closing by hand. If it failed or a PR predates it, the manual fallback is the same parse:
 
 ```bash
-# Parse the issues this PR claims to fix from its body/title, then close each with a back-reference.
+# Fallback only — normally close-issues-on-next-merge.yml does this on merge.
 gh pr view <NN> --json body,title --jq '[.body, .title] | join("\n")' \
   | grep -oiE '(fix(e[sd])?|close[sd]?|resolve[sd]?)[[:space:]]+#[0-9]+' \
   | grep -oE '#[0-9]+' | tr -d '#' | sort -u \
@@ -129,7 +129,7 @@ gh pr view <NN> --json body,title --jq '[.body, .title] | join("\n")' \
     done
 ```
 
-(Relying on the keyword alone is the defect that stranded #133–136 open after their PRs merged — the fix is to close them on `next`-merge, not to chase a keyword that can't fire here.) After the sweep, spot-check with `gh issue list --state open` and close with evidence anything a merged PR resolved that's still dangling.
+(Relying on the GitHub keyword alone is the defect that stranded #133–136 open after their PRs merged — closure has to happen at `next`-merge, which is exactly what the workflow does.) After the sweep, spot-check with `gh issue list --state open` and close with evidence anything a merged PR resolved that's still dangling — a PR whose body *lacked* the `Fixes` line is the common leak.
 
 Merge the flagged same-file PRs **one at a time**, newest-validated first or in whatever order minimizes rework; after each merge, rebase the next conflicting PR on the updated `next` and re-run its Step 2 gates before merging it — a clean validation against a stale base isn't a clean merge. Keep `next` green at every step: the source-stamp gate must still pass after each merge. A `docs-next-sync` PR moving a submodule is expected (that is the whole point of it) — its bundled `docs-sources.json` re-stamp keeps the gate green; what must never happen is a submodule move *backward* (Step 2 ancestry check) or a stamp that disagrees with the pinned HEAD.
 

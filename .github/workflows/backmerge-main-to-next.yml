@@ -1,8 +1,9 @@
-# Back-merge main into next (post-publish)
+# Back-merge main into next
 #
-# Completes the publish loop. When a publish PR (head `publish/**`) merges into
-# `main`, this re-establishes the `next ⊇ main` invariant by merging `main` back
-# into `next` — the skill's Step 7.2, automated. It is channel-preserving: it
+# Keeps the `next ⊇ main` invariant continuously. When ANY pull request merges
+# into `main` — a publish PR, a hotfix to published docs, or an infra change
+# (CI, skills, CLAUDE.md) — this merges `main` back into `next` so the work
+# flows forward without waiting for the next release. It is channel-preserving: it
 # takes `main`'s new doc CONTENT but keeps `next`'s channel, stamp, and submodule
 # pins, so the production restamp never leaks onto `next`.
 #
@@ -16,9 +17,10 @@
 # run for a human. It also runs the next-channel gates before pushing, so a bad
 # back-merge never lands on `next`.
 #
-# Triggers on publish PRs whether opened by receive-production-release.yml
-# (automated) or by a human running docs-publish-release — so the skill's manual
-# Step 7.2 is redundant once this is live.
+# Triggers on every merged PR into main — publish PRs (whether opened by
+# receive-production-release.yml or a human running docs-publish-release),
+# hotfixes, and infra PRs alike — so the skill's manual back-merge (its "Land
+# and backflow" step) is only ever a fallback for when this run fails.
 #
 # NOTE: a `pull_request` workflow runs the version of this file on the PR's base
 # branch (main), so it must live on main.
@@ -42,11 +44,12 @@ permissions:
 
 jobs:
   backmerge:
-    # Only when a publish PR actually merged (skip mere closes and other PRs).
+    # Any PR that actually merged (skip mere closes). The merge logic below is
+    # no-op-safe and channel-preserving, so it is correct for publish PRs,
+    # hotfixes, and infra changes alike.
     if: >
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.merged == true &&
-       startsWith(github.event.pull_request.head.ref, 'publish/'))
+      github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -127,7 +130,7 @@ jobs:
           pnpm stamp:sources --channel next
 
           git add -A
-          git commit -m "Back-merge main into next after publishing ${HEAD_REF:-main} (#${PR_NUM:-manual}) — channel preserved"
+          git commit -m "Back-merge main into next after merging ${HEAD_REF:-main} (#${PR_NUM:-manual}) — channel preserved"
           echo "noop=false" >> "$GITHUB_OUTPUT"
 
       - name: Validate next after back-merge
