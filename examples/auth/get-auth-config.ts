@@ -7,8 +7,8 @@ export async function discoverAuthMethods(client: JsBaoClient) {
   // {
   //   appId, name, mode, waitlistEnabled,
   //   googleOAuthEnabled, googleClientId, hasOAuth, redirectUris,
-  //   passkeyEnabled, passkeyRpId, passkeyRpName, hasPasskey,
-  //   magicLinkEnabled, otpEnabled
+  //   passkeyEnabled, passkeyRpId, passkeyRpName, passkeyRpConfig, hasPasskey,
+  //   appleSignInEnabled, hasApple, magicLinkEnabled, otpEnabled
   // }
 
   const methods = {

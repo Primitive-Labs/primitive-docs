@@ -181,6 +181,8 @@ text = "Summarize: {{ input.content }}"
 
 `prompt` may be an object (forwarded as the body) or an array of messages. `gemini.generateRaw` is the same shape, forwarded as a raw API payload. `gemini.countTokens` returns a token count.
 
+If Gemini returns no usable content — a `SAFETY`/`RECITATION`/`MAX_TOKENS` finish, or an empty completion — the step fails with `GEMINI_EMPTY_RESPONSE` (HTTP 502), surfacing the `finishReason`/`blockReason`, rather than completing with empty output. The step runs with no retries, so an empty response fails the run instead of silently yielding a blank result downstream.
+
 The effective model — `prompt.model` when `prompt` is an object, otherwise the top-level `model` — is validated against the server's Gemini model allow-list **at save time**: a disallowed model rejects the workflow save (the error names the step index and lists the allowed models) instead of failing at run time. A model containing template syntax resolves at run time and is validated then.
 
 ### `prompt.execute`
@@ -350,7 +352,7 @@ runIf = "outputs.tracker.documentId == null"
 # ... create the user's tracker document
 ```
 
-### `group.addMember` / `removeMember` / `checkMembership` / `listMembers` / `listUserMemberships`
+### `group.addMember` / `removeMember` / `removeAll` / `checkMembership` / `listMembers` / `listUserMemberships`
 
 ```toml
 [[steps]]
@@ -362,6 +364,8 @@ userId = "{{ input.userId }}"   # OR email = "...", not both
 ```
 
 `addMember` is idempotent. With `email`, returns `{ status: "pending_signup", invitationId, inviteToken, ... }` if the email has no AppUser yet.
+
+`group.removeAll` clears all of one user's memberships within a single group type. Params: `groupType` (required; no `#`, no `_`-prefixed system types) and `userId` (required; no `groupId`, no `email`). Returns `{ userId, groupType, removed, groupIds }`. Type-scoped via the `userId#groupType#` sort-key prefix (no cross-type bleed — `sub` ≠ `subscription`); a no-op returns `removed: 0`; caps at 1000 removals per run (refused up front if exceeded). Caller runs pre-flight every affected group's `member.delete` CEL rule (all-or-nothing); system runs need the `membership` capability instead.
 
 Group operations evaluate the group type's CEL rules. For workflow-issued operations, rules can match `fromWorkflow("workflowKey")`. In a system run, `addMember`/`removeMember` record `sys:<appId>` as the membership's `addedBy` (not the admin/cron/webhook that initiated the run).
 
@@ -537,7 +541,7 @@ for i in items { total += i.qty * i.price; }
 
 Given `steps.fetch.body = { "items": [{ "sku": "a1", "qty": 2, "price": 5.0 }, { "sku": "b2", "qty": 0, "price": 9.0 }] }` and `input.currency = "USD"`, the step records `steps.normalize.output = { "result": { "currency": "USD", "itemCount": 1, "total": 10.0 }, "ok": true }` — the return value is wrapped under `result` (see Result nesting below).
 
-- `ref` (required) names a `Script` — a stored Rhai body, unique per app. Script bodies live in `transforms/<name>.rhai` in your sync directory and are mirrored to the server by `primitive sync push` (and pulled back by `primitive sync pull`); the `<name>` is the filename without `.rhai`. There is no separate `transforms` CLI command — scripts ride the normal sync flow.
+- `ref` (required) names a `Script` — a stored Rhai body, unique per app. Script bodies live in `transforms/<name>.rhai` in your sync directory and are mirrored to the server by `primitive sync push` (and pulled back by `primitive sync pull`); the `<name>` is the filename without `.rhai`. Script bodies are authored only through sync — no CLI command writes them; the `primitive scripts` command inspects scripts and manages their test cases (see the [Scripts guide](AGENT_GUIDE_TO_PRIMITIVE_SCRIPTS.md)).
 - `with` is the JSON context handed to the script. Inside the script the whole table is exposed as **`input.*`** (with `ctx.*` as an alias) — NOT as bare top-level variables. `let x = payload;` fails with `Variable not found: payload`; write `input.payload`. Also, `with` itself is a reserved Rhai keyword — a script can't declare a variable named `with`.
 - **Result nesting.** A script step's output is an envelope: `steps.<id>.output = { result: <return value>, ok: <bool> }`. The return value lives at `steps.<id>.output.result.*` and the success verdict at `steps.<id>.output.ok` (also mirrored at `steps.<id>.ok`); per-run telemetry sits in a sibling `steps.<id>.scriptMetrics`, not inside `output`. Unlike `transform`, whose result is the templated table directly (`steps.<id>.<field>`), wire downstream templates/`runIf` as `{{ steps.normalize.output.result.total }}` — not `{{ steps.normalize.output.total }}` or `{{ steps.normalize.total }}`.
 - **Script bodies resolve live at run time.** The runner looks up the script's active config body on each execution; there is no publish-time snapshot. Pushing a changed `.rhai` file (`primitive sync push`) creates a new config and activates it — referencing workflows pick up the new body on their next run with no re-publish step. Pin a specific config with `configId = "..."` on the step to bypass the active-config lookup when determinism is required.
@@ -546,6 +550,27 @@ Given `steps.fetch.body = { "items": [{ "sku": "a1", "qty": 2, "price": 5.0 }, {
 - `limits` (optional) lets a step lower the per-run ceilings (`maxOperations`, `wallMsHint`, `maxOutputBytes`, `maxArrayLength`, `maxObjectKeys`, `maxNestingDepth`, `maxStringSize`, `maxCallDepth`, `maxLogBytes`); requested values are clamped at the app ceiling, never raised.
 - Deterministic failures (parse / compile / runtime / limit / validation) come back as a non-retryable step error so durable retries don't re-run a guaranteed failure; transient/transport errors throw and retry normally. The runtime fails closed — it never silently passes input through.
 - Each execution records per-step telemetry at `steps.<id>.scriptMetrics` — a sibling of the step's `output`, persisted on `WorkflowStepRun.scriptMetrics` (operation counts, input/output byte sizes, runtime version) — visible in run detail.
+
+### `block.call`
+
+A single unified step over the four executable block types. It **lowers** at run time to the typed runner for the referenced block and reuses that step's full contract (resolution, success verdict, durable retry policy) — it adds no capability the typed steps don't already have. Reach for the typed step (`prompt.execute`, `integration.call`, `script`, `workflow.call`) directly unless you specifically want one call site parameterized by block type.
+
+```toml
+[[steps]]
+id = "run-block"
+kind = "block.call"
+blockType = "prompt"          # required — prompt | integration | script | workflow
+blockKey = "summarize"        # required — the block's key (promptKey / integrationKey / script ref / workflowKey)
+# configId = "..."            # optional — pin a specific config
+# version = "active"          # optional — "active" (the default) uses the block's active config; any other value pins it
+[steps.input]                 # unified input, mapped to the lowered step's field
+content = "{{ steps.fetch.body }}"
+```
+
+- `blockType` selects the runner it lowers to: `prompt` → `prompt.execute`, `integration` → `integration.call`, `script` → `script`, `workflow` → `workflow.call`. An unknown `blockType`, or an empty `blockKey`, fails the step non-retryably.
+- `input` is the unified input; per type it maps to the lowered step's own field — prompt `variables`, integration `request`, script `with`, workflow `input`. The type-specific field name still works and takes precedence over `input` (pass `variables` for a prompt, `request` for an integration, `with` for a script).
+- `configId` pins a specific config; `version` also pins one unless it's the `"active"` sentinel (the default — use the block's active config). Config/version pins apply to `prompt`, `integration`, and `script` blocks; a `workflow` block ignores them.
+- Passthrough fields reach the lowered step: prompts take `modelOverride`; integrations take `attachments` / `bodyMode` / `multipartFields`; scripts take `limits`.
 
 ### `iterate-users`
 
@@ -883,7 +908,7 @@ runAs = "system"
 capabilities = ["membership"]
 ```
 
-`membership` gates the `group.addMember` / `group.removeMember` steps in a **system** run — without the grant they reject (`group.addMember requires the 'membership' capability`). Read-only group steps (`checkMembership`, `listMembers`, `listUserMemberships`) are never gated, and caller runs are governed by access rules, not capabilities, so the gate never applies to them.
+`membership` gates the `group.addMember` / `group.removeMember` / `group.removeAll` steps in a **system** run — without the grant they reject (`group.addMember requires the 'membership' capability`). Read-only group steps (`checkMembership`, `listMembers`, `listUserMemberships`) are never gated, and caller runs are governed by access rules, not capabilities, so the gate never applies to them.
 
 **`iterate-users` is system-only.** A workflow containing an `iterate-users` step must set `runAs = "system"` — otherwise it's rejected at save time (`'iterate-users' is system-only and may appear only in a runAs:"system" workflow`).
 

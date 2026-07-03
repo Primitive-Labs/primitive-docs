@@ -30,6 +30,16 @@ Server-side config refers to a secret as <span v-pre>`{{ secrets.KEY }}`</span>,
 | [Inbound webhooks](./workflows.md#via-inbound-webhooks) | A webhook's `signingSecret` — resolved server-side when an incoming event is verified |
 | [Databases](./working-with-databases.md) | CEL access expressions on operations and trigger stamp values can read `secrets.*` |
 
+::: warning The CEL `secrets.*` variable is declared-only
+The <span v-pre>`{{ secrets.KEY }}`</span> template form (integration headers, webhook `signingSecret`, step-config templates) resolves any secret you have set. The `secrets.*` variable **in a CEL expression** — a workflow `runIf`, a database operation's access rule, or a trigger's stamp value — binds only the secrets that config **declares**. List them in the owning config's TOML (a database or collection type config, or a workflow definition):
+
+```toml
+secrets = ["STRIPE_KEY"]
+```
+
+An undeclared `secrets.KEY` is absent when the rule evaluates, so a rule that reads it denies. Declare every secret a CEL rule needs.
+:::
+
 For example, an integration authenticates with a header that names the secret:
 
 ```toml

@@ -23,6 +23,8 @@ primitive secrets delete OPENAI_API_KEY
 | Inbound webhooks | A webhook's `signingSecret` (a `{{secrets.KEY}}` reference — the tighter no-space form) | Server-side, immediately before HMAC verification of an incoming event. Referenced key must exist at create/update; **fails closed** with a `401` (`rejectionReason: secret_unresolved`) if unresolvable at delivery |
 | Databases | Operation `access` / per-param `access` CEL; trigger stamp `value` CEL | When the operation executes (secrets load only when the expression references `secrets.`) |
 
+**The CEL `secrets.*` variable is declared-only.** In a CEL expression (workflow `runIf` / `switch` `when`, a database operation or per-param `access` rule, a trigger stamp `value`), `secrets.*` binds **only** the keys the owning config declares in a top-level `secrets = ["KEY", ...]` manifest — on the database or collection type config, or the workflow definition. An undeclared `secrets.KEY` is absent at evaluation, so a rule that reads it denies closed. The `{{ secrets.KEY }}` template form (the rows above) is unaffected: it resolves any set key.
+
 There is no client-side surface: apps cannot read secret values through any API.
 
 Integration templates only match uppercase keys — `{{secrets.MY_KEY}}` with `[A-Z][A-Z0-9_]`, max 64 chars. Stick to `UPPER_SNAKE_CASE` keys everywhere.

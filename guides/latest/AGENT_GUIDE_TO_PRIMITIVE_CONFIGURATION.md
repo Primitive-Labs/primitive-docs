@@ -62,7 +62,7 @@ Push forwards only recognized `[auth]` keys and only those present: an omitted k
 
 Every command resolves its target environment in order: `--env <name>` flag → `PRIMITIVE_ENV` env var → `defaultEnvironment` in `.primitive/config.json` → the only defined environment → error. Manage environments with `primitive env add|list|show|use|remove`. Tokens are stored per-environment in `.primitive/credentials.json` (gitignored); `.primitive/config.json` is committed.
 
-`primitive env add` writes only the environment entry into `.primitive/config.json` — it seeds no credentials, and project mode does **not** fall back to the global `~/.primitive/credentials.json`. A freshly-added environment therefore starts logged-out: project-scoped commands report "not logged in" until you run `primitive login` for that environment, even when a global `primitive whoami` succeeds. Agents and CI can log in without a browser by piping a refresh token — `primitive token --refresh | primitive login -s <url> --token-stdin` (see [Headless auth](#headless-auth-ci)).
+`primitive env add` writes only the environment entry into `.primitive/config.json` — it seeds no credentials, and project mode does **not** fall back to the global `~/.primitive/credentials.json`. A freshly-added environment therefore starts logged-out: project-scoped commands report "not logged in" until you run `primitive login` for that environment, even when a global `primitive whoami` succeeds. Agents and CI can log in without a browser by piping a refresh token — `primitive token --refresh | primitive -e <env> login --token-stdin` (see [Headless auth](#headless-auth-ci)).
 
 ## Previewing a push
 
@@ -96,11 +96,13 @@ primitive secrets delete OPENAI_API_KEY
 
 ## Headless auth (CI)
 
-Browser-based `primitive login` doesn't work in CI. Either log in non-interactively by piping a refresh token — `primitive token --refresh | primitive login -s <url> --token-stdin` — or create a long-lived API token and target an environment explicitly:
+Browser-based `primitive login` doesn't work in CI. Either log in non-interactively by piping a refresh token — `primitive token --refresh | primitive -e <env> login --token-stdin` — or create a long-lived API token and target an environment explicitly:
 
 ```bash
 primitive tokens create --name "CI deploys" --ttl 90d    # m/h/d/w/mo/y units; omit for non-expiring
 PRIMITIVE_ENV=prod primitive sync push
 ```
+
+`login` resolves its server from the active environment's `apiUrl` (project mode) or the default server (legacy/no project config). Set `PRIMITIVE_SERVER_URL` to point legacy-mode login and scripts at a custom server (`PRIMITIVE_SERVER_URL=http://localhost:8787 primitive login`). An unresolvable environment — multiple environments with no `-e <env>` and no `defaultEnvironment` — fails loudly rather than defaulting to production.
 
 `primitive token` (singular) prints the current access token, auto-refreshing it — usable for `curl -H "Authorization: Bearer $(primitive token)"`.

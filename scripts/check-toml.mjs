@@ -43,11 +43,21 @@ const CLI_LIB = join(ROOT, "library_repos", "js-bao-wss", "cli", "src", "lib");
 const BUILD_DIR = join(ROOT, "scripts", ".build");
 
 // ── Transpile + import the CLI's sync-push validators from the submodule ────
-async function importCliLib(name) {
+async function importCliLib(name, seen = new Set()) {
+  if (seen.has(name)) return;
+  seen.add(name);
   const src = readFileSync(join(CLI_LIB, `${name}.ts`), "utf-8");
-  const js = ts.transpileModule(src, {
+  // Transpile the file's relative sibling deps first (they compile to `.mjs`
+  // in BUILD_DIR), so a CLI lib file that imports another (e.g.
+  // toml-database-config → toml-metadata-config) resolves at import time.
+  for (const m of src.matchAll(/from\s+["']\.\/([\w.-]+)\.js["']/g)) {
+    await importCliLib(m[1], seen);
+  }
+  let js = ts.transpileModule(src, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
   }).outputText;
+  // Point relative `./x.js` specifiers at the transpiled `./x.mjs` outputs.
+  js = js.replace(/(from\s+["']\.\/[\w.-]+)\.js(["'])/g, "$1.mjs$2");
   mkdirSync(BUILD_DIR, { recursive: true });
   const out = join(BUILD_DIR, `${name}.mjs`);
   writeFileSync(out, js);

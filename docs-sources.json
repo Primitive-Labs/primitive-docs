@@ -3,7 +3,7 @@
   "stampedAt": "2026-07-03",
   "libraries": {
     "js-bao-wss": {
-      "commit": "e598ce0de24a13d01e773d03511d0486d2336464",
+      "commit": "e72da39d1ae91ad83fe6e0dfae00a622db221525",
       "npm": {
         "js-bao-wss-client": "2.0.4",
         "js-bao": "0.5.1",
