@@ -19,13 +19,16 @@
 # branch is recreated from `next` every run — no accumulation, no chain). On
 # merge, `next`'s stamp advances and the next run starts fresh and small.
 #
-# The scan step (below) picks its baseline accordingly: if that rolling PR
-# branch already exists, it scans against the branch's docs-sources.json stamp
-# (the tips the LAST RUN trued to) rather than next's merged stamp — so an
-# un-merged PR doesn't make us re-derive the same window every night. We only
-# pay for a Claude run when the library tips have actually moved past the last
-# attempt. The agent itself still trues from next's merged baseline, keeping the
-# PR a complete superset; only the cheap has_work gate uses the branch stamp.
+# The scan step (below) picks its baseline accordingly: if the rolling PR is
+# still OPEN, it scans against the branch's docs-sources.json stamp (the tips
+# the LAST RUN trued to) rather than next's merged stamp — so an un-merged PR
+# doesn't make us re-derive the same window every night. We only pay for a
+# Claude run when the library tips have actually moved past the last attempt.
+# The gate checks the PR's state, not just the branch's existence: a PR closed
+# UNMERGED (rejected/superseded) must not suppress re-deriving its window, so a
+# closed PR falls back to next's merged stamp. The agent itself always trues
+# from next's merged baseline, keeping the PR a complete superset; only the
+# cheap has_work gate uses the branch stamp.
 #
 # NOTE: repository_dispatch only triggers workflows that live on the default
 # branch (main), so this file must stay on main even though the work it does
@@ -76,7 +79,7 @@ permissions:
 jobs:
   next-sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - name: Checkout primitive-docs (next)
         uses: actions/checkout@v5
@@ -141,19 +144,25 @@ jobs:
         id: scan
         env:
           PR_BRANCH: docs-next-sync/auto
+          GH_TOKEN: ${{ secrets.DOCS_REPO_PAT }}
         run: |
           git submodule foreach 'git fetch -q origin || true' || true
 
           # Baseline selection. By default the scan reads next's docs-sources.json
-          # (the last MERGED stamp). But if the rolling PR branch already exists,
-          # an earlier pass is still un-merged — scan against THAT branch's stamp
+          # (the last MERGED stamp). But if the rolling PR is still OPEN, an
+          # earlier pass is awaiting review — scan against THAT branch's stamp
           # (the tips the last run trued to) so we don't re-derive the same window
           # every night. We only re-run when the library tips moved past the last
-          # attempt. This overlays the branch's docs-sources.json just for the
-          # scan, then restores next's so the agent step trues from the merged
-          # baseline (keeping the PR a complete superset).
+          # attempt. The branch alone isn't enough (delete-branch:false keeps it
+          # after close): a PR closed UNMERGED must not suppress re-deriving its
+          # window, so we require an open PR before overlaying its stamp. This
+          # overlays the branch's docs-sources.json just for the scan, then
+          # restores next's so the agent step trues from the merged baseline
+          # (keeping the PR a complete superset).
           BASELINE="next (last merged stamp)"
-          if git fetch -q origin "$PR_BRANCH" 2>/dev/null \
+          OPEN_PRS="$(gh pr list --head "$PR_BRANCH" --base next --state open --json number --jq 'length' 2>/dev/null || echo 0)"
+          if [ "${OPEN_PRS:-0}" -gt 0 ] \
+             && git fetch -q origin "$PR_BRANCH" 2>/dev/null \
              && git show "FETCH_HEAD:docs-sources.json" > /tmp/pr-sources.json 2>/dev/null; then
             cp docs-sources.json /tmp/next-sources.json
             cp /tmp/pr-sources.json docs-sources.json
@@ -190,7 +199,8 @@ jobs:
           URL: ${{ steps.ctx.outputs.url }}
           NOTES: ${{ steps.ctx.outputs.notes }}
         run: |
-          npm install -g @anthropic-ai/claude-code
+          # Pinned: a bad CLI release must not break the nightly tier. Bump deliberately.
+          npm install -g @anthropic-ai/claude-code@2.1.199
 
           # Static instructions (quoted heredoc → no shell interpolation).
           cat > /tmp/prompt.txt <<'PROMPT'
@@ -200,41 +210,29 @@ jobs:
           documentation against the library main tips, then leave the result for
           a human-reviewed pull request. Begin now by invoking the
           docs-next-sync skill (the `/docs-next-sync` command) and carry it to
-          completion under the rules below.
+          completion.
 
-          CRITICAL unattended-run rules:
-          - Non-interactive: NEVER ask a question or wait for input. The skill's
-            posture is to DRAFT changes, not defer them — when it would normally
-            escalate, make the change and FLAG it in your report rather than
-            skipping it:
-              * New capability/section: draft it, strongly preferring an existing
-                page/guide section; only add a new page if it genuinely won't fit.
-                Call out any larger change (new page, big restructure, content
-                removal) prominently in the report for human review.
-              * A genuinely ambiguous editorial call with no defensible answer:
-                pick the most conservative reasonable option and note it.
-            Every drafted change must still be source-true: verify each fact
-            against the submodule source first (never trust PR summaries).
-          - Do the full truing: triage every changed commit AND the open docs
-            issue tracker, update human docs AND the matching agent guides, run
-            `pnpm render:guides`, restamp, and run the gates (`pnpm check:examples`,
-            `npx vitepress build docs`). Drive the gates to GREEN — a failing
-            compile gate is a stale callsite to fix, not a result to report.
-          - FILE issues for parity/platform gaps and library bugs, per
-            `.claude/ISSUE_FILING.md` (which repo, the `ios` label for Swift-client
-            gaps, no assignee). Record each filed issue number in your report — do
-            NOT merely describe a gap and move on. (Filing uses `gh`, which reads
-            GH_TOKEN below; that token must have issues:write on the target repo.)
+          The skill's "Unattended mode (CI)" section governs this run — read it
+          first and follow it exactly. Hard boundaries (the skill section
+          elaborates; these are absolute):
           - Do NOT run `git commit`, `git push`, `git checkout -b`, `git merge`,
             or `gh pr create`/`gh pr merge`. Leave every change in the working
-            tree; the workflow opens the pull request. This also means you do NOT
-            perform the skill's Step 0.5 main→next drain — that step is
-            interactive-only and is a direct push; here you only open a PR.
-          - Finish by writing your complete disposition report (the per-commit
-            table plus any drafted larger-change items and the parity issues you
-            filed) to `.docs-next-sync-report.md` at the repo root. If the pass
-            made no doc changes, say so there and reset the submodules so the tree
-            is clean.
+            tree; the workflow opens the pull request. (The skill's Step 0.5
+            main→next drain never runs here.)
+          - Non-interactive: NEVER ask a question or wait for input — draft and
+            flag, don't defer.
+          - Drive the gates to GREEN. If a failure has no mechanical fix, mark
+            the run blocked in the report rather than claiming a pass — the
+            workflow opens a blocked run's PR as a draft.
+          - FILE parity/platform-gap issues (never close any); include a
+            `Fixes #NN` line in the report for every open docs issue this pass
+            resolves — they auto-close when the PR merges.
+          - Finish by writing your complete disposition report to
+            `.docs-next-sync-report.md` at the repo root, in the format the
+            skill's unattended section specifies. Its FIRST line MUST be
+            `SYNC_STATUS: ready` or `SYNC_STATUS: blocked — <reason>`. If the
+            pass made no doc changes, write `SYNC_STATUS: ready`, say so, and
+            reset the submodules so the tree is clean.
           PROMPT
 
           # Append the (untrusted) payload context as plain data.
@@ -249,9 +247,10 @@ jobs:
 
           # Opus, not Sonnet: this pass does careful source-verification and
           # drafts new doc/guide prose — capability matters more than the small
-          # per-run cost of a once-nightly job.
+          # per-run cost of a once-nightly job. The budget covers the full
+          # truing pass including the required whole-set audit.
           set +e
-          timeout 50m claude -p "$(cat /tmp/prompt.txt)" \
+          timeout 100m claude -p "$(cat /tmp/prompt.txt)" \
             --model opus \
             --permission-mode bypassPermissions \
             --output-format json \
@@ -288,10 +287,16 @@ jobs:
             echo "::group::Disposition report (.docs-next-sync-report.md)"
             cat .docs-next-sync-report.md
             echo "::endgroup::"
+            # SYNC_STATUS drives the PR's draft state: anything but a clean
+            # `ready` opens as a draft so a best-effort tree can't be mistaken
+            # for a certified-green pass.
+            STATUS="$(grep -m1 '^SYNC_STATUS:' .docs-next-sync-report.md | sed 's/^SYNC_STATUS:[[:space:]]*//' | awk '{print $1}')"
+            echo "status=${STATUS:-blocked}" >> "$GITHUB_OUTPUT"
             { echo "body<<REPORT_EOF"; cat .docs-next-sync-report.md; echo "REPORT_EOF"; } >> "$GITHUB_OUTPUT"
             rm -f .docs-next-sync-report.md
           else
             echo "No .docs-next-sync-report.md was written by the agent — see the agent final message above."
+            echo "status=blocked" >> "$GITHUB_OUTPUT"
             echo "body=The agent produced no report file. Review the run logs (agent final message)." >> "$GITHUB_OUTPUT"
           fi
 
@@ -320,11 +325,18 @@ jobs:
           # runs so the scan step above can read its stamp as the baseline.
           branch: docs-next-sync/auto
           delete-branch: false
+          # Blocked runs open as a draft so a best-effort tree is never
+          # mistaken for a certified-green pass. (Draft state is applied when
+          # the PR is created; a later `ready` update to an existing draft PR
+          # still needs a human to mark it ready for review.)
+          draft: ${{ steps.report.outputs.status != 'ready' }}
           commit-message: |
             docs-next-sync: true next against ${{ steps.ctx.outputs.submodule }} (automated)
           title: "docs-next-sync: ${{ steps.ctx.outputs.submodule }} changes (automated)"
           body: |
             Automated `docs-next-sync` pass against the library main tips, triggered by the nightly release ${{ steps.ctx.outputs.submodule }}#${{ steps.ctx.outputs.issue }}.
+
+            ${{ steps.report.outputs.status != 'ready' && '> ⚠️ **Blocked / best-effort.** The unattended pass could not certify green gates — see the SYNC_STATUS line in the report below. Resolve before merging.' || '' }}
 
             > **Rolling PR.** This PR is updated in place each night until it merges — every update is a complete, gate-green superset of everything new since the last merge (branched fresh from `next`, not stacked). Merge it to advance the baseline; the next nightly then starts fresh and small.
 

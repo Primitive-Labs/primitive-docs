@@ -1,6 +1,6 @@
 {
   "channel": "next",
-  "stampedAt": "2026-07-01",
+  "stampedAt": "2026-07-03",
   "libraries": {
     "js-bao-wss": {
       "commit": "e598ce0de24a13d01e773d03511d0486d2336464",

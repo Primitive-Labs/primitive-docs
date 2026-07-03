@@ -92,7 +92,7 @@ Skip mechanical noise entirely: source stamps, lockfiles, rendered guide builds,
 1. PR the publish branch into `main` with the release-coverage table (Step 5), the set-audit result (Step 6), **and** the docs-delta summary (Step 7); merging publishes the site (publish-docs.yml verifies the channel is `production`).
 2. Backflow so `next` contains everything `main` does. **`next` is never recreated from `main`** — it carries trued-but-unreleased work a reset would destroy; you *merge* `main` into it. This release-time back-merge is the primary mechanism that keeps `next ⊇ main` (an interactive `docs-next-sync` run can optionally drain sooner, but the unattended nightly never does — it only opens PRs).
 
-   **CI normally does this for you.** `backmerge-main-to-next.yml` fires when the publish PR (head `publish/**`) merges into `main` — whether you opened it or the automated publisher did — and performs this back-merge channel-preservingly: it takes `main`'s new content but forces `next`'s channel/stamp/pins, runs the next gates, and pushes `next` directly. So after the publish PR merges, **check that workflow succeeded** rather than running anything by hand.
+   **CI normally does this for you.** `backmerge-main-to-next.yml` fires when **any** PR merges into `main` — the publish PR included, whether you opened it or the automated publisher did — and performs this back-merge channel-preservingly: it takes `main`'s new content but forces `next`'s channel/stamp/pins, runs the next gates, and pushes `next` directly. So after the publish PR merges, **check that workflow succeeded** rather than running anything by hand.
 
    Only run the back-merge manually if that workflow **failed or aborted** (it aborts and goes red on a content conflict outside the channel/stamp/pin files — exactly the case a human must resolve):
 
@@ -104,3 +104,13 @@ Skip mechanical noise entirely: source stamps, lockfiles, rendered guide builds,
 
    Commit and push `next`.
 3. Report: release SHA published, merge point used, packages repinned, the summary-coverage table, the set-audit result, the docs-delta summary, and any held (unpublished-API) or gap items.
+
+## Unattended mode (CI)
+
+The production-release workflow (`receive-production-release.yml`) runs this skill unattended when a release deploys. Everything above applies, with these deltas — this section is the single source of truth for the unattended posture (the workflow prompt only restates the hard boundaries):
+
+- **Scope: Steps 1–7 only.** Build the publish branch (named exactly as the workflow instructs), carry it through the full set audit (Step 6) and the docs-delta summary (Step 7), and stop with the branch checked out and all changes committed on it. Step 8 belongs to CI: the workflow pushes the branch and opens the PR into `main`, and `backmerge-main-to-next.yml` does the backflow after it merges.
+- **Local git only.** `git branch`/`merge`/`commit` locally are how the publish branch is built; never `git push`, `gh pr create`, or `gh pr merge` — nothing that publishes.
+- **Never ask or wait.** A genuinely ambiguous editorial call takes the most conservative option, noted in the report. The release summary in the payload is a coverage hint only — verify every fact against the submodule source at the release SHA.
+- **Gates arbitrate.** Drive them green against the production surface (Step 4's repin first). A slice relying on a merged-but-unpublished package API is reverted on the publish branch (it stays on `next`) and recorded as held. File Step 6's deferred restructures and any parity gaps as issues per `.claude/ISSUE_FILING.md`, and record the numbers.
+- **The report is the PR body.** Write it to `.docs-publish-release-report.md` at the repo root. FIRST line: `PUBLISH_STATUS: ready` (branch built, committed, gates green — mergeable as-is) or `PUBLISH_STATUS: blocked — <reason>` (leave the best-effort branch committed for a human to take over; the workflow opens it as a draft PR). Then: the Step 5 release-coverage table, the Step 6 set-audit result with issue numbers filed, the Step 7 docs-delta summary (developer audience — no branches/channels/stamps/truing mechanics), and any held or gap items.
