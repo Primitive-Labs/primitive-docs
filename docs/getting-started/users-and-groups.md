@@ -48,9 +48,11 @@ Groups let you organize users into teams, roles, departments, or any relationshi
 # Create a group type config (defines a category of groups)
 primitive group-type-configs create --group-type team
 
-# Create a group
+# Create a group — omit --id and the server assigns one
 primitive groups create --type team --id engineering --name "Engineering Team"
 ```
+
+`--id` (`groupId` on the client) is optional — omit it and the server assigns a ULID, returned in the response, the same way documents and databases get their ids.
 
 ### Managing Members
 
@@ -120,6 +122,8 @@ access = "isMemberOf('org', params.orgId) || isMemberOf('team', params.teamId)"
 
 Who can *manage* groups themselves — create groups of a type, add or remove members — is governed by **rule sets** bound to the group type. See [Access Control](./access-control.md#rule-sets-governing-management-operations).
 
+A group type (or collection type) can also declare [resource metadata](./resource-metadata.md) categories, making `md.self.<category>.<key>` available in that type's rule set — along with a reserved `attrs` category projecting the group's own `groupType`, `groupId`, `name`, and `createdBy` (a collection's `attrs` also includes `contextId`).
+
 ## Best Practices
 
 1. **Use groups for access control.** Groups integrate natively with documents (group permissions) and databases (CEL membership checks). They're the primary mechanism for authorization in Primitive.
@@ -131,6 +135,7 @@ Who can *manage* groups themselves — create groups of a type, add or remove me
 ## Next Steps
 
 - **[Access Control](./access-control.md)** — The CEL rules your groups plug into
+- **[Resource Metadata](./resource-metadata.md)** — Attach schema'd, access-controlled data to a group or collection
 - **[Invitations](./invitations.md)** — App membership and deferred grants for not-yet-users
 - **[Working with Documents](./working-with-documents.md)** — Share documents with groups
 - **[Authentication](./authentication.md)** — How users get authenticated

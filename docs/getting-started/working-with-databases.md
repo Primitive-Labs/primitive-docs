@@ -220,6 +220,14 @@ access = "params.createdBy == user.userId"
 
 Use `fromWorkflow(...)` to gate an operation so only a specific workflow can invoke it — useful for cron-fired refreshes that no user, including admins, should call directly. An operation's `access` rule is evaluated on every call, including from [system workflow](./workflows.md#system-workflows) runs — `runAs = "system"` doesn't bypass it. So reserve a workflow-only operation with `fromWorkflow('key')` rather than setting `access = "false"` and expecting a system run to reach it.
 
+An operation's `definition` can also substitute a declared [resource metadata](./resource-metadata.md#using-metadata-in-access-rules) value alongside `$params.*` and `$user.userId`:
+
+```toml novalidate
+definition = '{"filter":{"tier":"$md.self.profile.tier"}}'
+```
+
+`$md.self.<category>.<key>` resolves to `null` (not the literal string) when the category isn't declared on the database type's manifest or the key is missing.
+
 ### Per-Parameter Access
 
 Restrict who can set specific parameters by adding an `access` rule to the parameter itself:
@@ -541,5 +549,6 @@ Pass `timing: true` to `executeOperation` and the response includes a `_timing` 
 
 - **[Choosing Your Data Model](./choosing-your-data-model.md)** — When to use databases vs. documents
 - **[Users and Groups](./users-and-groups.md)** — Set up groups for database access control
+- **[Resource Metadata](./resource-metadata.md)** — Declare a category to read it from `access` and `definition`
 - **[Workflows](./workflows.md)** — Multi-step server-side automation
 - **[Primitive CLI](./primitive-cli.md)** — Full CLI reference for database management

@@ -328,6 +328,16 @@ primitive secrets list
 primitive secrets delete OPENAI_API_KEY
 ```
 
+### Resource Metadata
+
+Read and write [resource metadata](./resource-metadata.md) category values — category definitions (schema, `readRule`, `writeRule`) are managed through `primitive sync`, not this command:
+
+```bash
+primitive metadata set user 01HXY... profile --data '{"tier":"pro"}'
+primitive metadata get user 01HXY... profile --json
+primitive metadata get-batch --resource user:01HXY...:profile,billing
+```
+
 ### Integrations
 
 Configure external API connections:

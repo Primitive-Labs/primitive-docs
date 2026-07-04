@@ -15,7 +15,7 @@
     }
   },
   "builtAgainst": {
-    "stampedAt": "2026-07-03",
+    "stampedAt": "2026-07-04",
     "channel": "next",
     "packages": {
       "js-bao-wss-client": "2.0.4",
@@ -237,7 +237,8 @@
         "documents",
         "data-modeling",
         "authentication",
-        "invitations"
+        "invitations",
+        "resource-metadata"
       ],
       "variants": [
         {
@@ -328,7 +329,8 @@
         "documents",
         "data-modeling",
         "users-and-groups",
-        "workflows"
+        "workflows",
+        "resource-metadata"
       ],
       "variants": [
         {
@@ -496,7 +498,8 @@
         "databases",
         "blobs",
         "analytics",
-        "app-secrets"
+        "app-secrets",
+        "resource-metadata"
       ],
       "variants": [
         {
@@ -927,6 +930,63 @@
         "Governing who can create groups or manage members",
         "Testing and debugging CEL rules",
         "Building a subscription-entitlement (Stripe billing) gate end to end"
+      ],
+      "relatedGuides": [
+        "resource-metadata"
+      ]
+    },
+    {
+      "topic": "resource-metadata",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_RESOURCE_METADATA.ts.md",
+      "description": "Typed metadata on any resource — categories, md.self/md.caller in CEL, batch reads, workflow steps",
+      "keywords": [
+        "resource metadata",
+        "metadata category",
+        "md.self",
+        "md.caller",
+        "metadataManifest",
+        "MetadataCategoryConfig",
+        "readRule",
+        "writeRule",
+        "resourceMetadata",
+        "getBatch",
+        "metadata.write",
+        "metadata.read",
+        "attrs",
+        "fromWorkflow"
+      ],
+      "useCases": [
+        "Attaching schema'd, access-controlled data to a user, group, collection, database, or workflow subject",
+        "Reading and writing a metadata category from the client or CLI, including a batch read",
+        "Referencing declared metadata in a group, collection, or database access rule",
+        "Reading the calling user's own metadata (md.caller) in an access rule",
+        "Writing metadata from a workflow step, restricted to that workflow with fromWorkflow()",
+        "Substituting a metadata value into a database operation's filter or data"
+      ],
+      "concepts": [
+        "metadata category config (schema + readRule/writeRule)",
+        "declared-access manifest ([metadata.self]/[metadata.paths])",
+        "md.self.<category>.<key>",
+        "md.self.attrs (projected category)",
+        "md.caller (user.userId root)",
+        "metadata.write / metadata.read workflow steps",
+        "trusted-author model"
+      ],
+      "relatedGuides": [
+        "access-control",
+        "users-and-groups",
+        "databases",
+        "workflows"
+      ],
+      "variants": [
+        {
+          "language": "ts",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_RESOURCE_METADATA.ts.md"
+        },
+        {
+          "language": "swift",
+          "file": "AGENT_GUIDE_TO_PRIMITIVE_RESOURCE_METADATA.swift.md"
+        }
       ]
     },
     {

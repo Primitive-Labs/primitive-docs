@@ -346,6 +346,8 @@ Triggers are computed fields that run server-side before a record is saved. Conf
 
 **Don't confuse trigger CEL with operation substitutions.** Triggers use bare CEL — `user.userId`, `now()`. Operation `definition` and `params` use `$user.userId`, `$now`, `$params.x`, `$database.celContext.x` substitutions, which are deep string-replacement on the JSON template, NOT CEL. (`$database.metadata.x` is accepted as an alternate alias for the same value.)
 
+A declared [resource metadata](AGENT_GUIDE_TO_PRIMITIVE_RESOURCE_METADATA.md) category value is also substitutable this way: `$md.self.<category>.<key>` in `filter`/`data`, resolving to `null` (not the literal string) when the category isn't declared on the database type's manifest or the key is missing. Access rules (`access`, `defaultAccess`) can likewise reference `md.self.<category>.<key>` and, where declared, `md.caller.<category>.<key>` (the caller's own metadata, rooted at `user.userId`) — see the Resource Metadata guide for declaring the manifest.
+
 ### Timestamps
 
 The `timestamps` knob on the `[type]` config stamps `createdAt` and/or `modifiedAt` fields automatically on every write, removing the need for per-model trigger boilerplate. Field names are caller-configurable.

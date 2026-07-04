@@ -46,6 +46,7 @@ config/
   rule-sets/*.toml                # Access rule sets
   group-type-configs/*.toml       # Group type configs
   collection-type-configs/*.toml  # Collection type configs
+  metadata-category-configs/*.toml # Resource metadata category configs (schema + readRule/writeRule)
 ```
 
 ## App settings (`app.toml`)
