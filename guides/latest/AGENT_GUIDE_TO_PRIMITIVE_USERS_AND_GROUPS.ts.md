@@ -221,7 +221,7 @@ Groups are identified by a `(groupType, groupId)` pair, allowing multiple taxono
 
 ### Quick start
 
-1. Create a group with `client.groups.create({ groupType, groupId, name })`.
+1. Create a group with `client.groups.create({ groupType, groupId, name })` — `groupId` is optional; omit it (or pass `null`) and the server assigns a ULID, returned in the response.
 2. Add members with `client.groups.addMember(...)` (by `userId` or `email`).
 3. Grant group access to a document with `client.documents.grantGroupPermission(...)`.
 4. Gate database operations in CEL: `access: "isMemberOf('team', database.metadata.teamId)"`.
@@ -264,6 +264,8 @@ The full create/list/get/update/delete surface is in [Managing Groups](#managing
 ```
 
 If the group type has `autoAddCreator: true` (default), the creator is automatically added as a member.
+
+`groupId` on create is optional — a supplied id keeps its existing validation (`#` banned, no `_`-prefixed reserved type, `409` on a duplicate); a non-string supplied value is rejected with `400 "groupId must be a string"`, an empty string with `400 "groupId cannot be empty"`. Omit it (or send `null`) to have the server assign a ULID, returned as `groupId` in the response — the same pattern documents, databases, and collections use for server-assigned ids.
 
 `groups.list()` returns a paginated `{ items: GroupInfo[], cursor? }`. `ListGroupsOptions` supports `type`, `limit`, `cursor`, and `includeSystem: true` to include platform-managed internal groups whose `groupType` is prefixed with `_` (e.g. `_col-reader`/`_col-writer` backing collection sharing). These are filtered out by default — only set `includeSystem` for admin tooling.
 
@@ -364,7 +366,13 @@ Group types are configured via TOML config files and the `primitive sync` comman
 groupType = "team"
 ruleSetName = "team-rules"     # optional — name of an attached rule set
 autoAddCreator = true          # auto-add creator as member when the config exists (default: true)
+
+[metadata.self]
+categories = ["config"]        # optional — declares which metadata categories this
+                                # group type's rule set may read as md.self.config.*
 ```
+
+A group type config can also declare a metadata manifest (`[metadata.self]`/`[metadata.paths.*]`/top-level `secrets`), making `md.self.<category>.<key>` — plus a reserved, schema-less `attrs` category (`groupType`, `groupId`, `name`, `createdBy`) — available in that type's rule set. Collection type configs take the identical `[metadata]` block (collection `attrs` adds `contextId`). See the [Resource Metadata guide](AGENT_GUIDE_TO_PRIMITIVE_RESOURCE_METADATA.md).
 
 Push to the server:
 

@@ -32,7 +32,7 @@ Every CEL evaluation sees the authenticated caller:
 
 Group membership is the workhorse: model teams, roles, and relationships as [groups](./users-and-groups.md), then write rules against membership instead of hard-coding user IDs. `isMemberOf('team', params.teamId)` stays correct as people join and leave; `userId == '01ABC...'` doesn't.
 
-Each place a rule appears adds its own context on top — operation `params.*`, the `database.*` being accessed, the `record.*` being written. The feature pages document their specific variables.
+Each place a rule appears adds its own context on top — operation `params.*`, the `database.*` being accessed, the `record.*` being written. The feature pages document their specific variables. A rule at a site with a declared metadata manifest also gains `md.self.*` (and, where declared, `md.<path>.*` / `md.caller.*`) — see [Resource Metadata](./resource-metadata.md).
 
 ### A Rule Sees Identity, Not Stored Data
 
@@ -56,6 +56,7 @@ Maintain that membership from your billing source — add a member when a subscr
 | Server-stamped fields (trigger `when` conditions) | Whether a computed field applies to this write | [Server-Stamped Fields](./working-with-databases.md#server-stamped-fields) |
 | Blob buckets (`ruleSetId`) | Member-level access to a bucket's blobs, per operation | [Blobs and Files](./blobs-and-files.md#access-presets) |
 | Rule sets | Who can perform **management operations** on groups and collections | below |
+| Metadata categories (`readRule` + `writeRule`) | Who can read or write one category of a resource's metadata | [Resource Metadata](./resource-metadata.md) |
 
 ## Rule Sets: Governing Management Operations
 

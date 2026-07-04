@@ -13,6 +13,7 @@
     { "page": "docs/getting-started/devtools.md", "template": "guides/latest/AGENT_GUIDE_TO_PRIMITIVE_DEVTOOLS.template.md" },
     { "page": "docs/getting-started/invitations.md", "template": "guides/latest/AGENT_GUIDE_TO_PRIMITIVE_INVITATIONS.template.md" },
     { "page": "docs/getting-started/prompts.md", "template": "guides/latest/AGENT_GUIDE_TO_PRIMITIVE_PROMPTS.template.md" },
+    { "page": "docs/getting-started/resource-metadata.md", "template": "guides/latest/AGENT_GUIDE_TO_PRIMITIVE_RESOURCE_METADATA.template.md" },
     { "page": "docs/getting-started/users-and-groups.md", "template": "guides/latest/AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.template.md" },
     { "page": "docs/getting-started/workflows.md", "template": "guides/latest/AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.template.md" },
     { "page": "docs/getting-started/workflows.md", "template": "guides/latest/AGENT_GUIDE_TO_PRIMITIVE_SCRIPTS.template.md", "note": "the page's `script` step section" },

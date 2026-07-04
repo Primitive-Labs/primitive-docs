@@ -372,6 +372,7 @@ export default defineConfig({
           { text: 'Authentication', link: '/getting-started/authentication' },
           { text: 'Users and Groups', link: '/getting-started/users-and-groups' },
           { text: 'Access Control', link: '/getting-started/access-control' },
+          { text: 'Resource Metadata', link: '/getting-started/resource-metadata' },
           { text: 'Invitations', link: '/getting-started/invitations' },
         ],
         collapsed: false,

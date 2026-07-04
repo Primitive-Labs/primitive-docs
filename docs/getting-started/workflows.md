@@ -456,6 +456,7 @@ Every step has an `id` (unique within the workflow) and a `kind` (the step type)
 | `document.query` / `queryOne` / `count` / `save` / `patch` / `delete` | Read and write records in a document's models |
 | `document.resolveAlias` | Resolve a document alias to its id (or null) for conditional branching |
 | `group.addMember` / `removeMember` / `removeAll` / `checkMembership` / `listMembers` / `listUserMemberships` | Group membership operations |
+| `metadata.write` / `metadata.read` | Write or read a [resource metadata](./resource-metadata.md) category |
 | `collect` | Auto-paginate any step that returns `{ items, cursor }` |
 | `workflow.call` | Run a child workflow synchronously, inline (use `forEach` to fan out) |
 | `block.call` | Invoke a prompt, integration, script, or workflow block selected by `blockType` — a unified wrapper over the four steps above |
@@ -826,6 +827,25 @@ It takes a `groupType` and a `userId` (no `groupId` — it removes the user from
 
 Group steps evaluate the group type's rule sets like any other caller; rules can match workflow-issued operations with `fromWorkflow("workflowKey")` — see [Access Control](./access-control.md). In a [system run](#system-workflows), `addMember` and `removeMember` record the app's system principal as the member's `addedBy` — not the admin or trigger that started the run.
 
+### Metadata Steps
+
+`metadata.write` and `metadata.read` read and write a [resource metadata](./resource-metadata.md) category, going through the same category `writeRule` / `readRule` gate as the client and CLI:
+
+```toml
+[[steps]]
+id = "record-billing"
+kind = "metadata.write"
+resourceType = "user"
+resourceId = "{{ input.userId }}"
+category = "billing"
+saveAs = "output"
+[steps.data]
+stripeCustomerId = "{{ input.customerId }}"
+status = "active"
+```
+
+`metadata.write` fully replaces the category and returns `{ data, schemaVersion, size }`; `metadata.read` returns `{ data, schemaVersion, exists }` (`saveAs` puts either under `outputs.<name>`). A category's `writeRule`/`readRule` can name `fromWorkflow('workflowKey')` to authorize only that workflow's step — a REST call or a different workflow to the same category is denied.
+
 ### `collect`
 
 Auto-paginates any step that returns `{ items, cursor }` (or `{ data, nextCursor }`), merging all pages into one result:
@@ -1037,6 +1057,7 @@ In interpolation mode an unresolved path renders as `<missing: steps.x.y>`, so t
 ## Next Steps
 
 - **[Prompts](./prompts.md)** — Versioned, testable LLM prompt templates
+- **[Resource Metadata](./resource-metadata.md)** — Write metadata a workflow alone is authorized to change
 - **[Working with Databases](./working-with-databases.md)** — Server-side structured storage
 - **[Blobs and Files](./blobs-and-files.md)** — General-purpose file storage
 - **[Primitive CLI](./primitive-cli.md)** — Full CLI command reference

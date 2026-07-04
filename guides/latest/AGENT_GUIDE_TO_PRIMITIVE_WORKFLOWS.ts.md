@@ -369,6 +369,33 @@ userId = "{{ input.userId }}"   # OR email = "...", not both
 
 Group operations evaluate the group type's CEL rules. For workflow-issued operations, rules can match `fromWorkflow("workflowKey")`. In a system run, `addMember`/`removeMember` record `sys:<appId>` as the membership's `addedBy` (not the admin/cron/webhook that initiated the run).
 
+### `metadata.write` / `metadata.read`
+
+```toml
+[[steps]]
+id = "record-billing"
+kind = "metadata.write"
+resourceType = "user"
+resourceId = "{{ input.userId }}"
+category = "billing"
+saveAs = "output"
+[steps.data]
+stripeCustomerId = "{{ input.customerId }}"
+status = "active"
+# Output: { ok, resourceType, resourceId, category, data, schemaVersion, size }
+
+[[steps]]
+id = "load-billing"
+kind = "metadata.read"
+resourceType = "user"
+resourceId = "{{ input.userId }}"
+category = "billing"
+saveAs = "output"
+# Output: { ok, resourceType, resourceId, category, data, schemaVersion, exists }
+```
+
+Both route through the same read/write path (and the same category `readRule`/`writeRule` gate) as the client and CLI — `resourceType`/`resourceId`/`category`/`data` are all templated. `metadata.write` is a full replace, not a merge. Gate a category to exactly this workflow with `fromWorkflow('workflowKey')` in its `writeRule`/`readRule`; the workflow identity is a privileged, call-local value the step runner passes in-process, never derived from a request header. A `runAs:"system"` run gets no owner/admin bypass here — only `fromWorkflow('key')` authorizes it; a `runAs:"caller"` run keeps the bypass. Errors follow the `database.*` step convention: 4xx (validation, rule denial, reserved category) is non-retryable, 429/5xx is retryable. See the [Resource Metadata guide](AGENT_GUIDE_TO_PRIMITIVE_RESOURCE_METADATA.md).
+
 ### `collect`
 
 Auto-paginate through any step that returns `{ items|data: [...], cursor|nextCursor }`.

@@ -26,6 +26,9 @@ A rule reads caller identity and operation params only — it cannot read a data
 | Workflow | `accessRule` on `[workflow]` | identity context only | Evaluated on `workflows.start()` and `workflow.call`; NOT on webhook triggers. admin/owner bypass. No rule → any authenticated member can start. |
 | Server-stamped fields / triggers | trigger `when` conditions; `autoPopulatedFields` values | `record.*`, `database.*`, `now()` | CEL produces values (`user.userId`, `now()`) as well as conditions. |
 | Rule sets | per-op rules on a named rule set | resource objects (e.g. `group.groupType`, `group.groupId`, `group.createdBy`) | Governs **management operations** (create/edit/delete groups & collections, member management) — see below. |
+| Metadata category | `readRule` (read API) / `writeRule` (write API) on the category config | `user.userId`, `user.role`, `resource.resourceType`/`resourceId`/`category`; `workflow.workflowKey` when called from a `metadata.write`/`read` step | Gates the metadata read/write API only — a *different* rule's `md.self`/`md.caller` use is authorized by declaration, not this rule. See the Resource Metadata guide. |
+
+Any eval site with a declared metadata manifest also gains `md.self.*` (and, where declared, `md.<path>.*` / `md.caller.*`) in its CEL context — see the [Resource Metadata guide](AGENT_GUIDE_TO_PRIMITIVE_RESOURCE_METADATA.md).
 
 ## Rule sets (management operations)
 

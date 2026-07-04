@@ -57,9 +57,10 @@ config/
   rule-sets/*.toml                # Access rule sets
   group-type-configs/*.toml       # Group type configuration
   collection-type-configs/*.toml  # Collection type configuration
+  metadata-category-configs/*.toml # Resource metadata category configs
 ```
 
-Every feature page in these docs that shows a TOML block — [Workflows](./workflows.md), [Prompts](./prompts.md), [API Integrations](./api-integrations.md), [Working with Databases](./working-with-databases.md), [Blobs and Files](./blobs-and-files.md) — is describing one of these files. Define the entity in TOML, `primitive sync push`, and it's live.
+Every feature page in these docs that shows a TOML block — [Workflows](./workflows.md), [Prompts](./prompts.md), [API Integrations](./api-integrations.md), [Working with Databases](./working-with-databases.md), [Blobs and Files](./blobs-and-files.md), [Resource Metadata](./resource-metadata.md) — is describing one of these files. Define the entity in TOML, `primitive sync push`, and it's live.
 
 `app.toml` holds the app-level settings, and pushing it is the preferred way to change them — the imperative `primitive apps update --flag` calls mutate the server directly and drift from the checked-in TOML, so a later `sync push` reverts them. The TOML-syncable settings are:
 
