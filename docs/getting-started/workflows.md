@@ -332,6 +332,8 @@ capabilities = ["membership"]
 
 `membership` lets the workflow change group membership — the `group.addMember`, `group.removeMember`, and `group.removeAll` steps. Without the grant, those steps in a system workflow are refused. Read-only group checks never need it.
 
+`sync push` only sets `capabilities` when it creates a workflow. To grant or revoke capabilities on a workflow that already exists, use `primitive workflows update <id> --capabilities membership` (a comma-separated list; `--capabilities ""` revokes all).
+
 [`iterate-users`](#iterate-users) is system-only — it fans out across the entire user roster, which no single caller has the standing to do. A workflow that uses it must set `runAs = "system"`, or the server rejects it when you push.
 
 ### Acting on Behalf of a User
@@ -432,7 +434,7 @@ primitive sync diff
 primitive sync push
 ```
 
-When a workflow needs flags `sync push` doesn't carry (`requiresClientApply`, `syncCallable`, queue caps), set them with `primitive workflows update`.
+`syncCallable` is the one `[workflow]` field `sync push` won't flip on an existing workflow — the server re-validates it against the currently-active steps, so set it with `primitive workflows update --sync-callable true` after the new steps are live. (`capabilities` has a similar create-only limitation — see [above](#sensitive-capabilities).) Every other field round-trips through `sync push`.
 
 For reusable step blocks, lift them into `<workflowDir>/../workflow-fragments/<name>.toml` and reference them from a workflow via `include = ["<name>"]`. The CLI flattens fragment references before push; `primitive workflows expand <workflow.toml>` prints the expanded result for debugging.
 
@@ -799,6 +801,19 @@ scope = "user"
 aliasKey = "tracker"
 saveAs = "tracker"
 ```
+
+**Writing many records in one step.** `document.save` and `document.patch` accept `records` (an array) instead of `recordId` + `data`; `document.delete` accepts `recordIds` (an array of strings) instead of `recordId`. A step takes one form or the other, never both — supplying `recordId` alongside `records`/`recordIds` fails the step. Batch mode collapses a `forEach` fan-out into a single step that resolves the document's ACL once and applies every record in one transaction per chunk (chunked at 100 records; a batch over 100 records makes several sequential chunk round-trips, each atomic on its own but not atomic with the others — a failure partway through leaves earlier chunks committed):
+
+```toml
+[[steps]]
+id = "upsert-holdings"
+kind = "document.save"
+documentId = "{{ input.docId }}"
+modelName = "Holding"
+records = "{{ steps.rows.output.result.rows }}"   # each { id?, ...fields } — id is optional; omitted ids are minted server-side
+```
+
+`document.save` returns `{ saved, savedIds }` and `document.patch` returns `{ patched, patchedIds }` (each element of `records` needs an `id` for `patch`); `document.delete` returns `{ deleted }` (a non-existent id is a no-op, not an error). Re-running a batch save whose records had no `id` mints fresh ids each time rather than upserting the same ones — give records an explicit `id` if the workflow might retry.
 
 ### Group Steps
 
