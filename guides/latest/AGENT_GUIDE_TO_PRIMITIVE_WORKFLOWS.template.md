@@ -30,7 +30,7 @@ greeting = "Hello {{ input.name }}"
 ```
 
 Workflow-level fields the engine actually reads:
-`perUserMaxRunning`, `perUserMaxQueued`, `perAppMaxRunning` (default 25), `perAppMaxQueued` (default 10000), `queueTtlSeconds` (default 43200), `dequeueOrder`, `accessRule`, `runAs` (default `caller` — see "Execution identity" below), `capabilities` (system-only grants), `inputSchema`, `outputSchema`, `requiresClientApply` (default `true` — see "Client apply" below), `syncCallable` (default `false` — see "Synchronous invocation" below). Sync pushes the schema fields, access rule, `runAs`/`capabilities`, queue settings, step list, `requiresClientApply`, and `syncCallable`.
+`perUserMaxRunning`, `perUserMaxQueued`, `perAppMaxRunning` (default 25), `perAppMaxQueued` (default 10000), `queueTtlSeconds` (default 43200), `dequeueOrder`, `accessRule`, `runAs` (default `caller` — see "Execution identity" below), `capabilities` (system-only grants), `inputSchema`, `outputSchema`, `requiresClientApply` (default `true` — see "Client apply" below), `syncCallable` (default `false` — see "Synchronous invocation" below). `sync push` forwards every one of these — `name`, `description`, `status`, `accessRule`, `runAs`, queue settings, schemas, `requiresClientApply`, step list — on both a fresh create and a push to an existing workflow, with two exceptions that need a direct CLI update instead: `syncCallable` on an existing workflow (the server re-validates it against the currently-active steps, so `sync push` omits it there — use `primitive workflows update --sync-callable true` after the new steps are live) and `capabilities` on an existing workflow (`sync push` persists `capabilities` on create only — grant or revoke them on an existing workflow with `primitive workflows update --capabilities <list>`, comma-separated, `""` to revoke all).
 
 ### Per-step common fields
 
@@ -351,6 +351,48 @@ kind = "document.save"
 runIf = "outputs.tracker.documentId == null"
 # ... create the user's tracker document
 ```
+
+### `document.save` / `patch` / `delete` — batch mode (`records` / `recordIds`)
+
+Each write step works in exactly one of two modes, never mixed: singular (`recordId` [+ `data`]) or batch (`records` for `save`/`patch`, `recordIds` for `delete`). Batch mode is keyed off the array field being present at all (not off `recordId` being absent) — supplying both a singular and an array field on the same step is a hard non-retryable error. Batch mode resolves the document ACL once and applies every record in one Yjs transaction + one persist + one broadcast **per chunk**, instead of the per-record cost of a `forEach` fan-out.
+
+| Mode | Input | Output |
+|---|---|---|
+| singular | `recordId` (+ `data`) | unchanged: `save`/`patch` → `{ record }`; `delete` → `{ deleted: true, id }` |
+| batch | `records` (save/patch) / `recordIds` (delete) | `save` → `{ saved, savedIds }`; `patch` → `{ patched, patchedIds }`; `delete` → `{ deleted }` |
+
+```toml
+[[steps]]
+id = "upsert-holdings"
+kind = "document.save"
+documentId = "{{ outputs.doc.documentId }}"
+modelName = "holding"
+records = "{{ steps.rows.output.result.rows }}"   # Array<{ id?, ...fields }> — id optional, minted server-side (ulid()) when absent
+
+[[steps]]
+id = "merge-holdings"
+kind = "document.patch"
+documentId = "{{ outputs.doc.documentId }}"
+modelName = "holding"
+records = "{{ steps.rows.output.result.rows }}"   # Array<{ id, ...fields }> — id REQUIRED per element
+
+[[steps]]
+id = "remove-obsolete"
+kind = "document.delete"
+documentId = "{{ outputs.doc.documentId }}"
+modelName = "holding"
+recordIds = "{{ steps.plan.output.result.obsoleteIds }}"   # string[] — a non-existent id is a no-op, not an error
+```
+
+Rules and edge cases:
+
+- **Chunk cap = 100 records** (server constant). A batch of N records runs as `ceil(N / 100)` sequential DO round-trips, not one unbounded transaction.
+- **Validation-first, then fail-fast.** A structural pass runs over every record before the first chunk is sent (well-formed objects; `patch` elements require a non-empty `id`; `recordIds` entries are non-empty strings). A structural failure fails the whole step non-retryably, names the offending index, and writes nothing.
+- **Per-chunk atomicity, not whole-batch atomicity.** Each chunk (≤100 records) commits atomically, but a batch spanning multiple chunks is not atomic across chunks — a failure on chunk *k* leaves chunks `0..k-1` committed. The error names the offending record. Keep a batch ≤100 (one chunk) for all-or-nothing, or design the workflow for idempotent re-runs.
+- **Duplicate ids within one batch:** allowed, last write wins (records apply in id order within the transaction).
+- **Batch failures are non-retryable** — a validation or constraint failure fails the run immediately rather than retrying.
+- **Id-less batch `save` and retries.** An omitted `id` mints a fresh ULID server-side on every attempt — retrying a batch save whose records had no `id` (e.g. after a transient error) creates duplicates rather than upserting the originals. Supply explicit ids, or make the workflow idempotent some other way, if the step might retry.
+- **Projection freshness.** A batch marks the document's query projection dirty once (rebuilt on the next read) instead of updating it inline per record — the first `document.query`/`count` after a batch pays one rebuild rather than N inline upserts. Single-record writes still update the projection inline.
 
 ### `group.addMember` / `removeMember` / `removeAll` / `checkMembership` / `listMembers` / `listUserMemberships`
 
@@ -935,7 +977,9 @@ runAs = "system"
 capabilities = ["membership"]
 ```
 
-`membership` gates the `group.addMember` / `group.removeMember` / `group.removeAll` steps in a **system** run — without the grant they reject (`group.addMember requires the 'membership' capability`). Read-only group steps (`checkMembership`, `listMembers`, `listUserMemberships`) are never gated, and caller runs are governed by access rules, not capabilities, so the gate never applies to them.
+`membership` gates the `group.addMember` / `group.removeMember` / `group.removeAll` steps in a **system** run — without the grant they reject (`group.addMember requires the 'membership' capability`). Read-only group steps (`checkMembership`, `listMembers`, `listUserMemberships`) are never gated, and caller runs are governed by access rules, not capabilities, so the gate never applies to them. When the group type carries no explicit rule set (no `GroupTypeConfig` row, or one with `ruleSetId` unset), a system run holding `membership` is allowed through anyway — the granted capability stands in for a CEL rule the app never configured. A group type with an explicit rule set is still governed by that rule set, never overridden by the capability.
+
+Grant or revoke `capabilities` on a workflow that already exists with `primitive workflows update <id> --capabilities <list>` (comma-separated; `""` revokes all) — `sync push` only persists `capabilities` when creating a new workflow (see above).
 
 **`iterate-users` is system-only.** A workflow containing an `iterate-users` step must set `runAs = "system"` — otherwise it's rejected at save time (`'iterate-users' is system-only and may appear only in a runAs:"system" workflow`).
 

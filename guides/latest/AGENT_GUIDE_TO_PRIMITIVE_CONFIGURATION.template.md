@@ -75,15 +75,17 @@ Every command resolves its target environment in order: `--env <name>` flag → 
 
 ## What sync does NOT carry
 
-Some settings are set with dedicated update commands rather than TOML (app-level settings that *do* sync are listed under [App settings](#app-settings-app-toml)):
+Some settings are set with dedicated update commands rather than TOML (app-level settings that *do* sync are listed under [App settings](#app-settings-app-toml)). Two workflow-level fields are the exception to "TOML round-trips everything": `sync push` sets them only when it **creates** a workflow, never when it updates one already on the server — flip them on an existing workflow with a direct update instead:
 
 ```bash
-primitive workflows update <id> --requires-client-apply false
-primitive workflows update <id> --sync-callable true
+primitive workflows update <id> --sync-callable true     # existing workflow only; the server re-validates against the currently-active steps
+primitive workflows update <id> --capabilities membership   # existing workflow only; comma-separated, "" revokes all
 primitive apps update --member-invitations-enabled true --member-invitation-limit 5
 primitive apps update --test-account-bases alice@example.com
 primitive apps update --redirect-uris "https://app.example.com/auth/callback"  # no TOML key
 ```
+
+`requiresClientApply` is an ordinary `[workflow]` TOML field — `sync push` forwards it on both create and update — so `primitive workflows update <id> --requires-client-apply false` is a convenience, not the only path.
 
 ## Secrets
 
