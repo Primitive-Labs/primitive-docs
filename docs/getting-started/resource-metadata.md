@@ -33,7 +33,7 @@ primitive sync push
 
 Field types are `string`, `number`, `boolean`, `date`, `id`, and `stringset`; `enum` is valid only on a `string` field. A category holds up to 100 keys and 16 KB of data, and writes are validated against the schema before they're stored.
 
-`readRule` and `writeRule` are CEL expressions evaluated against `user.*` (the caller) and `resource.*` (`resourceType`, `resourceId`, `category`) — app owners and admins bypass both. `writeRule` gates the write API; `readRule` gates the read API. Omit either and it defaults to deny.
+`readRule` and `writeRule` are CEL expressions evaluated against `user.*` (the caller) and `resource.*` (`resourceType`, `resourceId`, `category`) — app-level owners and admins bypass both. The bypass is the app role only: holding a permission on the resource itself (being a database's owner or manager, say) grants no bypass — the rule is what authorizes resource-scoped callers. `writeRule` gates the write API; `readRule` gates the read API. Omit either and it defaults to deny.
 
 ## Reading and Writing Metadata
 

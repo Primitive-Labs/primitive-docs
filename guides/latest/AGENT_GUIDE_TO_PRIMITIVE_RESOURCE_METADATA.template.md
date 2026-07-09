@@ -32,7 +32,7 @@ primitive sync push
 - **Field types:** `string`, `number`, `boolean`, `date`, `id`, `stringset`. `enum` (string array) is valid only on a `string` field; other supported constraints are `required`, `maxLength`, `maxCount`.
 - **Category name `attrs` is reserved** — it's the read-only projected category (see **`md.self.attrs`** below), not a category you define.
 - **Limits:** up to 100 keys per category, 16 KB per category item.
-- **`readRule`/`writeRule` context:** `user.userId`, `user.role` (the caller), `resource.resourceType`, `resource.resourceId`, `resource.category` — plus `workflow.workflowKey` when the call originates from a `metadata.write`/`metadata.read` step (so `fromWorkflow('key')` works). Owner/admin always bypass both rules. Omitting either rule defaults to deny.
+- **`readRule`/`writeRule` context:** `user.userId`, `user.role` (the caller), `resource.resourceType`, `resource.resourceId`, `resource.category` — plus `workflow.workflowKey` when the call originates from a `metadata.write`/`metadata.read` step (so `fromWorkflow('key')` works). An **app-level** owner or admin always bypasses both rules; a resource-level permission (e.g. a database's `owner`/`manager` grant) never bypasses — the rule itself is what authorizes resource-scoped callers. Omitting either rule defaults to deny.
 - **Category authoring is admin-scoped** — define and update categories via TOML sync, or directly through the admin-gated `metadata-categories` REST route. `client.resourceMetadata` covers values only (`get`/`set`/`getBatch`).
 
 ## Values: read, write, batch read
@@ -178,7 +178,7 @@ saveAs = "output"
 - `metadata.write` is a **full replace** of the category, matching the REST `PUT` semantics.
 - Gate a category to exactly one workflow with `fromWorkflow('workflowKey')` in its `writeRule`/`readRule` — a REST call or a different workflow gets `403`. The workflow identity here is a privileged, call-local value the step runner passes in-process; it is never derived from a request header (an `X-Workflow-Context` header on a REST call has no effect).
 - Error behavior mirrors `database.*` steps: a 4xx (schema validation, rule denial, reserved category, bad segment) is **non-retryable**; a 429 or 5xx is retryable.
-- A `runAs:"system"` run's metadata calls carry no `user.*` context (empty `{}`) and get no owner/admin bypass — only `fromWorkflow('key')` can authorize a system-run write/read. A `runAs:"caller"` run's calls still get the owner/admin bypass.
+- A `runAs:"system"` run's metadata calls carry no `user.*` context (empty `{}`) and get no app-level owner/admin bypass — only `fromWorkflow('key')` can authorize a system-run write/read. A `runAs:"caller"` run's calls still get the app-level owner/admin bypass.
 
 ## Metadata lifecycle
 
