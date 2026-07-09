@@ -251,7 +251,7 @@ primitive databases records query <id> <model> --filter '{"status":"open"}'
 
 # Data migration (records + indexes + constraints; type config excluded — run sync push on target first)
 primitive databases export <id> --output ./out
-primitive databases import ./out --overwrite [--dry-run]
+primitive databases import ./out --overwrite [--dry-run] [--batch-size 5000] [--stop-on-error]
 
 # CSV bulk import — load a CSV file into a database via a batch save operation
 primitive databases import-csv <database-id> <file.csv> --model <name> \
@@ -259,6 +259,8 @@ primitive databases import-csv <database-id> <file.csv> --model <name> \
   [--types '{"price":"number"}'] [--id-column <col>] [--batch-size 5000] \
   [--delimiter ,] [--dry-run] [--stop-on-error] [--json]
 ```
+
+`databases import` writes records in chunked batch requests: `--batch-size` sets records per request (default 5000, ceiling 25000; an invalid value fails before any write). A failing chunk is reported and the run continues by default — the command still exits non-zero at the end; `--stop-on-error` aborts the whole run (including a multi-database export dir) at the first failing chunk. Record upserts are keyed by `_id`, so re-running an import after a partial failure is safe.
 
 `database-types delete <type>` refuses with a 409 when live database instances of that type still exist — delete the instances first (`primitive databases delete <id>`) or pass `--force` to delete the type anyway (this orphans the instances). `-y`/`--yes` only skips the confirmation prompt; it does not bypass the guard.
 

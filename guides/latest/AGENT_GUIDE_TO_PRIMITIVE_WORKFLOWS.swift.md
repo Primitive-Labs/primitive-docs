@@ -499,9 +499,9 @@ textBody = "Download: {{ outputs.upload.signedUrl }}"
 
 `to` is a single address (string), not an array. Built-in templates: `magic-link`, `otp`, `document-share`, `document-share-deferred`, `waitlist-invite`, `waitlist-signup-notification`, `admin-invite`, `app-invite`, `access-request-created`, `access-request-resolved`. Register custom types with `primitive email-templates set <type>`. Hourly rate limit: 100 emails per app per hour (`workflowEmailByApp` in `src/config/rate-limits.ts`).
 
-### `blob.upload` / `blob.download` / `blob.signedUrl`
+### `blob.upload` / `blob.download` / `blob.signedUrl` / `blob.delete`
 
-Three separate kinds, NOT one `blob` step with an `action` field.
+Four separate kinds, NOT one `blob` step with an `action` field.
 
 ```toml
 [[steps]]
@@ -528,8 +528,19 @@ kind = "blob.download"
 bucketKey = "reports"
 blobId = "{{ steps.save.blobId }}"
 asBase64 = true                   # default false (returns utf-8 string)
-# Output: { blobId, filename, contentType, numBytes, content?, contentBase64? }
+# Output: { blobId, bucketId, filename, contentType, numBytes, content?, contentBase64? }
+
+[[steps]]
+id = "cleanup"
+kind = "blob.delete"
+bucketKey = "reports"
+blobId = "{{ steps.save.blobId }}"
+# Output: { deleted: true, blobId, bucketId }
 ```
+
+- Every kind takes exactly one of `bucketId` / `bucketKey`; missing both, an unknown bucket, or a missing required param is non-retryable.
+- `blob.delete` is idempotent: it reports `deleted: true` uniformly, including when the blob is already gone — a retried run doesn't fail on cleanup it already did. `blob.signedUrl` never checks blob existence; an authorized caller mints a token even for an absent blob.
+- **Caller-mode access.** In a `runAs:"caller"` run, each kind evaluates the bucket's preset/rule set before the storage op, with the same op mapping as direct client calls: `blob.upload` → `write` (evaluated with `blobId: null`, `createdBy` = the caller), `blob.download` → `read`, `blob.signedUrl` → `share` (minting is gated like sharing, not reading), `blob.delete` → `delete`. Download, signedUrl, and delete load the blob's `createdBy` first so uploader-scoped rules (`record.blobCreatedBy == user.userId`) work; download decides access before revealing whether the blob exists, so a denied caller gets an access error, never not-found. Denial is non-retryable (`"<kind> access denied: …"`). A `runAs:"system"` run skips the bucket policy entirely (app-privileged).
 
 ### `analytics.write` / `analytics.query`
 
@@ -954,8 +965,8 @@ Set `accessRule` once in the `[workflow]` TOML block and it sticks: `primitive s
 
 `runAs` declares the principal a run executes as — `caller` (default) or `system`. It's a top-level `[workflow]` field.
 
-- `runAs = "caller"` (default) — the run executes as the invoking user. Every step acts with that member's permissions: `document.*` steps enforce the caller's per-document ACL, group/data ops are checked against their roles. `accessRule` gates who may start it.
-- `runAs = "system"` — the run executes as the app's synthetic per-app principal (`sys:<appId>`, also the `WorkflowRun` partition key). App-privileged on the **raw** data baseline: direct document/record read/write/delete/manage skips the per-caller ACL. It does **not** bypass a registered database operation's own `access` CEL — a `database.*` step evaluates that rule on every call, system run included (`access = "false"` → `403`; reserve a workflow-only op with `fromWorkflow('key')`, not `"false"`).
+- `runAs = "caller"` (default) — the run executes as the invoking user. Every step acts with that member's permissions: `document.*` steps enforce the caller's per-document ACL, group/data ops are checked against their roles, and `blob.*` steps evaluate the bucket's access policy per op (write/read/share/delete — see the blob steps section). `accessRule` gates who may start it.
+- `runAs = "system"` — the run executes as the app's synthetic per-app principal (`sys:<appId>`, also the `WorkflowRun` partition key). App-privileged on the **raw** data baseline: direct document/record read/write/delete/manage skips the per-caller ACL, and `blob.*` steps skip the bucket policy. It does **not** bypass a registered database operation's own `access` CEL — a `database.*` step evaluates that rule on every call, system run included (`access = "false"` → `403`; reserve a workflow-only op with `fromWorkflow('key')`, not `"false"`).
 
 The invocation gate is enforced once at top-level start (HTTP start/run-sync, cron, webhook, admin test) — never silently downgraded:
 
@@ -1600,7 +1611,7 @@ If a step output contains sensitive data, do NOT `saveAs`. Pipe it directly into
 
 ### Wrong: forgetting `requiresClientApply = false` for server-only workflows
 
-Cron-triggered workflows almost always want `requiresClientApply = false`. Otherwise the run sits in `apply_pending` forever because no client is listening.
+Cron- and webhook-triggered workflows almost always want `requiresClientApply = false`. Otherwise the run sits in `apply_pending` forever because no client is listening.
 
 ```bash
 primitive workflows update <workflow-id> --requires-client-apply false
