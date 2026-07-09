@@ -174,7 +174,7 @@ A workflow runs on the server, but its result often belongs in a **document** �
 2. When a run reaches `apply_pending`, a client calls `claimApply()` (an exclusive, time-limited claim), runs the handler, then `confirmApply()` — or `releaseApply()` on failure so another client can retry.
 3. `define(...)` wraps this loop for you — when the status event arrives, the client claims the lease, runs your handler, and confirms (or releases on a thrown error). Most apps never call claim/confirm directly.
 
-If a workflow's output doesn't need to land in a document — it writes to databases, sends email, returns a value — leave `requiresClientApply` off. Server-only workflows (cron-fired jobs especially) should set it to `false` explicitly, otherwise runs sit in `apply_pending` waiting for a client that never comes:
+If a workflow's output doesn't need to land in a document — it writes to databases, sends email, returns a value — leave `requiresClientApply` off. Server-only workflows (cron- and webhook-fired jobs especially) should set it to `false` explicitly, otherwise runs sit in `apply_pending` waiting for a client that never comes:
 
 ```bash
 primitive workflows update <workflow-id> --requires-client-apply false
@@ -294,7 +294,7 @@ Push the rule with `primitive sync push` like any other workflow config, or chan
 
 ## System Workflows
 
-By default a workflow runs **as the user who started it** (`runAs = "caller"`): every step acts with that member's own permissions — it touches only documents they can access, and its group and data operations are checked against their roles. This is the safe default, and most workflows want it.
+By default a workflow runs **as the user who started it** (`runAs = "caller"`): every step acts with that member's own permissions — it touches only documents they can access, its group and data operations are checked against their roles, and its blob steps are checked against the bucket's access policy. This is the safe default, and most workflows want it.
 
 Set `runAs = "system"` to run a workflow as the **app itself** instead of as any one user:
 
@@ -463,7 +463,7 @@ Every step has an `id` (unique within the workflow) and a `kind` (the step type)
 | `workflow.call` | Run a child workflow synchronously, inline (use `forEach` to fan out) |
 | `block.call` | Invoke a prompt, integration, script, or workflow block selected by `blockType` — a unified wrapper over the four steps above |
 | `email.send` | Send an email (template-based or inline) |
-| `blob.upload` / `blob.download` / `blob.signedUrl` | Read, write, or sign blob URLs |
+| `blob.upload` / `blob.download` / `blob.signedUrl` / `blob.delete` | Write, read, sign URLs for, or delete bucket blobs |
 | `analytics.write` / `analytics.query` | Emit analytics events or query server-side aggregates |
 | `noop` | Return `{ message, payload }`; useful as a placeholder |
 
@@ -953,7 +953,7 @@ templateType = "announcement"
 
 ### Blob Steps
 
-`blob.upload`, `blob.download`, and `blob.signedUrl` read, write, and sign URLs for files in [blob buckets](./blobs-and-files.md) — the standard way to hand a generated file (a PDF report, an export) to users:
+`blob.upload`, `blob.download`, `blob.signedUrl`, and `blob.delete` write, read, sign URLs for, and delete files in [blob buckets](./blobs-and-files.md) — the standard way to hand a generated file (a PDF report, an export) to users, and to clean one up when a flow is done with it:
 
 ```toml
 [[steps]]
@@ -972,7 +972,9 @@ blobId = "{{ steps.save.blobId }}"
 expiresInSeconds = 3600
 ```
 
-`blob.upload` returns the `blobId`; `blob.signedUrl` mints a time-limited URL you can email or return to the client. See [Blobs and Files](./blobs-and-files.md#using-buckets-in-workflows) for the full pattern.
+`blob.upload` returns the `blobId`; `blob.signedUrl` mints a time-limited URL you can email or return to the client. `blob.delete` removes a blob by `blobId` and returns `{ deleted: true, blobId, bucketId }` — it reports success even when the blob is already gone, so a retried run doesn't fail on cleanup it already did.
+
+When the run is `runAs = "caller"` (the default), every blob step enforces the bucket's [access preset or rule set](./blobs-and-files.md#access-presets) with the same per-operation granularity as direct client calls — upload checks `write`, download checks `read`, signedUrl checks `share`, delete checks `delete`. A `runAs = "system"` run is app-privileged and skips the bucket policy. See [Blobs and Files](./blobs-and-files.md#using-buckets-in-workflows) for the full pattern.
 
 ### Analytics Steps
 

@@ -116,7 +116,7 @@ Signed URLs:
 
 - Are safe to put in `<img>` tags or hand to clients that can't attach auth headers
 - Expire after the time you specify — from 30 seconds up to 24 hours (default 5 minutes)
-- Respect the bucket's preset at generation time — if the user can't read, the call fails
+- Respect the bucket's preset at generation time — if the user can't share, the call fails
 - Don't require the recipient to be authenticated during the valid window
 
 Use a short expiry for user-facing URLs and regenerate as needed.
@@ -163,6 +163,20 @@ templateType = "report-ready"
 to = "{{ input.email }}"
 variables = { downloadUrl = "{{ steps.report-url.url }}" }
 ```
+
+When a flow is done with a blob — a temporary snapshot, an intermediate artifact — clean it up with `blob.delete`:
+
+```toml
+[[steps]]
+id = "cleanup"
+kind = "blob.delete"
+bucketKey = "reports"
+blobId = "{{ steps.save-report.blobId }}"
+```
+
+`blob.delete` returns `{ deleted: true, blobId, bucketId }` and reports success even when the blob is already gone, so a retried run doesn't fail on cleanup it already did. (For blobs with a natural lifespan, a [TTL tier](#ttl-tiers) expires them without any step at all.)
+
+Blob steps in a `runAs = "caller"` workflow enforce the bucket's [preset or rule set](#access-presets) with the same per-operation granularity as direct client calls: upload checks `write`, download checks `read`, signedUrl checks `share`, delete checks `delete`. A `runAs = "system"` run is app-privileged and skips the bucket policy.
 
 ## Buckets vs. Document Blobs
 

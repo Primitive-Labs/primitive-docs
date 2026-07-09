@@ -798,7 +798,7 @@ It handles four key concerns:
 
 1. **Waiting for documents to be ready** - The `documentReady` ref/computed tells the loader when all required documents have been opened. Queries won't run until `documentReady` is true, preventing errors from querying before documents are available.
 
-2. **Knowing when UI is ready to render** - The `initialDataLoaded` ref becomes true after the first successful data load, letting you show loading states appropriately.
+2. **Knowing when UI is ready to render** - The `initialDataLoaded` ref becomes true after the first successful data load, and the `showSkeleton` ref gates loading UI without flashing: it is true immediately while the document is still opening, but on reloads after that it only turns true once the load has run longer than `skeletonDelayMs` (option, default 100 ms) — a fast warm reload never flashes a skeleton.
 
 3. **Subscribing to model changes** - When any model in `subscribeTo` changes (local edits or sync from other clients), the loader automatically re-runs `loadData` to keep the UI current.
 
@@ -822,8 +822,8 @@ Under the hood it wraps the same compiled client calls documented above — `Mod
 - **Return a single structured object** from `loadData`
 - NEVER add a watch on `loadData` results. Do processing inside `loadData`.
 - NEVER rely on component remounting for route param changes. The loader only sees changes via `queryParams`.
-- `initialDataLoaded` becomes true after the first successful `loadData`. Use this (not `documentReady`) with `PrimitiveLoadingGate`.
-- Make rendering/redirect decisions ONLY after `initialDataLoaded` is true.
+- Gate skeleton/loading UI (e.g. `PrimitiveLoadingGate`) on `showSkeleton`, not on `documentReady` or raw load state — it handles the initial-load wait and suppresses the warm-reload flash for you.
+- `initialDataLoaded` becomes true after the first successful `loadData`. Make rendering/redirect decisions ONLY after `initialDataLoaded` is true.
 - For side effects after load (like redirects), watch `initialDataLoaded` and act when it becomes true.
 - For sequences of mutations (save/delete/reorder), set `pauseUpdates` while mutating, then call `reload()` afterward to avoid flicker.
 

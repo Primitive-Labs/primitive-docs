@@ -548,6 +548,10 @@ Web-template glue (Vue) gating `<router-view>` on the auth flag:
 
 Components inside the gate **don't** need to null-check `currentUser` or watch `isAuthenticated`. If auth is lost, they unmount.
 
+### Onboarding hand-off (template)
+
+Every sign-in method in the template funnels through a shared `/onboarding` route (`PrimitiveOnboarding`): `PrimitiveLogin` (OTP verify and passkey conditional UI) and the OAuth/magic-link callback push to it with `continueURL`, `isNewUser`, and `promptAddPasskey` as query params (state survives a refresh), and the route handles profile completion and the passkey prompt before navigating to the continue URL. Configure the target with `onboardingRoute` or `onboardingUrl` on `PrimitiveLogin`/`PrimitiveOauthCallback`; omit both and sign-in navigates straight to the continue URL. Customize the step (name/avatar required or optional, passkey prompt) via the `PrimitiveOnboarding` props where the route is declared.
+
 ### Reactive watchers (downstream stores)
 
 Web-template glue (Vue) reacting to auth-state transitions — initialize on sign-in, reset on sign-out:
@@ -665,7 +669,7 @@ Guardrails:
 
 - Per-app whitelist. The base address (`alice@example.com`) must be on the app's `testAccountBaseEmails` list — explicit owner consent.
 - Only `+primitivetest<suffix>` derivatives are eligible. The bare base is never a test account.
-- The derived user must already exist as an `AppUser` in this app — bypass never auto-provisions.
+- First verify provisions the derived user through the standard signup path and returns the real `isNewUser`, so first-run/new-user flows are testable through the bypass. Signup-mode gates apply as 403s exactly like a normal signup: `INVITATION_REQUIRED` (invite-only, no invitation), `ADDED_TO_WAITLIST` (invite-only with waitlist — the address is added), `DOMAIN_NOT_ALLOWED` (domain mode); an `inviteToken` is honored and provisions with the invitation's role (member-role invitations only — see the reserved-email boundary below).
 - Issued tokens are short-lived (~30 minutes) and carry a `primitiveBypass: true` claim that gets re-checked on every request, so removing the base from the whitelist revokes sessions immediately.
 - `+primitivetest*` accounts can sign in as ordinary members but are reserved at admin / owner / invitation boundaries — they cannot hold those roles.
 
@@ -706,7 +710,7 @@ Overrides are tracked by `primitive sync` (TOML in `email-templates/`). Custom t
 6. Gate your app layout on `isAuthenticated` so child components can assume `currentUser`.
 7. Watch `isAuthenticated` reactively in downstream stores (it changes both directions).
 8. Sequence: auth ready → open documents → query data.
-9. Offer passkey registration when `promptAddPasskey` is true after magic-link/OTP verify.
+9. The template's `/onboarding` route owns the post-sign-in passkey prompt and profile completion for every method; a hand-rolled auth UI should offer passkey registration when `promptAddPasskey` is true after verify.
 10. Customize email templates via CLI if you need branded auth emails.
 {{/lang}}
 {{#lang swift}}

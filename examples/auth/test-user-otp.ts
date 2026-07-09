@@ -1,7 +1,8 @@
 import type { JsBaoClient } from "js-bao-wss-client";
 
 // Sign in a `+primitivetest` account in an integration test using the magic
-// OTP code. The derived account must already exist as a user in the app.
+// OTP code. A first verify provisions the account through the normal signup
+// path (the app's signup-mode gates apply).
 export async function signInTestUser(client: JsBaoClient) {
   // #region example
   // Requires the app owner to have added "alice@example.com" to the app's
