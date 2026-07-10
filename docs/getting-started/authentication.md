@@ -163,7 +163,7 @@ Display `AUTH_USER_DISABLED` in your sign-in UI as a distinct error so the user 
 
 For integration tests and local dev, Primitive supports a `+primitivetest` OTP bypass: whitelist a base email per app, and derived addresses like `alice+primitivetest-teacher@example.com` sign in through the normal OTP flow with the magic code `000000` — no real email round-trip, and a first sign-in provisions the account through the app's normal signup path. One mailbox covers a whole fleet of role-distinguished test users.
 
-See [Test Users for Automated Testing](./primitive-cli.md#test-users-for-automated-testing) on the CLI page for setup, the sign-in pattern, and the security guardrails.
+See [Test Users for Automated Testing](./primitive-cli.md#test-users-for-automated-testing) on the CLI page for setup, the sign-in pattern, the security guardrails, and the CI recipe for invite-only apps.
 
 ## How It Works Under the Hood
 
