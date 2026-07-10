@@ -510,7 +510,7 @@ Each whitelisted base authorizes unlimited derived addresses of the form `<base-
 
 :::
 
-The derived account must already exist as a user in this app — invite it ahead of time or seed it as part of test setup. The bypass never auto-provisions, which keeps a public-mode app from being signed up as `attacker+primitivetest@<whitelisted>`.
+A first sign-in provisions the derived account through the same signup path as a real user, and the response's `isNewUser` reflects whether the account was just created — so first-run and new-user flows can be exercised through the bypass. The app's signup-mode gates apply exactly as for a normal signup: an invite-only app still requires an invitation or invite token (or adds the address to the waitlist when that's enabled), and domain mode still rejects disallowed domains. The whitelist is what keeps provisioning safe — only the app owner's own `+primitivetest` derivatives are eligible.
 
 Guardrails:
 

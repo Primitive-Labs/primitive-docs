@@ -13,6 +13,7 @@ export function useTodoList(props: { listId: string }, showCompleted: boolean, d
   const {
     data: todos,
     initialDataLoaded,
+    showSkeleton, // gate loading UI on this: true while the document opens, suppressed on fast warm reloads
     reload,
   } = useJsBaoDataLoader<{ items: TodoItem[]; total: number }>({
     subscribeTo: [TodoItem],
@@ -26,5 +27,5 @@ export function useTodoList(props: { listId: string }, showCompleted: boolean, d
     },
   });
   // #endregion example
-  return { todos, initialDataLoaded, reload };
+  return { todos, initialDataLoaded, showSkeleton, reload };
 }

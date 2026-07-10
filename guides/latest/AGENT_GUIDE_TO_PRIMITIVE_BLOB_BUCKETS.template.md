@@ -164,7 +164,7 @@ imgEl.src = url;
 
 ## Workflow integration
 
-The `blob.upload`, `blob.download`, and `blob.signedUrl` workflow steps write to and read from buckets. Steps reference the bucket by `bucketId` or `bucketKey`. See the [Workflows guide](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md).
+The `blob.upload`, `blob.download`, `blob.signedUrl`, and `blob.delete` workflow steps write to, read from, sign URLs for, and delete from buckets. Steps reference the bucket by `bucketId` or `bucketKey`. A `runAs:"caller"` run evaluates this bucket policy per op with the same mapping as direct calls (upload → `write`, download → `read`, signedUrl → `share`, delete → `delete`); a `runAs:"system"` run is app-privileged and skips it. See the [Workflows guide](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md).
 
 ---
 
