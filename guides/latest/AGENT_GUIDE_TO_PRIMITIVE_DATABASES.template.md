@@ -71,17 +71,44 @@ name = "listTasks"
 type = "query"
 modelName = "tasks"
 access = "isMemberOf('team', database.celContext.teamId)"
-definition = '{"filter":{"projectId":"$params.projectId"},"sort":{"createdAt":-1},"limit":50}'
-params = '{"projectId":{"type":"string","required":true}}'
+
+[operations.definition]
+filter = { projectId = "$params.projectId" }
+sort = { createdAt = -1 }
+limit = 50
+
+[[operations.params]]
+name = "projectId"
+type = "string"
+required = true
 
 [[operations]]
 name = "createTask"
 type = "mutation"
 modelName = "tasks"
 access = "isMemberOf('team', database.celContext.teamId)"
-definition = '{"operations":[{"op":"save","data":{"title":"$params.title","projectId":"$params.projectId","status":"open","createdBy":"$user.userId"}}]}'
-params = '{"title":{"type":"string","required":true},"projectId":{"type":"string","required":true}}'
+
+[[operations.definition.operations]]
+op = "save"
+
+[operations.definition.operations.data]
+title = "$params.title"
+projectId = "$params.projectId"
+status = "open"
+createdBy = "$user.userId"
+
+[[operations.params]]
+name = "title"
+type = "string"
+required = true
+
+[[operations.params]]
+name = "projectId"
+type = "string"
+required = true
 ```
+
+`definition` and `params` can equivalently be written as single-line JSON strings (`definition = '{"filter":{...}}'`) — see [Operation types](#operation-types) for both forms and `primitive sync migrate-toml` for converting a file.
 
 Push configuration to the server:
 
@@ -112,10 +139,14 @@ primitive sync pull            # Pull current config from server
 primitive sync diff            # Preview changes
 primitive sync push            # Push local config to server
 primitive sync push --dry-run  # See what would change without applying
+primitive sync migrate-toml    # Rewrite database-type files to native [operations.definition] tables
+primitive sync migrate-toml --dry-run  # Preview the rewrite without writing files
 # Override with a fixed path:
 primitive sync init --dir ./config
 primitive sync push --dir ./config
 ```
+
+`migrate-toml` is a purely local rewrite — it converts JSON-string `definition`/`params` fields to native TOML tables in place, semantically identical on the server (see [Operation types](#operation-types) for the two forms and the fallback rules).
 
 The config directory structure:
 
@@ -274,6 +305,12 @@ primitive databases codegen -o ./src/generated/db
 Codegen reads the database-type TOML from the auto-resolved sync directory (`.primitive/sync/<env>/<appId>/`); pass `--sync-dir <path>` only when overriding it. With no `-o`, generated files land in `<sync-dir>/database-types/generated/`.
 
 **Codegen enum / union / required typing.** When a field or an operation param restricts a string to a fixed set of values, codegen emits a TypeScript string-literal union (e.g. `status: "open" | "in-progress" | "closed"`) instead of `string`, and enum params are validated server-side as well. Fields that operation params mark `required` are emitted as non-optional on the generated record interface. This keeps generated types aligned with the server's validation instead of widening everything to `string`.
+
+**Codegen result-typing limits.** Three places where a generated result alias is looser (or wider) than the payload the server actually returns — declare a local type at the call site instead of leaning on the alias:
+
+- `pipeline` op results are always typed `PipelineResult` (`{ steps: Record<string, unknown> }`), even when the definition's `return` mode reshapes the payload into something else.
+- `mutation` results type `results` as `unknown[]`, though each element carries `{ success, id }`.
+- `query` results are typed as the full record interface even when the definition sets a `projection` — at runtime the server returns only the projected fields, so the generated type promises fields that aren't there.
 {{/lang}}
 
 ## Database Types
@@ -582,7 +619,48 @@ This also works with `$steps.*` references in pipelines (see [Settings record pa
 
 ### Operation types
 
-Operations are defined in the `[[operations]]` array in the database type TOML file. The `definition` and `params` fields are JSON strings. A `definition` may equivalently be written as an inline TOML table (`definition = { filter = { "$in" = [...] } }`); both forms round-trip stably through `sync push`/`pull`. `sync push` warns (does not block) on an unrecognized filter operator — the supported set is `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$exists`, `$contains`, `$startsWith`, `$endsWith`, `$containsText`, plus logical `$and`/`$or`.
+Operations are defined in the `[[operations]]` array in the database type TOML file. An operation's `definition` and `params` can be written in two forms, semantically identical on the server:
+
+- **Native TOML tables** — the primary form: `definition` as an `[operations.definition]` table (nested tables like `[operations.definition.filter]`; mutation steps as `[[operations.definition.operations]]` array-of-tables) and `params` as one `[[operations.params]]` entry per parameter (`name`, `type`, `required`, and any other param keys). `sync pull` writes new files in this form. A compact inline table (`definition = { filter = { "$in" = [...] } }`) also counts as native and round-trips stably.
+- **JSON strings** — `definition = '{...}'` and `params = '{...}'` single-line encodings; here `params` is an object keyed by param name rather than an array. The per-op reference examples below use this compact encoding — the JSON inside `definition` is the same shape either way.
+
+The same mutation in both forms:
+
+```toml
+# Native TOML tables
+[[operations]]
+name = "approvePost"
+type = "mutation"
+modelName = "posts"
+access = "isMemberOf('class-teachers', database.id)"
+
+[[operations.definition.operations]]
+op = "patch"
+id = "$params.id"
+
+[operations.definition.operations.data]
+status = "approved"
+
+[[operations.params]]
+name = "id"
+type = "string"
+required = true
+```
+
+```toml
+# JSON-string encoding — same operation
+[[operations]]
+name = "approvePost"
+type = "mutation"
+modelName = "posts"
+access = "isMemberOf('class-teachers', database.id)"
+definition = '{"operations":[{"op":"patch","id":"$params.id","data":{"status":"approved"}}]}'
+params = '{"id":{"type":"string","required":true}}'
+```
+
+The form is **sticky per file**: `sync pull` preserves whichever form each operation already uses (per op, so mixed files stay mixed), so a JSON-string file keeps that shape until you rewrite it — `primitive sync migrate-toml` (add `--dry-run` to preview) converts a file's JSON-string fields to native tables in place as a purely local rewrite. A value TOML cannot represent — a `null`, or a mixed-type array such as `"$and": ["$database.metadata.peerVisible", {...}]` — falls back to a JSON string for that field on emit, with a log line naming the operation; the rest of the file stays native.
+
+`sync push` accepts both forms and warns (does not block) on an unrecognized filter operator — the supported set is `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$exists`, `$contains`, `$startsWith`, `$endsWith`, `$containsText`, plus logical `$and`/`$or`.
 
 #### Query — read records
 
