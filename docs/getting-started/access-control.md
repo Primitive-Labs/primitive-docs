@@ -109,7 +109,8 @@ name = "my-billing-profile"
 type = "query"
 modelName = "billingProfile"
 access = "user.userId != ''"
-definition = '{"filter":{"userId":"$user.userId"}}'
+[operations.definition]
+filter = { userId = "$user.userId" }
 ```
 
 When a server action needs the external id, resolve it from the authenticated user through this operation — never accept it as a parameter from the client.

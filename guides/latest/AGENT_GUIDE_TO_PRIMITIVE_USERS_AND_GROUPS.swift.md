@@ -821,8 +821,15 @@ name = "viewGrades"
 type = "query"
 modelName = "grades"
 access = "true"
-definition = '{"filter":{"studentId":"$params.studentId"},"sort":{"date":-1}}'
-params = '''{"studentId":{"type":"string","required":true,"access":"value in memberGroups('parent-of')"}}'''
+[operations.definition]
+filter = { studentId = "$params.studentId" }
+sort = { date = -1 }
+
+[[operations.params]]
+name = "studentId"
+type = "string"
+required = true
+access = "value in memberGroups('parent-of')"
 ```
 
 The per-parameter `access` expression ensures parents can only view their own children's grades.

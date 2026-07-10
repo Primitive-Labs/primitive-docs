@@ -141,7 +141,8 @@ access = "md.caller.billing.status in ['trialing', 'active', 'past_due']"
 Beyond CEL `access` rules, an operation's `definition` (`filter`/`data`) can substitute a declared category value directly, alongside `$params.*` / `$user.userId` / `$now` / `$steps.*`:
 
 ```toml novalidate
-definition = '{"filter":{"tier":"$md.self.profile.tier"}}'
+[operations.definition]
+filter = { tier = "$md.self.profile.tier" }
 ```
 
 `$md.self.<category>.<key>` resolves to `null` (not the literal string) when the category isn't declared on that database type's manifest, or the key is missing — same fail-closed convention as `$database.metadata.<key>`.
