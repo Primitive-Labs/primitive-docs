@@ -49,6 +49,12 @@ For **agent guide templates**, also sweep for compilable code that bypassed the 
 grep -n '```\(ts\|typescript\|js\|javascript\|swift\)' guides/latest/*.template.md
 ```
 
+Also sweep TOML examples for **JSON stuffed into a string** where the platform accepts native TOML (STYLE.md, Platform treatment): any `definition = '{...}'` / `params = '{...}'` in an example block is a finding — the fix is the nested-table form (`[operations.definition]`, `[[operations.params]]`, `[steps.params.<field>]`). Prose mentions of the JSON-string encoding (recognition, `migrate-toml`) are fine; example blocks teaching it are not. Surfaces whose platform contract is a JSON-encoded string (prompt test-case fields) are exempt. Inventory:
+
+```bash
+grep -n "definition = '\|params = '\|= '{" docs/getting-started/*.md guides/latest/*.template.md
+```
+
 Framework-integration sections (Vue/Pinia, SwiftUI/`PrimitiveApp`) are the common exception to "just promote it" — the binding can't compile in the corpus harness. They should still be **generic-first**: the section leads with the compiled client operation (a normal `{{ example: }}` pair or a reference to where it's shown), and the binding is a `// nocompile` corpus file referenced via `{{ example: }}`, not an inline fence. A binding that exists in only one language carries `// no-parity` and is referenced from inside that language's `{{#lang}}` block. Findings here: a framework section whose load-bearing client call is buried in inline glue instead of led by a compiled example; glue left as a raw inline fence; or a `// no-parity` file referenced from outside a `{{#lang}}` block (it would break the other language's build).
 
 ### 5. Facts (`--verify` mode — slower, run when asked or when the page makes API/limit claims)
