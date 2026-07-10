@@ -49,24 +49,50 @@ name = "list-products"
 type = "query"
 modelName = "product"
 access = "true"
-definition = '{"sort":{"name":1}}'
+
+[operations.definition]
+sort = { name = 1 }
 
 [[operations]]
 name = "get-product"
 type = "query"
 modelName = "product"
 access = "true"
-definition = '{"filter":{"id":"$params.id"}}'
-params = '{"id":{"type":"string","required":true}}'
+
+[operations.definition]
+filter = { id = "$params.id" }
+
+[[operations.params]]
+name = "id"
+type = "string"
+required = true
 
 [[operations]]
 name = "create-product"
 type = "mutation"
 modelName = "product"
 access = "isMemberOf('admin', database.celContext.adminGroupId)"
-definition = '{"operations":[{"op":"save","data":{"name":"$params.name","price":"$params.price","createdBy":"$user.userId"}}]}'
-params = '{"name":{"type":"string","required":true},"price":{"type":"number","required":true}}'
+
+[[operations.definition.operations]]
+op = "save"
+
+[operations.definition.operations.data]
+name = "$params.name"
+price = "$params.price"
+createdBy = "$user.userId"
+
+[[operations.params]]
+name = "name"
+type = "string"
+required = true
+
+[[operations.params]]
+name = "price"
+type = "number"
+required = true
 ```
+
+An operation's `definition` and `params` can also be written as single-line JSON strings (`definition = '{"sort":{"name":1}}'`) — the two forms are equivalent on the server, and several examples below use the compact JSON form. `primitive sync pull` writes new files with TOML tables and keeps whichever form a file already uses; `primitive sync migrate-toml` rewrites a file from JSON strings to TOML tables in place.
 
 ### 3. Push to Server
 
@@ -320,6 +346,8 @@ primitive databases codegen -o ./src/generated/db
 ```
 
 Codegen reads the database-type TOML from the auto-resolved sync directory; pass `--sync-dir <path>` to override it. This reads the `[models.*]` blocks and `[[operations]]` definitions and emits typed interfaces — one per model, plus typed params and results per operation. Fields and params restricted to a fixed set of string values become TypeScript string-literal unions, so invalid values are caught at compile time (enum params are also validated server-side).
+
+Result types are generated from the operation's `type`, not its `definition` — a query with a `projection` is still typed as the full record, pipeline results are typed as a generic step map, and mutation result elements are `unknown` — so declare a local type where a call site needs more precision.
 
 ## Bulk CSV Import
 
