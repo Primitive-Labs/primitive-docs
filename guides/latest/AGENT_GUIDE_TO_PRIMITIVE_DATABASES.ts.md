@@ -126,7 +126,7 @@ type = "string"
 required = true
 ```
 
-`definition` and `params` can equivalently be written as single-line JSON strings (`definition = '{"filter":{...}}'`) — see [Operation types](#operation-types) for both forms and `primitive sync migrate-toml` for converting a file.
+Files written before migration may encode `definition`/`params` as single-line JSON strings — the server treats the encodings identically; see [Operation types](#operation-types) and `primitive sync migrate-toml` for converting a file.
 
 Push configuration to the server:
 
@@ -225,40 +225,109 @@ name = "listTasks"
 type = "query"
 modelName = "tasks"
 access = "isMemberOf('team', database.metadata.teamId)"
-definition = '{"filter":{"projectId":"$params.projectId"},"sort":{"createdAt":-1},"limit":50,"projection":{"title":1,"status":1}}'
-params = '{"projectId":{"type":"string","required":true}}'
+[operations.definition]
+filter = { projectId = "$params.projectId" }
+sort = { createdAt = -1 }
+limit = 50
+projection = { title = 1, status = 1 }
+
+[[operations.params]]
+name = "projectId"
+type = "string"
+required = true
 
 [[operations]]
 name = "createTask"
 type = "mutation"
 modelName = "tasks"
 access = "isMemberOf('team', database.metadata.teamId)"
-definition = '{"operations":[{"op":"save","data":{"title":"$params.title","projectId":"$params.projectId","status":"open","createdBy":"$user.userId","createdAt":"$now"}}]}'
-params = '{"title":{"type":"string","required":true},"projectId":{"type":"string","required":true}}'
+[[operations.definition.operations]]
+op = "save"
+
+[operations.definition.operations.data]
+title = "$params.title"
+projectId = "$params.projectId"
+status = "open"
+createdBy = "$user.userId"
+createdAt = "$now"
+
+[[operations.params]]
+name = "title"
+type = "string"
+required = true
+
+[[operations.params]]
+name = "projectId"
+type = "string"
+required = true
 
 [[operations]]
 name = "countOpenTasks"
 type = "count"
 modelName = "tasks"
 access = "isMemberOf('team', database.metadata.teamId)"
-definition = '{"filter":{"projectId":"$params.projectId","status":"open"}}'
-params = '{"projectId":{"type":"string","required":true}}'
+[operations.definition]
+filter = { projectId = "$params.projectId", status = "open" }
+
+[[operations.params]]
+name = "projectId"
+type = "string"
+required = true
 
 [[operations]]
 name = "tasksByStatus"
 type = "aggregate"
 modelName = "tasks"
 access = "isMemberOf('team', database.metadata.teamId)"
-definition = '{"groupBy":["status"],"operations":[{"type":"count","outputField":"total"},{"type":"sum","field":"estimatedHours","outputField":"totalHours"}],"filter":{"projectId":"$params.projectId"},"sort":{"field":"total","direction":-1},"limit":10}'
-params = '{"projectId":{"type":"string","required":true}}'
+[operations.definition]
+groupBy = ["status"]
+filter = { projectId = "$params.projectId" }
+sort = { field = "total", direction = -1 }
+limit = 10
+operations = [
+  { type = "count", outputField = "total" },
+  { type = "sum", field = "estimatedHours", outputField = "totalHours" },
+]
+
+[[operations.params]]
+name = "projectId"
+type = "string"
+required = true
 
 [[operations]]
 name = "projectDashboard"
 type = "pipeline"
 modelName = "_pipeline"
 access = "isMemberOf('team', database.metadata.teamId)"
-definition = '{"steps":[{"name":"recentTasks","type":"query","modelName":"tasks","filter":{"projectId":"$params.projectId"},"sort":{"createdAt":-1},"limit":5},{"name":"statusBreakdown","type":"aggregate","modelName":"tasks","filter":{"projectId":"$params.projectId"},"groupBy":["status"],"operations":[{"type":"count","outputField":"total"}]},{"name":"openBugs","type":"count","modelName":"tasks","filter":{"projectId":"$params.projectId","label":"bug","status":"open"}}],"return":"all"}'
-params = '{"projectId":{"type":"string","required":true}}'
+[operations.definition]
+return = "all"
+
+[[operations.definition.steps]]
+name = "recentTasks"
+type = "query"
+modelName = "tasks"
+filter = { projectId = "$params.projectId" }
+sort = { createdAt = -1 }
+limit = 5
+
+[[operations.definition.steps]]
+name = "statusBreakdown"
+type = "aggregate"
+modelName = "tasks"
+filter = { projectId = "$params.projectId" }
+groupBy = ["status"]
+operations = [{ type = "count", outputField = "total" }]
+
+[[operations.definition.steps]]
+name = "openBugs"
+type = "count"
+modelName = "tasks"
+filter = { projectId = "$params.projectId", label = "bug", status = "open" }
+
+[[operations.params]]
+name = "projectId"
+type = "string"
+required = true
 ```
 
 ### Rule set config files
@@ -477,7 +546,8 @@ name = "list-products"
 type = "query"
 modelName = "product"
 access = "true"
-definition = '{"filter":{"priceCents":{"$gt":0}}}'
+[operations.definition]
+filter = { priceCents = { "$gt" = 0 } }
 ```
 
 Adding the `[models.product.fields.*]` blocks above means any future `[[operations]]` that references `product.nameTypo` (instead of `name`) is rejected at push time, before it can return broken data. Note the 422 *message* doesn't name the offending field — the unresolved refs are in the response payload's `refs` array.
@@ -538,10 +608,26 @@ For group-based access patterns, per-parameter access, and detailed CEL examples
 
 ### Parameters
 
-Declare parameters callers must provide. In TOML, `params` is a JSON string:
+Declare parameters callers must provide — one `[[operations.params]]` entry per parameter:
 
 ```toml
-params = '{"projectId":{"type":"string","required":true},"status":{"type":"string"}}'
+[[operations]]
+name = "listProjectTasks"
+type = "query"
+modelName = "tasks"
+access = "true"
+
+[operations.definition]
+filter = { projectId = "$params.projectId", status = "$params.status" }
+
+[[operations.params]]
+name = "projectId"
+type = "string"
+required = true
+
+[[operations.params]]
+name = "status"
+type = "string"
 ```
 
 | Field | Required | Description |
@@ -560,8 +646,17 @@ By default, scalar mismatches are coerced where safe (`"42"` → `42` for type `
 name = "createTask"
 type = "mutation"
 modelName = "tasks"
-definition = '{"operations":[{"op":"save","data":{"$spread":"$params.row","userId":"$user.userId"}}]}'
-params = '{"row":{"type":"Task","required":true}}'
+[[operations.definition.operations]]
+op = "save"
+
+[operations.definition.operations.data]
+"$spread" = "$params.row"
+userId = "$user.userId"
+
+[[operations.params]]
+name = "row"
+type = "Task"
+required = true
 ```
 
 `$spread` expands the object's fields into the write; at most one `$spread` per data object, and it's not available inside an `applyToQuery` action's `data`. Explicit sibling keys and server-managed stamps (auto-populated fields, timestamps) always win over spread values, order-independent — so a server-stamped `userId` can't be spoofed from the caller's object. A `$spread` of a non-object value fails at execute time (`SPREAD_NON_OBJECT`).
@@ -603,8 +698,15 @@ name = "listPosts"
 type = "query"
 modelName = "posts"
 access = "true"
-definition = '{"filter":{"status":"approved","authorId":"$params.authorId"},"sort":{"createdAt":-1},"limit":50}'
-params = '{"authorId":{"type":"string","required":false}}'
+[operations.definition]
+filter = { status = "approved", authorId = "$params.authorId" }
+sort = { createdAt = -1 }
+limit = 50
+
+[[operations.params]]
+name = "authorId"
+type = "string"
+required = false
 ```
 
 | Caller input | Resolved filter |
@@ -643,15 +745,9 @@ This also works with `$steps.*` references in pipelines (see [Settings record pa
 
 ### Operation types
 
-Operations are defined in the `[[operations]]` array in the database type TOML file. An operation's `definition` and `params` can be written in two forms, semantically identical on the server:
-
-- **Native TOML tables** — the primary form: `definition` as an `[operations.definition]` table (nested tables like `[operations.definition.filter]`; mutation steps as `[[operations.definition.operations]]` array-of-tables) and `params` as one `[[operations.params]]` entry per parameter (`name`, `type`, `required`, and any other param keys). `sync pull` writes new files in this form. A compact inline table (`definition = { filter = { "$in" = [...] } }`) also counts as native and round-trips stably.
-- **JSON strings** — `definition = '{...}'` and `params = '{...}'` single-line encodings; here `params` is an object keyed by param name rather than an array. The per-op reference examples below use this compact encoding — the JSON inside `definition` is the same shape either way.
-
-The same mutation in both forms:
+Operations are defined in the `[[operations]]` array in the database type TOML file. `definition` is written as an `[operations.definition]` table (nested tables like `[operations.definition.filter]`, or compact inline tables like `definition = { filter = { "$in" = [...] } }`; mutation steps as `[[operations.definition.operations]]` array-of-tables), and `params` as one `[[operations.params]]` entry per parameter (`name`, `type`, `required`, and any other param keys):
 
 ```toml
-# Native TOML tables
 [[operations]]
 name = "approvePost"
 type = "mutation"
@@ -671,18 +767,7 @@ type = "string"
 required = true
 ```
 
-```toml
-# JSON-string encoding — same operation
-[[operations]]
-name = "approvePost"
-type = "mutation"
-modelName = "posts"
-access = "isMemberOf('class-teachers', database.id)"
-definition = '{"operations":[{"op":"patch","id":"$params.id","data":{"status":"approved"}}]}'
-params = '{"id":{"type":"string","required":true}}'
-```
-
-The form is **sticky per file**: `sync pull` preserves whichever form each operation already uses (per op, so mixed files stay mixed), so a JSON-string file keeps that shape until you rewrite it — `primitive sync migrate-toml` (add `--dry-run` to preview) converts a file's JSON-string fields to native tables in place as a purely local rewrite. A value TOML cannot represent — a `null`, or a mixed-type array such as `"$and": ["$database.metadata.peerVisible", {...}]` — falls back to a JSON string for that field on emit, with a log line naming the operation; the rest of the file stays native.
+`sync pull` writes new files in this form. Files written before migration may instead carry a single-line **JSON-string encoding** (`definition = '{"operations":[...]}'`, with `params` as an object keyed by param name) — the server treats the two identically, and `sync pull` preserves whichever form each operation already uses (per op, so mixed files stay mixed). Convert a file with `primitive sync migrate-toml` (add `--dry-run` to preview); it's a purely local rewrite. A value TOML cannot represent — a `null`, or a mixed-type array such as a `$and` gate mixing a `$steps.*` reference with a filter object (see [Settings record pattern](#settings-record-pattern)) — stays a JSON string for that field on emit, with a log line naming the operation; the rest of the file stays native.
 
 `sync push` accepts both forms and warns (does not block) on an unrecognized filter operator — the supported set is `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$exists`, `$contains`, `$startsWith`, `$endsWith`, `$containsText`, plus logical `$and`/`$or`.
 
@@ -694,8 +779,16 @@ name = "listTasks"
 type = "query"
 modelName = "tasks"
 access = "true"
-definition = '{"filter":{"projectId":"$params.projectId"},"sort":{"createdAt":-1},"limit":50,"projection":{"title":1,"status":1}}'
-params = '{"projectId":{"type":"string","required":true}}'
+[operations.definition]
+filter = { projectId = "$params.projectId" }
+sort = { createdAt = -1 }
+limit = 50
+projection = { title = 1, status = 1 }
+
+[[operations.params]]
+name = "projectId"
+type = "string"
+required = true
 ```
 
 Definition fields: `filter` (required), `sort`, `limit` (1–1000), `projection`, `include`.
@@ -714,8 +807,19 @@ name = "createTask"
 type = "mutation"
 modelName = "tasks"
 access = "isMemberOf('team', database.metadata.teamId)"
-definition = '{"operations":[{"op":"save","data":{"title":"$params.title","status":"open","createdBy":"$user.userId","createdAt":"$now"}}]}'
-params = '{"title":{"type":"string","required":true}}'
+[[operations.definition.operations]]
+op = "save"
+
+[operations.definition.operations.data]
+title = "$params.title"
+status = "open"
+createdBy = "$user.userId"
+createdAt = "$now"
+
+[[operations.params]]
+name = "title"
+type = "string"
+required = true
 ```
 
 **Mutation operation types:**
@@ -739,8 +843,24 @@ name = "ensureContact"
 type = "mutation"
 modelName = "contacts"
 access = "hasRole('admin')"
-definition = '{"operations":[{"op":"save","upsertOn":"email","data":{"email":"$params.email","name":"$params.name","updatedAt":"$now"}}]}'
-params = '{"email":{"type":"string","required":true},"name":{"type":"string","required":true}}'
+[[operations.definition.operations]]
+op = "save"
+upsertOn = "email"
+
+[operations.definition.operations.data]
+email = "$params.email"
+name = "$params.name"
+updatedAt = "$now"
+
+[[operations.params]]
+name = "email"
+type = "string"
+required = true
+
+[[operations.params]]
+name = "name"
+type = "string"
+required = true
 ```
 
 Two failure modes to know:
@@ -756,8 +876,13 @@ name = "countOpenTasks"
 type = "count"
 modelName = "tasks"
 access = "true"
-definition = '{"filter":{"projectId":"$params.projectId","status":"open"}}'
-params = '{"projectId":{"type":"string","required":true}}'
+[operations.definition]
+filter = { projectId = "$params.projectId", status = "open" }
+
+[[operations.params]]
+name = "projectId"
+type = "string"
+required = true
 ```
 
 **Response:** `{ count: 42 }`
@@ -770,8 +895,21 @@ name = "tasksByStatus"
 type = "aggregate"
 modelName = "tasks"
 access = "true"
-definition = '{"groupBy":["status"],"operations":[{"type":"count","outputField":"total"},{"type":"sum","field":"estimatedHours","outputField":"totalHours"},{"type":"avg","field":"estimatedHours","outputField":"avgHours"}],"filter":{"projectId":"$params.projectId"},"sort":{"field":"total","direction":-1},"limit":10}'
-params = '{"projectId":{"type":"string","required":true}}'
+[operations.definition]
+groupBy = ["status"]
+filter = { projectId = "$params.projectId" }
+sort = { field = "total", direction = -1 }
+limit = 10
+operations = [
+  { type = "count", outputField = "total" },
+  { type = "sum", field = "estimatedHours", outputField = "totalHours" },
+  { type = "avg", field = "estimatedHours", outputField = "avgHours" },
+]
+
+[[operations.params]]
+name = "projectId"
+type = "string"
+required = true
 ```
 
 Aggregate types: `count`, `sum`, `avg`, `min`, `max`.
@@ -790,8 +928,35 @@ name = "projectDashboard"
 type = "pipeline"
 modelName = "_pipeline"
 access = "isMemberOf('team', database.metadata.teamId)"
-definition = '{"steps":[{"name":"recentTasks","type":"query","modelName":"tasks","filter":{"projectId":"$params.projectId"},"sort":{"createdAt":-1},"limit":5},{"name":"statusBreakdown","type":"aggregate","modelName":"tasks","filter":{"projectId":"$params.projectId"},"groupBy":["status"],"operations":[{"type":"count","outputField":"total"}]},{"name":"openBugs","type":"count","modelName":"tasks","filter":{"projectId":"$params.projectId","label":"bug","status":"open"}}],"return":"all"}'
-params = '{"projectId":{"type":"string","required":true}}'
+[operations.definition]
+return = "all"
+
+[[operations.definition.steps]]
+name = "recentTasks"
+type = "query"
+modelName = "tasks"
+filter = { projectId = "$params.projectId" }
+sort = { createdAt = -1 }
+limit = 5
+
+[[operations.definition.steps]]
+name = "statusBreakdown"
+type = "aggregate"
+modelName = "tasks"
+filter = { projectId = "$params.projectId" }
+groupBy = ["status"]
+operations = [{ type = "count", outputField = "total" }]
+
+[[operations.definition.steps]]
+name = "openBugs"
+type = "count"
+modelName = "tasks"
+filter = { projectId = "$params.projectId", label = "bug", status = "open" }
+
+[[operations.params]]
+name = "projectId"
+type = "string"
+required = true
 ```
 
 **Pipeline step references** — only these accessors exist (no `$steps.X.result`):
@@ -819,8 +984,18 @@ name = "archiveCompleted"
 type = "applyToQuery"
 modelName = "tasks"
 access = "hasRole('admin')"
-definition = '{"source":{"filter":{"status":"completed","updatedAt":{"$lt":"$params.olderThan"}},"limit":500},"action":{"op":"patch","data":{"archived":true}}}'
-params = '{"olderThan":{"type":"string","required":true}}'
+[operations.definition.source]
+filter = { status = "completed", updatedAt = { "$lt" = "$params.olderThan" } }
+limit = 500
+
+[operations.definition.action]
+op = "patch"
+data = { archived = true }
+
+[[operations.params]]
+name = "olderThan"
+type = "string"
+required = true
 ```
 
 Supported action ops: `delete`, `patch` (requires `data`), `increment` (requires `fields`), `addToSet`/`removeFromSet` (require `stringSets`).
@@ -1649,7 +1824,12 @@ const result = await client.databases.importCsv(databaseId, {
 
   ```toml
   # WRONG — caller can claim any role:
-  definition = '{"operations":[{"op":"save","data":{"authorRole":"$params.authorRole","title":"$params.title"}}]}'
+  [[operations.definition.operations]]
+  op = "save"
+
+  [operations.definition.operations.data]
+  authorRole = "$params.authorRole"
+  title = "$params.title"
 
   # RIGHT — split into per-role operations, hardcode the role server-side, gate each with CEL:
   [[operations]]
@@ -1657,8 +1837,19 @@ const result = await client.databases.importCsv(databaseId, {
   type = "mutation"
   modelName = "posts"
   access = "isMemberOf('class-teachers', database.metadata.classId)"
-  definition = '{"operations":[{"op":"save","data":{"authorRole":"teacher","title":"$params.title","authorId":"$user.userId"}}]}'
-  params = '{"title":{"type":"string","required":true}}'
+
+  [[operations.definition.operations]]
+  op = "save"
+
+  [operations.definition.operations.data]
+  authorRole = "teacher"
+  title = "$params.title"
+  authorId = "$user.userId"
+
+  [[operations.params]]
+  name = "title"
+  type = "string"
+  required = true
   ```
 
 - **Don't use `addManager` to grant "access to data."** `manager` bypasses every operation-level CEL gate and grants administrative control. End-user data access goes through registered operations with CEL `access`; `manager` is reserved for the small set of accounts that should be able to update title, metadata, and (for `owner`) delete the database.
@@ -1696,6 +1887,8 @@ params = '{}'
 
 This pipeline first reads the settings record, then uses `$steps.settings.first.peerVisible` as a **boolean gate** in the posts query. When `peerVisible` is `true`, the `$and` branch opens and includes approved posts from all students. When the settings record doesn't have `peerVisible` set (or it's `false`), the gate short-circuits to no-match, so students only see their own posts. See [Boolean gate conditions](#boolean-gate-conditions) for details on this pattern.
 
+The `definition` here stays a JSON string deliberately: the `$and` gate is a mixed-type array (a `$steps.*` string reference alongside a filter object), which TOML cannot represent — this is the per-field JSON-string fallback described in [Operation types](#operation-types), and `sync pull`/`migrate-toml` keep the field as a JSON string with a log line.
+
 ### User-scoped data via operations
 
 Operations that scope data to the calling user using `$user.userId`:
@@ -1708,15 +1901,29 @@ name = "myItems"
 type = "query"
 modelName = "items"
 access = "true"
-definition = '{"filter":{"ownerId":"$user.userId"},"sort":{"createdAt":-1},"limit":50}'
+[operations.definition]
+filter = { ownerId = "$user.userId" }
+sort = { createdAt = -1 }
+limit = 50
 
 [[operations]]
 name = "createItem"
 type = "mutation"
 modelName = "items"
 access = "true"
-definition = '{"operations":[{"op":"save","data":{"title":"$params.title","ownerId":"$user.userId","createdAt":"$now"}}]}'
-params = '{"title":{"type":"string","required":true}}'
+
+[[operations.definition.operations]]
+op = "save"
+
+[operations.definition.operations.data]
+title = "$params.title"
+ownerId = "$user.userId"
+createdAt = "$now"
+
+[[operations.params]]
+name = "title"
+type = "string"
+required = true
 ```
 
 **In app code:**

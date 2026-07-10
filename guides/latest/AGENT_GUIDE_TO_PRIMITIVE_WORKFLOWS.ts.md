@@ -1648,7 +1648,7 @@ kind = "database.mutate"
 operationName = "patch-import-job"
 [steps.params]
 id = "{{ input.jobId }}"
-data = '{ "status": "ready_to_review" }'
+data = { status = "ready_to_review" }
 ```
 
 This drifts the moment the workflow ends without your mutate firing — async failure, terminated run, an upstream step that throws between the data write and the status patch. The row sticks on `"processing"` forever and your UI spins indefinitely.

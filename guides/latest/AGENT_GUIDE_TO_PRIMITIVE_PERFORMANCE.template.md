@@ -142,7 +142,10 @@ name = "listAllTargets"
 type = "query"
 modelName = "targets"
 access = "user.userId == database.metadata.ownerId"
-definition = '{"filter":{},"sort":{"groupId":1},"limit":1000}'
+[operations.definition]
+filter = {}
+sort = { groupId = 1 }
+limit = 1000
 ```
 
 Call it once, then group client-side:

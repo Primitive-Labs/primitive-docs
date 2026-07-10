@@ -94,7 +94,10 @@ name = "listMyTasks"
 type = "query"
 modelName = "tasks"
 access = "isMemberOf('team', database.celContext.teamId)"
-definition = '{"filter":{"assigneeId":"$user.userId"},"sort":{"createdAt":-1},"limit":50}'
+[operations.definition]
+filter = { assigneeId = "$user.userId" }
+sort = { createdAt = -1 }
+limit = 50
 ```
 
 ```typescript

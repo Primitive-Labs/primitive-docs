@@ -92,7 +92,7 @@ type = "number"
 required = true
 ```
 
-An operation's `definition` and `params` can also be written as single-line JSON strings (`definition = '{"sort":{"name":1}}'`) — the two forms are equivalent on the server, and several examples below use the compact JSON form. `primitive sync pull` writes new files with TOML tables and keeps whichever form a file already uses; `primitive sync migrate-toml` rewrites a file from JSON strings to TOML tables in place.
+Files written before migration may encode an operation's `definition` and `params` as single-line JSON strings — the server treats the encodings identically. `primitive sync pull` writes new files with TOML tables and keeps whichever form a file already uses; `primitive sync migrate-toml` rewrites a file from JSON strings to TOML tables in place.
 
 ### 3. Push to Server
 
@@ -125,8 +125,14 @@ name = "search-products"
 type = "query"
 modelName = "product"
 access = "true"
-definition = '{"filter":{"name":{"$startsWith":"$params.search"}},"sort":{"name":1}}'
-params = '{"search":{"type":"string","required":true}}'
+[operations.definition]
+filter = { name = { "$startsWith" = "$params.search" } }
+sort = { name = 1 }
+
+[[operations.params]]
+name = "search"
+type = "string"
+required = true
 ```
 
 **Response:** `{ data: [...records], hasMore: boolean, nextCursor?: string }`
@@ -140,8 +146,28 @@ name = "update-product"
 type = "mutation"
 modelName = "product"
 access = "hasRole('admin')"
-definition = '{"operations":[{"op":"patch","id":"$params.id","data":{"name":"$params.name","price":"$params.price"}}]}'
-params = '{"id":{"type":"string","required":true},"name":{"type":"string","required":true},"price":{"type":"number","required":true}}'
+[[operations.definition.operations]]
+op = "patch"
+id = "$params.id"
+
+[operations.definition.operations.data]
+name = "$params.name"
+price = "$params.price"
+
+[[operations.params]]
+name = "id"
+type = "string"
+required = true
+
+[[operations.params]]
+name = "name"
+type = "string"
+required = true
+
+[[operations.params]]
+name = "price"
+type = "number"
+required = true
 ```
 
 **Response:** `{ results: [{ success: boolean, id: string }] }`
@@ -154,8 +180,17 @@ name = "create-product"
 type = "mutation"
 modelName = "product"
 access = "hasRole('admin')"
-definition = '{"operations":[{"op":"save","data":{"$spread":"$params.row","createdBy":"$user.userId"}}]}'
-params = '{"row":{"type":"product","required":true}}'
+[[operations.definition.operations]]
+op = "save"
+
+[operations.definition.operations.data]
+"$spread" = "$params.row"
+createdBy = "$user.userId"
+
+[[operations.params]]
+name = "row"
+type = "product"
+required = true
 ```
 
 Explicit fields you set alongside the spread — and server-stamped fields — always win over the caller's object, so `createdBy` here can't be spoofed from `row`.
@@ -172,8 +207,17 @@ name = "mark-overdue"
 type = "applyToQuery"
 modelName = "task"
 access = "hasRole('admin')"
-definition = '{"source":{"filter":{"dueDate":{"$lt":"$params.now"},"status":"pending"}},"action":{"op":"patch","data":{"status":"overdue"}}}'
-params = '{"now":{"type":"string","required":true}}'
+[operations.definition.source]
+filter = { dueDate = { "$lt" = "$params.now" }, status = "pending" }
+
+[operations.definition.action]
+op = "patch"
+data = { status = "overdue" }
+
+[[operations.params]]
+name = "now"
+type = "string"
+required = true
 ```
 
 **Response:** `{ matched, affected, failed }` — when the definition sets a `source.limit`, the response also carries `truncated` and `appliedLimit`; if `truncated` is `true`, re-run until it returns `false`.
@@ -206,7 +250,12 @@ name = "sales-by-category"
 type = "aggregate"
 modelName = "product"
 access = "hasRole('admin')"
-definition = '{"groupBy":["category"],"operations":[{"type":"sum","field":"price","outputField":"total"},{"type":"count","outputField":"count"}]}'
+[operations.definition]
+groupBy = ["category"]
+operations = [
+  { type = "sum", field = "price", outputField = "total" },
+  { type = "count", outputField = "count" },
+]
 ```
 
 **Response:** `{ result: { "category-a": { total: 500, count: 10 }, ... } }`
@@ -220,8 +269,25 @@ name = "order-with-product"
 type = "pipeline"
 modelName = "_pipeline"
 access = "true"
-definition = '{"steps":[{"name":"order","type":"query","modelName":"orders","filter":{"id":"$params.orderId"}},{"name":"product","type":"query","modelName":"product","filter":{"id":"$steps.order.first.productId"}}],"return":"all"}'
-params = '{"orderId":{"type":"string","required":true}}'
+[operations.definition]
+return = "all"
+
+[[operations.definition.steps]]
+name = "order"
+type = "query"
+modelName = "orders"
+filter = { id = "$params.orderId" }
+
+[[operations.definition.steps]]
+name = "product"
+type = "query"
+modelName = "product"
+filter = { id = "$steps.order.first.productId" }
+
+[[operations.params]]
+name = "orderId"
+type = "string"
+required = true
 ```
 
 Pipelines support `query`, `count`, and `aggregate` steps only. For read-then-mutate flows, run a pipeline to read, then call a separate mutation.
@@ -249,7 +315,8 @@ Use `fromWorkflow(...)` to gate an operation so only a specific workflow can inv
 An operation's `definition` can also substitute a declared [resource metadata](./resource-metadata.md#using-metadata-in-access-rules) value alongside `$params.*` and `$user.userId`:
 
 ```toml novalidate
-definition = '{"filter":{"tier":"$md.self.profile.tier"}}'
+[operations.definition]
+filter = { tier = "$md.self.profile.tier" }
 ```
 
 `$md.self.<category>.<key>` resolves to `null` (not the literal string) when the category isn't declared on the database type's manifest or the key is missing.
@@ -259,7 +326,29 @@ definition = '{"filter":{"tier":"$md.self.profile.tier"}}'
 Restrict who can set specific parameters by adding an `access` rule to the parameter itself:
 
 ```toml
-params = '{"userId":{"type":"string","required":true},"role":{"type":"string","required":true,"access":"hasRole(\"super-admin\")"}}'
+[[operations]]
+name = "set-user-role"
+type = "mutation"
+modelName = "member"
+access = "hasRole('admin')"
+
+[[operations.definition.operations]]
+op = "patch"
+id = "$params.userId"
+
+[operations.definition.operations.data]
+role = "$params.role"
+
+[[operations.params]]
+name = "userId"
+type = "string"
+required = true
+
+[[operations.params]]
+name = "role"
+type = "string"
+required = true
+access = "hasRole('super-admin')"
 ```
 
 ### Default Access
@@ -381,8 +470,15 @@ name = "list-posts"
 type = "query"
 modelName = "posts"
 access = "true"
-definition = '{"filter":{"status":"approved","authorId":"$params.authorId"},"sort":{"createdAt":-1},"limit":50}'
-params = '{"authorId":{"type":"string","required":false}}'
+[operations.definition]
+filter = { status = "approved", authorId = "$params.authorId" }
+sort = { createdAt = -1 }
+limit = 50
+
+[[operations.params]]
+name = "authorId"
+type = "string"
+required = false
 ```
 
 Reach for one operation with optional filter params before declaring a separate operation for each filter combination.
@@ -545,8 +641,14 @@ name = "my-orders"
 type = "query"
 modelName = "orders"
 access = "params.userId == user.userId"
-definition = '{"filter":{"userId":"$params.userId"},"sort":{"createdAt":-1}}'
-params = '{"userId":{"type":"string","required":true}}'
+[operations.definition]
+filter = { userId = "$params.userId" }
+sort = { createdAt = -1 }
+
+[[operations.params]]
+name = "userId"
+type = "string"
+required = true
 ```
 
 ### Admin + User Access
@@ -558,15 +660,22 @@ name = "list-orders-admin"
 type = "query"
 modelName = "orders"
 access = "hasRole('admin')"
-definition = '{"sort":{"createdAt":-1}}'
+[operations.definition]
+sort = { createdAt = -1 }
 
 [[operations]]
 name = "list-orders-user"
 type = "query"
 modelName = "orders"
 access = "params.userId == user.userId"
-definition = '{"filter":{"userId":"$params.userId"},"sort":{"createdAt":-1}}'
-params = '{"userId":{"type":"string","required":true}}'
+[operations.definition]
+filter = { userId = "$params.userId" }
+sort = { createdAt = -1 }
+
+[[operations.params]]
+name = "userId"
+type = "string"
+required = true
 ```
 
 ## Debugging Slow Operations

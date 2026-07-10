@@ -112,7 +112,9 @@ access = "fromWorkflow('process-stripe')"
 name = "myBillingCustomer"
 type = "query"
 access = "true"
-definition = '{"filter":{"userId":"$user.userId"},"limit":1}'
+[operations.definition]
+filter = { userId = "$user.userId" }
+limit = 1
 ```
 
 Resolve the provider id server-side from the authenticated user — never accept a client-supplied `customer_id` (see External identifiers, above).
