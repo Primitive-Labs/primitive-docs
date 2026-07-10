@@ -36,18 +36,35 @@ func liveTickets(
       for change in event.changes {
         if change.op == "delete" {
           byId.removeValue(forKey: change.id)
-        } else if change.op == "save" {
+          continue
+        }
+        if change.op == "save" {
           // save delivers the full row.
           byId[change.id] = change.data as? [String: Any] ?? [:]
-        } else {
-          // patch / increment / addToSet / removeFromSet deliver ONLY the
-          // changed fields — merge them; assigning would blank the rest.
-          // On a cache miss (a patch brought the row into the filter set),
-          // the pre-write row in previousData supplies the base.
-          var row = byId[change.id] ?? change.previousData as? [String: Any] ?? [:]
-          for (field, value) in change.data as? [String: Any] ?? [:] { row[field] = value }
-          byId[change.id] = row
+          continue
         }
+        // On a cache miss (the write brought the row into the filter set),
+        // the pre-write row in previousData supplies the base.
+        var row = byId[change.id] ?? change.previousData as? [String: Any] ?? [:]
+        for (field, input) in change.data as? [String: Any] ?? [:] {
+          if change.op == "patch" {
+            // patch delivers the patched fields' new values — merge them;
+            // assigning change.data would blank the rest.
+            row[field] = input
+          } else if change.op == "increment" {
+            // increment delivers the amounts, not the results — add them.
+            row[field] = (row[field] as? Double ?? 0) + (input as? Double ?? 0)
+          } else {
+            // addToSet / removeFromSet deliver the values added or removed —
+            // union or subtract against the current set.
+            let current = row[field] as? [String] ?? []
+            let values = input as? [String] ?? []
+            row[field] = change.op == "addToSet"
+              ? current + values.filter { !current.contains($0) }
+              : current.filter { !values.contains($0) }
+          }
+        }
+        byId[change.id] = row
       }
       render(Array(byId.values))
     })

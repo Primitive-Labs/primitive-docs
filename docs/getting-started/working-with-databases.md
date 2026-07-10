@@ -537,12 +537,14 @@ Each change carries two discriminants: `op` — the underlying write — and `ch
 | `op` | `data` | `previousData` |
 |---|---|---|
 | `save` | The full submitted row | The pre-write row; `null` for a fresh insert |
-| `patch` / `increment` / `addToSet` / `removeFromSet` | **Only the changed fields** | The pre-write row |
+| `patch` | **The patched fields only**, at their new values | The pre-write row |
+| `increment` | The per-field increment **amounts** — not the resulting values | The pre-write row |
+| `addToSet` / `removeFromSet` | The values **added or removed** per field — not the resulting sets | The pre-write row |
 | `delete` | `null` | The deleted row |
 
 Everything in both columns passes through the subscription's `select` projection. An `applyToQuery` operation arrives as one `patch`/`increment`/set-op/`delete` change per matched record — there is no `applyToQuery` op on the wire. And because `data`'s shape follows `op`, an `enter` transition doesn't imply a full row: a patch that brings a row into the filter set delivers `changeType: "enter"` with only the changed fields.
 
-**Merge, don't assign.** Replacing a cached row with `change.data` on a patch silently blanks every field the write didn't touch. Key your cache on `change.id`, replace the row on `save`, merge the fields present in `data` on everything else, and drop the row on `delete` — the pattern the example above follows. If your handler needs a field the patch didn't include (say, a grouping key), read it from `previousData`.
+**Merge, don't assign.** Replacing a cached row with `change.data` on a patch silently blanks every field the write didn't touch. Key your cache on `change.id`, replace the row on `save`, merge the fields present in `data` on a `patch`, and drop the row on `delete`. For `increment` and the set ops, `data` is the *delta*, not the new value — derive the new value from `previousData` plus `data` (add the amount; union or subtract the set values), the pattern the example above follows. If your handler needs a field the write didn't include (say, a grouping key), read it from `previousData`.
 
 #### Origin attribution
 

@@ -22,12 +22,37 @@ export function watchOpenTickets(
         // change.changeType: "enter" | "update" | "leave"
         // change.op decides the shape of change.data (all subject to `select`):
         //   "save"  → the full row                     "delete" → null
-        //   "patch" / "increment" / "addToSet" / "removeFromSet"
-        //           → ONLY the changed fields (pre-write row in previousData)
-        if (change.op === "delete") removeTicket(change.id);
-        else if (change.op === "save") replaceTicket(change.id, change.data);
-        // Merge — assigning change.data would blank every untouched field.
-        else mergeTicket(change.id, change.data as Record<string, unknown>);
+        //   "patch" → the patched fields' new values
+        //   "increment" / "addToSet" / "removeFromSet" → the op input
+        //     (amounts / values added or removed), NOT the resulting values —
+        //     derive those from previousData (the pre-write row).
+        if (change.op === "delete") {
+          removeTicket(change.id);
+        } else if (change.op === "save") {
+          replaceTicket(change.id, change.data);
+        } else if (change.op === "patch") {
+          // Merge — assigning change.data would blank every untouched field.
+          mergeTicket(change.id, change.data as Record<string, unknown>);
+        } else {
+          // increment / addToSet / removeFromSet: compute each field's new value.
+          const prev = (change.previousData ?? {}) as Record<string, unknown>;
+          const resolved: Record<string, unknown> = {};
+          for (const [field, input] of Object.entries(
+            change.data as Record<string, unknown>
+          )) {
+            if (change.op === "increment") {
+              resolved[field] =
+                ((prev[field] as number | undefined) ?? 0) + (input as number);
+            } else {
+              const current = (prev[field] as string[] | undefined) ?? [];
+              resolved[field] =
+                change.op === "addToSet"
+                  ? [...current, ...(input as string[]).filter((v) => !current.includes(v))]
+                  : current.filter((v) => !(input as string[]).includes(v));
+            }
+          }
+          mergeTicket(change.id, resolved);
+        }
       }
     },
   });

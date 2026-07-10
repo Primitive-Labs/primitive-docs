@@ -26,21 +26,41 @@ export async function liveTickets(
       for (const change of event.changes) {
         if (change.op === "delete") {
           byId.delete(change.id);
-        } else if (change.op === "save") {
+          continue;
+        }
+        if (change.op === "save") {
           // save delivers the full row.
           byId.set(change.id, change.data as Record<string, unknown>);
-        } else {
-          // patch / increment / addToSet / removeFromSet deliver ONLY the
-          // changed fields — merge them; assigning would blank the rest.
-          // On a cache miss (a patch brought the row into the filter set),
-          // the pre-write row in previousData supplies the base.
-          byId.set(change.id, {
-            ...(byId.get(change.id) ??
-              (change.previousData as Record<string, unknown>) ??
-              {}),
-            ...(change.data as Record<string, unknown>),
-          });
+          continue;
         }
+        // On a cache miss (the write brought the row into the filter set),
+        // the pre-write row in previousData supplies the base.
+        const row = {
+          ...(byId.get(change.id) ??
+            (change.previousData as Record<string, unknown>) ??
+            {}),
+        };
+        for (const [field, input] of Object.entries(
+          change.data as Record<string, unknown>
+        )) {
+          if (change.op === "patch") {
+            // patch delivers the patched fields' new values — merge them;
+            // assigning change.data would blank the rest.
+            row[field] = input;
+          } else if (change.op === "increment") {
+            // increment delivers the amounts, not the results — add them.
+            row[field] = ((row[field] as number | undefined) ?? 0) + (input as number);
+          } else {
+            // addToSet / removeFromSet deliver the values added or removed —
+            // union or subtract against the current set.
+            const current = (row[field] as string[] | undefined) ?? [];
+            row[field] =
+              change.op === "addToSet"
+                ? [...current, ...(input as string[]).filter((v) => !current.includes(v))]
+                : current.filter((v) => !(input as string[]).includes(v));
+          }
+        }
+        byId.set(change.id, row);
       }
       render(Array.from(byId.values()));
     },
