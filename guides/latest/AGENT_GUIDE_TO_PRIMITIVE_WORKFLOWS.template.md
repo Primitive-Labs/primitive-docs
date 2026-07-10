@@ -750,7 +750,7 @@ Available filters (see `src/workflows/runner/templates.ts` for full list):
 
 Templates have **no arithmetic** (`{{ a + b }}` won't work). Move math into a step or filter chain.
 
-**Missing path sentinel.** In interpolation mode (`"prefix-{{ steps.x.y }}-suffix"`), an unresolved path renders as `<missing: steps.x.y>` so it's visible in step output and logs. In single-expression mode (`"{{ steps.x.y }}"` alone) the raw value is `null` so downstream `runIf`/comparisons work naturally. A resolved `null` interpolates as `"null"`; a resolved empty string interpolates as `""`. Set `strict = true` on the step to throw on any unresolved path instead, or `strictParams = ["userId", ...]` to make only the named top-level params strict-on-missing (a resolved `null` is still tolerated); `strict = true` covers everything and wins when both are set. When a template references a root outside the five valid roots (`input`, `steps`, `outputs`, `meta`, `secrets`), the strict-mode error lists them — catching typos like `{{ inputs.userId }}`.
+**Missing path sentinel.** In interpolation mode (`"prefix-{{ steps.x.y }}-suffix"`), an unresolved path renders as `<missing: steps.x.y>` so it's visible in step output and logs. In single-expression mode (`"{{ steps.x.y }}"` alone) the raw value is `null` so downstream `runIf`/comparisons work naturally. A resolved `null` interpolates as `"null"`; a resolved empty string interpolates as `""`. A filter chain that **begins with `default`** (or `now`) rescues a missing path instead: `{{ steps.x.output.result | default: '' }}` renders `''` when the path is unresolved — including when step `x` was skipped and recorded no `output` at all. That makes `default` the idiom for skipped-step collapse in an output table: a field built from an optionally-skipped step yields the fallback value rather than `<missing: …>`. Set `strict = true` on the step to throw on any unresolved path instead, or `strictParams = ["userId", ...]` to make only the named top-level params strict-on-missing (a resolved `null` is still tolerated); `strict = true` covers everything and wins when both are set. When a template references a root outside the five valid roots (`input`, `steps`, `outputs`, `meta`, `secrets`), the strict-mode error lists them — catching typos like `{{ inputs.userId }}`.
 
 ## `runIf` (CEL, not templates)
 
@@ -924,7 +924,17 @@ After all steps run:
 - `outputs[saveAs]` holds outputs for steps with `saveAs`.
 - The workflow's final result is `outputs.output` if any step used `saveAs = "output"`, otherwise the full `outputs` map.
 
-**Best practice**: end with a `transform` step using `saveAs = "output"` that explicitly shapes the return value.
+**Best practice**: end with a `transform` step using `saveAs = "output"` that explicitly shapes the return value. Because a single-expression `output` forwards the raw value (see [Templating](#templating)), the minimal form is a passthrough — useful when one step's result *is* the run's result:
+
+```toml
+[[steps]]
+id = "result"
+kind = "transform"
+output = "{{ steps.evaluate.output.result }}"   # single expression — forwards the raw value
+saveAs = "output"
+```
+
+Arrays and primitives pass through byte-for-byte. An **object** result additionally carries the engine's `ok: true` verdict stamp (see [Uniform step verdict](#uniform-step-verdict)) — the stamp overwrites any `ok` key of your own on the forwarded object, so don't use `ok` as a data field in a run result.
 
 ### Uniform step verdict
 

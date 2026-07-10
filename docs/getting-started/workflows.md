@@ -488,8 +488,10 @@ items = "{{ steps.fetch.items }}"     # single-expression mode preserves arrays
 The step's result is the templated table itself — `steps.final` (and `outputs.output`, via `saveAs`) becomes:
 
 ```json
-{ "greeting": "Hello Ada", "items": ["alpha", "beta"] }
+{ "greeting": "Hello Ada", "items": ["alpha", "beta"], "ok": true }
 ```
+
+(The `ok` field is the engine's verdict stamp — it's added to every object result, so don't use `ok` as a data field of your own.)
 
 ### `script`
 
@@ -1069,7 +1071,7 @@ Templates have **no arithmetic** — <span v-pre>`{{ a + b }}`</span> won't reso
 
 ### Unresolved Paths
 
-In interpolation mode an unresolved path renders as `<missing: steps.x.y>`, so the gap is visible in step output and logs. In single-expression mode it resolves to `null`, so downstream `runIf` comparisons work naturally. Set `strict = true` on a step to make any unresolved template path fail the step instead. To be strict about only some params while leaving others null-tolerant, list them in `strictParams = ["userId", ...]` — a listed top-level param fails on a missing path but still tolerates a resolved `null`. When a template names a root that doesn't exist, the error lists the valid ones (`input`, `steps`, `outputs`, `meta`, `secrets`), which catches typos like <span v-pre>`{{ inputs.userId }}`</span>.
+In interpolation mode an unresolved path renders as `<missing: steps.x.y>`, so the gap is visible in step output and logs. In single-expression mode it resolves to `null`, so downstream `runIf` comparisons work naturally. A filter chain that starts with `default` rescues a missing path instead — <span v-pre>`{{ steps.x.output.result | default: '' }}`</span> renders `''` even when step `x` was skipped and recorded no output, which keeps a result table clean when some of its fields come from optionally-skipped steps. Set `strict = true` on a step to make any unresolved template path fail the step instead. To be strict about only some params while leaving others null-tolerant, list them in `strictParams = ["userId", ...]` — a listed top-level param fails on a missing path but still tolerates a resolved `null`. When a template names a root that doesn't exist, the error lists the valid ones (`input`, `steps`, `outputs`, `meta`, `secrets`), which catches typos like <span v-pre>`{{ inputs.userId }}`</span>.
 
 ## Next Steps
 
