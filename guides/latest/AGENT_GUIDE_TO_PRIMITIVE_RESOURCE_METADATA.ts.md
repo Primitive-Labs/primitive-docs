@@ -71,6 +71,7 @@ primitive metadata get-batch --requests '[{"resourceType":"user","resourceId":"0
 - Errors on single read/write: `404 NOT_FOUND` (no such category on that resource type), `403 FORBIDDEN` (`readRule`/`writeRule` denied), `400` (schema validation failure, or writing the reserved `attrs` category → `RESERVED_CATEGORY`).
 - All CLI text output (`keyValue`/`success`/`info`) goes to **stderr** — only `--json` output goes to stdout. A `primitive metadata get ... > out.txt` without `--json` produces an empty file.
 - `set --data` and `--data-file` are mutually available; `--data-file` wins if both are passed. The payload must be a JSON object.
+- **Reads are polling-only.** Metadata reads return point-in-time values; changes are not pushed to clients, and there is no subscription surface. Poll on whatever interval the use case's freshness requires. State that must react in real time on the client belongs in a [document](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md) — connected clients receive document updates automatically; metadata is for configuration and state the server reads.
 
 ## Declaring metadata for CEL rules
 
@@ -194,6 +195,7 @@ A write never checks that the target resource exists — a write for a not-yet-c
 - Relying on resource deletion to clean up its metadata — there's no cascade; delete metadata explicitly in the same flow.
 - Trying to create or list category configs from the client SDK — that surface is TOML-sync/admin-REST only.
 - Treating `set()` as a merge — it's a full replace of the category's data.
+- Expecting a metadata change to appear on other clients without a new read — updates are never pushed; poll for freshness, or model live client state in a document instead.
 
 ## Related guides
 
