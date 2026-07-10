@@ -972,7 +972,7 @@ blobId = "{{ steps.save.blobId }}"
 expiresInSeconds = 3600
 ```
 
-`blob.upload` returns the `blobId`; `blob.signedUrl` mints a time-limited URL you can email or return to the client. `blob.delete` removes a blob by `blobId` and returns `{ deleted: true, blobId, bucketId }` — it reports success even when the blob is already gone, so a retried run doesn't fail on cleanup it already did.
+`blob.upload` returns the `blobId`; `blob.signedUrl` mints a time-limited URL you can email or return to the client. `blob.delete` removes a blob by `blobId` and returns `{ deleted: true, blobId, bucketId }` — it reports success even when the blob is already gone, so a retried run doesn't fail on cleanup it already did. A blob a run reads as input must outlive the run's retry window — see [Blobs and Files](./blobs-and-files.md#using-buckets-in-workflows).
 
 When the run is `runAs = "caller"` (the default), every blob step enforces the bucket's [access preset or rule set](./blobs-and-files.md#access-presets) with the same per-operation granularity as direct client calls — upload checks `write`, download checks `read`, signedUrl checks `share`, delete checks `delete`. A `runAs = "system"` run is app-privileged and skips the bucket policy. See [Blobs and Files](./blobs-and-files.md#using-buckets-in-workflows) for the full pattern.
 

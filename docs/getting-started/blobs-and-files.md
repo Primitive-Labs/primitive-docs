@@ -176,6 +176,8 @@ blobId = "{{ steps.save-report.blobId }}"
 
 `blob.delete` returns `{ deleted: true, blobId, bucketId }` and reports success even when the blob is already gone, so a retried run doesn't fail on cleanup it already did. (For blobs with a natural lifespan, a [TTL tier](#ttl-tiers) expires them without any step at all.)
 
+A blob a workflow reads as **input** needs the opposite care: it must outlive the run's retry window. Retries re-run against the same input, so a `blob.download` in a retried attempt fetches the same blob again — and deleting that blob between attempts fails the next retry — and the run — with a not-found error. Don't delete a blob from a cancel or cleanup path while a run that references it can still retry; give the bucket a [TTL tier](#ttl-tiers) and let expiry clean it up. `blob.delete`'s idempotency covers re-execution of the deleting step itself — it doesn't protect a blob that a retrying run still needs.
+
 Blob steps in a `runAs = "caller"` workflow enforce the bucket's [preset or rule set](#access-presets) with the same per-operation granularity as direct client calls: upload checks `write`, download checks `read`, signedUrl checks `share`, delete checks `delete`. A `runAs = "system"` run is app-privileged and skips the bucket policy.
 
 ## Buckets vs. Document Blobs
