@@ -663,16 +663,12 @@ required = true
 
 **Per-parameter access control** restricts what value a caller may pass:
 
-```json
-{
-  "params": {
-    "studentId": {
-      "type": "string",
-      "required": true,
-      "access": "value in memberGroups('parent-of')"
-    }
-  }
-}
+```toml novalidate
+[[operations.params]]
+name = "studentId"
+type = "string"
+required = true
+access = "value in memberGroups('parent-of')"
 ```
 
 ### Substitution variables

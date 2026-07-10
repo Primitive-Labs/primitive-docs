@@ -62,15 +62,44 @@ name = "dashboardBundle"
 type = "pipeline"
 modelName = "_pipeline"
 access = "user.userId == database.metadata.ownerId"
-definition = '''
-{"steps":[
-  {"name":"groups","type":"query","modelName":"groups","filter":{"ownerId":"$user.userId"},"limit":50},
-  {"name":"accounts","type":"query","modelName":"accounts","filter":{"ownerId":"$user.userId"},"limit":100},
-  {"name":"holdings","type":"query","modelName":"holdings","filter":{"ownerId":"$user.userId"},"limit":1000},
-  {"name":"targets","type":"query","modelName":"targets","filter":{},"limit":1000},
-  {"name":"latestSnapshot","type":"query","modelName":"snapshots","filter":{"ownerId":"$user.userId"},"sort":{"createdAt":-1},"limit":1}
-],"return":"all"}
-'''
+[operations.definition]
+return = "all"
+
+[[operations.definition.steps]]
+name = "groups"
+type = "query"
+modelName = "groups"
+filter = { ownerId = "$user.userId" }
+limit = 50
+
+[[operations.definition.steps]]
+name = "accounts"
+type = "query"
+modelName = "accounts"
+filter = { ownerId = "$user.userId" }
+limit = 100
+
+[[operations.definition.steps]]
+name = "holdings"
+type = "query"
+modelName = "holdings"
+filter = { ownerId = "$user.userId" }
+limit = 1000
+
+[[operations.definition.steps]]
+name = "targets"
+type = "query"
+modelName = "targets"
+filter = {}
+limit = 1000
+
+[[operations.definition.steps]]
+name = "latestSnapshot"
+type = "query"
+modelName = "snapshots"
+filter = { ownerId = "$user.userId" }
+sort = { createdAt = -1 }
+limit = 1
 ```
 
 Then execute it in one round trip and read each step's `data`:
