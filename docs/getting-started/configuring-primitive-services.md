@@ -37,6 +37,8 @@ primitive sync revert --snapshot <id>   # restore a specific one
 
 Snapshots are local CLI state, kept out of version control and pruned after 28 days. `revert` replaces the sync directory with the snapshot — run `primitive sync diff` afterwards to see where the restored files stand relative to the server.
 
+**Make the sync tree the single source of truth.** Once you manage configuration as TOML, create entities and land changes by editing files and pushing — including throwaway test or debugging workflows — rather than with one-off `primitive workflows create` calls or console edits. The CLI records each pushed entity's server identity in `.primitive-sync.json`, a state file in the sync directory, and uses it to decide whether a push creates or updates each entity; changes made outside the loop leave that state out of date. In particular, an entity **deleted** outside the loop leaves a stale entry behind: the next push of an edited version of its TOML updates an entity that no longer exists and fails with a "not found" error. When a push fails that way, remove that entity's entry from `.primitive-sync.json` and push again — the entity is created fresh. And when you retire an entity on purpose, delete it explicitly (CLI or console), then remove its TOML file and its `.primitive-sync.json` entry together.
+
 ## What Lives in the Config Directory
 
 One subdirectory per kind of configuration:

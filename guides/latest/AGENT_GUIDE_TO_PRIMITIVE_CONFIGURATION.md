@@ -73,6 +73,17 @@ Every command resolves its target environment in order: `--env <name>` flag → 
 
 `sync push` validates every TOML file before applying anything — any validation error aborts the push with no changes applied (`Aborting push: N TOML validation error(s) — no changes were applied.`). For workflows it validates `$params.X` references against declared `[[operations.params]]` entries at push time, naming the file and line of a bad reference. When validation passes but the server rejects an entity, the error names the entity and file. A cron trigger or workflow that already exists on the server but is missing from local sync state is adopted by key and updated in place rather than failing on the 409 — re-running a failed push converges. Diagnostics go to stderr; `--json` data goes to stdout (pipes stay clean).
 
+## Out-of-band changes and stale sync state
+
+Push decides create-vs-update per entity from the server id stored in `.primitive-sync.json` (`entities.<entityType>.<entityKey>.id`, at the root of the sync directory; database types and the group/collection/metadata type-config families track the entry without an id — the decision there is on the entry's presence). Changes made outside the sync loop — console edits, ad-hoc CLI creates/deletes — leave that state out of date, and the two directions behave differently:
+
+- **Created out-of-band** — converges for workflows, cron triggers, database types, and transform scripts: push adopts the existing entity by key and updates it in place instead of failing the create (see [Push failures](#push-failures)).
+- **Deleted out-of-band** — does not self-heal. The stored id goes stale, and the next push of a changed TOML for that entity issues an update against the missing entity, failing the push with a "not found" error for that entity.
+
+Symptom → fix: `sync push` fails with `Failed to update <entity> <key>: … not found` ⇒ the entity was deleted on the server while its sync-state entry survived. Delete `entities.<entityType>.<entityKey>` from `.primitive-sync.json` and push again — the entity is created fresh (or adopted, for the kinds listed above). A full `sync pull` also rebuilds sync state from the server, but it overwrites every server-backed file with server state — hand-removing the stale entry is the fix that preserves local TOML edits.
+
+Keep everything in the sync tree — including test, probe, and dev workflows. An entity created ad-hoc shows as "Remote only" in `sync diff` until a `sync pull` folds it (and its sync-state entry) into the tree; from then on it's subject to the staleness above if anything deletes it server-side. Create through TOML + push; when retiring an entity, delete it explicitly (CLI or console), then remove its TOML file *and* its `.primitive-sync.json` entry together.
+
 ## What sync does NOT carry
 
 Some settings are set with dedicated update commands rather than TOML (app-level settings that *do* sync are listed under [App settings](#app-settings-app-toml)). Two workflow-level fields are the exception to "TOML round-trips everything": `sync push` sets them only when it **creates** a workflow, never when it updates one already on the server — flip them on an existing workflow with a direct update instead:
