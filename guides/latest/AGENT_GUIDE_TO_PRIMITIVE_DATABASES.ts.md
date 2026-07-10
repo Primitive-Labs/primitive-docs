@@ -1568,11 +1568,15 @@ The two phases see different contexts:
         return;
       }
       for (const change of event.changes) {
-        // change.op:         "save" | "patch" | "delete" | "increment" | ...
         // change.changeType: "enter" | "update" | "leave"
-        // change.data, change.previousData (subject to the select projection)
+        // change.op decides the shape of change.data (all subject to `select`):
+        //   "save"  → the full row                     "delete" → null
+        //   "patch" / "increment" / "addToSet" / "removeFromSet"
+        //           → ONLY the changed fields (pre-write row in previousData)
         if (change.op === "delete") removeTicket(change.id);
-        else upsertTicket(change.data);
+        else if (change.op === "save") replaceTicket(change.id, change.data);
+        // Merge — assigning change.data would blank every untouched field.
+        else mergeTicket(change.id, change.data as Record<string, unknown>);
       }
     },
   });
@@ -1638,10 +1642,18 @@ interface DatabaseChangeEvent {
   changeType?: "enter" | "update" | "leave";
   modelName: string;
   id: string;
-  data?: any;          // present on save/patch/increment/addToSet/removeFromSet, subject to `select`
-  previousData?: any;  // present on patch/delete, subject to `select`
+  data?: any;          // save → the FULL submitted row; patch/increment/addToSet/removeFromSet →
+                       // ONLY the changed fields; null on delete. Subject to `select`.
+  previousData?: any;  // the pre-write row (null for a fresh insert); the deleted row on
+                       // delete. Subject to `select`.
 }
 ```
+
+**The shape of `data` follows `op`, not `changeType`.** A `save` delivers the full row; `patch`, `increment`, `addToSet`, and `removeFromSet` deliver **only the changed fields** (the pre-write row rides in `previousData`); `delete` delivers no `data`. An `applyToQuery` operation arrives as one `patch`/`increment`/set-op/`delete` change per matched record — there is no `applyToQuery` op on the wire. Consequences:
+
+- An `enter` transition does NOT imply a full row: a patch that brings a row into the filter set is `changeType: "enter"` with only the changed fields in `data`.
+- **Merge, don't assign.** Replacing a cached row with `change.data` on a non-`save` op silently blanks every field the write didn't touch. Key the cache on `change.id`; replace on `save`, merge the fields present in `data` otherwise, remove on `delete` (the pattern the subscribe example above and the load-then-subscribe example below follow).
+- A field the patch didn't include (a grouping key, a display label) is readable from `previousData` — both fields pass through the `select` projection, so anything `select` excludes is in neither.
 
 ### Change-frame origin attribution
 
@@ -1672,15 +1684,32 @@ On WS reconnect the local connection id rotates, so a frame for the writer's own
     databaseId,
     "list-my-open-tickets",
   );
-  const byId = new Map<string, unknown>(tickets.map((t: { id: string }) => [t.id, t]));
+  const byId = new Map<string, Record<string, unknown>>(
+    tickets.map((t: { id: string }) => [t.id, t]),
+  );
   render(Array.from(byId.values()));
 
   // 2. Subscribe for delta updates.
   const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
     onChange: (event) => {
       for (const change of event.changes) {
-        if (change.op === "delete") byId.delete(change.id);
-        else byId.set(change.id, change.data); // save / patch / increment / addToSet / removeFromSet
+        if (change.op === "delete") {
+          byId.delete(change.id);
+        } else if (change.op === "save") {
+          // save delivers the full row.
+          byId.set(change.id, change.data as Record<string, unknown>);
+        } else {
+          // patch / increment / addToSet / removeFromSet deliver ONLY the
+          // changed fields — merge them; assigning would blank the rest.
+          // On a cache miss (a patch brought the row into the filter set),
+          // the pre-write row in previousData supplies the base.
+          byId.set(change.id, {
+            ...(byId.get(change.id) ??
+              (change.previousData as Record<string, unknown>) ??
+              {}),
+            ...(change.data as Record<string, unknown>),
+          });
+        }
       }
       render(Array.from(byId.values()));
     },

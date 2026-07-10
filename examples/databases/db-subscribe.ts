@@ -7,7 +7,8 @@ export function watchOpenTickets(
   client: JsBaoClient,
   databaseId: string,
   removeTicket: (id: string) => void,
-  upsertTicket: (data: unknown) => void
+  replaceTicket: (id: string, row: unknown) => void,
+  mergeTicket: (id: string, changedFields: Record<string, unknown>) => void
 ): () => void {
   // #region example
   const unsub = client.databases.subscribe(databaseId, "my-open-tickets", {
@@ -18,11 +19,15 @@ export function watchOpenTickets(
         return;
       }
       for (const change of event.changes) {
-        // change.op:         "save" | "patch" | "delete" | "increment" | ...
         // change.changeType: "enter" | "update" | "leave"
-        // change.data, change.previousData (subject to the select projection)
+        // change.op decides the shape of change.data (all subject to `select`):
+        //   "save"  → the full row                     "delete" → null
+        //   "patch" / "increment" / "addToSet" / "removeFromSet"
+        //           → ONLY the changed fields (pre-write row in previousData)
         if (change.op === "delete") removeTicket(change.id);
-        else upsertTicket(change.data);
+        else if (change.op === "save") replaceTicket(change.id, change.data);
+        // Merge — assigning change.data would blank every untouched field.
+        else mergeTicket(change.id, change.data as Record<string, unknown>);
       }
     },
   });

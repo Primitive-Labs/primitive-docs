@@ -7,7 +7,8 @@ func watchOpenTickets(
   client: JsBaoClient,
   databaseId: String,
   removeTicket: @escaping (String) -> Void,
-  upsertTicket: @escaping (Any?) -> Void
+  replaceTicket: @escaping (String, Any?) -> Void,
+  mergeTicket: @escaping (String, [String: Any]) -> Void
 ) throws -> () -> Void {
   // #region example
   let unsub = try client.databases.subscribe(
@@ -20,10 +21,19 @@ func watchOpenTickets(
         return
       }
       for change in event.changes {
-        // change.op:         "save" | "patch" | "delete" | "increment" | ...
         // change.changeType: "enter" | "update" | "leave"
-        // change.data, change.previousData (subject to the select projection)
-        if change.op == "delete" { removeTicket(change.id) } else { upsertTicket(change.data) }
+        // change.op decides the shape of change.data (all subject to `select`):
+        //   "save"  → the full row                     "delete" → nil
+        //   "patch" / "increment" / "addToSet" / "removeFromSet"
+        //           → ONLY the changed fields (pre-write row in previousData)
+        if change.op == "delete" {
+          removeTicket(change.id)
+        } else if change.op == "save" {
+          replaceTicket(change.id, change.data)
+        } else {
+          // Merge — assigning change.data would blank every untouched field.
+          mergeTicket(change.id, change.data as? [String: Any] ?? [:])
+        }
       }
     })
   )

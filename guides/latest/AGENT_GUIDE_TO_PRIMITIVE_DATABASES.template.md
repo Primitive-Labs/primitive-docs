@@ -1415,8 +1415,10 @@ interface DatabaseChangeEvent {
   changeType?: "enter" | "update" | "leave";
   modelName: string;
   id: string;
-  data?: any;          // present on save/patch/increment/addToSet/removeFromSet, subject to `select`
-  previousData?: any;  // present on patch/delete, subject to `select`
+  data?: any;          // save → the FULL submitted row; patch/increment/addToSet/removeFromSet →
+                       // ONLY the changed fields; null on delete. Subject to `select`.
+  previousData?: any;  // the pre-write row (null for a fresh insert); the deleted row on
+                       // delete. Subject to `select`.
 }
 ```
 {{/lang}}
@@ -1447,11 +1449,19 @@ public struct DatabaseChangeEvent {
     public let changeType: String?
     public let modelName: String
     public let id: String
-    public let data: Any?          // present on save/patch/increment/addToSet/removeFromSet, subject to `select`
-    public let previousData: Any?  // present on patch/delete, subject to `select`
+    public let data: Any?          // save → the FULL submitted row; patch/increment/addToSet/removeFromSet →
+                                   // ONLY the changed fields; nil on delete. Subject to `select`.
+    public let previousData: Any?  // the pre-write row (nil for a fresh insert); the deleted row
+                                   // on delete. Subject to `select`.
 }
 ```
 {{/lang}}
+
+**The shape of `data` follows `op`, not `changeType`.** A `save` delivers the full row; `patch`, `increment`, `addToSet`, and `removeFromSet` deliver **only the changed fields** (the pre-write row rides in `previousData`); `delete` delivers no `data`. An `applyToQuery` operation arrives as one `patch`/`increment`/set-op/`delete` change per matched record — there is no `applyToQuery` op on the wire. Consequences:
+
+- An `enter` transition does NOT imply a full row: a patch that brings a row into the filter set is `changeType: "enter"` with only the changed fields in `data`.
+- **Merge, don't assign.** Replacing a cached row with `change.data` on a non-`save` op silently blanks every field the write didn't touch. Key the cache on `change.id`; replace on `save`, merge the fields present in `data` otherwise, remove on `delete` (the pattern the subscribe example above and the load-then-subscribe example below follow).
+- A field the patch didn't include (a grouping key, a display label) is readable from `previousData` — both fields pass through the `select` projection, so anything `select` excludes is in neither.
 
 ### Change-frame origin attribution
 
