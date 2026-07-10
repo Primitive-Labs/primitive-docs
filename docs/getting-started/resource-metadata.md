@@ -54,6 +54,8 @@ primitive metadata set user 01HXY... profile --data '{"tier":"pro","displayName"
 primitive metadata get user 01HXY... profile --json
 ```
 
+Metadata reads are on-demand: a `get` returns the value at the moment of the call, and changes are not pushed to clients. A client that needs current values polls on whatever interval fits its freshness needs. This is a deliberate division of labor: metadata holds configuration and state the server reads, while state that must react in real time on the client belongs in a [document](./working-with-documents.md), where connected clients receive updates automatically.
+
 ### Batch Reads
 
 Read several resources' categories in one call — useful for a listing view that would otherwise issue one request per row. The call always succeeds; per-resource and per-category problems (a missing category, a denied `readRule`) show up inside the results instead of failing the whole batch:

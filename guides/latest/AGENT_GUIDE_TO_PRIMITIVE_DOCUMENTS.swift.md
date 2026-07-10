@@ -968,7 +968,7 @@ Update a document's title, thumbnail, and presentation metadata — see [Update 
 
 ### Deleting Documents
 
-Delete a document (it must be closed first, or pass `forceCloseIfOpen: true`) — see the compiled call below. Root documents cannot be deleted.
+Delete a document (it must be closed first, or pass `forceCloseIfOpen: true`) — see the compiled call below. Root documents cannot be deleted. Deletion requires **direct `owner` permission** on the document or the app `owner` role — group- or collection-derived permission never qualifies, and `read-write` editors can delete records and content but not the document itself.
 
 ```swift
   // Must be closed first

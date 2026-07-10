@@ -32,6 +32,7 @@ Both starter templates ship a drop-in login flow:
   appName="My App"
   defaultContinueRoute="home"
   emailAuthMethod="one_time_code"
+  onboardingRoute="onboarding"
 />
 ```
 
@@ -54,7 +55,7 @@ AuthGateView(
 | Component | `PrimitiveLogin` | `PrimitiveLoginView`, wrapped by `AuthGateView` |
 | Email sign-in | `emailAuthMethod`: `"magic_link"` (default) or `"one_time_code"` | One-time code |
 | Social sign-in | Google button appears automatically when configured | Google and Sign in with Apple buttons appear automatically when configured (Google runs in an `ASWebAuthenticationSession` sheet) |
-| After sign-in | Navigates to `defaultContinueRoute` | Renders the `AuthGateView` content closure |
+| After sign-in | New users pass through the template's `/onboarding` step (profile completion + passkey prompt), then land on `defaultContinueRoute` | Renders the `AuthGateView` content closure |
 
 ### Choosing Your Email Sign-In Method (Web)
 
@@ -108,7 +109,7 @@ That's it — the template's login component automatically shows a "Sign in with
 
 ## Passkeys (WebAuthn)
 
-Passkeys let returning users sign in with biometrics (fingerprint, face) or hardware security keys. The web template's `PrimitiveLogin` flow supports passkeys automatically — users can register a passkey after signing in, then use it for future logins.
+Passkeys let returning users sign in with biometrics (fingerprint, face) or hardware security keys. The web template's `PrimitiveLogin` flow supports passkeys automatically — the onboarding step prompts users to register one after sign-in, whichever method they signed in with, and they can use it for future logins.
 
 On iOS, the client wraps Apple's `AuthenticationServices` in two one-call helpers — `client.auth.signInWithPasskey()` and `client.auth.registerPasskey(deviceName:)` — and the iOS template offers passkey enrollment after a first sign-in by another method, then lists and manages saved passkeys from the profile screen. Passkeys require the app's associated-domains entitlement to list your RP domain; see [Deep links and universal links](#deep-links-and-universal-links).
 
@@ -160,7 +161,7 @@ Display `AUTH_USER_DISABLED` in your sign-in UI as a distinct error so the user 
 
 ## Test User Sign-In for Automated Testing
 
-For integration tests and local dev, Primitive supports a `+primitivetest` OTP bypass: whitelist a base email per app, and derived addresses like `alice+primitivetest-teacher@example.com` sign in through the normal OTP flow with the magic code `000000` — no real email round-trip. One mailbox covers a whole fleet of role-distinguished test users.
+For integration tests and local dev, Primitive supports a `+primitivetest` OTP bypass: whitelist a base email per app, and derived addresses like `alice+primitivetest-teacher@example.com` sign in through the normal OTP flow with the magic code `000000` — no real email round-trip, and a first sign-in provisions the account through the app's normal signup path. One mailbox covers a whole fleet of role-distinguished test users.
 
 See [Test Users for Automated Testing](./primitive-cli.md#test-users-for-automated-testing) on the CLI page for setup, the sign-in pattern, and the security guardrails.
 
