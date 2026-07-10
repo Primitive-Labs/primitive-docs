@@ -145,7 +145,7 @@ It returns `{ items, nextCursor }`, where each row is `{ userId, email, name, av
 Every user has one of three built-in roles: `"owner"`, `"admin"`, or `"member"` (default). **Prefer groups over app roles** for application-level role modeling — groups are multi-tenant by context (a user can be `editor` in one project, `viewer` in another) while app roles are global per-app.
 
 Behavior:
-- **`owner`** and **`admin`** users **bypass all rule-set evaluation** for groups, collections, and database type rules (see `evaluateRule` in `cel-resource-registry.ts`). Do not try to restrict them via rules.
+- **`owner`** and **`admin`** users **bypass all rule-set evaluation** for groups, collections, and database type rules. Do not try to restrict them via rules.
 - **`member`** is the default — access is determined by direct permissions and group memberships.
 - In CEL rule contexts the field is `user.role` (NOT `user.appRole`). See [Rule CEL context](#rule-cel-context) below.
 
@@ -381,9 +381,9 @@ primitive sync push
 ```
 
 **Defaults & gotchas:**
-- `autoAddCreator` defaults to `true` **only when a `GroupTypeConfig` row exists** for the type. With **no config row at all**, no auto-add happens.
-- A group type with **no config row** falls back to built-in default rules. Per-op fallback also applies: when a configured rule set leaves a `(category, op)` pair undefined, that op resolves against the defaults too. The defaults: `group.create = "true"` (any signed-in member); `group.edit/delete` and `member.create/edit/delete` are creator-only (`user.userId == group.createdBy`); `group.get` and `member.list` allow the creator OR any direct group member (`isMemberOf(group.groupType, group.groupId)`).
-- A `GroupTypeConfig` row with no `ruleSetName` (`ruleSetId: null`) is an **explicit opt-out** and denies everything except admin/owner; it does NOT fall through to defaults. To re-enable defaults, delete the config row entirely.
+- `autoAddCreator` defaults to `true` **only when a group type config exists** for the type. With **no config at all**, no auto-add happens.
+- A group type with **no config** falls back to built-in default rules. Per-op fallback also applies: when a configured rule set leaves a `(category, op)` pair undefined, that op resolves against the defaults too. The defaults: `group.create = "true"` (any signed-in member); `group.edit/delete` and `member.create/edit/delete` are creator-only (`user.userId == group.createdBy`); `group.get` and `member.list` allow the creator OR any direct group member (`isMemberOf(group.groupType, group.groupId)`).
+- A group type config with no `ruleSetName` (`ruleSetId: null`) is an **explicit opt-out** and denies everything except admin/owner; it does NOT fall through to defaults. To re-enable defaults, delete the config entirely (`primitive group-type-configs delete <group-type>`, or `client.groupTypeConfigs.delete(groupType)`).
 
 See the [Databases guide](AGENT_GUIDE_TO_PRIMITIVE_DATABASES.md#configuring-with-the-cli) for the full sync workflow (`init`, `pull`, `diff`, `push`).
 
@@ -512,7 +512,7 @@ Rule sets control who can manage groups (`category: "group"`) and group members 
 
 There is no `read` or `update` — use `edit`. There is no `add` — use `create` (for `member.create` = "add member").
 
-**Default rule set:** A group type with no `GroupTypeConfig` row falls back to built-in defaults:
+**Default rule set:** A group type with no group type config falls back to built-in defaults:
 
 | Op | Default | Meaning |
 |----|---------|---------|
@@ -525,7 +525,7 @@ There is no `read` or `update` — use `edit`. There is no `add` — use `create
 | `member.delete` | `user.userId == group.createdBy` | Creator only |
 | `member.list` | `user.userId == group.createdBy \|\| isMemberOf(group.groupType, group.groupId)` | Creator or direct member |
 
-Per-op fallback applies — when a configured rule set defines some ops but leaves others undefined, the missing ops still resolve against this table. Apps that need stricter (or looser) policy install a custom rule set whose defined ops always win. A `GroupTypeConfig` row with no rule set attached (`ruleSetId: null`) is an explicit opt-out and denies everything except admin/owner — it does NOT fall through to these defaults.
+Per-op fallback applies — when a configured rule set defines some ops but leaves others undefined, the missing ops still resolve against this table. Apps that need stricter (or looser) policy install a custom rule set whose defined ops always win. A group type config with no rule set attached (`ruleSetId: null`) is an explicit opt-out and denies everything except admin/owner — it does NOT fall through to these defaults.
 
 ### Defining a rule set
 
@@ -876,9 +876,9 @@ CEL can check any level: `"isMemberOf('org', database.metadata.orgId)"`, `"isMem
 | `addMember` returns `status: "pending_signup"` | Email isn't an app user yet | Expected. Membership resolves when they sign up or accept via `inviteToken`. Render a pending-members UI; cancel via `removeMember({ email })` or `invitations.revokeDeferredGrant(deferredId, "group")`. |
 | `addMember` returns `status: "already_member"` | User already in the group | Idempotent — no error. |
 | 409 on `groups.create` | A group with that `(groupType, groupId)` already exists | Use a different `groupId` or call `groups.get` first. |
-| 403 on `groups.create` (member role) | The group type has a `GroupTypeConfig` row with no rule set attached (explicit opt-out), OR a configured `group.create` rule denied the caller | Either delete the `GroupTypeConfig` row to fall back to the permissive default (`group.create = "true"`), attach a rule set with a permissive `group.create`, or call as an owner/admin. |
+| 403 on `groups.create` (member role) | The group type has a config with no rule set attached (explicit opt-out), OR a configured `group.create` rule denied the caller | Either delete the group type config to fall back to the permissive default (`group.create = "true"`), attach a rule set with a permissive `group.create`, or call as an owner/admin. |
 | 403 on `groups.create` with `groupType` starting with `_` | Reserved system group type | Pick a different prefix. |
 | Group permission not taking effect on document | User hasn't reopened the document | Close and reopen the document to pick up new group permissions. |
 | CEL `isMemberOf` returns false unexpectedly | Wrong `groupType`/`groupId` casing, user not yet added (deferred), or membership cache stale | Verify with `listUserMemberships(userId)`; remember email-based adds defer until sign-up. |
 | Rule evaluation always denies, no obvious reason | Expression references a field not in the context (e.g. `user.appRole`, `group.description`) — runtime errors are silently turned into deny | Run `client.ruleSets.debug({...})` and inspect `trace`/`expression`/`context`. |
-| Can't restrict admin/owner access via rules | By design — they bypass `evaluateRule` | Use group memberships for fine-grained access; don't try to gate admins. |
+| Can't restrict admin/owner access via rules | By design — app owner/admin bypass all rule evaluation | Use group memberships for fine-grained access; don't try to gate admins. |
