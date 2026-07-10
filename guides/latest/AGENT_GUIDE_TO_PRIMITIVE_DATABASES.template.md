@@ -1415,8 +1415,12 @@ interface DatabaseChangeEvent {
   changeType?: "enter" | "update" | "leave";
   modelName: string;
   id: string;
-  data?: any;          // present on save/patch/increment/addToSet/removeFromSet, subject to `select`
-  previousData?: any;  // present on patch/delete, subject to `select`
+  data?: any;          // save → the FULL submitted row; patch → the patched fields' new values;
+                       // increment/addToSet/removeFromSet → the op INPUT (amounts / values
+                       // added-or-removed), not the resulting values; null on delete.
+                       // Subject to `select`.
+  previousData?: any;  // the pre-write row (null for a fresh insert); the deleted row on
+                       // delete. Subject to `select`.
 }
 ```
 {{/lang}}
@@ -1447,11 +1451,22 @@ public struct DatabaseChangeEvent {
     public let changeType: String?
     public let modelName: String
     public let id: String
-    public let data: Any?          // present on save/patch/increment/addToSet/removeFromSet, subject to `select`
-    public let previousData: Any?  // present on patch/delete, subject to `select`
+    public let data: Any?          // save → the FULL submitted row; patch → the patched fields' new values;
+                                   // increment/addToSet/removeFromSet → the op INPUT (amounts / values
+                                   // added-or-removed), not the resulting values; nil on delete.
+                                   // Subject to `select`.
+    public let previousData: Any?  // the pre-write row (nil for a fresh insert); the deleted row
+                                   // on delete. Subject to `select`.
 }
 ```
 {{/lang}}
+
+**The shape of `data` follows `op`, not `changeType`.** A `save` delivers the full row; a `patch` delivers **the patched fields only, at their new values**; `increment` delivers the per-field increment **amounts** and `addToSet`/`removeFromSet` deliver the values **added or removed** per field — the op *input*, not the resulting values; `delete` delivers no `data`. The pre-write row rides in `previousData` on all of them. An `applyToQuery` operation arrives as one `patch`/`increment`/set-op/`delete` change per matched record — there is no `applyToQuery` op on the wire. Consequences:
+
+- An `enter` transition does NOT imply a full row: a patch that brings a row into the filter set is `changeType: "enter"` with only the changed fields in `data`.
+- **Merge, don't assign.** Replacing a cached row with `change.data` on a non-`save` op silently blanks every field the write didn't touch. Key the cache on `change.id`; replace on `save`, merge the fields present in `data` on `patch`, remove on `delete`.
+- **For `increment` and the set ops, derive — don't merge.** Merging `change.data` writes the delta over the value (an `increment` of `{views: 1}` would set `views` to `1`; a `removeFromSet` would set the field to the values just removed). Compute the new value from the base row plus the input: add the amount, union the added values, subtract the removed ones (the pattern the subscribe example above and the load-then-subscribe example below follow).
+- A field the write didn't include (a grouping key, a display label) is readable from `previousData` — both fields pass through the `select` projection, so anything `select` excludes is in neither.
 
 ### Change-frame origin attribution
 

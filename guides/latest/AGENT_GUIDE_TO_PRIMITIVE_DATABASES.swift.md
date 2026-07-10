@@ -1537,10 +1537,37 @@ The two phases see different contexts:
         return
       }
       for change in event.changes {
-        // change.op:         "save" | "patch" | "delete" | "increment" | ...
         // change.changeType: "enter" | "update" | "leave"
-        // change.data, change.previousData (subject to the select projection)
-        if change.op == "delete" { removeTicket(change.id) } else { upsertTicket(change.data) }
+        // change.op decides the shape of change.data (all subject to `select`):
+        //   "save"  → the full row                     "delete" → nil
+        //   "patch" → the patched fields' new values
+        //   "increment" / "addToSet" / "removeFromSet" → the op input
+        //     (amounts / values added or removed), NOT the resulting values —
+        //     derive those from previousData (the pre-write row).
+        if change.op == "delete" {
+          removeTicket(change.id)
+        } else if change.op == "save" {
+          replaceTicket(change.id, change.data)
+        } else if change.op == "patch" {
+          // Merge — assigning change.data would blank every untouched field.
+          mergeTicket(change.id, change.data as? [String: Any] ?? [:])
+        } else {
+          // increment / addToSet / removeFromSet: compute each field's new value.
+          let prev = change.previousData as? [String: Any] ?? [:]
+          var resolved: [String: Any] = [:]
+          for (field, input) in change.data as? [String: Any] ?? [:] {
+            if change.op == "increment" {
+              resolved[field] = (prev[field] as? Double ?? 0) + (input as? Double ?? 0)
+            } else {
+              let current = prev[field] as? [String] ?? []
+              let values = input as? [String] ?? []
+              resolved[field] = change.op == "addToSet"
+                ? current + values.filter { !current.contains($0) }
+                : current.filter { !values.contains($0) }
+            }
+          }
+          mergeTicket(change.id, resolved)
+        }
       }
     })
   )
@@ -1614,10 +1641,21 @@ public struct DatabaseChangeEvent {
     public let changeType: String?
     public let modelName: String
     public let id: String
-    public let data: Any?          // present on save/patch/increment/addToSet/removeFromSet, subject to `select`
-    public let previousData: Any?  // present on patch/delete, subject to `select`
+    public let data: Any?          // save → the FULL submitted row; patch → the patched fields' new values;
+                                   // increment/addToSet/removeFromSet → the op INPUT (amounts / values
+                                   // added-or-removed), not the resulting values; nil on delete.
+                                   // Subject to `select`.
+    public let previousData: Any?  // the pre-write row (nil for a fresh insert); the deleted row
+                                   // on delete. Subject to `select`.
 }
 ```
+
+**The shape of `data` follows `op`, not `changeType`.** A `save` delivers the full row; a `patch` delivers **the patched fields only, at their new values**; `increment` delivers the per-field increment **amounts** and `addToSet`/`removeFromSet` deliver the values **added or removed** per field — the op *input*, not the resulting values; `delete` delivers no `data`. The pre-write row rides in `previousData` on all of them. An `applyToQuery` operation arrives as one `patch`/`increment`/set-op/`delete` change per matched record — there is no `applyToQuery` op on the wire. Consequences:
+
+- An `enter` transition does NOT imply a full row: a patch that brings a row into the filter set is `changeType: "enter"` with only the changed fields in `data`.
+- **Merge, don't assign.** Replacing a cached row with `change.data` on a non-`save` op silently blanks every field the write didn't touch. Key the cache on `change.id`; replace on `save`, merge the fields present in `data` on `patch`, remove on `delete`.
+- **For `increment` and the set ops, derive — don't merge.** Merging `change.data` writes the delta over the value (an `increment` of `{views: 1}` would set `views` to `1`; a `removeFromSet` would set the field to the values just removed). Compute the new value from the base row plus the input: add the amount, union the added values, subtract the removed ones (the pattern the subscribe example above and the load-then-subscribe example below follow).
+- A field the write didn't include (a grouping key, a display label) is readable from `previousData` — both fields pass through the `select` projection, so anything `select` excludes is in neither.
 
 ### Change-frame origin attribution
 
@@ -1643,13 +1681,20 @@ On WS reconnect the local connection id rotates, so a frame for the writer's own
 ### Canonical Pattern: Load + Subscribe
 
 ```swift
+  // Loaded rows arrive as JSONValue, subscription deltas as [String: Any] —
+  // normalize to one representation so deltas can merge into loaded rows.
+  let rowDictionary: (JSONValue) -> [String: Any] = { value in
+    guard let data = try? JSONEncoder().encode(value) else { return [:] }
+    return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+  }
+
   // 1. Initial load — full current state.
   let loaded = try await client.databases.executeOperation(
     databaseId: databaseId, name: "list-my-open-tickets"
   )
-  var byId: [String: Any] = [:]
+  var byId: [String: [String: Any]] = [:]
   for ticket in loaded["data"]?.arrayValue ?? [] {
-    if let id = ticket["id"]?.stringValue { byId[id] = ticket }
+    if let id = ticket["id"]?.stringValue { byId[id] = rowDictionary(ticket) }
   }
   render(Array(byId.values))
 
@@ -1659,8 +1704,37 @@ On WS reconnect the local connection id rotates, so a frame for the writer's own
     subscriptionKey: "my-open-tickets",
     options: DatabaseSubscribeOptions(onChange: { event in
       for change in event.changes {
-        if change.op == "delete" { byId.removeValue(forKey: change.id) }
-        else { byId[change.id] = change.data } // save / patch / increment / addToSet / removeFromSet
+        if change.op == "delete" {
+          byId.removeValue(forKey: change.id)
+          continue
+        }
+        if change.op == "save" {
+          // save delivers the full row.
+          byId[change.id] = change.data as? [String: Any] ?? [:]
+          continue
+        }
+        // On a cache miss (the write brought the row into the filter set),
+        // the pre-write row in previousData supplies the base.
+        var row = byId[change.id] ?? change.previousData as? [String: Any] ?? [:]
+        for (field, input) in change.data as? [String: Any] ?? [:] {
+          if change.op == "patch" {
+            // patch delivers the patched fields' new values — merge them;
+            // assigning change.data would blank the rest.
+            row[field] = input
+          } else if change.op == "increment" {
+            // increment delivers the amounts, not the results — add them.
+            row[field] = (row[field] as? Double ?? 0) + (input as? Double ?? 0)
+          } else {
+            // addToSet / removeFromSet deliver the values added or removed —
+            // union or subtract against the current set.
+            let current = row[field] as? [String] ?? []
+            let values = input as? [String] ?? []
+            row[field] = change.op == "addToSet"
+              ? current + values.filter { !current.contains($0) }
+              : current.filter { !values.contains($0) }
+          }
+        }
+        byId[change.id] = row
       }
       render(Array(byId.values))
     })
