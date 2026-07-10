@@ -90,7 +90,7 @@ content = "Generate premium content for {{ input.topic }}."
 
 Every step output carries an engine-managed `ok` boolean (and `skipped: true` when `runIf` was falsy, `errored: true` when captured by `continueOnError`), so downstream `runIf` expressions can branch reliably on `steps.<id>.ok` or `!steps.<id>.skipped`.
 
-CEL optional types are enabled in every workflow context, so you can collapse multi-conjunct null guards: `steps.fetch.?data.?items.orValue([]).size() > 0`.
+CEL optional types are enabled in every workflow context, so you can collapse multi-conjunct null guards: `steps.fetch.?data.?items.orValue([]).size() > 0`. One caution: comparing a `.?` path to a value with `!=` is **true when the path is absent** — `input.metadata.?userId != ''` passes for input with no `userId` at all. For strings, lists, and maps, write "present and non-empty" as `size(input.metadata.?userId) > 0` — `size()` is `0` for an absent path and for a present-but-null value; for numbers and booleans, use `.hasValue()`.
 
 When a step reads a value from an upstream step that can itself be skipped, list that upstream in `skipWhenSkipped` so the dependent skips too instead of failing on the missing output:
 

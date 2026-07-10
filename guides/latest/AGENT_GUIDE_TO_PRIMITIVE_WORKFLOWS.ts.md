@@ -780,14 +780,16 @@ Common operations work directly on optional values — no `.orValue()` unwrap ne
 
 | Expression | Semantics |
 |---|---|
-| `size(steps.x.?data)` | `none` → `0`; `some(xs)` → `xs.size()`. Works for lists, maps, strings, bytes. |
-| `steps.x.?body.?token != ''` | `none` is never equal to any scalar value (absent ≠ empty string). |
-| `steps.x.?body.?err == null` | `none == null` is `true` (absent path treated as null). |
+| `size(steps.x.?data)` | `none` → `0`; a present-but-`null` value → `0`; `some(xs)` → `xs.size()`. Works for lists, maps, strings, bytes. |
+| `steps.x.?body.?err == null` / `!= null` | `none == null` is `true` (an absent path compares equal to null), so `!= null` means "present and non-null". |
+| `steps.x.?body.?token != 'v'` | **TRUE when the path is absent.** `none` never equals a non-null value, and `!=` is derived as the negation — this is is-distinct-from, not a presence check. |
+
+**Presence checks on strings, lists, maps, and bytes use `size()`, not a bare `!=`.** A guard like `runIf = "input.metadata.?userId != ''"` *passes* for input with no `userId` at all — the opposite of the intent. Write "present and non-empty" as `size(input.metadata.?userId) > 0` (and "absent or empty" as `== 0`): `size()` is `0` for an absent path and for a present-but-null value, so it covers both. For values without a size (numbers, booleans), use `.hasValue()` instead — `size()` on a present number or boolean is an evaluation error (which fails the step), and `.hasValue()` is `true` for a present-but-`null` value. Comparing against `null` is the one safe bare comparison — `.?err != null` correctly means present-and-non-null.
 
 ```cel
 runIf = "size(steps['fetch'].?data) > 0"
 runIf = "steps['profile'].?body.?err != null"
-runIf = "steps['profile'].?body.?token != ''"
+runIf = "size(steps['profile'].?body.?token) > 0"   # present and non-empty — NOT `.?token != ''`
 ```
 
 You can still use `.orValue()` and `.hasValue()` when you need explicit control over the fallback value:
