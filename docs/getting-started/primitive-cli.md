@@ -521,6 +521,29 @@ Guardrails:
 
 Use this for automated tests and local development — not for staging or production flows.
 
+### CI Recipe for Invite-Only Apps
+
+Because the signup gates apply, a fresh derived address on an invite-only app is stopped at the email step — waitlisted or rejected before any code is accepted. Rather than routing invitation emails through CI, add the member directly:
+
+```bash
+# 1. One-time app setup: whitelist the base
+primitive apps update --test-account-bases ci@example.com
+
+# 2. Per test user: add the derived address as a member — no invitation email.
+#    --json returns the new member's userId for scripting.
+primitive users create ci+primitivetest-checkout@example.com --json
+
+# 3. The test session signs in through the normal OTP flow with code 000000
+```
+
+`users create` adds the membership directly, so the invite gate never fires and the OTP sign-in proceeds as an existing member. For features gated on [resource metadata](./resource-metadata.md) — a subscription entitlement, a feature flag — an app owner or admin can set the test user's state directly, since app-level owners and admins bypass category write rules:
+
+```bash
+primitive metadata set user <userId> entitlements --data '{"tier":"pro"}'
+```
+
+With those steps a headless or browser-automation session can sign in as a fresh, entitled member with no human interaction.
+
 ## Scripting
 
 For automation and scripting, most commands support `--json` output:
