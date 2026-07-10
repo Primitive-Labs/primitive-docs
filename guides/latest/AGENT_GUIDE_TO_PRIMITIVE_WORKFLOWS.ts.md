@@ -60,7 +60,7 @@ A run threads one JSON context through every step:
 
 1. **Input**: one JSON object per run — the `start()`/`runSync()` input, the webhook's mapped payload, or the cron trigger's configured input. Validated against `inputSchema` when declared. Top-level scalar properties are coerced to the declared type before the strict check where it's safe: number→`string` via `String()`, numeric string→`number`/`integer` via `Number()` (rejects `""`/NaN), number→`integer` only when integral, `"true"`/`"false"` (case-insensitive)→`boolean`. A non-coercible value (e.g. `"abc"`→number) fails the run with a clear type error. Per-property `coerce: false` opts out; unions/enums/null/nested are not coerced. Applies at every input site (durable run, `start`, `run-sync`, admin preview/run, and `workflow.call` child input), which makes explicit `| string`/`| number` filters at typed call sites optional no-ops.
 2. **Step config is templated at execution time**: steps have no implicit input argument — `{{ ... }}` expressions in config strings resolve against the run context (`input`, `steps.<id>`, `outputs.<saveAs>`, `secrets`, `meta`, forEach vars) just before the step runs (see [Templating](#templating)).
-3. **Output recording**: each step's JSON result is stored as `steps[id]`; `saveAs = "name"` also registers it as `outputs.name` — a stable alias that survives step-id renames. The engine stamps the uniform verdict (`ok`, plus `skipped`/`errored`) on every entry.
+3. **Output recording**: each step's JSON result is stored as `steps[id]`; `saveAs = "name"` also registers it as `outputs.name` — a stable alias that survives step-id renames. The engine stamps the uniform verdict (`ok`, plus `skipped`/`errored`) on every object entry; array and primitive results pass through unstamped.
 4. **Final result**: `outputs.output` if any step used `saveAs = "output"`, otherwise the full `outputs` map (see [Output contract](#output-contract)). Every step's input and output stays on the run record.
 
 ## Step types
@@ -759,7 +759,7 @@ Templates have **no arithmetic** (`{{ a + b }}` won't work). Move math into a st
 runIf = "input.shouldRun"                        # truthy
 runIf = "outputs.text.length < 1000"             # comparison
 runIf = "steps.check.isMember && input.amount > 0"
-runIf = "steps.previous.ok"                      # uniform verdict on every step
+runIf = "steps.previous.ok"                      # uniform verdict on every object result
 runIf = "!steps.fetch.skipped"
 ```
 
@@ -894,7 +894,7 @@ The predicate runs against each iteration's `result` plus the usual `input`/`ste
 ## Error handling
 
 - **Default**: a failed step throws and the workflow fails.
-- `continueOnError = true`: failure is captured as `steps[id] = { error, errorDetails }` and execution continues.
+- `continueOnError = true`: failure is captured as `steps[id] = { error, errorDetails, ok: false, errored: true }` and execution continues.
 - `strict = true`: any unresolved template expression in the step throws with a path-listing error.
 - `expect:` filter (in templates): runtime type check.
 - `[[compensate]]` block at the top level runs after a failure (when `continueOnError` is not set). Compensate steps see `steps._error = { message, stepId }`. Compensate runs only in sync execution paths (e.g., `executeWorkflowSync`); not all engine modes invoke it.
@@ -941,16 +941,16 @@ Arrays and primitives pass through byte-for-byte. An **object** result additiona
 
 ### Uniform step verdict
 
-Every entry in `steps[id]` carries a reserved verdict namespace alongside the runner's own fields:
+Every **object** entry in `steps[id]` carries a reserved verdict namespace alongside the runner's own fields (a successful array or primitive result passes through unstamped, with no verdict keys):
 
 | Field | When set |
 |---|---|
-| `ok: boolean` | Always. `true` if the step ran and the runner classified it as successful; `false` for skipped, errored, or kind-specific failures (e.g. an `integration.call` that returned HTTP 5xx) |
+| `ok: boolean` | On every object result. `true` if the step ran and the runner classified it as successful; `false` for skipped, errored, or kind-specific failures (e.g. an `integration.call` that returned HTTP 5xx) |
 | `skipped: true` | The step's `runIf` evaluated falsy, or a step listed in its `skipWhenSkipped` was itself skipped. The runner did NOT execute. |
 | `errored: true` | The step threw but was captured by `continueOnError = true` |
 | `error`, `errorDetails` | Companion fields populated when `errored: true` |
 
-`ok`, `skipped`, `errored`, `error`, and `errorDetails` are written by the engine and override any same-named field the runner would have produced. Downstream `runIf` and templates can rely on them on every step kind:
+`ok`, `skipped`, `errored`, `error`, and `errorDetails` are written by the engine and override any same-named field the runner would have produced. Downstream `runIf` and templates can rely on them whenever the step's result is an object — skipped and errored steps always are:
 
 ```toml novalidate
 runIf = "steps.fetch.ok"

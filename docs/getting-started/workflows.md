@@ -66,7 +66,7 @@ A run carries a single growing JSON context from the first step to the last:
 
 2. **Steps read from the context through templates.** A step has no implicit input argument. Just before it runs, the <span v-pre>`{{ ... }}`</span> expressions in its config strings are resolved against the run context — `input.*` plus the recorded output of every step that already ran — and the step executes with that filled-in config. An email step's <span v-pre>`to = "{{ input.userEmail }}"`</span> and an LLM message's <span v-pre>`content = "Summarize: {{ steps.fetch.body }}"`</span> are both reading the context this way.
 
-3. **Every step's output is recorded.** Whatever a step produces (always JSON) is stored on the run as `steps.<id>`. Give the step `saveAs = "name"` and the same value is also available as `outputs.name` — a stable alias later steps can use without depending on the step's id. The engine also stamps each entry with a verdict — `ok`, plus `skipped` or `errored` when relevant — that later steps can branch on.
+3. **Every step's output is recorded.** Whatever a step produces (always JSON) is stored on the run as `steps.<id>`. Give the step `saveAs = "name"` and the same value is also available as `outputs.name` — a stable alias later steps can use without depending on the step's id. The engine also stamps each object entry with a verdict — `ok`, plus `skipped` or `errored` when relevant — that later steps can branch on; arrays and primitives pass through unstamped.
 
 4. **The run's final output.** When the last step finishes, the workflow's result is `outputs.output` — the value saved by a step with `saveAs = "output"` — or the whole `outputs` map if no step used that name. The standard pattern is to end with a `transform` step that sets `saveAs = "output"` and explicitly shapes the return value. The full step-by-step record (each step's input and output) stays on the run for inspection.
 
@@ -88,7 +88,7 @@ role = "user"
 content = "Generate premium content for {{ input.topic }}."
 ```
 
-Every step output carries an engine-managed `ok` boolean (and `skipped: true` when `runIf` was falsy, `errored: true` when captured by `continueOnError`), so downstream `runIf` expressions can branch reliably on `steps.<id>.ok` or `!steps.<id>.skipped`.
+Every **object** step output carries an engine-managed `ok` boolean (and `skipped: true` when `runIf` was falsy, `errored: true` when captured by `continueOnError` — skipped and errored outputs are always objects), so downstream `runIf` expressions can branch reliably on `steps.<id>.ok` or `!steps.<id>.skipped`. An array or primitive output passes through unstamped.
 
 CEL optional types are enabled in every workflow context, so you can collapse multi-conjunct null guards: `steps.fetch.?data.?items.orValue([]).size() > 0`. One caution: comparing a `.?` path to a value with `!=` is **true when the path is absent** — `input.metadata.?userId != ''` passes for input with no `userId` at all. For strings, lists, and maps, write "present and non-empty" as `size(input.metadata.?userId) > 0` — `size()` is `0` for an absent path and for a present-but-null value; for numbers and booleans, use `.hasValue()`.
 
