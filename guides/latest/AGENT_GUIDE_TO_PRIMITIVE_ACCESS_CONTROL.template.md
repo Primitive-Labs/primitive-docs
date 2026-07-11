@@ -21,7 +21,7 @@ A rule reads caller identity and operation params only — it cannot read a data
 
 | Surface | Field(s) | Extra context | Notes |
 |---|---|---|---|
-| Database operation | `access` per op; `defaultAccess` on `[type]`; per-param `access` inside `params` JSON | `params.*`, `database.id`, `database.celContext`, `fromWorkflow()` / `fromWorkflow(key)` | No rule and no `defaultAccess` → denied to non-owner/manager callers. `fromWorkflow(key)` gates ops to the internal workflow runner (unspoofable). |
+| Database operation | `access` per op; `defaultAccess` on `[type]`; per-param `access` inside `params` JSON | `params.*`, `database.id`, `database.celContext`, `fromWorkflow()` / `fromWorkflow(key)` | No rule and no `defaultAccess` → denied to every caller (operation `access` has no owner/manager/admin bypass). `fromWorkflow(key)` gates ops to the internal workflow runner (unspoofable). |
 | Database subscription | `accessRule` (subscribe-time) + `filter` (per change) | `accessRule`: full context incl. `database.*`, membership fns, `params.*`. `filter`: **narrow** — `user.userId`, `record.*` (`record.data.*`, `record.previousData.*`, `record.modelName`/`op`/`id`), `params.*` only | `filter` cannot reference `database.*` (HTTP 400 at save) and cannot widen what `accessRule` allows. Both required; use `"true"` for filter to pass everything in scope. |
 | Workflow | `accessRule` on `[workflow]` | identity context only | Evaluated on `workflows.start()` and `workflow.call`; NOT on webhook triggers. admin/owner bypass. No rule → any authenticated member can start. |
 | Server-stamped fields / triggers | trigger `when` conditions; `autoPopulatedFields` values | `record.*`, `database.*`, `now()` | CEL produces values (`user.userId`, `now()`) as well as conditions. |
@@ -59,7 +59,7 @@ primitive rule-sets debug --user <userId> --group-type <type> --category <group|
 primitive rule-sets schema                                   # available context variables/functions
 ```
 
-Client equivalents: `client.ruleSets.test()`, `client.ruleSets.debug()`, `client.ruleSets.schema()`. For end-to-end checks of operation rules, sign in as `+primitivetest` derived users with different roles/memberships and execute the operation. Owners and admins bypass every rule, so a gated or entitlement-gated state reads as open to them even when the gate is correct — test that a gate actually denies as a plain `member`.
+Client equivalents: `client.ruleSets.test()`, `client.ruleSets.debug()`, `client.ruleSets.schema()`. For end-to-end checks of operation rules, sign in as `+primitivetest` derived users with different roles/memberships and execute the operation. Owners and admins bypass workflow access rules, rule sets, metadata rules, and bucket presets — but NOT database operation `access`, which is evaluated for every caller — so on a bypassing surface a gated or entitlement-gated state reads as open to them even when the gate is correct. Test that a gate actually denies as a plain `member`.
 
 ## Patterns
 

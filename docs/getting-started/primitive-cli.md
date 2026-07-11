@@ -285,13 +285,9 @@ primitive sync push --dry-run  # walk the full push, reported but not applied
 primitive sync revert          # restore the sync directory from a pre-pull snapshot
 ```
 
-Pass `--dir <path>` to any of these to override the auto-resolved directory with a fixed path. `sync revert --list` enumerates snapshots and `--snapshot <id>` restores a specific one. `diff` and `push --dry-run` run the same validate-first gate as a real push, so the preview is faithful — what it reports is what the push will do.
+Pass `--dir <path>` to any of these to override the auto-resolved directory with a fixed path. `sync revert --list` enumerates snapshots and `--snapshot <id>` restores a specific one.
 
-`push` is safe to re-run: an entity that exists on the server but is missing from local sync state — created out of band, or left behind by a push that aborted before recording it — is adopted by its key and updated in place. A failed push converges on the next run.
-
-**Workflow fragments.** `workflow-fragments/<name>.toml` lets several workflows share a common run of `[[steps]]`. Reference them from a workflow file with `include = ["<name>"]`; the CLI expands fragments client-side before push (the server stores only the flattened step list). Use `primitive workflows expand <workflow.toml>` to inspect the expanded result.
-
-**Validation errors.** `sync push` validates every TOML file before applying anything — one error aborts the whole push with no changes applied, so a typo can't leave a half-pushed configuration behind. For workflows the CLI checks operation params at push time: every `$params.X` substitution must match a declared `[[operations.params]]` entry, and the error names the file and line of the operation block — catching typos like `$params.proectId` that would otherwise no-op at runtime. When validation passes but the server rejects an entity, the error names the entity so you can jump straight to the file.
+Validation, preview fidelity, and push convergence (re-running a failed push adopts entities missing from sync state by key) are covered in [The Sync Loop](./configuring-primitive-services.md#the-sync-loop). `primitive workflows expand <workflow.toml>` prints a workflow with its [fragments](./workflows.md#syncing-workflow-config) expanded — the same flattening `sync push` performs before upload.
 
 CLI diagnostics (success/warning/info messages) are written to stderr; only structured data (`--json` output) goes to stdout, so `primitive sync diff --json | jq` works without any extra redirects.
 
@@ -320,7 +316,7 @@ When you run `primitive init`, you'll be prompted to install the skill as part o
 
 ### App Secrets
 
-Store app-level secrets server-side and reference them from workflows and integrations as <span v-pre>`{{ secrets.KEY_NAME }}`</span> — your client code and repo never see the values:
+Store app-level secrets server-side and reference them from workflows and integrations as <span v-pre>`{{secrets.KEY_NAME}}`</span> — your client code and repo never see the values:
 
 ```bash
 primitive secrets set OPENAI_API_KEY --value sk-...
@@ -464,7 +460,7 @@ primitive email-templates test magic-link
 primitive email-templates delete magic-link
 ```
 
-Email template types include built-in types (`magic-link`, `otp`, `access-request-created`, `access-request-resolved`, and others) plus any custom kebab-case type names you register. Each type exposes template variables (e.g. <span v-pre>`{{magicLinkUrl}}`</span>, <span v-pre>`{{otpCode}}`</span>) that Primitive substitutes at send time. Use `primitive email-templates variables <type>` to see the full list.
+Email template types are the built-ins — `magic-link`, `otp`, `document-share`, `document-share-deferred`, `collection-share`, `collection-share-deferred`, `waitlist-invite`, `waitlist-signup-notification`, `admin-invite`, `app-invite`, `access-request-created`, and `access-request-resolved` — plus any custom kebab-case type names you register. Each type exposes template variables (e.g. <span v-pre>`{{magicLinkUrl}}`</span>, <span v-pre>`{{otpCode}}`</span>) that Primitive substitutes at send time. Use `primitive email-templates variables <type>` to see the full list.
 
 ### Analytics
 
@@ -498,7 +494,7 @@ primitive apps get
 primitive apps update --test-account-bases ''
 ```
 
-The list is capped at 50 base emails per app, and a base cannot itself be a `+primitivetest` derivative. The whitelist is re-checked on every request, so removing a base immediately revokes its derived sessions.
+The list is capped at 50 base emails per app, and a base cannot itself be a `+primitivetest` derivative.
 
 Each whitelisted base authorizes unlimited derived addresses of the form `<base-local>+primitivetest<suffix>@<base-domain>`. From the test side, sign in via the normal OTP flow using the magic code `000000`:
 

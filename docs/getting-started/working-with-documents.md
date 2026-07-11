@@ -20,7 +20,7 @@ When multiple users have access to the same document, changes sync instantly. Si
 Data lives in a local database on the device. Your app works without a network connection — changes queue and sync when connectivity returns.
 
 ### Size Guidelines
-Documents work best under ~10MB each. For most apps this means thousands of records per document. If you need more, split data across multiple documents.
+Documents work best under ~10 MB each. For most apps this means thousands of records per document. If you need more, split data across multiple documents.
 
 ## Defining Models
 
@@ -128,7 +128,7 @@ max_count = 10
 ```toml
 [models.tasks.fields.id]
 type = "id"
-auto_assign = true     # server-assigns a ULID on save
+auto_assign = true     # the client assigns a ULID at save
 indexed = true         # required for fast lookup by id
 
 [models.tasks.fields.email]
@@ -403,7 +403,7 @@ A document must be **open** before you can read or write the data inside it — 
 
 The document is ready as soon as `open()` resolves — await it before the first query and show a loading state until then. `open()` is idempotent, so re-opening an already-open document is a no-op.
 
-Only keep open the documents you actually need — the ones you're querying or want real-time updates from. Every open document is synced continuously, and in JavaScript queries span all open documents by default, so an unneeded open document costs sync traffic and widens query results. Close documents you're done with:
+Only keep open the documents you actually need — the ones you're querying or want real-time updates from. Every open document is synced continuously, and queries span all open documents by default, so an unneeded open document costs sync traffic and widens query results. Close documents you're done with:
 
 ::: code-group
 
@@ -618,13 +618,9 @@ Documents can carry binary files — images, PDFs, attachments. Each blob belong
 
 ::: code-group
 
-```typescript [JavaScript]
-const imageUrl = blobs.downloadUrl(blobId, { disposition: "inline" });
-```
+<<< ../../examples/blobs/doc-blob-inline-url.ts#example{ts} [JavaScript]
 
-```swift [Swift]
-let imageUrl = blobs.downloadUrl(blobId: blobId, disposition: .inline)
-```
+<<< ../../examples/blobs/doc-blob-inline-url.swift#example{swift} [Swift]
 
 :::
 

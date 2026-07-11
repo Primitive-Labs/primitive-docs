@@ -24,7 +24,7 @@ A **document** is:
 - **Read-write** - View and edit capabilities
 - **Owner** - Full control including sharing and deletion
 
-**Size Guidelines:** Documents work best around ~10MB each (soft limit). For most apps (thousands of records, years of data), this is sufficient.
+**Size Guidelines:** Documents work best around ~10 MB each (soft limit). For most apps (thousands of records, years of data), this is sufficient.
 
 ## Documents vs. Databases
 

@@ -267,7 +267,7 @@ status = "active"
 runAs = "system"  # required — webhooks can only fire system workflows
 ```
 
-That identity *is* the security boundary: members can't start a system workflow — a direct `client.workflows.start()` from a member is refused with a `403` — so, together with the webhook's signature verification, a client can't invoke the workflow with a crafted payload. A system workflow takes no `accessRule` — the rule is never evaluated on a system run, so declaring one is an error: a non-empty `accessRule` on a `runAs = "system"` workflow is rejected when you save or push it (`runAs:"system" workflows do not evaluate accessRule — remove the accessRule`). Reserve `accessRule` for [caller workflows](#controlling-access-to-workflows), where it gates who may start a run.
+That identity *is* the security boundary: members can't start a system workflow — a direct `client.workflows.start()` from a member is refused with a `403` — so, together with the webhook's signature verification, a client can't invoke the workflow with a crafted payload. A system workflow takes no `accessRule` — declaring one is rejected at save or push; see [Controlling Access to Workflows](#controlling-access-to-workflows).
 
 Inspect webhooks and their recent deliveries (accepted, rejected, duplicate) from the CLI:
 
@@ -288,7 +288,7 @@ name = "Generate Report"
 accessRule = "hasRole('admin') || isMemberOf('team', 'ops')"
 ```
 
-With no rule, any signed-in member of the app can start the workflow; admins and owners always pass regardless of the rule. The rule is evaluated on every client invocation — asynchronous or synchronous — and when another workflow invokes this one through a `workflow.call` step. Cron triggers and inbound webhooks skip it entirely (they have their own controls). Because those triggers run [system workflows](#system-workflows) — which members can't start at all — a system workflow takes no `accessRule` at all: a non-empty rule on a `runAs = "system"` workflow is rejected when you save or push it. `accessRule` gates only **caller** workflows, deciding who may start a run.
+With no rule, any signed-in member of the app can start the workflow; admins and owners always pass regardless of the rule. The rule is evaluated on every client invocation — asynchronous or synchronous — and when another workflow invokes this one through a `workflow.call` step. Cron triggers and inbound webhooks skip it entirely (they have their own controls). Because those triggers run [system workflows](#system-workflows) — which members can't start at all — a system workflow takes no `accessRule` at all: a non-empty rule on a `runAs = "system"` workflow is rejected when you save or push it (`runAs:"system" workflows do not evaluate accessRule — remove the accessRule`). `accessRule` gates only **caller** workflows, deciding who may start a run.
 
 Push the rule with `primitive sync push` like any other workflow config, or change it in place with `primitive workflows update <id> --access-rule "<CEL>"`. For the rule language and the identity context available to it (`hasRole`, `isMemberOf`, `memberGroups`), see [Access Control](./access-control.md).
 
@@ -717,7 +717,7 @@ grant_type = "client_credentials"
 scope = "read:data"
 ```
 
-Keep credentials in the integration config (where <span v-pre>`{{ secrets.* }}`</span> resolves server-side) rather than passing them through `request.headers` — that way secrets never appear in workflow step output snapshots.
+Keep credentials in the integration config (where <span v-pre>`{{secrets.*}}`</span> resolves server-side) rather than passing them through `request.headers` — that way secrets never appear in workflow step output snapshots.
 
 ### Database Steps
 
@@ -903,7 +903,7 @@ Sends an email from inside a workflow. It has two modes.
 
 #### Template Mode
 
-Use a registered email template — either a built-in type (`magic-link`, `otp`, `document-share`, etc.) or a custom one you registered:
+Use a registered email template — either a built-in type (the full list is in the [CLI reference](./primitive-cli.md#email-templates)) or a custom one you registered:
 
 ```toml
 [[steps]]

@@ -6,7 +6,7 @@ This page covers what's tracked out of the box, how to emit your own events, and
 
 ## What's Tracked Automatically
 
-You get a working analytics pipeline by initializing `JsBaoClient` with default options. No `logEvent` calls required.
+You get a working analytics pipeline by initializing the client with default options. No `logEvent` calls required.
 
 ### Client-Side Auto Events
 
@@ -15,8 +15,8 @@ The client emits these lifecycle events automatically. All are enabled by defaul
 | Action | Feature | When it fires |
 |---|---|---|
 | `user_active_daily` | `session` | First authenticated activity on a UTC day |
-| `user_returned` | `session` | Tab becomes visible after `minResumeMs` (default 5 min) hidden |
-| `session_end` | `session` | `beforeunload` or `client.destroy()` (records `duration_ms`) |
+| `user_returned` | `session` | App returns to the foreground after at least `minResumeMs` (default 5 min) away |
+| `session_end` | `session` | The app or tab closes, or the client is torn down (records `duration_ms`) |
 | `sync_error` | `sync` | Outbound sync fails (rate-limited, default 30s minimum interval) |
 | `blob_upload_started` / `_succeeded` / `_failed` | `blobs` | Blob upload lifecycle |
 | `prompt_started` / `_succeeded` / `_failed` | `llm`, `gemini` | LLM call lifecycle |
@@ -43,7 +43,7 @@ Every event — auto or custom — gets these fields populated automatically: `t
 
 ### Offline Persistence
 
-Events are persisted on the device while offline and flushed on reconnect. A rate limiter caps emission at roughly 300 events per minute, with a short burst allowance of about 60. No code required.
+Events are persisted on the device while offline and flushed on reconnect. A rate limiter caps emission at 300 events per minute, with a burst allowance of 60. No code required.
 
 ## Emitting Custom Events
 
@@ -67,7 +67,7 @@ Pass a `context_json` object for per-event debug data. It's serialized and **tru
 
 ### Pre-Auth Events
 
-Events without an authenticated user are dropped silently. To track activity on landing pages and sign-up flows, pass the unauthenticated-user constant as the `user_ulid`:
+Events without an authenticated user are dropped silently. To track activity on landing pages and sign-up flows, pass the client's unauthenticated-user constant as the `user_ulid` — each client exports one, shown below:
 
 ::: code-group
 <<< ../../examples/analytics/log-event-preauth.ts#example{ts} [JavaScript]

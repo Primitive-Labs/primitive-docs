@@ -100,15 +100,9 @@ Simulator builds run unsigned — you need an Apple Developer account ($99/year)
 
 After that, device installs and archives both work.
 
-### 2. Run on a Physical iPhone / iPad
+With signing set up, `./run-ios.sh --device` installs directly on a paired iPhone — see [Run It](./template-app.md#_2-run-it) on the Quick Start page.
 
-```bash
-./run-ios.sh --device
-```
-
-You need a paired iPhone connected over USB (run `xcrun devicectl list devices` to verify it shows up as `paired`). The script auto-picks the first paired device, builds with `-allowProvisioningUpdates` (so Xcode requests provisioning profiles for you), installs via `devicectl`, and launches with `--console` so `print` and NSLog output stream to your terminal.
-
-### 3. Set up Fastlane
+### 2. Set up Fastlane
 
 The iOS template **ships Fastlane** — the project already has a root `Gemfile`, plus `fastlane/Appfile`, `fastlane/Fastfile`, and `fastlane/.env.example`. That gets you one-command builds to TestFlight and the App Store, plus version bumping. Install the gem:
 

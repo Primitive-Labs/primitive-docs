@@ -116,7 +116,7 @@ Best practices:
 - Keep business logic in `src/lib/` (not embedded in components) so it's easy to test
 - Test real behavior — don't mock browser APIs
 - Only create test documents when your test actually needs database operations, and always clean them up in a `finally` block
-- Scope queries to the test document. `createTestDocument()` sets its document as the default, but a model query spans every open document and test documents aren't reliably evicted between tests — so an unscoped `Task.query({ ... })` can pick up other tests' records and return more than the test created. Pass `{ documents: doc.docId }` (a single id or an array) so the assertion sees only its own data:
+- Scope queries to the test document. `createTestDocument()` sets its document as the default, but a model query spans every open document — so an unscoped `Task.query({ ... })` can pick up records from other documents open in the session and return more than the test created. Pass `{ documents: doc.docId }` (a single id or an array) so the assertion sees only its own data:
 
 ```ts
 const doc = await createTestDocument();

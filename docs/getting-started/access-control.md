@@ -92,7 +92,7 @@ primitive rule-sets debug --user <userId> --group-type team --category member --
 
 The same is available from the client as `client.ruleSets.test()` and `client.ruleSets.debug()`. For database operations, the fastest loop is running the operation as different test users — see [Test Users for Automated Testing](./primitive-cli.md#test-users-for-automated-testing).
 
-**Test gated states as a plain member.** App owners and admins bypass access rules and rule sets — they pass every gate — so you can't exercise a locked or entitlement-gated state while signed in as one. A paywalled feature reads as open to an admin even when the gate is correct. Verify that a gate actually denies using a `member` test user.
+**Test gated states as a plain member.** App owners and admins bypass most gates — workflow access rules, rule sets, metadata read/write rules, and bucket presets — so on those surfaces you can't exercise a locked or entitlement-gated state while signed in as one: a paywalled feature reads as open to an admin even when the gate is correct. Database operation `access` rules are the exception — they are evaluated for every caller, admins included. Verify that a gate actually denies using a `member` test user.
 
 ## Trusting External Identifiers
 
@@ -117,7 +117,7 @@ When a server action needs the external id, resolve it from the authenticated us
 
 ## Patterns That Hold Up
 
-1. **Default-deny, then open up.** Start restrictive (`hasRole('admin')`) and widen deliberately. An operation with no rule and no `defaultAccess` is denied to regular callers.
+1. **Default-deny, then open up.** Start restrictive (`hasRole('admin')`) and widen deliberately. An operation with no rule and no `defaultAccess` is denied to every caller.
 2. **One group type per concept.** Separate `team`, `org`, and role-like types keep expressions readable: `isMemberOf('team', params.teamId) || isMemberOf('org', params.orgId)`.
 3. **Membership over IDs.** Manage *who's in the group*, not the rules — rules referencing groups rarely need to change.
 4. **Parameterize the resource.** Rules like `isMemberOf('team', params.teamId)` or `params.userId == user.userId` make one operation serve every team/user safely.

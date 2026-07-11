@@ -122,7 +122,7 @@ access = "isMemberOf('org', params.orgId) || isMemberOf('team', params.teamId)"
 
 Who can *manage* groups themselves — create groups of a type, add or remove members — is governed by **rule sets** bound to the group type. See [Access Control](./access-control.md#rule-sets-governing-management-operations).
 
-A group type (or collection type) can also declare [resource metadata](./resource-metadata.md) categories, making `md.self.<category>.<key>` available in that type's rule set — along with a reserved `attrs` category projecting the group's own `groupType`, `groupId`, `name`, and `createdBy` (a collection's `attrs` also includes `contextId`).
+A group type (or collection type) can also declare [resource metadata](./resource-metadata.md) categories, making `md.self.<category>.<key>` available in that type's rule set — including a reserved read-only `attrs` category projecting the group's own attributes (the field list is on [Resource Metadata](./resource-metadata.md#using-metadata-in-access-rules)).
 
 ## Best Practices
 

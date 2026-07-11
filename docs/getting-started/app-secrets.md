@@ -1,6 +1,6 @@
 # App Secrets
 
-Your app's server-side configuration needs credentials — API keys for LLM providers, tokens for external services, signing secrets. **App secrets** are the platform's server-side store for them: set a value once with the CLI, reference it from server-side config as <span v-pre>`{{ secrets.KEY }}`</span>, and the value resolves on the server. Secrets never appear in your repo, your client code, or anything shipped to users.
+Your app's server-side configuration needs credentials — API keys for LLM providers, tokens for external services, signing secrets. **App secrets** are the platform's server-side store for them: set a value once with the CLI, reference it from server-side config as <span v-pre>`{{secrets.KEY}}`</span>, and the value resolves on the server. Secrets never appear in your repo, your client code, or anything shipped to users.
 
 ## Managing Secrets
 
@@ -21,7 +21,7 @@ Secrets are scoped to an app, so each of your [environments](./primitive-cli.md#
 
 ## Referencing Secrets
 
-Server-side config refers to a secret as <span v-pre>`{{ secrets.KEY }}`</span>, resolved at the moment the config runs:
+Server-side config refers to a secret as <span v-pre>`{{secrets.KEY}}`</span>, resolved at the moment the config runs:
 
 | Surface | Where secrets resolve |
 |---|---|
@@ -31,7 +31,7 @@ Server-side config refers to a secret as <span v-pre>`{{ secrets.KEY }}`</span>,
 | [Databases](./working-with-databases.md) | CEL access expressions on operations and trigger stamp values can read `secrets.*` |
 
 ::: warning The CEL `secrets.*` variable is declared-only
-The <span v-pre>`{{ secrets.KEY }}`</span> template form (integration headers, webhook `signingSecret`, step-config templates) resolves any secret you have set. The `secrets.*` variable **in a CEL expression** — a workflow `runIf`, a database operation's access rule, or a trigger's stamp value — binds only the secrets that config **declares**. List them in the owning config's TOML (a database or collection type config, or a workflow definition):
+The <span v-pre>`{{secrets.KEY}}`</span> template form (integration headers, webhook `signingSecret`, step-config templates) resolves any secret you have set. The `secrets.*` variable **in a CEL expression** — a workflow `runIf`, a database operation's access rule, or a trigger's stamp value — binds only the secrets that config **declares**. List them in the owning config's TOML (a database or collection type config, or a workflow definition):
 
 ```toml
 secrets = ["STRIPE_KEY"]
@@ -52,7 +52,7 @@ Authorization = "Bearer {{secrets.OPENAI_API_KEY}}"
 
 The point of the store is that secret values only ever exist where the server resolves them:
 
-- **Never inline credentials in TOML** — config files are committed to your repo. Reference <span v-pre>`{{ secrets.KEY }}`</span> instead.
+- **Never inline credentials in TOML** — config files are committed to your repo. Reference <span v-pre>`{{secrets.KEY}}`</span> instead.
 - **Keep credentials in integration config, not workflow steps** — a workflow step's resolved config is recorded on the run, so a secret passed through `request.headers` would appear in step output snapshots. Resolution inside the integration's `defaultHeaders` happens after that snapshot, where it stays invisible. See [`integration.call`](./workflows.md#integration-call).
 - **Clients can't read secrets** — there is no client API for secret values; apps only ever see the results of server-side calls that used them.
 

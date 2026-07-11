@@ -307,7 +307,7 @@ The `invitation` event is the only typed app-membership event. The lifecycle act
 ## Anti-Patterns
 
 - Calling a method that doesn't exist: `client.invitations.revoke`, `client.deferredGrants.list`. The correct names are `client.invitations.delete`, `client.invitations.listDeferredGrants`.
-- Calling `client.invitations.delete()` to cancel a single pending document share — it cascades to every share and group add linked to that invitation. Use the per-resource `removePermission`/`removeMember` by email.
+- Calling `client.invitations.delete()` to cancel a single pending document share — it cascades to every share, group add, and collection add linked to that invitation. Use the per-resource `removePermission`/`removeMember` by email.
 - Showing a member invite button without checking `client.invitations.quota()` first — a member with a 0 quota hits a 403.
 - Re-granting access after signup — email-matched deferred grants already resolved (Path A); the user has access.
 - Polling `invitations.list()` for acceptance. Subscribe to the `invitation` event and switch on the `accepted` action (delivered to the inviter).

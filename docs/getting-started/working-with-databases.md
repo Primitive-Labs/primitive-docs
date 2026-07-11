@@ -353,7 +353,7 @@ access = "hasRole('super-admin')"
 
 ### Default Access
 
-Set `defaultAccess` on the `[type]` config to apply a CEL rule to every operation that doesn't declare its own `access`. Without `defaultAccess` and no per-operation rule, the operation is denied to non-owner/manager callers.
+Set `defaultAccess` on the `[type]` config to apply a CEL rule to every operation that doesn't declare its own `access`. Without `defaultAccess` and no per-operation rule, the operation is denied for every caller — operation `access` rules carry no owner, manager, or admin bypass.
 
 ```toml
 [type]
@@ -422,8 +422,8 @@ To add a schema to an existing type with live data, scaffold it from the server 
 primitive databases schema generate inventory
 ```
 
-::: tip No object/array field types
-`[models.*.fields.*]` accepts `string`, `number`, `boolean`, `date`, `id`, and `stringset` — there's no object or array type. To store a structured payload, declare the field as a `string`, write JSON-encoded values, and parse where consumed.
+::: tip Schema field types
+`[models.*.fields.*]` accepts `string`, `number`, `boolean`, `date`, `id`, and `stringset`. Structured payloads are stored as a `string` field holding JSON-encoded values, parsed where consumed.
 :::
 
 ## TypeScript Codegen

@@ -38,7 +38,7 @@ Credentials live in your app's secrets store. Reference one from the integration
 
 ```toml
 [requestConfig.defaultHeaders]
-Authorization = "Bearer {{ secrets.WEATHER_API_KEY }}"
+Authorization = "Bearer {{secrets.WEATHER_API_KEY}}"
 ```
 
 The value resolves server-side when the request is proxied and is never exposed to your client code. Set and manage the value with `primitive secrets set` — see [App Secrets](./app-secrets.md) for the full management workflow.
@@ -60,24 +60,9 @@ primitive integrations test weather-api
 
 ::: code-group
 
-```typescript [JavaScript]
-const response = await client.integrations.call({
-  integrationKey: "weather-api",
-  method: "GET",
-  path: "/forecast/san-francisco",
-  query: { units: "metric" },
-});
-console.log(response.status, response.body);
-```
+<<< ../../examples/integrations/integration-call-get.ts#example{ts} [JavaScript]
 
-```swift [Swift]
-let response = try await client.integrations.call(IntegrationCallRequest(
-  integrationKey: "weather-api",
-  method: "GET",
-  path: "/forecast/san-francisco",
-  query: ["units": "metric"]
-))
-```
+<<< ../../examples/integrations/integration-call-get.swift#example{swift} [Swift]
 
 :::
 

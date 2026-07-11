@@ -249,11 +249,10 @@ host app. Key invariants:
    (`documents.delete(id, { forceCloseIfOpen: true })`) so test docs don't
    accumulate. Always call it in a `finally` block.
 4. **Scope queries to the test document.** `createTestDocument()` sets its
-   document as the default, but a model query spans every open document and
-   test docs aren't reliably evicted between tests — an unscoped
-   `Task.query({ ... })` can pick up other tests' records. Pass
-   `{ documents: doc.docId }` (a single id or an array) so the assertion sees
-   only its own data:
+   document as the default, but a model query spans every open document — an
+   unscoped `Task.query({ ... })` can pick up records from other documents
+   open in the session. Pass `{ documents: doc.docId }` (a single id or an
+   array) so the assertion sees only its own data:
    ```ts
    const highPriority = await Task.query({ priority: 2 }, { documents: doc.docId });
    ```

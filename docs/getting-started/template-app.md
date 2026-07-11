@@ -34,11 +34,12 @@ pnpm dev
 cd my-app
 ./run-ios.sh
 # regenerates the Xcode project, runs model codegen, builds, and
-# launches the simulator (./run-ios.sh --device targets a real iPhone —
-# see Deploying to Production for signing)
+# launches the simulator
 ```
 
 :::
+
+To run on a physical iPhone or iPad, set up [signing](./deploying-to-production.md#_1-signing-and-team-id) once, then `./run-ios.sh --device`. You need a paired iPhone connected over USB (`xcrun devicectl list devices` should show it as `paired`); the script auto-picks the first paired device, builds with `-allowProvisioningUpdates` so Xcode requests provisioning profiles for you, installs via `devicectl`, and launches with `--console` so `print` and NSLog output stream to your terminal.
 
 **Congratulations!** You now have a working Primitive app with:
 
@@ -65,42 +66,11 @@ git push -u origin main
 
 ## Setting Up Google Sign In (Optional)
 
-Google OAuth is optional. If you want to enable Google as a sign-in option for your app, follow these steps.
-
-### 1. Configure Google OAuth Client
-
-Go to the [Google Cloud Console OAuth page](https://console.cloud.google.com/auth/clients) and create a new OAuth client (Web application type):
-
-| Setting | Value |
-|---------|-------|
-| Authorized JavaScript origins | `http://localhost:5173` |
-| Authorized redirect URIs | `http://localhost:5173/oauth/callback` |
-
-Save and note your **Client ID** and **Client Secret**.
-
-::: tip Production Setup
-When deploying to production, you'll add your production domain to these settings alongside localhost.
-:::
-
-### 2. Enable Google OAuth in Primitive Admin
-
-Go to the [Primitive Admin Console](https://admin.primitiveapi.com) and navigate to your app's settings:
-
-1. Open the **Google OAuth** section
-2. Enable Google OAuth as a sign-in method
-3. Add your **Google Client ID** and **Client Secret** from step 1
-4. Add matching origin/callback URLs to match what you configured with Google
-
-You can also toggle the provider and set allowed origins from the CLI:
-
-```bash
-primitive apps update --google-oauth true
-primitive apps update --cors-origins "http://localhost:5173"
-```
+Google OAuth is optional. The template's login shows a "Sign in with Google" button automatically once it's configured — create the OAuth client in Google Cloud Console, enter its credentials in the Admin Console, and enable the provider. The full walkthrough is in [Setting Up Google OAuth](./authentication.md#setting-up-google-oauth-optional).
 
 ## What's in the Template?
 
-Both templates are production-ready starting points with the same shape: app config, data model schemas with codegen, UI scaffolding around the platform's login flow, and agent guides for AI coding assistants.
+Both templates share the same shape: app config, data model schemas with codegen, UI scaffolding around the platform's login flow, and agent guides for AI coding assistants.
 
 ::: code-group
 

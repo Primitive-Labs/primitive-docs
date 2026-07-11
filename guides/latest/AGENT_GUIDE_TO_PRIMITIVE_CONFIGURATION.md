@@ -100,7 +100,7 @@ primitive apps update --redirect-uris "https://app.example.com/auth/callback"  #
 
 ## Secrets
 
-App-level secrets are server-side values referenced from workflow/integration TOML as `{{ secrets.KEY }}` — never inline credentials in TOML:
+App-level secrets are server-side values referenced from workflow/integration TOML as `{{secrets.KEY}}` — never inline credentials in TOML:
 
 ```bash
 primitive secrets set OPENAI_API_KEY --value sk-...

@@ -9,7 +9,7 @@ The Primitive Admin Console is a web-based dashboard for managing your apps, use
 - Configure authentication providers (Google OAuth credentials, Magic Link, OTP, Passkeys)
 - Manage email templates for authentication flows
 - Set invite-only mode for controlled access
-- Manage the `testAccountBaseEmails` whitelist for `+primitivetest` automated-testing sign-ins (see [Authentication](./authentication.md#test-user-sign-in-for-automated-testing))
+- Manage the per-app whitelist for `+primitivetest` automated-testing sign-ins (see [Authentication](./authentication.md#test-user-sign-in-for-automated-testing))
 
 ### Users & Groups
 - View all users in your app
@@ -26,8 +26,8 @@ The Primitive Admin Console is a web-based dashboard for managing your apps, use
 
 ### Databases
 - Browse databases and their types
-- View and test registered operations (including `applyToQuery`)
-- Inspect operation access control expressions and per-subscription filter rules
+- View and test registered operations
+- Inspect operation [access rules](./access-control.md) and per-subscription filter rules
 - Grant group-based permissions on a database
 - Run operations directly to verify behavior
 
@@ -51,12 +51,12 @@ The Primitive Admin Console is a web-based dashboard for managing your apps, use
 - View recent call logs
 
 ### Email Templates
-- Manage built-in email templates (magic link, OTP, access-request-created, etc.)
+- Manage the built-in email templates (the full type list is in the [CLI reference](./primitive-cli.md#email-templates))
 - Register custom email template types with arbitrary kebab-case names
 - Preview rendered templates and send test emails
 
 ### Blob Buckets
-- Create and configure blob buckets (access policy, TTL tier, CEL rules)
+- Create and configure blob buckets (access policy, retention tier, access rules)
 - Browse blobs and generate signed URLs for inspection
 - Delete buckets and their contents
 
@@ -72,7 +72,7 @@ Both tools manage the same configuration. In practice, many developers use the c
 
 ## Next Steps
 
-- **[Primitive CLI](./primitive-cli.md)** — Command-line alternative for all admin tasks
+- **[Primitive CLI](./primitive-cli.md)** — The command-line side of the same configuration
 - **[Workflows](./workflows.md)** — Define the workflows you'll test in the console
 - **[API Integrations](./api-integrations.md)** — Configure the integrations you'll manage in the console
 - **[Analytics](./analytics.md)** — Emit and query the events that show up under Analytics

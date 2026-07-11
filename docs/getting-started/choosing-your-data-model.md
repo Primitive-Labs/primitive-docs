@@ -29,7 +29,7 @@ Documents are the right choice for the "inner" data of most productivity and col
 
 ## When to Use Databases
 
-Databases are server-side structured storage with registered operations and expression-based access control. Individual databases have a 5 GB data limit. Choose databases when:
+Databases are server-side structured storage with registered operations and expression-based access control. Individual databases hold up to ~5 GB each. Choose databases when:
 
 - **Server-enforced rules are required** — Validation, computed fields, or business logic that must run server-side
 - **Data is shared across all users** — Product catalogs, configuration, lookup tables, shared settings
@@ -38,7 +38,7 @@ Databases are server-side structured storage with registered operations and expr
 - **Admin manages the content** — Content that's curated centrally, not user-generated
 
 ::: tip Partitioning Databases for Scale
-A single global database works well when your data will stay under 5 GB. But if there are natural ways to partition your data — by user, organization, team, or other context — and most queries stay within a single partition, consider creating separate databases from the start. This gives you scaling benefits for free and avoids a costly migration later. For example, an app where each organization has its own project data can use a database per organization rather than one large shared database.
+A single global database works well when your data will stay under ~5 GB. But if there are natural ways to partition your data — by user, organization, team, or other context — and most queries stay within a single partition, consider creating separate databases from the start. This gives you scaling benefits for free and avoids a costly migration later. For example, an app where each organization has its own project data can use a database per organization rather than one large shared database.
 :::
 
 ## Using Both Together
@@ -73,7 +73,7 @@ Most non-trivial apps benefit from both systems. Here are some patterns:
 
 3. **Use groups for access control.** Both documents and databases integrate with Primitive's group system. Groups let you model teams, roles, and relationships without building custom permission logic.
 
-4. **Keep documents focused.** A document works best under ~10MB. If data grows large, split across multiple documents by natural boundaries (per-project, per-channel, per-time-period).
+4. **Keep documents focused.** A document works best under ~10 MB. If data grows large, split across multiple documents by natural boundaries (per-project, per-channel, per-time-period).
 
 ## Common Mistakes
 
@@ -82,7 +82,7 @@ Most non-trivial apps benefit from both systems. Here are some patterns:
 | Storing admin-managed content in documents | No server-side enforcement; any editor can change anything | Use a database with CEL access expressions |
 | Building cross-user queries on documents | Documents are isolated per user/sharing group — no global queries | Use a database for data that needs cross-user visibility |
 | Using databases for real-time collaborative editing | Databases don't have built-in conflict resolution or offline sync | Use documents for collaborative data |
-| One giant document for everything | Performance degrades past ~10MB; can't share subsets independently | Split into multiple documents by sharing context |
+| One giant document for everything | Performance degrades past ~10 MB; can't share subsets independently | Split into multiple documents by sharing context |
 
 ## Next Steps
 

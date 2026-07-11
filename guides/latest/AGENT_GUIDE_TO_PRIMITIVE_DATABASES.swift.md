@@ -53,7 +53,7 @@ A **database** is:
 - Databases can be organized by **type** — a named configuration shared across many database instances
 - Supports queries, mutations, counts, aggregates, multi-step pipelines, atomic operations, batch writes, apply-to-query, and real-time subscriptions
 
-**Size Guidelines:** Individual databases can hold up to ~5GB of data. For larger needs, split data across multiple databases (one per tenant, project, or domain) — each is a separate isolated instance that scales independently.
+**Size Guidelines:** Individual databases can hold up to ~5 GB of data. For larger needs, split data across multiple databases (one per tenant, project, or domain) — each is a separate isolated instance that scales independently.
 
 ## When to Use Databases vs. Documents
 
@@ -505,7 +505,7 @@ databaseType = "project"
 defaultAccess = "isMemberOf('team', database.celContext.teamId)"
 ```
 
-An operation can override the default by setting its own `access`. Without `defaultAccess` (and no per-operation rule), the operation is denied for non-owner/manager callers.
+An operation can override the default by setting its own `access`. Without `defaultAccess` (and no per-operation rule), the operation is denied for every caller — operation `access` rules have no owner/manager/admin bypass.
 
 ### Schema gate
 

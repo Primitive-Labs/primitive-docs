@@ -88,7 +88,7 @@ Inviting over the quota returns a `403` with `error: "INVITATION_LIMIT_REACHED"`
 
 :::
 
-`delete` cascades — any pending document shares or group adds attached to the invitation are removed in the same operation.
+`delete` cascades — any pending document shares, group adds, or collection adds attached to the invitation are removed in the same operation.
 
 ### Sending Your Own Invitation Emails
 
@@ -150,7 +150,7 @@ Whatever URL the recipient lands on, the page handles three states:
 2. **Signed-out invitee** — stash the token (e.g. `sessionStorage`), send them through your login flow, and pass the token to whichever auth verify call the user ends up on (`magicLinkVerify`, `otpVerify`, `passkeyRegisterFinish`, `startOAuthFlow`) — the server resolves the grants atomically with signup, no second click needed.
 3. **Errors** — any invalid, expired, or already-used token returns `401 INVITE_TOKEN_INVALID`; show one clear "this invitation is no longer valid" message with a path to request a new invite.
 
-**The web template ships all of this** — a landing page mounted at `/invite/accept` plus the token carry-over wired into every auth method. If you're using the template, just point invitation emails at `${yourApp.baseUrl}/invite/accept?inviteToken=${token}` and you're done. On iOS, resolve the incoming invite URL with `client.links` (see [Deep links and universal links](./authentication.md#deep-links-and-universal-links)), then follow the same three states: `accept(inviteToken)` when signed in, or — when signed out — hold the token and pass it to a sign-in method that carries one (`magicLinkVerify`, `otpVerify`, or `signInWithGoogle(inviteToken:)`). Native `signInWithApple` doesn't carry an invite token; for that path, sign in first and then call `invitations.accept(inviteToken)`.
+**The web template ships all of this** — a landing page mounted at `/invite/accept` plus the token carry-over wired into every auth method. If you're using the template, just point invitation emails at `${yourApp.baseUrl}/invite/accept?inviteToken=${token}` and you're done. On iOS, resolve the incoming invite URL with `client.links` (see [Deep links and universal links](./authentication.md#deep-links-and-universal-links)), then follow the same three states: `accept(inviteToken)` when signed in, or — when signed out — hold the token and pass it to a sign-in method that carries one (`magicLinkVerify`, `otpVerify`, or `signInWithGoogle(inviteToken:)`); with `signInWithApple`, hold the token through sign-in and call `invitations.accept(inviteToken)` immediately after.
 
 ### Domain Re-Validation
 
@@ -162,11 +162,12 @@ Revoking an invitation also removes every pending grant attached to it — there
 
 ## Reacting to Invitation Events
 
-```typescript
-client.on("invitation", (event) => {
-  if (event.action === "accepted") refreshMembersList();
-});
-```
+Subscribe to the `invitation` event to react to lifecycle changes — for example, refreshing a members list when an invitee accepts. The action is on `event.action`; most actions are delivered to one side of the invitation only (`accepted` goes to the inviter).
+
+::: code-group
+<<< ../../examples/sharing/invitation-events.ts#example{ts} [JavaScript]
+<<< ../../examples/sharing/invitation-events.swift#example{swift} [Swift]
+:::
 
 ## Next Steps
 

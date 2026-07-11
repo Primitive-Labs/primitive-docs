@@ -223,7 +223,7 @@ primitive blob-buckets delete avatars
 ## Limits
 
 - **Max object size** — 100 MB per blob.
-- **Signed URL expiry** — 30 seconds to 24 hours.
+- **Signed URL expiry** — see [Signed URLs](#signed-urls) for the range and default.
 
 ## Next Steps
 
