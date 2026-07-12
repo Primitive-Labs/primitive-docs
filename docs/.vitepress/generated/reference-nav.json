@@ -109,6 +109,10 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/BasicUserInfo"
                 },
                 {
+                  "text": "BatchBlobDeleteResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/BatchBlobDeleteResult"
+                },
+                {
                   "text": "BatchUserProfile",
                   "link": "/reference/js-bao-wss-client/api/interfaces/BatchUserProfile"
                 },
@@ -721,6 +725,30 @@
                   "link": "/reference/js-bao-wss-client/api/interfaces/ReleaseApplyResult"
                 },
                 {
+                  "text": "ResourceMetadataAPI",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ResourceMetadataAPI"
+                },
+                {
+                  "text": "ResourceMetadataBatchParams",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ResourceMetadataBatchParams"
+                },
+                {
+                  "text": "ResourceMetadataBatchRequestItem",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ResourceMetadataBatchRequestItem"
+                },
+                {
+                  "text": "ResourceMetadataBatchResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ResourceMetadataBatchResult"
+                },
+                {
+                  "text": "ResourceMetadataReadResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ResourceMetadataReadResult"
+                },
+                {
+                  "text": "ResourceMetadataWriteResult",
+                  "link": "/reference/js-bao-wss-client/api/interfaces/ResourceMetadataWriteResult"
+                },
+                {
                   "text": "RevokeOfflineGrantOptions",
                   "link": "/reference/js-bao-wss-client/api/interfaces/RevokeOfflineGrantOptions"
                 },
@@ -946,12 +974,24 @@
                   "link": "/reference/js-bao-wss-client/api/type-aliases/ModelIdentifier"
                 },
                 {
+                  "text": "ResourceMetadataBatchCategoryResult",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/ResourceMetadataBatchCategoryResult"
+                },
+                {
+                  "text": "ResourceMetadataBatchResourceResult",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/ResourceMetadataBatchResourceResult"
+                },
+                {
                   "text": "StorageConfig",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/StorageConfig"
                 },
                 {
                   "text": "TypedModelConstructor",
                   "link": "/reference/js-bao-wss-client/api/type-aliases/TypedModelConstructor"
+                },
+                {
+                  "text": "WorkflowRunStatus",
+                  "link": "/reference/js-bao-wss-client/api/type-aliases/WorkflowRunStatus"
                 },
                 {
                   "text": "WorkflowStatusValue",

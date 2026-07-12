@@ -349,6 +349,9 @@ async function testSync() {
 # Core (always required)
 npm install js-bao-wss-client yjs lib0 js-bao
 
+# WebSocket transport (required in Node.js — the browser uses the global WebSocket)
+npm install ws
+
 # For SQLite storage (optional, recommended for persistence)
 npm install better-sqlite3
 
@@ -356,7 +359,82 @@ npm install better-sqlite3
 npm install y-sqlite3
 ```
 
-Note: `better-sqlite3` and `y-sqlite3` are native modules requiring compilation. If you encounter build issues, ensure you have the appropriate build tools installed (Python, C++ compiler).
+Note: `ws`, `better-sqlite3`, and `y-sqlite3` are declared as **optional peer
+dependencies**. In Node.js the client connects over WebSocket via `ws` (it
+dynamically `import("ws")` when there is no global `WebSocket`), so `ws` must be
+installed for any test or script that opens a document or database — otherwise
+the connection attempt fails with `Cannot find package 'ws'`. `better-sqlite3`
+and `y-sqlite3` are native modules requiring compilation; if you encounter build
+issues, ensure you have the appropriate build tools installed (Python, C++
+compiler). None are needed in the browser.
+
+### Testing in Node.js (dual-context tests)
+
+The same test can run in **two contexts** — interactively in an app's in-browser
+test-harness panel, and headlessly in Node under a normal test runner (e.g.
+[Vitest](https://vitest.dev)) to gate CI — because `JsBaoClient` runs the full
+document / Yjs / database / blob lifecycle in Node with no browser. Author the
+test once; run it in the panel while developing and under `vitest run` in CI.
+
+**Authenticate from Node with no browser and no email delivery.** Use the
+`+primitivetest` OTP bypass: `otpVerify(email, "000000")` authenticates and
+connects a fresh test user, provided the email's base address is on the app's
+`testAccountBaseEmails` whitelist (the app owner's per-app consent gate). No admin
+credentials, no pre-existing user — the user is auto-provisioned on first verify.
+
+Prerequisites:
+
+- The app's `testAccountBaseEmails` includes the base of your sign-in email — set
+  it with `primitive apps update <appId> --test-account-bases <base@example.com>`.
+  The sign-in email is then any `<base>+primitivetest<suffix>@example.com`
+  derivative (e.g. `alice+primitivetest-ci@example.com`). Reuse a **stable
+  suffix** per CI project so the same test user is reused across runs (the
+  provisioner is find-or-create) rather than accumulating one user per run.
+- `ws` is installed (see Required Packages above).
+- Storage defaults to `auto` — SQLite via `better-sqlite3` when present, in-memory
+  otherwise. No native dependency is required to run ephemeral tests.
+
+```typescript
+import { initializeClient } from "js-bao-wss-client";
+
+// Author once — this same async body is what a browser harness test runs too.
+const client = await initializeClient({
+  apiUrl: "https://your-api.example.com",
+  wsUrl: "wss://your-ws.example.com",
+  appId: "your-app-id",
+  models: [/* the models your tests need, as in the browser */],
+  // storageConfig defaults to { type: "auto" } — memory fallback in Node,
+  // no native deps required.
+});
+
+// #1413 OTP bypass: whitelisted +primitivetest email + code "000000".
+// On success the client is authenticated AND connected — no browser.
+await client.otpVerify("alice+primitivetest-ci@example.com", "000000");
+
+// From here the client behaves exactly as in the browser.
+const doc = await client.documents.create();
+await client.documents.open(doc.id);
+```
+
+Under `vitest run`, a failing assertion or a group that throws surfaces as a test
+failure and yields a **non-zero exit** natively (all passing → exit `0`), so the
+suite gates a merge with no bespoke runner. Emit JUnit for CI with
+`vitest run --reporter=junit`.
+
+**Failure mode.** If the sign-in email is **not** whitelisted (its base is absent
+from `testAccountBaseEmails`, or the app's mode rejects the provisioning),
+`otpVerify` rejects with a clear authentication error rather than hanging — catch
+it and fail the test:
+
+```typescript
+await expect(
+  client.otpVerify("not-whitelisted@example.com", "000000"),
+).rejects.toThrow(/otp|auth|verif/i);
+```
+
+> The in-browser test-harness panel and this Node path run the **same registered
+> tests**. Nothing in the test authoring contract requires a DOM — every browser
+> API the client touches is guarded with `typeof window === "undefined"`.
 
 ## Quick Start
 
@@ -2058,7 +2136,7 @@ const runs = await client.workflows.listRuns();
 console.log("Total runs:", runs.items.length);
 
 runs.items.forEach((run) => {
-  console.log(run.runKey, run.status, run.createdAt);
+  console.log(run.runKey, run.status, run.startedAt);
 });
 
 // Filter by workflow
@@ -2101,6 +2179,15 @@ const combined = await client.workflows.listRuns({
 #### Run Record Fields
 
 ```typescript
+type WorkflowRunStatus =
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed"
+  | "terminated"
+  | "apply_pending"
+  | "apply_claimed";
+
 interface WorkflowRun {
   runId: string;
   runKey: string;
@@ -2109,9 +2196,11 @@ interface WorkflowRun {
   workflowKey: string;
   revisionId: string;
   contextDocId?: string;
-  status: string;
-  createdAt: string;
+  status: WorkflowRunStatus;
+  startedAt?: string; // ISO timestamp stamped when the run started
   endedAt?: string;
+  errorMessage?: string | null; // set when status is "failed", null otherwise
+  meta?: Record<string, any>; // custom metadata passed to workflows.start()
 }
 ```
 

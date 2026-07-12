@@ -16,15 +16,18 @@ A workflow run record
 
 ***
 
-### createdAt
-
-> **createdAt**: `string`
-
-***
-
 ### endedAt?
 
 > `optional` **endedAt**: `string`
+
+***
+
+### errorMessage?
+
+> `optional` **errorMessage**: `string` \| `null`
+
+Error message when `status` is `"failed"`, `null` otherwise. Always
+ present in run responses (the server sends `errorMessage || null`).
 
 ***
 
@@ -60,9 +63,19 @@ User-defined metadata (max 1KB)
 
 ***
 
+### startedAt?
+
+> `optional` **startedAt**: `string`
+
+ISO timestamp stamped when the run started. Emitted by all run
+ serializers (the model field is `required`); optional here only to
+ tolerate hypothetical legacy records written before the field existed.
+
+***
+
 ### status
 
-> **status**: `string`
+> **status**: [`WorkflowRunStatus`](../type-aliases/WorkflowRunStatus.md)
 
 ***
 

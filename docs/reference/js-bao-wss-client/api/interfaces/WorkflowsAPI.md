@@ -160,7 +160,7 @@ Release a claimed workflow apply so another client can retry. Called automatical
 
 ### runSync()
 
-> **runSync**(`options`): `Promise`\<[`RunSyncWorkflowResult`](RunSyncWorkflowResult.md)\>
+> **runSync**\<`I`, `O`\>(`options`): `Promise`\<[`RunSyncWorkflowResult`](RunSyncWorkflowResult.md)\<`O`\>\>
 
 Synchronously invoke a workflow and wait for the final result.
 
@@ -174,29 +174,57 @@ including engine failure and timeout — failure surfaces as
 `status: "failed"` (or `"timeout"` / `"terminated"`), not a thrown
 error. Network / transport errors still reject as usual.
 
+The optional generics `I` (input) and `O` (`output`) type the payload and
+the result envelope (issue #1442). Both are additive and default to today's
+untyped `Record<string, any>` / `any`, so existing callers are unaffected.
+The generated per-workflow `<key>(client)` factory supplies them from the
+workflow's `inputSchema`/`outputSchema`.
+
+#### Type Parameters
+
+##### I
+
+`I` = `Record`\<`string`, `any`\>
+
+##### O
+
+`O` = `any`
+
 #### Parameters
 
 ##### options
 
-[`RunSyncWorkflowOptions`](RunSyncWorkflowOptions.md)
+`Omit`\<[`RunSyncWorkflowOptions`](RunSyncWorkflowOptions.md), `"input"`\> & `object`
 
 #### Returns
 
-`Promise`\<[`RunSyncWorkflowResult`](RunSyncWorkflowResult.md)\>
+`Promise`\<[`RunSyncWorkflowResult`](RunSyncWorkflowResult.md)\<`O`\>\>
 
 ***
 
 ### start()
 
-> **start**(`options`): `Promise`\<[`StartWorkflowResult`](StartWorkflowResult.md)\>
+> **start**\<`I`\>(`options`): `Promise`\<[`StartWorkflowResult`](StartWorkflowResult.md)\>
 
-Start a workflow and return the run information
+Start a workflow and return the run information.
+
+The optional generic `I` types the `input` payload (issue #1442). It is
+additive and defaults to today's untyped `Record<string, any>`, so existing
+callers that pass no type argument are unaffected. The generated per-workflow
+`<key>(client)` factory (`primitive workflows codegen`) supplies it from the
+workflow's `inputSchema`.
+
+#### Type Parameters
+
+##### I
+
+`I` = `Record`\<`string`, `any`\>
 
 #### Parameters
 
 ##### options
 
-[`StartWorkflowOptions`](StartWorkflowOptions.md)
+`Omit`\<[`StartWorkflowOptions`](StartWorkflowOptions.md), `"input"`\> & `object`
 
 #### Returns
 

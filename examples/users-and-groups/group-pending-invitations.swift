@@ -7,7 +7,8 @@ func listPendingGroupInvites(client: JsBaoClient) async throws {
   let pending = try await client.groups.listPendingInvitations(
     groupType: "team", groupId: "engineering"
   )
-  // [["email", "role", "invitationId", "createdAt", "expiresAt", "addedBy"?]]
+  // [["email", "role", "invitationId", "deferredId", "createdAt", "expiresAt", "addedBy"?]]
+  // deferredId → invitations.revokeDeferredGrant(deferredId:type: .group) cancels it
   // #endregion example
   _ = pending
 }

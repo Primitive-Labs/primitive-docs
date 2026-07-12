@@ -40,6 +40,10 @@ The API is **flat** (`client.blobBuckets.upload(bucketIdOrKey, …)`), not a `.b
   await client.blobBuckets.delete("avatars", blobId);
 ```
 
+`delete` is overloaded: a `blobId` string deletes one blob (`{ deleted: boolean }`); a `string[]` of up to 500 ids deletes a batch in one call, returning `{ deleted, blobIds, bucketId }` where `deleted` counts the ids processed (duplicates included). The batch is all-or-nothing: every id — including ids that no longer exist — is screened against the bucket's `delete` policy before anything is removed; one denial → 403 naming the blob, nothing deleted. An empty array is a valid no-op (`deleted: 0`). Footgun: a missing id screens with `record.blobCreatedBy == null`, so under an uploader-scoped policy (e.g. `personal-uploads`) retrying a batch whose ids are already gone is **denied** — idempotent cleanup needs a rule that also permits gone blobs (`record.blobCreatedBy == null || record.blobCreatedBy == user.userId`).
+
+From the CLI, `primitive blob-buckets delete-blob <bucket-id-or-key> <blob-id...>` deletes one or many — multiple ids go through the batch endpoint as one all-or-nothing call, and `--batch` forces the batch endpoint even for a single id.
+
 ### Bucket admin (create / list / get / delete)
 
 Admin/owner only. Deleting a bucket cascades to every blob inside it.

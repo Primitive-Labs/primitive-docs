@@ -4,11 +4,17 @@
 
 [js-bao-wss-client](../globals.md) / RunSyncWorkflowResult
 
-# Interface: RunSyncWorkflowResult
+# Interface: RunSyncWorkflowResult\<O\>
 
 Result envelope from `workflows.runSync`. All non-transport outcomes
 resolve with this shape — promise rejection is reserved for
 connectivity / abort-before-send errors.
+
+## Type Parameters
+
+### O
+
+`O` = `any`
 
 ## Properties
 
@@ -30,7 +36,7 @@ True if the runKey matched an existing run; no new execution occurred.
 
 ### output?
 
-> `optional` **output**: `any`
+> `optional` **output**: `O`
 
 Final output of the workflow, when `status === "completed"`.
 

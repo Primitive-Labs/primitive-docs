@@ -131,6 +131,15 @@ Use a short expiry for user-facing URLs and regenerate as needed.
 
 :::
 
+To delete a set of blobs in one call, pass `delete` an array of ids (up to 500). The whole batch is screened against the bucket's `delete` rule before anything is removed, so it succeeds or fails as a unit:
+
+```ts
+const result = await client.blobBuckets.delete("exports", expiredIds);
+// → { deleted, blobIds, bucketId } — `deleted` counts the ids processed
+```
+
+An empty array is a valid no-op, so a computed list that resolves to nothing doesn't throw.
+
 ## Using Buckets in Workflows
 
 The `blob.upload` workflow step lets your workflows write to buckets:
@@ -213,8 +222,9 @@ primitive blob-buckets upload avatars ./alice.jpg --content-type image/jpeg --ta
 # Generate a signed URL
 primitive blob-buckets signed-url avatars <blobId> --expires 3600
 
-# Delete a blob
-primitive blob-buckets delete-blob avatars <blobId>
+# Delete one or more blobs (multiple ids delete as one batch;
+# --batch forces the batch endpoint even for a single id)
+primitive blob-buckets delete-blob avatars <blobId> [<blobId>...]
 
 # Delete a bucket
 primitive blob-buckets delete avatars
@@ -223,6 +233,7 @@ primitive blob-buckets delete avatars
 ## Limits
 
 - **Max object size** — 100 MB per blob.
+- **Batch delete** — 500 ids per call, from the client, the CLI, or the `blob.delete` workflow step.
 - **Signed URL expiry** — see [Signed URLs](#signed-urls) for the range and default.
 
 ## Next Steps

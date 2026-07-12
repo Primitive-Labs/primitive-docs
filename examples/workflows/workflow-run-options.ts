@@ -32,9 +32,11 @@ export async function manageWorkflowRuns(client: JsBaoClient) {
 
   const { items, cursor } = await client.workflows.listRuns({
     workflowKey: "my-workflow",
-    status: "complete",
+    status: "completed", // run records use "completed" (WorkflowRunStatus)
     limit: 50,
   });
+  // → { items: WorkflowRun[], cursor? } — each { runId, runKey, workflowKey,
+  //   status, startedAt?, endedAt?, errorMessage, meta?, ... }
   // #endregion example
   return { status, items, cursor };
 }

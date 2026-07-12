@@ -33,9 +33,10 @@ func manageWorkflowRuns(client: JsBaoClient) async throws {
   )
 
   let runs = try await client.workflows.listRuns(
-    options: ListWorkflowRunsOptions(workflowKey: "my-workflow", status: "complete", limit: 50)
+    options: ListWorkflowRunsOptions(workflowKey: "my-workflow", status: "completed", limit: 50) // run records use "completed"
   )
   // ListWorkflowRunsResult: items ([WorkflowRunInfo]), cursor?
+  // Each item: runId, runKey, workflowKey, status, startedAt?, endedAt?, errorMessage?, meta?, ...
   // #endregion example
   _ = (status, runs.items, runs.cursor)
 }

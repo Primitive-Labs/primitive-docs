@@ -866,13 +866,13 @@ Useful for checking what auth methods are available before showing login UI.
 
 ### getAuthConfig()
 
-> **getAuthConfig**(): `Promise`\<\{ `appId`: `string`; `googleClientId`: `string` \| `null`; `googleOAuthEnabled`: `boolean`; `hasOAuth`: `boolean`; `hasPasskey`: `boolean`; `magicLinkEnabled`: `boolean`; `mode`: `string`; `name`: `string`; `otpEnabled`: `boolean`; `passkeyEnabled`: `boolean`; `passkeyRpId`: `string` \| `null`; `passkeyRpName`: `string` \| `null`; `redirectUris`: `string`[] \| `null`; `waitlistEnabled`: `boolean`; \}\>
+> **getAuthConfig**(): `Promise`\<\{ `appId`: `string`; `appleSignInEnabled`: `boolean`; `googleClientId`: `string` \| `null`; `googleOAuthEnabled`: `boolean`; `hasApple`: `boolean`; `hasOAuth`: `boolean`; `hasPasskey`: `boolean`; `magicLinkEnabled`: `boolean`; `mode`: `string`; `name`: `string`; `otpEnabled`: `boolean`; `passkeyEnabled`: `boolean`; `passkeyRpConfig`: `Record`\<`string`, \{ `name`: `string`; \}\> \| `null`; `passkeyRpId`: `string` \| `null`; `passkeyRpName`: `string` \| `null`; `redirectUris`: `string`[] \| `null`; `waitlistEnabled`: `boolean`; \}\>
 
 Get detailed authentication configuration including enabled providers and passkey settings.
 
 #### Returns
 
-`Promise`\<\{ `appId`: `string`; `googleClientId`: `string` \| `null`; `googleOAuthEnabled`: `boolean`; `hasOAuth`: `boolean`; `hasPasskey`: `boolean`; `magicLinkEnabled`: `boolean`; `mode`: `string`; `name`: `string`; `otpEnabled`: `boolean`; `passkeyEnabled`: `boolean`; `passkeyRpId`: `string` \| `null`; `passkeyRpName`: `string` \| `null`; `redirectUris`: `string`[] \| `null`; `waitlistEnabled`: `boolean`; \}\>
+`Promise`\<\{ `appId`: `string`; `appleSignInEnabled`: `boolean`; `googleClientId`: `string` \| `null`; `googleOAuthEnabled`: `boolean`; `hasApple`: `boolean`; `hasOAuth`: `boolean`; `hasPasskey`: `boolean`; `magicLinkEnabled`: `boolean`; `mode`: `string`; `name`: `string`; `otpEnabled`: `boolean`; `passkeyEnabled`: `boolean`; `passkeyRpConfig`: `Record`\<`string`, \{ `name`: `string`; \}\> \| `null`; `passkeyRpId`: `string` \| `null`; `passkeyRpName`: `string` \| `null`; `redirectUris`: `string`[] \| `null`; `waitlistEnabled`: `boolean`; \}\>
 
 ***
 
@@ -2973,6 +2973,14 @@ Sub-API for the current authenticated user's profile and preferences.
 > **prompts**: [`PromptsAPI`](../interfaces/PromptsAPI.md)
 
 Sub-API for managing and executing prompts.
+
+***
+
+### resourceMetadata
+
+> **resourceMetadata**: [`ResourceMetadataAPI`](../interfaces/ResourceMetadataAPI.md)
+
+Sub-API for reading and writing typed resource metadata (single + batch).
 
 ***
 

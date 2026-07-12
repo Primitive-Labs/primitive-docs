@@ -28,23 +28,58 @@ Create a new blob bucket (admin/owner only).
 
 ### delete()
 
+#### Call Signature
+
 > **delete**(`bucketIdOrKey`, `blobId`): `Promise`\<\{ `deleted`: `boolean`; \}\>
 
-Delete a blob from a bucket.
+Delete one blob (`DELETE .../blobs/:blobId`) → `{ deleted: boolean }`.
+Back-compat, unchanged.
 
-#### Parameters
+##### Parameters
 
-##### bucketIdOrKey
-
-`string`
-
-##### blobId
+###### bucketIdOrKey
 
 `string`
 
-#### Returns
+###### blobId
+
+`string`
+
+##### Returns
 
 `Promise`\<\{ `deleted`: `boolean`; \}\>
+
+#### Call Signature
+
+> **delete**(`bucketIdOrKey`, `blobIds`): `Promise`\<[`BatchBlobDeleteResult`](BatchBlobDeleteResult.md)\>
+
+Batch delete blobs (#1455). Routes to `POST .../blobs/delete` with
+`{ blobIds }`. All-or-nothing: if the bucket `delete` rule denies any id
+the whole batch fails (403, nothing deleted). `deleted` counts ids processed
+(input length, duplicates included). Max 500 ids; an empty array is a no-op.
+
+A missing id is screened against the `delete` rule with `blobCreatedBy ==
+null`, exactly like the single `delete(bucket, id)` path — so a missing id
+and an existing-but-unauthorized id are indistinguishable (no existence
+oracle). Under an open member-delete rule a missing id is a no-op, but under
+a strict uploader-scoped rule (`record.blobCreatedBy == user.userId`) a
+retry over already-deleted ids is DENIED. To opt into idempotent cleanup,
+write a delete rule that permits gone blobs, e.g.
+`record.blobCreatedBy == null || record.blobCreatedBy == user.userId`.
+
+##### Parameters
+
+###### bucketIdOrKey
+
+`string`
+
+###### blobIds
+
+`string`[]
+
+##### Returns
+
+`Promise`\<[`BatchBlobDeleteResult`](BatchBlobDeleteResult.md)\>
 
 ***
 

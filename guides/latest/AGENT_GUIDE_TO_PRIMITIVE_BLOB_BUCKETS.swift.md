@@ -47,6 +47,9 @@ The API is **flat** (`client.blobBuckets.upload(bucketIdOrKey, …)`), not a `.b
   _ = try await client.blobBuckets.delete(bucketIdOrKey: "avatars", blobId: blobId)
 ```
 
+
+From the CLI, `primitive blob-buckets delete-blob <bucket-id-or-key> <blob-id...>` deletes one or many — multiple ids go through the batch endpoint as one all-or-nothing call, and `--batch` forces the batch endpoint even for a single id.
+
 ### Bucket admin (create / list / get / delete)
 
 Admin/owner only. Deleting a bucket cascades to every blob inside it.

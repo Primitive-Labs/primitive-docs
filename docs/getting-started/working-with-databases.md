@@ -137,6 +137,26 @@ required = true
 
 **Response:** `{ data: [...records], hasMore: boolean, nextCursor?: string }`
 
+A parameter can also be an array — declare `type = "array"` with a scalar `items` type, and callers pass a list for the filter to consume with `$in` / `$nin`:
+
+```toml
+[[operations]]
+name = "quotes-for-symbols"
+type = "query"
+modelName = "quote"
+access = "true"
+[operations.definition]
+filter = { symbol = { "$in" = "$params.symbols" } }
+
+[[operations.params]]
+name = "symbols"
+type = "array"
+items = "string"
+required = true
+```
+
+The server checks that the value is an array and validates each element against `items` (`string`, `number`, `boolean`, or `integer`), with element-indexed errors on mismatch; an `enum` on a string-array parameter is enforced per element.
+
 ### Mutations
 Create, update, or delete records. Supports `save`, `patch`, `delete`, `increment`, `addToSet`, and `removeFromSet`.
 
@@ -170,7 +190,7 @@ type = "number"
 required = true
 ```
 
-**Response:** `{ results: [{ success: boolean, id: string }] }`
+**Response:** `{ results: [{ op, success, id, values? }] }` — one entry per definition step, in definition order, so a save-then-increment operation reports both writes. `op` names the step's kind (`"save"`, `"patch"`, `"delete"`, `"increment"`, `"addToSet"`, `"removeFromSet"`), and increment steps carry their post-update numeric values in `values`.
 
 Instead of spelling out each field, a parameter can be typed as one of the type's models — the caller passes the whole record object and the server validates it field-by-field against that model. Write it directly with `"data": "$params.row"`, or merge it into a write with the `$spread` directive so you can stamp trusted fields alongside it:
 
@@ -291,6 +311,8 @@ required = true
 ```
 
 Pipelines support `query`, `count`, and `aggregate` steps only. For read-then-mutate flows, run a pipeline to read, then call a separate mutation.
+
+`return = "all"` responds with a per-step map of every result. Set `return = "<stepName>"` instead to respond with just that step's payload at the top level — and when the named step is a query, the response paginates exactly like a bare query operation: `{ data, hasMore, nextCursor?, prevCursor? }`, with caller-supplied `limit`, `cursor`, and `direction` applied to the returned step (the effective limit is the smaller of the step's and the caller's).
 
 ## Access Control with CEL
 
@@ -434,9 +456,9 @@ Generate record interfaces and operation param/result types from your database-t
 primitive databases codegen -o ./src/generated/db
 ```
 
-Codegen reads the database-type TOML from the auto-resolved sync directory; pass `--sync-dir <path>` to override it. This reads the `[models.*]` blocks and `[[operations]]` definitions and emits typed interfaces — one per model, plus typed params and results per operation. Fields and params restricted to a fixed set of string values become TypeScript string-literal unions, so invalid values are caught at compile time (enum params are also validated server-side).
+Codegen reads the database-type TOML from the auto-resolved sync directory; pass `--sync-dir <path>` to override it. This reads the `[models.*]` blocks and `[[operations]]` definitions and emits typed interfaces — one per model, plus typed params and results per operation. Fields and params restricted to a fixed set of string values become TypeScript string-literal unions, so invalid values are caught at compile time (enum params are also validated server-side). Array parameters type as element arrays — a declared `type = "array"` / `items = "string"` param emits `string[]` (with an `enum`, an array of the literal union) — and even without an array declaration, a param bound to `$in`/`$nin` against a known model field is inferred as that field's array type.
 
-Result types are derived from each operation's `definition`, not just its `type`. A query with an inclusion `projection` is typed as just the projected fields (plus `id`, which is always returned); exclusion or dynamic projections widen to a partial record. Mutation results carry `{ success, id }` per step, with increment and string-set operations getting flat typed result shapes. A pipeline whose `return` names a single step is typed as that step's result — query, count, or aggregate. The one generic case left: a pipeline returning `all` is typed as a per-step map, so declare a local type there if a call site needs more precision.
+Result types are derived from each operation's `definition`, not just its `type`. A query with an inclusion `projection` is typed as just the projected fields (plus `id`, which is always returned); exclusion or dynamic projections widen to a partial record. Every mutation types its result as `{ results: MutationStepResult[] }` — one entry per definition step carrying `op`, `success`, `id`, and post-update `values` for increments. A pipeline whose `return` names a single step is typed as that step's result — query, count, or aggregate. The one generic case left: a pipeline returning `all` is typed as a per-step map, so declare a local type there if a call site needs more precision.
 
 ### Typed operation calls
 

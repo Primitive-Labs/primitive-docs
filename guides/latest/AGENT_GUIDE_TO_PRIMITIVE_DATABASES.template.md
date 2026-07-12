@@ -375,10 +375,12 @@ Codegen reads the database-type TOML from the auto-resolved sync directory (`.pr
 
 **Codegen enum / union / required typing.** When a field or an operation param restricts a string to a fixed set of values, codegen emits a TypeScript string-literal union (e.g. `status: "open" | "in-progress" | "closed"`) instead of `string`, and enum params are validated server-side as well. Fields that operation params mark `required` are emitted as non-optional on the generated record interface. This keeps generated types aligned with the server's validation instead of widening everything to `string`.
 
+**Codegen array-param typing.** A param declared `type = "array"` emits an element array from its `items` type — `items = "string"` → `string[]`, `items = "integer"` → `number[]`, a string array with `enum` → `("a" | "b")[]`; an unresolvable `items` widens to `unknown[]`. A param *without* an array declaration that a filter binds to `$in`/`$nin` against a model field (including inside `$and`/`$or`, mutation inner ops, and pipeline steps) is inferred as `<fieldType>[]` — a `stringset` field's element type is `string`; an unresolvable field or conflicting bindings widen to `unknown[]`; an explicit `type = "array"` declaration always wins. `integer` params (scalar or element) emit `number`.
+
 **Codegen result typing.** Result aliases are derived from each operation's `definition`, not just its `type`:
 
 - `query` with an inclusion `projection` → `QueryResult<Pick<Model, projectedFields | "id">>` (`id` is always returned). Exclusion, dynamic (`$params.*`), or nested-key projections → `QueryResult<Partial<Model>>` (excluded fields are still returned at runtime, so the type stays wide rather than promising removal). No `[models.*]` schema → `QueryResult<Record<string, unknown>>`.
-- `mutation` results type `results` as `MutationStepResult[]` (`{ success: boolean; id: string }`). Increment-only ops → `IncrementMutationResult` (`{ success, id, values: Record<string, number> }`); addToSet/removeFromSet-only ops → `StringSetMutationResult` (`{ success }`); a mix of only those two kinds → their union. Any save/patch/delete step → the batch `MutationResult`.
+- `mutation` results type `results` as `MutationStepResult[]` (`{ op: "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet"; success: boolean; id: string; values?: Record<string, number>; error?: string }`) — every mutation op, whatever mix of step kinds it contains, types as the one `MutationResult` shape.
 - `pipeline` with `return = "<step>"` → that step's result type: a query step gets `QueryResult<…>` (projection rules above), a count step `CountResult`, an aggregate step `AggregateResult`. `return = "all"` (or no `return`) stays the generic `PipelineResult` (`{ steps: Record<string, unknown> }`) — declare a local type there if a call site needs precision.
 
 After a CLI upgrade, `primitive databases codegen --check` flags previously generated files as out of date — regenerate rather than hand-editing.
@@ -620,12 +622,16 @@ type = "string"
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `type` | yes | One of `"string"`, `"number"`, `"boolean"`, `"object"`, or the name of a model declared in the type's `schema` |
+| `type` | yes | One of `"string"`, `"number"`, `"boolean"`, `"integer"`, `"object"`, `"array"`, or the name of a model declared in the type's `schema` |
 | `required` | no | Default `false`. If `true`, request fails 400 when missing |
 | `access` | no | CEL expression evaluated against the caller's value (bound as `value`); false → 403 |
 | `coerce` | no | Default `true`. If `false`, type-mismatched inputs are rejected instead of being coerced. Only valid on a scalar param — setting it on a model-typed param is rejected at registration |
+| `enum` | no | Allowed values. Valid on a `"string"` param, or on an `"array"` param with `items = "string"` (checked per element) |
+| `items` | no | Element type for `type = "array"`: `"string"`, `"number"`, `"boolean"`, or `"integer"`. Required when `type = "array"`, rejected on any other type |
 
 By default, scalar mismatches are coerced where safe (`"42"` → `42` for type `"number"`, `"true"` → `true` for type `"boolean"`, etc.). Undeclared params (not in the schema) are rejected with 400.
+
+**Array params.** A `type = "array"` param (typically feeding `$in`/`$nin` in a filter — `filter = { symbol = { "$in" = "$params.symbols" } }`) rejects non-array values with 400 (`Parameter "<name>" must be an array`) and validates each element against `items`, honoring `coerce` and reporting mismatches with the element index (`element 2 must be of type string`); `enum` membership is checked per element.
 
 **Model-typed params.** A param's `type` can name a model declared in the type's `schema`, and the param arrives as an object validated field-by-field against that model — an unknown field is rejected (`UNKNOWN_FIELD`), a wrong field type is rejected (`FIELD_TYPE_MISMATCH`), and on a `save` op every required field must be present (`MISSING_REQUIRED_FIELD`; a `patch` validates only the fields present). The model must exist in the type's `schema` or registration is rejected (`PARAM_TYPE_SCHEMA_REQUIRED` / `PARAM_TYPE_UNKNOWN_MODEL`). A save/patch op writes the whole object with `"data": "$params.row"`, or merges its fields with the `$spread` directive:
 
@@ -779,7 +785,7 @@ Definition fields: `filter` (required), `sort`, `limit` (1–1000), `projection`
 
 Callers can override `limit`, `cursor`, and `direction` at call time (effective limit is the lesser of definition and caller limits).
 
-**Response:** `{ data: [...], hasMore: boolean, nextCursor?: string }`
+**Response:** `{ data: [...], hasMore: boolean, nextCursor?: string, prevCursor?: string }` (`prevCursor` appears from the second page on)
 
 #### Mutation — write records
 
@@ -817,7 +823,7 @@ required = true
 | `addToSet` | Add values to StringSet fields | `id`, `stringSets` |
 | `removeFromSet` | Remove values from StringSet fields | `id`, `stringSets` |
 
-**Response:** `{ results: [{ success: true, id: "..." }] }`
+**Response:** `{ results: [{ op, success, id, values? }] }` — one entry per definition step, in definition order, so a multi-step op (save + increment, two increments, …) reports every step. `op` names the step's kind (`"save"` | `"patch"` | `"delete"` | `"increment"` | `"addToSet"` | `"removeFromSet"`); `values` carries an increment step's post-increment counters.
 
 **`upsertOn`** — pass the **field name** (`"upsertOn": "email"`, NOT a `$params.*` substitution) in a `save` op to create-or-update by a unique field instead of requiring an explicit `id`. The match **value** comes from `data` — the server looks up a record where that field equals `data.<field>`; if found, it patches it; if not, it inserts a new record. Useful for "ensure this user exists with these attributes" patterns:
 
@@ -956,7 +962,7 @@ required = true
 **Response shape** depends on `return`:
 
 - `"return": "all"` (default) → `{ steps: { stepName: { type, data | count | result } } }`
-- `"return": "<stepName>"` → just that step's payload at top level (`{data}` for query, `{count}` for count, `{result}` for aggregate)
+- `"return": "<stepName>"` → just that step's payload at top level: `{ count }` for count, `{ result }` for aggregate, and for a query step the full paginated envelope `{ data, hasMore, nextCursor?, prevCursor? }` — identical to a bare query op, with caller `cursor`/`limit`/`direction` applied to the returned step (effective limit = min of step and caller limits). `return = "all"` and non-query returns take no pagination: caller cursor/limit are ignored there.
 
 #### applyToQuery — server-side query+mutate
 
@@ -1021,11 +1027,11 @@ Callers can override `limit`, `cursor`, and `direction` at call time:
 
 | Operation Type | Response Shape |
 |----------------|---------------|
-| `query` | `{ data: [...records], hasMore: boolean, nextCursor?: string }` |
-| `mutation` | `{ results: [{ success: boolean, id: string }] }` (entire request returns 409 if any sub-op fails) |
+| `query` | `{ data: [...records], hasMore: boolean, nextCursor?: string, prevCursor?: string }` |
+| `mutation` | `{ results: [{ op, success, id, values? }] }` — one entry per definition step, in definition order; `values` on increments (entire request returns 409 if any sub-op fails) |
 | `count` | `{ count: number }` |
 | `aggregate` | `{ result: { [groupValue]: { ...computedFields } } }` |
-| `pipeline` | When `return = "all"`: `{ steps: { [stepName]: { type, data \| count \| result } } }`. When `return = "<step>"`: that step's payload at top level |
+| `pipeline` | When `return = "all"`: `{ steps: { [stepName]: { type, data \| count \| result } } }`. When `return = "<step>"`: that step's payload at top level — a returned query step paginates like a bare query (`hasMore`/`nextCursor`/`prevCursor`, caller cursor/limit honored) |
 | `applyToQuery` | `{ matched, affected, failed, truncated?, appliedLimit?, warning? }` (or `{matched, affected: 0, failed: 0, dryRun: true, sample: [...]}` when called with `?dryRun=true`) |
 
 **Operation timing:** Pass `timing: true` to get per-phase millisecond timings in `result._timing`. Works on all operation types.

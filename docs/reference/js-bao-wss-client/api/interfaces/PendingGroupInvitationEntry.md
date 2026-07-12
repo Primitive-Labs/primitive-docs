@@ -22,6 +22,15 @@ A pending (deferred) group invitation.
 
 ***
 
+### deferredId
+
+> **deferredId**: `string`
+
+Deferred-grant id for this pending invitation. Pass to
+`client.invitations.revokeDeferredGrant(deferredId, "group")` to cancel it.
+
+***
+
 ### email
 
 > **email**: `string`

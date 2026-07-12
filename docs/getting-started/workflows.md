@@ -166,6 +166,26 @@ For short, latency-sensitive workflows, opt the workflow into synchronous invoca
 
 The promise resolves for every terminal outcome; only network errors reject. Long-running workflows should use asynchronous `start()` instead.
 
+### Typed Invocations (TypeScript Codegen)
+
+When a workflow declares an `inputSchema` / `outputSchema`, the CLI can generate typed invocation wrappers from the workflow TOML in your sync directory:
+
+```bash
+primitive workflows codegen
+```
+
+The command writes one `<key>.generated.ts` per workflow (to `<sync-dir>/workflows/generated/` by default; `-o <dir>` overrides). Each file exports the workflow's input and output types plus a factory that pins the workflow key, so the key can't drift from the types it was generated with:
+
+```ts
+import { createCheckoutSession } from "./generated/create-checkout-session.generated";
+
+const checkout = createCheckoutSession(client);
+const res = await checkout.runSync({ input: { priceId: "price_123" } }); // input compile-checked
+console.log(res.output?.checkoutUrl);                                    // output typed
+```
+
+Every workflow gets a `.start`; `.runSync` is generated only for workflows with `syncCallable = true`. The `input` option is required whenever the schema requires fields, optional otherwise. Run with `--check` in CI to fail when the generated files are out of date, the same way `primitive databases codegen --check` guards [database types](./working-with-databases.md#typescript-codegen). Prefer annotating by hand? `client.workflows.start` and `runSync` take the same type parameters directly: `runSync<Input, Output>(...)`.
+
 ### Applying Results to Local Data (Client Apply)
 
 A workflow runs on the server, but its result often belongs in a **document** — local-first data only clients write. Set `requiresClientApply = true` on the workflow and the run doesn't finish at the last step: it transitions to `apply_pending`, and a connected client claims it, writes the output into the document, and confirms:
@@ -408,6 +428,8 @@ primitive workflows runs status <workflow-id> <run-id>
 primitive workflows runs steps <workflow-id> <run-id>
 ```
 
+The `<workflow-id>` argument to the management and runs commands (`get`, `update`, `delete`, `publish`, `runs ...`) accepts either the workflow's id or its key — `primitive workflows runs list send-digest` works as well as the ULID form. When both exist, the id wins; key lookup is scoped to the app and case-insensitive.
+
 ::: code-group
 
 <<< ../../examples/workflows/workflow-list-step-runs.ts#example{ts} [JavaScript]
@@ -458,6 +480,8 @@ Every step has an `id` (unique within the workflow) and a `kind` (the step type)
 | `document.query` / `queryOne` / `count` / `save` / `patch` / `delete` | Read and write records in a document's models |
 | `document.resolveAlias` | Resolve a document alias to its id (or null) for conditional branching |
 | `group.addMember` / `removeMember` / `removeAll` / `checkMembership` / `listMembers` / `listUserMemberships` | Group membership operations |
+| `collection.addDocument` / `removeDocument` | Add a document to a [collection](./working-with-documents.md#collections) or remove one |
+| `database.create` / `delete`, `group.create` / `delete`, `collection.create` / `delete` / `grantGroupPermission` | Provision and tear down databases, groups, and collections |
 | `metadata.write` / `metadata.read` | Write or read a [resource metadata](./resource-metadata.md) category |
 | `collect` | Auto-paginate any step that returns `{ items, cursor }` |
 | `workflow.call` | Run a child workflow synchronously, inline (use `forEach` to fan out) |
@@ -843,6 +867,59 @@ userId = "{{ input.userId }}"
 It takes a `groupType` and a `userId` (no `groupId` — it removes the user from every group of that type) and returns `{ removed, groupIds }`. It is strictly type-scoped, so clearing `sub` never touches `subscription`, and it removes at most 1000 memberships per run. In a caller run the group type's `member.delete` rule is checked for every affected group before anything is removed, so authorization is all-or-nothing.
 
 Group steps evaluate the group type's rule sets like any other caller; rules can match workflow-issued operations with `fromWorkflow("workflowKey")` — see [Access Control](./access-control.md). In a [system run](#system-workflows), `addMember` and `removeMember` record the app's system principal as the member's `addedBy` — not the admin or trigger that started the run.
+
+### Collection Steps
+
+`collection.addDocument` and `collection.removeDocument` manage a document's membership in a [collection](./working-with-documents.md#collections) — the workflow counterpart to the client's add/remove calls, useful when a run produces or processes a document that belongs in a shared set:
+
+```toml
+[[steps]]
+id = "publish"
+kind = "collection.addDocument"
+collectionId = "{{ input.collectionId }}"
+documentId = "{{ steps.create.documentId }}"
+```
+
+Both take a `collectionId` and a `documentId`, and both converge on retry: adding a document that's already a member succeeds with `{ added: false, alreadyPresent: true }` (a real add returns `{ added: true, alreadyPresent: false }`), and removing one that isn't a member succeeds with `{ removed: false, alreadyAbsent: true }`. Authorization matches the client calls exactly — `addDocument` checks the collection type's `document.add` rule plus the caller's write access to the document; `removeDocument` checks `document.remove`.
+
+### Resource Lifecycle Steps
+
+`database.create` / `database.delete`, `group.create` / `group.delete`, `collection.create` / `collection.delete`, and `collection.grantGroupPermission` provision and tear down resources from inside a run — so one durable workflow can set up a whole constellation (a database, its groups, its collections, and the grants wiring them together) instead of the client sequencing each call itself:
+
+```toml
+[[steps]]
+id = "db"
+kind = "database.create"
+title = "{{ input.className }}"
+databaseType = "classroom"
+
+[[steps]]
+id = "teachers"
+kind = "group.create"
+groupType = "class-teachers"
+groupId = "class-{{ input.classCode }}-teachers"   # optional; a caller-supplied id makes re-runs idempotent
+name = "{{ input.className }} Teachers"
+
+[[steps]]
+id = "posts"
+kind = "collection.create"
+name = "{{ input.className }} Posts"
+collectionType = "class-posts"
+
+[[steps]]
+id = "grant"
+kind = "collection.grantGroupPermission"
+collectionId = "{{ steps.posts.collectionId }}"
+groupType = "class-teachers"
+groupId = "{{ steps.teachers.groupId }}"
+permission = "read-write"   # or "reader"
+```
+
+These steps run in **caller workflows only** — each acts as the starting user under exactly the rules the equivalent client call enforces, and creates resources just as if that user had created them from the app. A `runAs = "system"` workflow that reaches one fails the step: provisioning is always attributable to a member.
+
+The create steps return the created resource, so later steps can wire it up (<span v-pre>`{{ steps.db.databaseId }}`</span>, <span v-pre>`{{ steps.posts.collectionId }}`</span>). `database.create` takes a `title` and `databaseType` plus optional `metadata` (validated against the type's declared metadata); `collection.create` takes a `name` plus optional `description`, `collectionType`, and `contextId`. Their ids are minted server-side, so a retried run can create a duplicate — put creates early and make later steps the fallible ones. `group.create` avoids this by accepting a caller-supplied `groupId`: re-creating an existing group succeeds with `{ created: false, alreadyExists: true }`.
+
+The delete steps (`database.delete` by `databaseId`, `group.delete` by `groupType` + `groupId`, `collection.delete` by `collectionId`) cascade exactly like their client counterparts and treat an already-gone resource as a no-op (`{ deleted: false, alreadyAbsent: true }`) — an ordered teardown workflow re-run over a partially torn-down set converges instead of failing.
 
 ### Metadata Steps
 

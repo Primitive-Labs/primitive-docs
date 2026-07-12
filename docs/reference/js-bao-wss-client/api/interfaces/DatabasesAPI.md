@@ -208,9 +208,22 @@ Object with `imported` and `failed` record counts
 
 ### executeOperation()
 
-> **executeOperation**(`databaseId`, `name`, `options?`): `Promise`\<`any`\>
+> **executeOperation**\<`R`\>(`databaseId`, `name`, `options?`): `Promise`\<`R`\>
 
 Execute a registered operation by name, with optional parameters and pagination.
+
+The optional type parameter `R` types the resolved result: pass the op's
+generated `<Op>Result` alias to get a typed response
+(`executeOperation<GetXResult>(dbId, "getX", { params })`). It defaults to
+`any`, so existing untyped callers keep the previous `Promise<any>` behavior
+(backward compatible). The generated `<type>Ops` factory (#1441) supplies
+this type argument for you.
+
+#### Type Parameters
+
+##### R
+
+`R` = `any`
 
 #### Parameters
 
@@ -234,7 +247,7 @@ Execution options for parameters, pagination, and diagnostics
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<`R`\>
 
 ***
 

@@ -374,6 +374,8 @@ primitive workflows publish my-workflow
 primitive workflows runs list
 ```
 
+The management and runs commands identify a workflow by its id **or** its key — `publish my-workflow` above resolves the key `my-workflow` (app-scoped, case-insensitive; when a value matches both, the id wins).
+
 Inspect and clear the restartable iterations of an [`iterate-users`](./workflows.md#iterate-users) workflow:
 
 ```bash
@@ -424,6 +426,16 @@ primitive databases codegen -o ./src/generated/db
 ```
 
 Reads from the database-type TOML in the auto-resolved sync directory; pass `--sync-dir <path>` to override it. Reads `[models.*]` schema blocks and `[[operations]]` from your database-type TOML and emits typed record interfaces, operation param and result types, and a typed `<type>Ops(client, databaseId)` call factory per database type (see [Typed operation calls](./working-with-databases.md#typed-operation-calls)). Keeps client-side types aligned with the server-authoritative schema.
+
+### Workflow Codegen
+
+Generate typed workflow-invocation wrappers from the `inputSchema`/`outputSchema` in your workflow TOML:
+
+```bash
+primitive workflows codegen
+```
+
+Emits one `<key>.generated.ts` per workflow with input/output types and a factory that pins the workflow key; `--check` fails in CI when the output is out of date (see [Typed Invocations](./workflows.md#typed-invocations-typescript-codegen)).
 
 ### Blob Buckets
 

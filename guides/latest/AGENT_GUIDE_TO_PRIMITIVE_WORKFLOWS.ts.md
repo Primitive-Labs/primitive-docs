@@ -270,11 +270,13 @@ databaseId = "{{ input.dbId }}"
 operationName = "createTask"
 [steps.params]
 title = "{{ input.title }}"
-# Output: { results: [{ success: true, id }] }
-# Each entry has `success` (not `ok`) + `id`. Failures throw — a result entry's
-# presence implies it succeeded. In `runIf`, prefer the step-level verdict
-# `steps['create-task'].ok` (true iff every result item succeeded) or
-# `size(steps['create-task'].?results) > 0`.
+# Output: { results: [{ op: "save", success: true, id, values? }] }
+# One entry per definition step, in definition order (a save+increment op
+# reports both). Each entry has `op` (the step's kind) + `success` (not `ok`)
+# + `id`; increment entries carry post-increment counters in `values`.
+# Failures throw — a result entry's presence implies it succeeded. In `runIf`,
+# prefer the step-level verdict `steps['create-task'].ok` (true iff every
+# result item succeeded) or `size(steps['create-task'].?results) > 0`.
 
 [[steps]]
 id = "mark-overdue"
@@ -423,6 +425,75 @@ userId = "{{ input.userId }}"   # OR email = "...", not both
 `group.removeAll` clears all of one user's memberships within a single group type. Params: `groupType` (required; no `#`, no `_`-prefixed system types) and `userId` (required; no `groupId`, no `email`). Returns `{ userId, groupType, removed, groupIds }`. Type-scoped via the `userId#groupType#` sort-key prefix (no cross-type bleed — `sub` ≠ `subscription`); a no-op returns `removed: 0`; caps at 1000 removals per run (refused up front if exceeded). Caller runs pre-flight every affected group's `member.delete` CEL rule (all-or-nothing); system runs need the `membership` capability instead.
 
 Group operations evaluate the group type's CEL rules. For workflow-issued operations, rules can match `fromWorkflow("workflowKey")`. In a system run, `addMember`/`removeMember` record `sys:<appId>` as the membership's `addedBy` (not the admin/cron/webhook that initiated the run).
+
+### `collection.addDocument` / `collection.removeDocument`
+
+Manage a document's membership in a collection. Both take `collectionId` + `documentId` (both required, both templatable) and enforce the same authorization as the equivalent client calls: `addDocument` checks the collection type's `document.add` rule plus caller owner/read-write on the document; `removeDocument` checks `document.remove` only.
+
+```toml
+[[steps]]
+id = "publish"
+kind = "collection.addDocument"
+collectionId = "{{ input.collectionId }}"
+documentId = "{{ steps.create.documentId }}"
+# Output: { collectionId, documentId, added: true, alreadyPresent: false }
+#         already a member → { added: false, alreadyPresent: true } (success, not an error)
+
+[[steps]]
+id = "retract"
+kind = "collection.removeDocument"
+collectionId = "{{ input.collectionId }}"
+documentId = "{{ input.documentId }}"
+# Output: { collectionId, documentId, removed: true, alreadyAbsent: false }
+#         not a member → { removed: false, alreadyAbsent: true } (a missing *collection* is still an error)
+```
+
+Both converge on retry (already-present add and already-absent remove are no-op successes). Membership presence is checked with a fresh read, so remove → add on the same document within one run works. Errors follow the standard convention: 4xx (except 429) non-retryable, 429/5xx retryable. Both kinds are sync-callable.
+
+### Resource lifecycle steps
+
+`database.create` / `database.delete`, `group.create` / `group.delete`, `collection.create` / `collection.delete`, and `collection.grantGroupPermission` provision and tear down resources inside a run, so one durable workflow can create a whole constellation (database + groups + collections + grants) with ordered teardown as the rollback story. All seven run in **caller mode only**: each acts as the starting user and enforces exactly the CEL rules and delete cascades of the equivalent client call. A `runAs = "system"` run fails the step non-retryably (`<kind> runs in caller mode only; it cannot run in a system-mode workflow (runAs:"system")`) before anything is written.
+
+| Kind | Params | Output |
+|---|---|---|
+| `database.create` | `title` (req), `databaseType` (req), `metadata` (opt object, validated against the type's declared metadata) | The created database: `{ databaseId, title, databaseType, permission: "owner", createdBy, createdAt, ... }` |
+| `database.delete` | `databaseId` (req) | `{ databaseId, deleted: true, ... }`; 404 → `{ databaseId, deleted: false, alreadyAbsent: true }` |
+| `group.create` | `groupType` (req), `name` (req), `groupId` (opt — caller-supplied id), `description` (opt) | `{ created: true, appId, groupType, groupId, name, ... }`; already exists → `{ groupType, groupId, created: false, alreadyExists: true }` |
+| `group.delete` | `groupType` (req), `groupId` (req) | `{ groupType, groupId, deleted: true, ... }`; 404 → `{ deleted: false, alreadyAbsent: true }` |
+| `collection.create` | `name` (req), `description`/`collectionType`/`contextId` (opt) | The created collection: `{ collectionId, name, collectionType, contextId, ... }`. A duplicate *name* is a 409 error (not a no-op) |
+| `collection.delete` | `collectionId` (req) | `{ collectionId, deleted: true, ... }`; 404 → `{ deleted: false, alreadyAbsent: true }`. Cascades memberships and group grants like the client delete |
+| `collection.grantGroupPermission` | `collectionId`, `groupType`, `groupId`, `permission` (all req; `permission` is exactly `"reader"` or `"read-write"` — `"read"` fails non-retryably) | `{ collectionId, groupType, groupId, permission, grantedAt, grantedBy }` (re-grant succeeds) |
+
+```toml
+[[steps]]
+id = "db"
+kind = "database.create"
+title = "{{ input.className }}"
+databaseType = "classroom"
+
+[[steps]]
+id = "teachers"
+kind = "group.create"
+groupType = "class-teachers"
+groupId = "class-{{ input.classCode }}-teachers"   # supplying the id makes re-runs idempotent
+name = "{{ input.className }} Teachers"
+
+[[steps]]
+id = "posts"
+kind = "collection.create"
+name = "{{ input.className }} Posts"
+collectionType = "class-posts"
+
+[[steps]]
+id = "grant"
+kind = "collection.grantGroupPermission"
+collectionId = "{{ steps.posts.collectionId }}"
+groupType = "class-teachers"
+groupId = "{{ steps.teachers.groupId }}"
+permission = "read-write"
+```
+
+Idempotency: the `*.delete` kinds map 404 to a no-op success, so an ordered teardown workflow re-run over a partially torn-down constellation converges. `group.create` with a caller-supplied `groupId` is likewise re-runnable. `database.create` and `collection.create` mint server-side ids — a whole-run retry can create a duplicate; sequence creates early and keep the fallible steps after them. Errors: 4xx (except 429) non-retryable, 429/5xx retryable.
 
 ### `metadata.write` / `metadata.read`
 
@@ -1028,6 +1099,8 @@ Grant or revoke `capabilities` on a workflow that already exists with `primitive
 
 **`iterate-users` is system-only.** A workflow containing an `iterate-users` step must set `runAs = "system"` — otherwise it's rejected at save time (`'iterate-users' is system-only and may appear only in a runAs:"system" workflow`).
 
+**The resource lifecycle steps are caller-only** — the mirror restriction. `database.create`/`delete`, `group.create`/`delete`, `collection.create`/`delete`, and `collection.grantGroupPermission` run only in `runAs:"caller"` workflows: in a system run each fails non-retryably at execution, before anything is written (`<kind> runs in caller mode only; it cannot run in a system-mode workflow (runAs:"system")`). Provisioning acts as, and is attributed to, the member who started the run — see [Resource lifecycle steps](#resource-lifecycle-steps).
+
 **No `accessRule` on a system workflow.** A `runAs:"system"` workflow with any non-empty `accessRule` is rejected at save time (`runAs:"system" workflows do not evaluate accessRule — remove the accessRule`) — a system run skips the rule entirely, so a constant (`"false"`), a role/group rule (`hasRole('admin')`), or a `user`-principal reference are all equally dead config. The only fix is to remove it. An absent/empty rule is fine. Enforced on every save path (create, version-create, metadata PATCH on the merged effective state, workflow-config create, and `sync push`).
 
 ### Subject-user methods (system workflows)
@@ -1356,6 +1429,8 @@ Call `workflows.runSync` and await the final envelope:
 
 An optional `signal` (`AbortSignal`) is accepted as well.
 
+Both invocation methods are generic: `start<I>(options)` types the `input`, and `runSync<I, O>(options)` additionally types the result envelope's `output` as `O` (`RunSyncWorkflowResult<O>`). Defaults (`Record<string, any>` / `any`) preserve untyped call sites. Rather than hand-writing `I`/`O`, generate them from the workflow's `inputSchema`/`outputSchema` with `primitive workflows codegen` — see [Typed invocation (codegen)](#typed-invocation-codegen).
+
 ## Workflow lifecycle
 
 A workflow needs `status = "active"` AND one of (active configuration | published revision) before clients can run it.
@@ -1448,6 +1523,13 @@ primitive workflows analytics top --days 7
 
 All inspection commands take `--json`.
 
+Every `<workflow-id>` argument above — CRUD, draft/publish, configs, runs — accepts the workflow **key** as well as the ULID. The value is tried as an id first (the id wins when both exist), then as a key lookup scoped to the app and case-insensitive; an unknown value exits non-zero with `Workflow not found for id or key "<arg>"`. The `workflows tests` commands take the ULID. Don't generalize to cron triggers: `cron-triggers` ops take the `triggerId`, never the trigger key.
+
+```bash
+# Typed invocation wrappers from inputSchema/outputSchema (see Typed invocation below)
+primitive workflows codegen [workflow-key] [-o <dir>] [--check] [--json]
+```
+
 A run that aborts during **setup** — before any step executes (resolving its config/revision, loading steps, or validating `input` against `inputSchema`) — is still marked `failed` with the real error message, and records one synthetic step with id `__setup__` and kind `setup`. So `runs steps` is never empty and `runs error` always names the failure, even when no author-defined step ran.
 
 ### Reusable step fragments
@@ -1524,9 +1606,11 @@ Full options and result shapes for these calls:
 
   const { items, cursor } = await client.workflows.listRuns({
     workflowKey: "my-workflow",
-    status: "complete",
+    status: "completed", // run records use "completed" (WorkflowRunStatus)
     limit: 50,
   });
+  // → { items: WorkflowRun[], cursor? } — each { runId, runKey, workflowKey,
+  //   status, startedAt?, endedAt?, errorMessage, meta?, ... }
 ```
 
 Inspect the per-step debug records of a run:
@@ -1544,6 +1628,33 @@ Inspect the per-step debug records of a run:
 The step records carry `{ stepRunId, runId, stepKind, status, input, output, error, startedAt, endedAt, ... }`.
 
 `runKey` is scoped as `${contextDocId}#${runKey}`. Calling `start` with an existing `runKey` returns `{ existing: true, ... }` unless `forceRerun: true`.
+
+### Typed invocation (codegen)
+
+Generate typed invocation wrappers from each workflow's `inputSchema`/`outputSchema`:
+
+```bash
+primitive workflows codegen [workflow-key] [-o <dir>] [--check] [--json]
+```
+
+The command reads `workflows/*.toml` from the auto-resolved sync directory (`--sync-dir <path>` overrides; `--app <app-id>` disambiguates when several apps are synced — with more than one match and neither flag, it errors rather than guessing) and emits **one `<key>.generated.ts` per workflow** (default output `<sync-dir>/workflows/generated/`; stale generated files for removed workflows are cleaned up on full runs). Reserved `__internal.*` workflows are skipped; malformed schema JSON fails the command. A single `[workflow-key]` argument matches the TOML file stem and generates just that file.
+
+Each generated file exports `<Key>Input` / `<Key>Output` interfaces plus a factory function (camelCase of the key; a leading digit gets a `_` prefix, a reserved word a `_` suffix) that pins the workflow key so it can't drift from its types:
+
+```ts
+import { createCheckoutSession } from "./generated/create-checkout-session.generated";
+
+const wf = createCheckoutSession(client);
+const res = await wf.runSync({ input: { priceId: "price_123" } }); // input: CreateCheckoutSessionInput
+res.output?.checkoutUrl;                                           // output: CreateCheckoutSessionOutput
+```
+
+Rules the generated code follows:
+
+- `.start` is emitted for every non-internal workflow; `.runSync` **only** when the workflow has `syncCallable = true` (the server rejects run-sync otherwise).
+- `input` is a **required** option when the schema rejects `{}` (i.e. has required properties), optional otherwise. `workflowKey` is pinned after the options spread, so callers can't override it.
+- Type mapping mirrors the server's schema validator exactly: scalar `type` → TS scalar, scalar-only type unions → TS unions, `enum` → literal union, `object` + `properties`/`required` → interface (open objects get `[key: string]: unknown`; `additionalProperties: false` omits it), `array` + `items` → `T[]`. Anything the validator ignores (`$ref`, `oneOf`/`anyOf`/`allOf`, `format`, tuples) → `unknown`. A schema-less workflow gets `Input`/`Output` of `unknown`.
+- After a CLI upgrade, `primitive workflows codegen --check` exits non-zero when generated files are out of date — regenerate rather than hand-editing (same CI pattern as `primitive databases codegen --check`).
 
 ## WebSocket events
 
