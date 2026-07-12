@@ -976,6 +976,18 @@ expiresInSeconds = 3600
 
 `blob.upload` returns the `blobId`; `blob.signedUrl` mints a time-limited URL you can email or return to the client. `blob.delete` removes a blob by `blobId` and returns `{ deleted: true, blobId, bucketId }` — it reports success even when the blob is already gone, so a retried run doesn't fail on cleanup it already did. A blob a run reads as input must outlive the run's retry window — see [Blobs and Files](./blobs-and-files.md#using-buckets-in-workflows).
 
+**Deleting many blobs in one step.** `blob.delete` accepts `blobIds` (an array of up to 500 ids) instead of `blobId` — one form or the other, never both. An empty array is a valid no-op, so a templated list that resolves to nothing doesn't fail the step:
+
+```toml
+[[steps]]
+id = "cleanup"
+kind = "blob.delete"
+bucketKey = "reports"
+blobIds = "{{ steps.expired.output.result | pluck:blobId }}"
+```
+
+Every id is validated, and in a caller run screened against the bucket's `delete` policy, before anything is deleted — one denial fails the whole step with nothing removed. The batch form returns `{ deleted: N, blobIds, bucketId }`, where `deleted` counts the ids processed.
+
 When the run is `runAs = "caller"` (the default), every blob step enforces the bucket's [access preset or rule set](./blobs-and-files.md#access-presets) with the same per-operation granularity as direct client calls — upload checks `write`, download checks `read`, signedUrl checks `share`, delete checks `delete`. A `runAs = "system"` run is app-privileged and skips the bucket policy. See [Blobs and Files](./blobs-and-files.md#using-buckets-in-workflows) for the full pattern.
 
 ### Analytics Steps

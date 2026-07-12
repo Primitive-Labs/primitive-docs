@@ -42,7 +42,7 @@ Browse and manage files stored with your documents: search by filename, filter b
 
 ### Test Harness
 
-Run automated tests against your business logic in the actual browser environment — with real IndexedDB, the Primitive sync layer, and Vue reactivity. Local-first apps depend on browser APIs (IndexedDB, WebSocket) that don't exist in Node.js; the test harness runs tests in the same environment as your app, so you test real behavior.
+Run automated tests against your business logic with the real client — real storage, the Primitive sync layer, and Vue reactivity, no mocks. Tests are written once and run in two contexts: interactively in this panel during development, and headlessly in Node under vitest so CI can gate merges (see [Running tests headlessly](#running-tests-headlessly-ci)).
 
 Create test files with the `.primitive-test.ts` suffix in your tests directory. Each file exports a `TestGroup`:
 
@@ -128,6 +128,63 @@ try {
   await destroyTestDocument(doc);
 }
 ```
+
+#### Environment-scoped tests
+
+Most tests run in both contexts. When a test depends on a browser API — canvas, `MediaRecorder` — or on something Node-only, scope it with `environment` on the test or the whole group (a test-level value overrides the group's):
+
+```typescript
+const tests: TestGroup = {
+  name: "Waveform rendering",
+  environment: "browser", // every test in this group
+  tests: [
+    {
+      id: "wave-render",
+      name: "Waveform renders to canvas",
+      run: async (log) => {
+        /* ... */
+        return "passed";
+      },
+    },
+  ],
+};
+```
+
+Each context reports the other's tests as skipped: the panel shows node-only tests as skipped, and the headless run skips browser-only tests without failing CI.
+
+#### Running tests headlessly (CI)
+
+The same registered tests run in Node under `vitest run`, so `pnpm test` can gate merges — the client runs the full document and model lifecycle natively in Node. The template ships the wiring: a spec entry that registers every `.primitive-test.ts` file with the harness adapter, a `vitest.config.ts` that merges your app's Vite config so aliases and codegen resolve exactly as in the browser, and the `vitest` and `ws` dev dependencies.
+
+```typescript
+// src/tests/primitive-tests.spec.ts
+import { registerPrimitiveTests } from "primitive-app/testing";
+import { allModels } from "@/models";
+
+await registerPrimitiveTests({
+  models: allModels,
+  testModules: import.meta.glob("./**/*.primitive-test.ts"),
+  appId: import.meta.env.VITE_APP_ID,
+  apiUrl: import.meta.env.VITE_API_URL,
+  wsUrl: import.meta.env.VITE_WS_URL,
+});
+```
+
+The run signs in as a real user through the [test-account OTP bypass](./authentication.md#test-user-sign-in-for-automated-testing): whitelist a base address once, then point the run at a bypass address:
+
+```bash
+primitive apps update <your-app-id> --test-account-bases "you@yourdomain.com"
+PRIMITIVE_TEST_EMAIL="you+primitivetest-ci@yourdomain.com" pnpm test
+```
+
+Use a stable suffix per CI project so the run reuses one test user instead of provisioning a fresh account every time. For CI report ingestion, vitest's standard reporters apply: `pnpm vitest run --reporter=junit --outputFile=test-results.xml`.
+
+A few behaviors differ from the panel:
+
+- A scored result below full marks (`"7/10 (70%)"`) **fails** the run — the panel displays the score without failing.
+- A test file that fails to load surfaces as a failing test, never a silent skip.
+- Each test gets a 60-second timeout.
+- Leftover test documents are cleaned up after the run, and the bypass token lives about 30 minutes — split very long suites.
 
 ## iOS: The Debug Inspector
 

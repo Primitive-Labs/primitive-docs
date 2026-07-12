@@ -1722,7 +1722,8 @@ const docPending = await client.documents.listPendingInvitations(documentId);
 
 // Pending group adds for one group
 const groupPending = await client.groups.listPendingInvitations(groupType, groupId);
-// [{ email, role, invitationId, createdAt, expiresAt, addedBy? }]
+// [{ email, role, invitationId, deferredId, createdAt, expiresAt, addedBy? }]
+// deferredId → invitations.revokeDeferredGrant(deferredId, "group") cancels it
 
 // Pending collection adds for one collection
 const colPending = await client.collections.listPendingInvitations(collectionId);

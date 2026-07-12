@@ -168,14 +168,14 @@ primitive sync pull            # Pull current config from server
 primitive sync diff            # Preview changes
 primitive sync push            # Push local config to server
 primitive sync push --dry-run  # See what would change without applying
-primitive sync migrate-toml    # Rewrite database-type files to native [operations.definition] tables
+primitive sync migrate-toml    # Rewrite database-type and workflow files to native TOML tables
 primitive sync migrate-toml --dry-run  # Preview the rewrite without writing files
 # Override with a fixed path:
 primitive sync init --dir ./config
 primitive sync push --dir ./config
 ```
 
-`migrate-toml` is a purely local rewrite — it converts JSON-string `definition`/`params` fields to native TOML tables in place, semantically identical on the server (see [Operation types](#operation-types) for the two forms and the fallback rules).
+`migrate-toml` is a purely local rewrite — it converts JSON-string fields to native TOML tables in place, semantically identical on the server: `definition`/`params` in database-type files (see [Operation types](#operation-types) for the two forms and the fallback rules) and `inputSchema`/`outputSchema` in workflow files.
 
 The config directory structure:
 
@@ -403,11 +403,23 @@ Codegen reads the database-type TOML from the auto-resolved sync directory (`.pr
 
 **Codegen enum / union / required typing.** When a field or an operation param restricts a string to a fixed set of values, codegen emits a TypeScript string-literal union (e.g. `status: "open" | "in-progress" | "closed"`) instead of `string`, and enum params are validated server-side as well. Fields that operation params mark `required` are emitted as non-optional on the generated record interface. This keeps generated types aligned with the server's validation instead of widening everything to `string`.
 
-**Codegen result-typing limits.** Three places where a generated result alias is looser (or wider) than the payload the server actually returns — declare a local type at the call site instead of leaning on the alias:
+**Codegen result typing.** Result aliases are derived from each operation's `definition`, not just its `type`:
 
-- `pipeline` op results are always typed `PipelineResult` (`{ steps: Record<string, unknown> }`), even when the definition's `return` mode reshapes the payload into something else.
-- `mutation` results type `results` as `unknown[]`, though each element carries `{ success, id }`.
-- `query` results are typed as the full record interface even when the definition sets a `projection` — at runtime the server returns only the projected fields, so the generated type promises fields that aren't there.
+- `query` with an inclusion `projection` → `QueryResult<Pick<Model, projectedFields | "id">>` (`id` is always returned). Exclusion, dynamic (`$params.*`), or nested-key projections → `QueryResult<Partial<Model>>` (excluded fields are still returned at runtime, so the type stays wide rather than promising removal). No `[models.*]` schema → `QueryResult<Record<string, unknown>>`.
+- `mutation` results type `results` as `MutationStepResult[]` (`{ success: boolean; id: string }`). Increment-only ops → `IncrementMutationResult` (`{ success, id, values: Record<string, number> }`); addToSet/removeFromSet-only ops → `StringSetMutationResult` (`{ success }`); a mix of only those two kinds → their union. Any save/patch/delete step → the batch `MutationResult`.
+- `pipeline` with `return = "<step>"` → that step's result type: a query step gets `QueryResult<…>` (projection rules above), a count step `CountResult`, an aggregate step `AggregateResult`. `return = "all"` (or no `return`) stays the generic `PipelineResult` (`{ steps: Record<string, unknown> }`) — declare a local type there if a call site needs precision.
+
+After a CLI upgrade, `primitive databases codegen --check` flags previously generated files as out of date — regenerate rather than hand-editing.
+
+**Typed operation calls.** Each generated file ends with a call factory named `camelCase(databaseType) + "Ops"` (`portfolio` → `portfolioOps`, `securities-ref` → `securitiesRefOps`): one method per operation, params checked against `<Op>Params`, results typed `<Op>Result`:
+
+```ts
+const ops = portfolioOps(client, databaseId);
+const accounts = await ops.listAccounts();            // Promise<ListAccountsResult>
+await ops.saveAccount({ name: "Brokerage" });         // params checked as SaveAccountParams
+```
+
+The generated file is import-free: the factory takes a structural `OpsClient` interface (`{ databases: { executeOperation<R>(databaseId, name, options?) } }`) that the real client satisfies, so generated code has no dependency on the client package. No-param ops take only an optional `OpsCallOptions` argument (`{ limit?, cursor?, direction?: 1 | -1, timing? }`), which every method passes through. Non-identifier op names become quoted keys. Outside the factory, `executeOperation<R = any>` accepts the result type directly — `client.databases.executeOperation<ListAccountsResult>(databaseId, "listAccounts")` — and defaults to `any`.
 
 ## Database Types
 
@@ -458,7 +470,7 @@ A declared [resource metadata](AGENT_GUIDE_TO_PRIMITIVE_RESOURCE_METADATA.md) ca
 
 ### Timestamps
 
-The `timestamps` knob on the `[type]` config stamps `createdAt` and/or `modifiedAt` fields automatically on every write, removing the need for per-model trigger boilerplate. Field names are caller-configurable.
+The `timestamps` knob on the `[type]` config stamps `createdAt` and/or `modifiedAt` fields automatically on `save` and `patch` writes, removing the need for per-model trigger boilerplate. Field names are caller-configurable. Stamp values are epoch milliseconds (numbers), written only when the field is absent or `null` in the submission. `increment`, `addToSet`, and `removeFromSet` do not stamp — those ops neither set the create field nor bump the update field.
 
 ```toml
 [type]
@@ -468,8 +480,8 @@ timestamps = { create = "createdAt", update = "modifiedAt" }
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `create` | string | Field name stamped with the current ISO 8601 timestamp on record creation. Optional. |
-| `update` | string | Field name stamped on every save (including the first). Optional. |
+| `create` | string | Field name stamped with the current time (epoch milliseconds) on record creation. Optional. |
+| `update` | string | Field name stamped on every save and patch (including the first save). Optional. |
 | `models` | string[] | Restrict stamping to these models only. Optional — omit to stamp every model under the type. |
 
 Either lifecycle key can be omitted independently: `timestamps = { create = "createdAt" }` stamps only on create. Field names are yours to choose (`createdAt`/`modifiedAt`, `created_at`/`updated_at`, etc.).
@@ -481,7 +493,7 @@ timestamps = { create = "createdAt", update = "modifiedAt", models = ["accounts"
 
 If a model has both an explicit `[[triggers]]` block AND `timestamps`, the trigger fires after the auto-stamp (last writer wins). Since the auto-stamp checks "is the field absent" first, an explicit trigger that sets the field always wins on its lifecycle.
 
-Use `timestamps` for the common "every write should have a created/modified stamp" pattern. Use per-model triggers when the rule depends on the record's data (e.g. `completedAt` only when `status == "done"`). Use `autoPopulatedFields` when you need CEL-resolved values beyond `now()` (e.g. `updatedBy = "user.userId"`).
+Use `timestamps` for the common "every save/patch should have a created/modified stamp" pattern. Use per-model triggers when the rule depends on the record's data (e.g. `completedAt` only when `status == "done"`). Use `autoPopulatedFields` when you need CEL-resolved values beyond `now()` (e.g. `updatedBy = "user.userId"`).
 
 ### Auto-populated fields
 
@@ -763,7 +775,7 @@ type = "string"
 required = true
 ```
 
-`sync pull` writes new files in this form. Files written before migration may instead carry a single-line **JSON-string encoding** (`definition = '{"operations":[...]}'`, with `params` as an object keyed by param name) — the server treats the two identically, and `sync pull` preserves whichever form each operation already uses (per op, so mixed files stay mixed). Convert a file with `primitive sync migrate-toml` (add `--dry-run` to preview); it's a purely local rewrite. A value TOML cannot represent — a `null`, or a mixed-type array such as a `$and` gate mixing a `$steps.*` reference with a filter object (see [Settings record pattern](#settings-record-pattern)) — stays a JSON string for that field on emit, with a log line naming the operation; the rest of the file stays native.
+`sync pull` writes new files in this form. Files written before migration may instead carry a single-line **JSON-string encoding** (`definition = '{"operations":[...]}'`, with `params` as an object keyed by param name) — the server treats the two identically, and `sync pull` preserves whichever form each operation already uses (per op, so mixed files stay mixed). Convert a file with `primitive sync migrate-toml` (add `--dry-run` to preview); it's a purely local rewrite. A value TOML cannot represent — a `null` (or `undefined`) anywhere in the value, including inside an array — stays a JSON string for that field on emit, with a log line naming the operation; the rest of the file stays native. Mixed-type arrays (a `$and` gate mixing a `$steps.*` reference with a filter object, say) carry natively — see [Settings record pattern](#settings-record-pattern).
 
 `sync push` accepts both forms and warns (does not block) on an unrecognized filter operator — the supported set is `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$exists`, `$contains`, `$startsWith`, `$endsWith`, `$containsText`, plus logical `$and`/`$or`.
 
@@ -1667,7 +1679,8 @@ interface DatabaseChangeEvent {
   changeType?: "enter" | "update" | "leave";
   modelName: string;
   id: string;
-  data?: any;          // save → the FULL submitted row; patch → the patched fields' new values;
+  data?: any;          // save → the FULL submitted row; patch → the patched fields' new values
+                       // (both plus any `timestamps`-stamped fields at their persisted values);
                        // increment/addToSet/removeFromSet → the op INPUT (amounts / values
                        // added-or-removed), not the resulting values; null on delete.
                        // Subject to `select`.
@@ -1676,7 +1689,7 @@ interface DatabaseChangeEvent {
 }
 ```
 
-**The shape of `data` follows `op`, not `changeType`.** A `save` delivers the full row; a `patch` delivers **the patched fields only, at their new values**; `increment` delivers the per-field increment **amounts** and `addToSet`/`removeFromSet` deliver the values **added or removed** per field — the op *input*, not the resulting values; `delete` delivers no `data`. The pre-write row rides in `previousData` on all of them. An `applyToQuery` operation arrives as one `patch`/`increment`/set-op/`delete` change per matched record — there is no `applyToQuery` op on the wire. Consequences:
+**The shape of `data` follows `op`, not `changeType`.** A `save` delivers the full row; a `patch` delivers **the patched fields only, at their new values**; `increment` delivers the per-field increment **amounts** and `addToSet`/`removeFromSet` deliver the values **added or removed** per field — the op *input*, not the resulting values; `delete` delivers no `data`. When the type configures `timestamps`, the stamped fields ride along in `data` on `save` and `patch` at their persisted server values (subject to `select`) — a patch's `data` is the patched fields plus the stamp; `increment` and the set ops don't stamp, so their frames carry none. The pre-write row rides in `previousData` on all of them. An `applyToQuery` operation arrives as one `patch`/`increment`/set-op/`delete` change per matched record — there is no `applyToQuery` op on the wire. Consequences:
 
 - An `enter` transition does NOT imply a full row: a patch that brings a row into the filter set is `changeType: "enter"` with only the changed fields in `data`.
 - **Merge, don't assign.** Replacing a cached row with `change.data` on a non-`save` op silently blanks every field the write didn't touch. Key the cache on `change.id`; replace on `save`, merge the fields present in `data` on `patch`, remove on `delete`.
@@ -1954,13 +1967,36 @@ name = "listVisiblePosts"
 type = "pipeline"
 modelName = "_pipeline"
 access = "isMemberOf('class-students', database.id)"
-definition = '{"steps":[{"name":"settings","type":"query","modelName":"settings","filter":{"key":"class-settings"},"limit":1},{"name":"posts","type":"query","modelName":"posts","filter":{"$or":[{"authorId":"$user.userId"},{"$and":["$steps.settings.first.peerVisible",{"status":"approved"}]}]},"sort":{"createdAt":-1},"limit":50}],"return":"posts"}'
-params = '{}'
+
+[operations.definition]
+return = "posts"
+
+[[operations.definition.steps]]
+name = "settings"
+type = "query"
+modelName = "settings"
+limit = 1
+
+[operations.definition.steps.filter]
+key = "class-settings"
+
+[[operations.definition.steps]]
+name = "posts"
+type = "query"
+modelName = "posts"
+limit = 50
+
+[[operations.definition.steps.filter."$or"]]
+authorId = "$user.userId"
+
+[[operations.definition.steps.filter."$or"]]
+"$and" = [ "$steps.settings.first.peerVisible", { status = "approved" } ]
+
+[operations.definition.steps.sort]
+createdAt = -1
 ```
 
-This pipeline first reads the settings record, then uses `$steps.settings.first.peerVisible` as a **boolean gate** in the posts query. When `peerVisible` is `true`, the `$and` branch opens and includes approved posts from all students. When the settings record doesn't have `peerVisible` set (or it's `false`), the gate short-circuits to no-match, so students only see their own posts. See [Boolean gate conditions](#boolean-gate-conditions) for details on this pattern.
-
-The `definition` here stays a JSON string deliberately: the `$and` gate is a mixed-type array (a `$steps.*` string reference alongside a filter object), which TOML cannot represent — this is the per-field JSON-string fallback described in [Operation types](#operation-types), and `sync pull`/`migrate-toml` keep the field as a JSON string with a log line.
+This pipeline first reads the settings record, then uses `$steps.settings.first.peerVisible` as a **boolean gate** in the posts query. When `peerVisible` is `true`, the `$and` branch opens and includes approved posts from all students. When the settings record doesn't have `peerVisible` set (or it's `false`), the gate short-circuits to no-match, so students only see their own posts. See [Boolean gate conditions](#boolean-gate-conditions) for details on this pattern. Note the mixed-type `$and` array carries natively in TOML, and an operation that takes no params simply omits `params`.
 
 ### User-scoped data via operations
 

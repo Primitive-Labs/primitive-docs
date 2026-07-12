@@ -423,7 +423,7 @@ Generate TypeScript types from your database-type TOML schemas:
 primitive databases codegen -o ./src/generated/db
 ```
 
-Reads from the database-type TOML in the auto-resolved sync directory; pass `--sync-dir <path>` to override it. Reads `[models.*]` schema blocks and `[[operations]]` from your database-type TOML and emits typed record interfaces, operation param types, and result types. Keeps client-side types aligned with the server-authoritative schema.
+Reads from the database-type TOML in the auto-resolved sync directory; pass `--sync-dir <path>` to override it. Reads `[models.*]` schema blocks and `[[operations]]` from your database-type TOML and emits typed record interfaces, operation param and result types, and a typed `<type>Ops(client, databaseId)` call factory per database type (see [Typed operation calls](./working-with-databases.md#typed-operation-calls)). Keeps client-side types aligned with the server-authoritative schema.
 
 ### Blob Buckets
 

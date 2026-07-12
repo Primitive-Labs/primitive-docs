@@ -228,8 +228,10 @@ There is no separate "Sort tab" or multi-field sort UI.
 
 ## Test Harness
 
-Runs `.primitive-test.ts` files in the same authenticated session as the
-host app. Key invariants:
+Registered `.primitive-test.ts` test groups run in two contexts: interactively
+in this panel, in the same authenticated session as the host app, and headlessly
+in Node under vitest (see "Headless runs (vitest / CI)" below). Key
+invariants (both contexts unless noted):
 
 1. **Explicit document lifecycle.** Tests that need database/model operations
    call `createTestDocument()` / `destroyTestDocument()` themselves.
@@ -261,7 +263,9 @@ host app. Key invariants:
 6. **Leftover cleanup.** `deleteAllTestDocuments()` runs on app start, when
    the overlay opens, and at the start of each run — anything titled with
    `===TEST===` is evicted.
-7. **No timeout.** A test can hang indefinitely; the runner won't kill it.
+7. **Timeouts differ by context.** The browser panel never kills a test — it
+   can hang indefinitely. The headless adapter times each test out at 60s
+   (`testTimeoutMs`).
 
 ### UI
 
@@ -456,6 +460,89 @@ run: async (log) => {
   },
 }
 ```
+
+### Environment-scoped tests
+
+A test or a whole group can restrict where it runs:
+
+```typescript
+export interface TestGroup {
+  name: string;
+  environment?: "browser" | "node";    // restrict every test in the group (default: both)
+  tests: Array<{
+    id: string;
+    name: string;
+    environment?: "browser" | "node";  // per-test; overrides the group setting
+    run: (log: TestLogFn) => Promise<string>;
+  }>;
+}
+```
+
+Resolution is `test.environment ?? group.environment`; unset runs in both
+contexts. `"browser"` tests are `it.skip`ped by the vitest adapter (reported
+skipped, never fail CI) — use for DOM/canvas/`MediaRecorder` dependencies.
+`"node"` tests show as skipped in the browser panel (grey skip icon and a
+skipped count in the summary).
+
+### Headless runs (vitest / CI)
+
+The same registered groups run in Node under `vitest run` — no browser or
+headless-browser stack, so `pnpm test` can gate merges. The template ships the
+wiring; the pieces, all load-bearing:
+
+- `src/tests/primitive-tests.spec.ts` — the single vitest spec that adapts
+  every registered group:
+
+  ```typescript
+  import { registerPrimitiveTests } from "primitive-app/testing";
+  import { allModels } from "@/models";
+
+  await registerPrimitiveTests({
+    models: allModels,
+    testModules: import.meta.glob("./**/*.primitive-test.ts"),
+    appId: import.meta.env.VITE_APP_ID,
+    apiUrl: import.meta.env.VITE_API_URL,
+    wsUrl: import.meta.env.VITE_WS_URL,
+  });
+  ```
+
+- `vitest.config.ts` — merges the app's Vite config (so `@` aliases and
+  codegen resolve exactly as in the browser) and sets
+  `resolve.dedupe: ["js-bao", "js-bao-wss-client", "yjs"]` (prevents model
+  base-class split-brain across module copies),
+  `test.server.deps.inline: ["primitive-app", "js-bao-wss-client"]`
+  (extension-less ESM dist), `testTimeout: 60_000`, `hookTimeout: 120_000`.
+- `vite.config.ts` applies the browser `ws` stub alias only when
+  `!process.env.VITEST`.
+- Dev dependencies `vitest` and `ws`. In Node the client dynamically imports
+  `ws` when no global `WebSocket` exists; without it the connection fails with
+  `Cannot find package 'ws'`.
+- Script: `"test": "pnpm codegen && vitest run"`.
+
+`registerPrimitiveTests(options)` — from `primitive-app/testing`:
+
+| Option | Default | Notes |
+|---|---|---|
+| `models` | required | The app's model classes, typically `allModels` from `@/models` |
+| `testModules` | required | `import.meta.glob("./**/*.primitive-test.ts")`; each module's default export must be a `TestGroup` or `TestGroup[]` |
+| `appId` / `apiUrl` / `wsUrl` | `process.env.VITE_APP_ID` / `VITE_API_URL` / `VITE_WS_URL` | |
+| `email` | `process.env.PRIMITIVE_TEST_EMAIL` | Must derive from a whitelisted test-account base (`primitive apps update <app-id> --test-account-bases "..."`). Use a stable suffix per CI project so the find-or-create provisioner reuses one test user across runs |
+| `otpCode` | `"000000"` (`PRIMITIVE_TEST_OTP_CODE`) | The test-account OTP bypass code |
+| `testTimeoutMs` | `60_000` | Per-test timeout |
+| `clientOptions` | storage `{ type: "auto" }` | Partial client options; `auto` storage uses better-sqlite3 if installed, memory otherwise — no native deps required |
+| `cleanupTestDocuments` | `true` | Deletes leftover `===TEST===` documents after the run |
+| `failBelowFullScore` | `true` | A scored result below full marks (`"7/10 (70%)"`) FAILS the run; the panel shows the same result as scored without failing |
+
+Auth and failure semantics:
+
+- Sign-in is the normal test-account flow: a non-whitelisted email rejects
+  with a clear auth error (never hangs); invite-only / domain-restricted /
+  waitlist apps reject provisioning the same way.
+- The bypass token lives ~30 minutes — split or shard suites that run longer.
+- A test file that fails to load surfaces as a failing test, never a silent
+  skip.
+- JUnit output for CI ingestion:
+  `pnpm vitest run --reporter=junit --outputFile=test-results.xml`.
 
 ### Element-identification cheat sheet
 

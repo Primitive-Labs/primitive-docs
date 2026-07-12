@@ -164,7 +164,7 @@ imgEl.src = url;
 
 ## Workflow integration
 
-The `blob.upload`, `blob.download`, `blob.signedUrl`, and `blob.delete` workflow steps write to, read from, sign URLs for, and delete from buckets. Steps reference the bucket by `bucketId` or `bucketKey`. A `runAs:"caller"` run evaluates this bucket policy per op with the same mapping as direct calls (upload → `write`, download → `read`, signedUrl → `share`, delete → `delete`); a `runAs:"system"` run is app-privileged and skips it. See the [Workflows guide](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md).
+The `blob.upload`, `blob.download`, `blob.signedUrl`, and `blob.delete` workflow steps write to, read from, sign URLs for, and delete from buckets. Steps reference the bucket by `bucketId` or `bucketKey`; `blob.delete` also takes a batch `blobIds` form (up to 500 ids, screened against the `delete` policy all-or-nothing before anything is removed). A `runAs:"caller"` run evaluates this bucket policy per op with the same mapping as direct calls (upload → `write`, download → `read`, signedUrl → `share`, delete → `delete`); a `runAs:"system"` run is app-privileged and skips it. See the [Workflows guide](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md).
 
 A blob a workflow run reads as input must outlive the run's retry window: retries re-read the same `blobId`, and deleting the blob between attempts fails the next retry — and the run — with a not-found error. Don't delete such blobs from outside the run (a cancel path, another workflow) — put them in a bucket whose TTL tier matches their lifespan and let expiry clean them up.
 

@@ -41,7 +41,7 @@ Credentials live in your app's secrets store. Reference one from the integration
 Authorization = "Bearer {{secrets.WEATHER_API_KEY}}"
 ```
 
-The value resolves server-side when the request is proxied and is never exposed to your client code. Set and manage the value with `primitive secrets set` — see [App Secrets](./app-secrets.md) for the full management workflow.
+The value resolves server-side when the request is proxied and is never exposed to your client code. The reference is checked when you save the integration — naming a secret that doesn't exist fails the save — so set the secret first. Set and manage the value with `primitive secrets set`; see [App Secrets](./app-secrets.md) for the full management workflow.
 
 ## Syncing Configuration
 

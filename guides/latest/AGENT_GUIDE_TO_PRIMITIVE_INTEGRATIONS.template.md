@@ -135,7 +135,7 @@ Behavior:
 
 - Resolution happens server-side at proxy time. The plaintext value is never returned to the client.
 - Any header/query whose value was substituted from a secret is automatically marked sensitive — its value is replaced with `[redacted]` in admin logs and the test-mode request preview.
-- An unresolved `{{secrets.MISSING}}` is left as-is in the outgoing request (it is **not** an error). Test the integration to catch this.
+- Secret references are validated at save time: creating or updating an integration (or creating a versioned config) whose `defaultHeaders`/`staticQuery` reference a nonexistent app secret fails with a 400 naming the missing key. Whitespace inside the braces is tolerated (`{{ secrets.KEY }}` ≡ `{{secrets.KEY}}`), but not around the dot. If a referenced secret is deleted *after* the config is saved, the proxy passes the literal `{{secrets.KEY}}` upstream and logs a server-side warning — re-create the secret or update the config.
 - Secret-key constraint: `^[A-Z][A-Z0-9_]{0,63}$` (uppercase letters, digits, underscores; starts with a letter; ≤64 chars).
 - Cache: app-secret reads are cached server-side (30s fresh / 60s stale). Updates invalidate the cache for that app.
 

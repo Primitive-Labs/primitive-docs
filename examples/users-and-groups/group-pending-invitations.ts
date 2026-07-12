@@ -5,7 +5,8 @@ import type { JsBaoClient } from "js-bao-wss-client";
 export async function listPendingGroupInvites(client: JsBaoClient) {
   // #region example
   const pending = await client.groups.listPendingInvitations("team", "engineering");
-  // [{ email, role, invitationId, createdAt, expiresAt, addedBy? }]
+  // [{ email, role, invitationId, deferredId, createdAt, expiresAt, addedBy? }]
+  // deferredId → invitations.revokeDeferredGrant(deferredId, "group") cancels it
   // #endregion example
   return pending;
 }

@@ -32,7 +32,7 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import TOML from "@iarna/toml";
+import * as TOML from "smol-toml";
 import { loadSchemaFromTomlString } from "js-bao";
 import ts from "typescript";
 import { VARIANTS } from "./variants.mjs";

@@ -436,7 +436,32 @@ primitive databases codegen -o ./src/generated/db
 
 Codegen reads the database-type TOML from the auto-resolved sync directory; pass `--sync-dir <path>` to override it. This reads the `[models.*]` blocks and `[[operations]]` definitions and emits typed interfaces — one per model, plus typed params and results per operation. Fields and params restricted to a fixed set of string values become TypeScript string-literal unions, so invalid values are caught at compile time (enum params are also validated server-side).
 
-Result types are generated from the operation's `type`, not its `definition` — a query with a `projection` is still typed as the full record, pipeline results are typed as a generic step map, and mutation result elements are `unknown` — so declare a local type where a call site needs more precision.
+Result types are derived from each operation's `definition`, not just its `type`. A query with an inclusion `projection` is typed as just the projected fields (plus `id`, which is always returned); exclusion or dynamic projections widen to a partial record. Mutation results carry `{ success, id }` per step, with increment and string-set operations getting flat typed result shapes. A pipeline whose `return` names a single step is typed as that step's result — query, count, or aggregate. The one generic case left: a pipeline returning `all` is typed as a per-step map, so declare a local type there if a call site needs more precision.
+
+### Typed operation calls
+
+Each generated file ends with a call factory — `camelCase` of the database type plus `Ops`, so the `portfolio` type emits `portfolioOps`. It binds a client and database id once and exposes one method per operation, with params checked against the generated `<Op>Params` type and results typed as `<Op>Result`:
+
+```ts
+export function portfolioOps(client: OpsClient, databaseId: string) {
+  return {
+    listAccounts: (options?: OpsCallOptions): Promise<ListAccountsResult> =>
+      client.databases.executeOperation<ListAccountsResult>(databaseId, "listAccounts", { ...options }),
+    saveAccount: (params: SaveAccountParams, options?: OpsCallOptions): Promise<SaveAccountResult> =>
+      client.databases.executeOperation<SaveAccountResult>(databaseId, "saveAccount", { params, ...options }),
+  };
+}
+```
+
+```ts
+const ops = portfolioOps(client, databaseId);
+const accounts = await ops.listAccounts();
+await ops.saveAccount({ name: "Brokerage", currency: "USD" });
+```
+
+The generated file is import-free — `OpsClient` is a structural interface the real client satisfies, so generated code never depends on the client package. Operations without params take just an optional `options` argument (`limit`, `cursor`, `direction`, `timing`), which every method passes through.
+
+For call sites not using the factory, `executeOperation<R>` accepts the result type directly: `client.databases.executeOperation<ListAccountsResult>(databaseId, "listAccounts")`.
 
 ## Bulk CSV Import
 
@@ -543,6 +568,8 @@ Each change carries two discriminants: `op` — the underlying write — and `ch
 | `delete` | `null` | The deleted row |
 
 Everything in both columns passes through the subscription's `select` projection. An `applyToQuery` operation arrives as one `patch`/`increment`/set-op/`delete` change per matched record — there is no `applyToQuery` op on the wire. And because `data`'s shape follows `op`, an `enter` transition doesn't imply a full row: a patch that brings a row into the filter set delivers `changeType: "enter"` with only the changed fields.
+
+One addition to the table: when the type configures `timestamps`, the server-stamped fields ride along in `data` on `save` and `patch` at their persisted values (subject to `select`) — a patch's `data` is the patched fields plus the stamp. `increment` and the set ops don't stamp, so their frames carry no stamp fields.
 
 **Merge, don't assign.** Replacing a cached row with `change.data` on a patch silently blanks every field the write didn't touch. Key your cache on `change.id`, replace the row on `save`, merge the fields present in `data` on a `patch`, and drop the row on `delete`. For `increment` and the set ops, `data` is the *delta*, not the new value — derive the new value from `previousData` plus `data` (add the amount; union or subtract the set values), the pattern the example above follows. If your handler needs a field the write didn't include (say, a grouping key), read it from `previousData`.
 

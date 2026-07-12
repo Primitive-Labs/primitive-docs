@@ -343,10 +343,14 @@ The email form is the right call when you don't know — and don't want to branc
 
 ```typescript
   const pending = await client.groups.listPendingInvitations("team", "engineering");
-  // [{ email, role, invitationId, createdAt, expiresAt, addedBy? }]
+  // [{ email, role, invitationId, deferredId, createdAt, expiresAt, addedBy? }]
+  // deferredId → invitations.revokeDeferredGrant(deferredId, "group") cancels it
 ```
 
 Use this to render the "pending members" section of a group sharing UI without having to filter the lower-level `client.invitations.listDeferredGrants()` surface.
+
+Authorization is the same gate as `listMembers`: the group's `member.list` rule, with app admins/owners always allowed and direct members of the group allowed as a fallback even under a stricter custom rule. A cross-group manager whose rules let them list a group's members can therefore also see its pending invitations — being a member of the group is not required.
+Each entry carries a `deferredId` — pass it to `client.invitations.revokeDeferredGrant(deferredId, "group")` to cancel that invitation. Cancelling an invitation another caller created is allowed for app admins/owners, the invitation's creator, or a caller who passes the group's `member.delete` rule (evaluated with `target.email` set to the invitee's email, so email-scoped rules work on the pending path).
 
 ### List a user's memberships
 

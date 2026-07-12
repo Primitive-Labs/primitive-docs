@@ -18,8 +18,19 @@ capabilities = ["membership"]    # system-only opt-in grants
 perUserMaxRunning = 4             # default 4
 perUserMaxQueued = 100            # default 100
 dequeueOrder = "fifo"             # fifo | lifo (default fifo)
-inputSchema  = "{\"type\":\"object\", ...}"   # JSON-encoded JSON Schema
-outputSchema = "{\"type\":\"object\", ...}"
+
+[workflow.inputSchema]            # JSON Schema as native TOML tables
+type = "object"
+required = [ "name" ]
+
+[workflow.inputSchema.properties.name]
+type = "string"
+
+[workflow.outputSchema]
+type = "object"
+
+[workflow.outputSchema.properties.greeting]
+type = "string"
 
 [[steps]]
 id = "step-1"
@@ -28,6 +39,8 @@ saveAs = "output"
 [steps.output]
 greeting = "Hello {{ input.name }}"
 ```
+
+Schema form rules: the sub-table headers must come after the scalar `[workflow]` keys (a sub-table header ends the parent table). `sync pull` always writes schemas as native tables regardless of the form the file had before; a JSON-encoded string (`inputSchema = "{\"type\":\"object\"}"`) is accepted on push, and pull only emits one when the schema contains a `null` TOML can't carry (logged with the workflow and field name). An absent schema omits the key entirely; an empty schema is an empty table. `primitive sync migrate-toml` rewrites legacy JSON-string schemas in local files to native form.
 
 Workflow-level fields the engine actually reads:
 `perUserMaxRunning`, `perUserMaxQueued`, `perAppMaxRunning` (default 25), `perAppMaxQueued` (default 10000), `queueTtlSeconds` (default 43200), `dequeueOrder`, `accessRule`, `runAs` (default `caller` — see "Execution identity" below), `capabilities` (system-only grants), `inputSchema`, `outputSchema`, `requiresClientApply` (default `true` — see "Client apply" below), `syncCallable` (default `false` — see "Synchronous invocation" below). `sync push` forwards every one of these — `name`, `description`, `status`, `accessRule`, `runAs`, queue settings, schemas, `requiresClientApply`, step list — on both a fresh create and a push to an existing workflow, with two exceptions that need a direct CLI update instead: `syncCallable` on an existing workflow (the server re-validates it against the currently-active steps, so `sync push` omits it there — use `primitive workflows update --sync-callable true` after the new steps are live) and `capabilities` on an existing workflow (`sync push` persists `capabilities` on create only — grant or revoke them on an existing workflow with `primitive workflows update --capabilities <list>`, comma-separated, `""` to revoke all).
@@ -536,9 +549,17 @@ kind = "blob.delete"
 bucketKey = "reports"
 blobId = "{{ steps.save.blobId }}"
 # Output: { deleted: true, blobId, bucketId }
+
+[[steps]]
+id = "cleanup-batch"
+kind = "blob.delete"
+bucketKey = "reports"
+blobIds = "{{ steps.expired.output.result | pluck:blobId }}"   # string[], max 500
+# Output: { deleted: N, blobIds, bucketId }
 ```
 
 - Every kind takes exactly one of `bucketId` / `bucketKey`; missing both, an unknown bucket, or a missing required param is non-retryable.
+- **`blob.delete` batch mode.** Exactly one of `blobId` / `blobIds` — supplying both (or neither) is a non-retryable config error. `blobIds` caps at 500 ids per step (`"blob.delete 'blobIds' exceeds the maximum batch size of 500"`); an **empty array is a valid no-op**, so a templated list that resolves to nothing doesn't fail the step. All ids are structurally validated (the error names the offending index) and, in a caller run, all are screened against the bucket's `delete` policy **before any delete happens** — one denial fails the whole step with nothing removed. The delete itself is a single storage call, not per-id round-trips. Output `deleted` counts ids *processed* (input length, duplicates included), unlike `document.delete`'s semantics.
 - `blob.delete` is idempotent: it reports `deleted: true` uniformly, including when the blob is already gone — a retried run doesn't fail on cleanup it already did. `blob.signedUrl` never checks blob existence; an authorized caller mints a token even for an absent blob.
 - **A blob referenced by a run's input must outlive the run's retry window.** Retries re-run against the identical input, so each attempt's `blob.download` re-fetches the same `blobId`; a deleted blob fails the next attempt — and with it the run — with the non-retryable `blob.download blob not found: <blobId>`. Never delete a blob from outside the run (a cancel handler, another workflow) while a run referencing it can still retry — leave it and let the bucket's TTL tier expire it. `blob.delete`'s idempotency covers sequential re-execution of the deleting step only; it is no protection against a concurrent deleter.
 - **Caller-mode access.** In a `runAs:"caller"` run, each kind evaluates the bucket's preset/rule set before the storage op, with the same op mapping as direct client calls: `blob.upload` → `write` (evaluated with `blobId: null`, `createdBy` = the caller), `blob.download` → `read`, `blob.signedUrl` → `share` (minting is gated like sharing, not reading), `blob.delete` → `delete`. Download, signedUrl, and delete load the blob's `createdBy` first so uploader-scoped rules (`record.blobCreatedBy == user.userId`) work; download decides access before revealing whether the blob exists, so a denied caller gets an access error, never not-found. Denial is non-retryable (`"<kind> access denied: …"`). A `runAs:"system"` run skips the bucket policy entirely (app-privileged).
