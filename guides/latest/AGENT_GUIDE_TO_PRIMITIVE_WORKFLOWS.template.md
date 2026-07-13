@@ -1376,10 +1376,10 @@ Opt a workflow into synchronous invocation by setting `syncCallable = true` in t
 Server-side constraints on a `syncCallable` workflow:
 
 - **Step kinds are restricted.** The server validates step kinds against a sync-compatible list when the flag is set (or when steps are pushed against a sync-callable workflow). Long-running or suspending kinds (`event.wait`, `delay` over the timeout) reject at save time with `Workflow contains sync-incompatible steps`.
-- **Timeout.** The invocation timeout defaults to 5s and is capped server-side at 30s (the server CPU budget per request). Exceeding it resolves with `status: "timeout"`.
+- **Timeout.** The invocation timeout defaults to 5s and is capped server-side at 30s (the server CPU budget per request). Exceeding it resolves with `status: "timeout"` — the run isn't cancelled at that boundary, the steps already in flight keep running, but the caller has no way to learn how they end. The run record is stamped `terminated` the moment the timeout fires and is never later updated to `completed`/`failed`. `getStatus` can't recover it either: a `runSync` run has no backing instance the way a `start()` run does, so polling `getStatus` on its `runId` returns `status: "missing"`. There's no supported way to recover a `runSync` call's true outcome after a timeout — for a workflow where the final result matters, use `start()` with `getStatus` instead.
 - **Apply still applies.** A sync-callable workflow may still have `requiresClientApply = true`, in which case the synchronous call resolves with `status: "apply_pending"` and the normal `claimApply`/`confirmApply` flow takes over. Most sync-callable workflows want `requiresClientApply = false`.
 
-Long-running workflows should keep using `start()` plus the WebSocket / polling lifecycle.
+Long-running workflows should keep using `start()` plus the WebSocket / polling lifecycle — a `runSync` timeout has no recovery path, so it's unsafe for anything where you need to know the final outcome.
 
 Call `workflows.runSync` and await the final envelope:
 

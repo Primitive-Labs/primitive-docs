@@ -164,7 +164,7 @@ For short, latency-sensitive workflows, opt the workflow into synchronous invoca
 
 :::
 
-The promise resolves for every terminal outcome; only network errors reject. Long-running workflows should use asynchronous `start()` instead.
+The promise resolves for every terminal outcome, including `timeout`; only network errors reject. A timeout doesn't cancel the workflow, but there's no way to recover its outcome afterward — for a workflow where the final result matters, use asynchronous `start()` with `getStatus` instead.
 
 ### Typed Invocations (TypeScript Codegen)
 
