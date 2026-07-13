@@ -1,7 +1,7 @@
 import type { JsBaoClient } from "js-bao-wss-client";
 
 // List, inspect, and delete blobs in a bucket.
-export async function manageBucket(client: JsBaoClient, blobId: string) {
+export async function manageBucket(client: JsBaoClient, blobId: string, expiredIds: string[]) {
   // #region example
   // List blobs in the bucket
   const { items, cursor } = await client.blobBuckets.list("avatars", { limit: 50 });
@@ -11,6 +11,10 @@ export async function manageBucket(client: JsBaoClient, blobId: string) {
 
   // Delete a blob
   await client.blobBuckets.delete("avatars", blobId);
+
+  // Delete a batch of blobs (up to 500 ids) in one call
+  const batchResult = await client.blobBuckets.delete("avatars", expiredIds);
+  // batchResult: { deleted, blobIds, bucketId }
   // #endregion example
-  return { items, cursor, meta };
+  return { items, cursor, meta, batchResult };
 }

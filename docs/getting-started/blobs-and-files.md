@@ -131,12 +131,7 @@ Use a short expiry for user-facing URLs and regenerate as needed.
 
 :::
 
-To delete a set of blobs in one call, pass `delete` an array of ids (up to 500). The whole batch is screened against the bucket's `delete` rule before anything is removed, so it succeeds or fails as a unit:
-
-```ts
-const result = await client.blobBuckets.delete("exports", expiredIds);
-// → { deleted, blobIds, bucketId } — `deleted` counts the ids processed
-```
+To delete a set of blobs in one call, pass `delete` an array of ids (up to 500) instead of a single id — shown above as `batchResult`. The whole batch is screened against the bucket's `delete` rule before anything is removed, so it succeeds or fails as a unit, and the result is `{ deleted, blobIds, bucketId }` where `deleted` counts the ids processed.
 
 An empty array is a valid no-op, so a computed list that resolves to nothing doesn't throw.
 
