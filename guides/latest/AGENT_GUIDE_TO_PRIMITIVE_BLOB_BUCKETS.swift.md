@@ -45,8 +45,13 @@ The API is **flat** (`client.blobBuckets.upload(bucketIdOrKey, …)`), not a `.b
 
   // Delete a blob
   _ = try await client.blobBuckets.delete(bucketIdOrKey: "avatars", blobId: blobId)
+
+  // Delete a batch of blobs (up to 500 ids) in one call
+  let batchResult = try await client.blobBuckets.delete(bucketIdOrKey: "avatars", blobIds: expiredIds)
+  // batchResult: BatchBlobDeleteResult { deleted, blobIds, bucketId }
 ```
 
+`delete` is overloaded: a single id deletes one blob (`{ deleted: boolean }`); an array of up to 500 ids deletes a batch in one call, returning `{ deleted, blobIds, bucketId }` where `deleted` counts the ids processed (duplicates included). The batch is all-or-nothing: every id — including ids that no longer exist — is screened against the bucket's `delete` policy before anything is removed; one denial → 403 naming the blob, nothing deleted. An empty array is a valid no-op (`deleted: 0`). Footgun: a missing id screens with `record.blobCreatedBy == null`, so under an uploader-scoped policy (e.g. `personal-uploads`) retrying a batch whose ids are already gone is **denied** — idempotent cleanup needs a rule that also permits gone blobs (`record.blobCreatedBy == null || record.blobCreatedBy == user.userId`).
 
 From the CLI, `primitive blob-buckets delete-blob <bucket-id-or-key> <blob-id...>` deletes one or many — multiple ids go through the batch endpoint as one all-or-nothing call, and `--batch` forces the batch endpoint even for a single id.
 

@@ -182,9 +182,11 @@ import { createCheckoutSession } from "./generated/create-checkout-session.gener
 const checkout = createCheckoutSession(client);
 const res = await checkout.runSync({ input: { priceId: "price_123" } }); // input compile-checked
 console.log(res.output?.checkoutUrl);                                    // output typed
+
+const status = await checkout.getStatus({ runKey: "run-1" });            // status.output typed too
 ```
 
-Every workflow gets a `.start`; `.runSync` is generated only for workflows with `syncCallable = true`. The `input` option is required whenever the schema requires fields, optional otherwise. Run with `--check` in CI to fail when the generated files are out of date, the same way `primitive databases codegen --check` guards [database types](./working-with-databases.md#typescript-codegen). Prefer annotating by hand? `client.workflows.start` and `runSync` take the same type parameters directly: `runSync<Input, Output>(...)`.
+Every workflow gets a `.start` and a typed `.getStatus` — bound to the workflow's output type even for async-only workflows with no `.runSync`; `.runSync` is generated only for workflows with `syncCallable = true`. There's no generated `.terminate`; type termination by hand with `client.workflows.terminate<Output>(...)`. The `input` option is required whenever the schema requires fields, optional otherwise. Run with `--check` in CI to fail when the generated files are out of date, the same way `primitive databases codegen --check` guards [database types](./working-with-databases.md#typescript-codegen). Prefer annotating by hand? `client.workflows.start`, `runSync`, `getStatus`, and `terminate` all take the same type parameters directly: `runSync<Input, Output>(...)`, `getStatus<Output>(...)`.
 
 ### Applying Results to Local Data (Client Apply)
 

@@ -435,7 +435,7 @@ Generate typed workflow-invocation wrappers from the `inputSchema`/`outputSchema
 primitive workflows codegen
 ```
 
-Emits one `<key>.generated.ts` per workflow with input/output types and a factory that pins the workflow key; `--check` fails in CI when the output is out of date (see [Typed Invocations](./workflows.md#typed-invocations-typescript-codegen)).
+Emits one `<key>.generated.ts` per workflow with input/output types and a factory that pins the workflow key, with typed `start`/`getStatus` (and `runSync` when the workflow is `syncCallable`); `--check` fails in CI when the output is out of date (see [Typed Invocations](./workflows.md#typed-invocations-typescript-codegen)).
 
 ### Blob Buckets
 

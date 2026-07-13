@@ -1429,7 +1429,7 @@ Call `workflows.runSync` and await the final envelope:
 
 An optional `signal` (`AbortSignal`) is accepted as well.
 
-Both invocation methods are generic: `start<I>(options)` types the `input`, and `runSync<I, O>(options)` additionally types the result envelope's `output` as `O` (`RunSyncWorkflowResult<O>`). Defaults (`Record<string, any>` / `any`) preserve untyped call sites. Rather than hand-writing `I`/`O`, generate them from the workflow's `inputSchema`/`outputSchema` with `primitive workflows codegen` — see [Typed invocation (codegen)](#typed-invocation-codegen).
+Both invocation methods are generic: `start<I>(options)` types the `input`, and `runSync<I, O>(options)` additionally types the result envelope's `output` as `O` (`RunSyncWorkflowResult<O>`). `getStatus<O>(options)` and `terminate<O>(options)` are generic the same way, typing `WorkflowStatusResult<O>`'s `output` — useful for a terminated run that still carries partial output. Defaults (`Record<string, any>` / `any`) preserve untyped call sites. Rather than hand-writing `I`/`O`, generate them from the workflow's `inputSchema`/`outputSchema` with `primitive workflows codegen` — see [Typed invocation (codegen)](#typed-invocation-codegen).
 
 ## Workflow lifecycle
 
@@ -1647,11 +1647,13 @@ import { createCheckoutSession } from "./generated/create-checkout-session.gener
 const wf = createCheckoutSession(client);
 const res = await wf.runSync({ input: { priceId: "price_123" } }); // input: CreateCheckoutSessionInput
 res.output?.checkoutUrl;                                           // output: CreateCheckoutSessionOutput
+
+const status = await wf.getStatus({ runKey: "run-1" });            // status.output: CreateCheckoutSessionOutput | undefined
 ```
 
 Rules the generated code follows:
 
-- `.start` is emitted for every non-internal workflow; `.runSync` **only** when the workflow has `syncCallable = true` (the server rejects run-sync otherwise).
+- `.start` and `.getStatus` are emitted for every non-internal workflow — `.getStatus`'s `output` is bound to `<Key>Output`, so an async-only workflow with no `.runSync` still gets a typed status fetch; `.runSync` **only** when the workflow has `syncCallable = true` (the server rejects run-sync otherwise). No `.terminate` member is generated — the factory stays a start/status helper; type termination manually with `client.workflows.terminate<Output>(...)`.
 - `input` is a **required** option when the schema rejects `{}` (i.e. has required properties), optional otherwise. `workflowKey` is pinned after the options spread, so callers can't override it.
 - Type mapping mirrors the server's schema validator exactly: scalar `type` → TS scalar, scalar-only type unions → TS unions, `enum` → literal union, `object` + `properties`/`required` → interface (open objects get `[key: string]: unknown`; `additionalProperties: false` omits it), `array` + `items` → `T[]`. Anything the validator ignores (`$ref`, `oneOf`/`anyOf`/`allOf`, `format`, tuples) → `unknown`. A schema-less workflow gets `Input`/`Output` of `unknown`.
 - After a CLI upgrade, `primitive workflows codegen --check` exits non-zero when generated files are out of date — regenerate rather than hand-editing (same CI pattern as `primitive databases codegen --check`).
