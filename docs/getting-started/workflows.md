@@ -212,7 +212,7 @@ enum = [ "error" ]
 type = "string"
 ```
 
-Codegen renders this as a `type` union of the member shapes, so a caller narrows on the discriminant the same way they would on any TS discriminated union:
+Codegen renders this as a `type` union of the member shapes. Give the checkout workflow the schema above and its caller narrows on the discriminant the same way they would on any TS discriminated union:
 
 ```ts
 const res = await checkout.runSync({ input: { priceId: "price_123" } });

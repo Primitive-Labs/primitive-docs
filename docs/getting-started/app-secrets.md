@@ -83,6 +83,8 @@ vars = ["ADMIN_GROUP_ID"]
 An undeclared `vars.KEY` is absent when the rule evaluates, so a rule that reads it denies.
 :::
 
+A rule then reads the declared var like any other CEL variable:
+
 ```toml novalidate
 access = "isMemberOf('team', vars.ADMIN_GROUP_ID)"
 ```

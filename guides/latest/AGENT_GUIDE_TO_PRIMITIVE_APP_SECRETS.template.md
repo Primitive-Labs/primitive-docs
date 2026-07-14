@@ -54,7 +54,7 @@ Declare a var for CEL access the same way as a secret, in the owning config's to
 vars = ["ADMIN_GROUP_ID"]
 ```
 
-A rule reads it as `vars.<KEY>`, bound only to declared keys — an undeclared `vars.KEY` is absent at evaluation (denies closed), exactly like `secrets.*`. Vars bind everywhere `secrets.*` does: workflow CEL contexts (`runIf`, `switch` `when`, predicate expressions on batch/collect steps), database operation `access`/per-param `access`, and trigger stamp `value` expressions — forwarded to the same evaluation sites `secrets.*` reaches, including a database's trigger CEL on the DO. There is no `{{vars.KEY}}` template-resolution form (vars are CEL-only, unlike secrets which also resolve in integration/webhook templates) and no client-side read API — `primitive vars list`/the admin API are the only read surfaces.
+A rule reads it as `vars.<KEY>`, bound only to declared keys — an undeclared `vars.KEY` is absent at evaluation (denies closed), exactly like `secrets.*`. Vars bind in workflow CEL contexts (`runIf`, `switch` `when`, predicate expressions on batch/collect steps), database operation `access`/per-param `access`, database trigger CEL, and trigger stamp `value` expressions. There is no `{{vars.KEY}}` template-resolution form (vars are CEL-only, unlike secrets which also resolve in integration/webhook templates) and no client-side read API — `primitive vars list`/the admin API are the only read surfaces.
 
 ## Related guides
 
