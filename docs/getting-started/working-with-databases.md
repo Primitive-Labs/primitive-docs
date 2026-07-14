@@ -242,7 +242,7 @@ type = "string"
 required = true
 ```
 
-**Response:** `{ matched, affected, failed }` — when the definition sets a `source.limit`, the response also carries `truncated` and `appliedLimit`; if `truncated` is `true`, re-run until it returns `false`.
+**Response:** `{ matched, affected, failed }` — when a `source.limit` is set and the match set exceeds it, the response adds `truncated: true` and `appliedLimit`. Re-running until the response no longer reports `truncated` drains the backlog only when the action makes records stop matching the filter — a `delete`, or a `patch` of a filtered field (like `status` above). With an action that leaves the filter's fields untouched (an `increment`, say), each re-run processes the same first batch again.
 
 ### Batch
 Apply many individual writes in a single request by calling a regular mutation operation in bulk with `executeBatch`. The operation's `access` rule is re-evaluated against each item's params — if any item fails authorization the whole batch is rejected before any writes happen. The response is `{ imported, failed }`.
