@@ -552,7 +552,7 @@ Then push with `primitive sync push`. The SDK equivalents are `client.collection
 
 ## Common Patterns
 
-For full app architecture examples showing how groups fit alongside documents and databases, see the [Data Modeling guide](AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.md#example-app-architectures).
+For full app architecture examples showing how groups fit alongside documents and databases, see the [Data Modeling guide](AGENT_GUIDE_TO_PRIMITIVE_DATA_MODELING.md#worked-architectures).
 
 ### Team-based workspace access
 
