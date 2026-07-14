@@ -1502,10 +1502,14 @@ Additional collection calls:
 ```typescript
 // Optional, immutable-after-create — bind create() to a CollectionTypeConfig
 // rule set and an external entity (exposed to CEL as collection.contextId).
+// `initialMetadata` stamps resource-metadata categories at create time (schema-
+// validated, writeRule waived, capped at 10 categories) — see the Resource
+// Metadata guide's "Create-time initial metadata" section.
 const collection = await client.collections.create({
   name: "Q1 Reports",
   collectionType: "class-reports",
   contextId: "math-101",
+  initialMetadata: { settings: { visibility: "class-only" } },
 });
 
 // List
@@ -1570,6 +1574,7 @@ For per-context CEL rules using `collectionType` + `contextId` (and the `hasColl
 
 ```bash
 primitive collections create "Q1 Reports" --description "Quarterly reports"
+primitive collections create "Q1 Reports" --initial-metadata '{"settings":{"visibility":"class-only"}}'
 primitive collections list
 primitive collections docs {add|remove|list} <collection-id> [<document-id>]
 primitive collections share <collection-id> --group team/engineering --permission read-write

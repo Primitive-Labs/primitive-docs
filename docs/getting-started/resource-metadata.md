@@ -33,7 +33,37 @@ primitive sync push
 
 Field types are `string`, `number`, `boolean`, `date`, `id`, and `stringset`; `enum` is valid only on a `string` field. A category holds up to 100 keys and 16 KB of data, and writes are validated against the schema before they're stored.
 
-`readRule` and `writeRule` are CEL expressions evaluated against `user.*` (the caller) and `resource.*` (`resourceType`, `resourceId`, `category`) — app-level owners and admins bypass both. The bypass is the app role only: holding a permission on the resource itself (being a database's owner or manager, say) grants no bypass — the rule is what authorizes resource-scoped callers. `writeRule` gates the write API; `readRule` gates the read API. Omit either and it defaults to deny.
+`readRule` and `writeRule` are CEL expressions evaluated against `user.*` (the caller) and `resource.*` (`resourceType`, `resourceId` — also reachable as `resource.id` — and `category`) — app-level owners and admins bypass both. The bypass is the app role only: holding a permission on the resource itself (being a database's owner or manager, say) grants no bypass — the rule is what authorizes resource-scoped callers. `writeRule` gates the write API; `readRule` gates the read API. Omit either and it defaults to deny.
+
+A category rule can also use the [identity context's](./access-control.md#the-identity-context) group-membership helpers, so access can be group-scoped instead of just self-scoped:
+
+```toml novalidate
+readRule = "isMemberOf('class-teachers', resource.id)"
+```
+
+`isMemberOf`, `memberGroups`, and `hasRole` are all available; `hasCollectionAccess` is not — it's collection-scoped, and a category rule that uses it is rejected when the config is pushed.
+
+### Reading Other Categories from a Category Rule
+
+A category's own `readRule`/`writeRule` can reach the resource's *other* categories — declare a `metadataManifest` on the category config the same way a group type or workflow declares one (see [Using Metadata in Access Rules](#using-metadata-in-access-rules)):
+
+```toml
+# config/metadata-category-configs/class-post.post.toml
+[metadataCategoryConfig]
+resourceType = "class-post"
+category = "post"
+readRule = "isMemberOf('class-teachers', md.self.classLink.classId)"
+writeRule = "isMemberOf('class-teachers', md.self.classLink.classId)"
+
+[metadataCategoryConfig.schema.fields.title]
+type = "string"
+required = true
+
+[metadata.self]
+categories = ["classLink"]
+```
+
+Every category the rule reads as `md.self.<category>.<key>` must be declared, and `secrets.<KEY>` follows the same declared-only rule described in [App Secrets](./app-secrets.md). A category config that declares no `metadataManifest` has no `md`/`secrets` access in its rule at all.
 
 ## Reading and Writing Metadata
 
@@ -179,6 +209,22 @@ required = true
 [metadataCategoryConfig.schema.fields.status]
 type = "string"
 ```
+
+## Stamping Metadata at Create Time
+
+Collections and databases can have metadata stamped in the same call that creates them, instead of a follow-up write. `collections.create()` / `databases.create()` accept an optional `initialMetadata`: a map of category name → values. Each entry is schema-validated before the resource is created — an invalid entry fails the whole create — and the category's `writeRule` is waived for this initial stamp, since creation authority already covers it. Up to 10 categories per create.
+
+```ts
+const database = await client.databases.create({
+  title: "Class Roster",
+  databaseType: "roster",
+  initialMetadata: {
+    settings: { visibility: "class-only" },
+  },
+});
+```
+
+The same param is available on `collections.create()`, and from the CLI as `--initial-metadata '<json>'` on `primitive databases create` / `primitive collections create`.
 
 ## Metadata Lifecycle
 

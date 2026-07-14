@@ -56,6 +56,39 @@ The point of the store is that secret values only ever exist where the server re
 - **Keep credentials in integration config, not workflow steps** — a workflow step's resolved config is recorded on the run, so a secret passed through `request.headers` would appear in step output snapshots. Resolution inside the integration's `defaultHeaders` happens after that snapshot, where it stays invisible. See [`integration.call`](./workflows.md#integration-call).
 - **Clients can't read secrets** — there is no client API for secret values; apps only ever see the results of server-side calls that used them.
 
+## Config Vars
+
+Not every server-side value is a credential. **Config vars** are the non-secret twin of app secrets: the same key format, the same per-app limit, and the same declare-and-bind path into CEL rules — but the values are plaintext. Use a var for something like a platform-assigned group ID that a rule needs to compare against; use a secret for anything that grants access to an external system.
+
+```bash
+# Create or update a var
+primitive vars set ADMIN_GROUP_ID --value grp_01ABC --summary "Admins group id"
+
+# List vars (values are shown — vars are not secret)
+primitive vars list
+
+# Delete a var
+primitive vars delete ADMIN_GROUP_ID
+```
+
+Unlike secrets, vars are readable: `list` shows every value, and a var may appear unmasked in debug traces. Never store a credential in a var.
+
+::: warning The CEL `vars.*` variable is declared-only
+A CEL rule reads a var as `vars.<KEY>`, bound only to the keys the owning config **declares** — the same declared-only discipline as `secrets.*`. List them in the owning config's TOML alongside any declared secrets:
+
+```toml
+vars = ["ADMIN_GROUP_ID"]
+```
+
+An undeclared `vars.KEY` is absent when the rule evaluates, so a rule that reads it denies.
+:::
+
+A rule then reads the declared var like any other CEL variable:
+
+```toml novalidate
+access = "isMemberOf('team', vars.ADMIN_GROUP_ID)"
+```
+
 ## Next Steps
 
 - **[API Integrations](./api-integrations.md)** — The most common secret consumer: authenticated calls to external APIs

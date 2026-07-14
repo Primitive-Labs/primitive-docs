@@ -536,6 +536,8 @@ Sharing one document at a time stops scaling as soon as access maps to a *set* o
 
 :::
 
+A collection can also be created with its first [resource metadata](./resource-metadata.md#stamping-metadata-at-create-time) already stamped, via `initialMetadata` on `collections.create()`.
+
 Collections sit between single-document shares and groups: share a *document* when access is about that one thing, share a *collection* when access is about a set of documents, and use a *group* when access is about who someone is (a team, a role). Membership works like document sharing — add by user ID or by email (email adds to non-users resolve at signup, like any [deferred grant](./invitations.md#sharing-with-people-who-aren-t-users-yet)), and list current members and pending invitations:
 
 ::: code-group
