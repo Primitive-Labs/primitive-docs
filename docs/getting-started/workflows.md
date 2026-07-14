@@ -166,6 +166,8 @@ For short, latency-sensitive workflows, opt the workflow into synchronous invoca
 
 The promise resolves for every terminal outcome; only network errors reject. Long-running workflows should use asynchronous `start()` instead.
 
+A call that exceeds `timeoutMs` (default 5 seconds, capped at 30 by the server) resolves with `status: "timeout"` — and that ends the call, not necessarily the work. Execution isn't interrupted at the boundary, so writes from steps already in flight can still land; but the run's record is finalized as `terminated` before the envelope returns, and it never later becomes `completed`. Don't poll `getStatus` waiting for a timed-out run to finish — it keeps reporting `terminated`. Treat the run as incomplete: check the state it was supposed to produce, and recover with idempotent writes so cleanup is safe even if a late step landed. To try again, call `runSync` with a new `runKey` — reusing the old one returns the terminated run instead of executing again.
+
 ### Typed Invocations (TypeScript Codegen)
 
 When a workflow declares an `inputSchema` / `outputSchema`, the CLI can generate typed invocation wrappers from the workflow TOML in your sync directory:
