@@ -221,7 +221,7 @@ The accept call (shown in [Accept an invite token](#accept-an-invite-token) abov
 
 ## Deferred Grants
 
-Deferred grants bridge "I have an email" and "they're in the app." When you share a document, add someone to a group, or add them to a collection **by email** and that email isn't yet a user, the platform mints (or reuses) an `AppInvitation` and records the pending grant. The grant-side mechanics live with each resource (documents in the [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#document-sharing), groups in the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md#managing-members)); the resolution lifecycle is below.
+Deferred grants bridge "I have an email" and "they're in the app." When you share a document, add someone to a group, or add them to a collection **by email** and that email isn't yet a user, the platform mints (or reuses) an `AppInvitation` and records the pending grant. The grant-side mechanics live with each resource (documents in the [Documents guide](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#sharing-documents), groups in the [Users and Groups guide](AGENT_GUIDE_TO_PRIMITIVE_USERS_AND_GROUPS.md#managing-members)); the resolution lifecycle is below.
 
 ### Lifecycle
 
