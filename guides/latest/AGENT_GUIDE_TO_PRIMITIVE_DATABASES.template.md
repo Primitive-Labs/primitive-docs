@@ -341,7 +341,7 @@ Beyond sync, the CLI exposes commands for one-off ops (use `--help` for full fla
 
 ```bash
 primitive database-types list | get <type> | delete <type> | operations list <type>
-primitive databases list | get <id> | create "Title" --type <type> [--cel-context '{...}'] | delete <id>
+primitive databases list | get <id> | create "Title" --type <type> [--cel-context '{...}'] [--initial-metadata '{...}'] | delete <id>
 primitive databases cel-context update <id> --data '{"teamId":"team-1"}'
 
 # Admin record introspection

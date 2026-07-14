@@ -188,6 +188,39 @@ const status = await checkout.getStatus({ runKey: "run-1" });            // stat
 
 Every workflow gets a `.start` and a typed `.getStatus` — bound to the workflow's output type even for async-only workflows with no `.runSync`; `.runSync` is generated only for workflows with `syncCallable = true`. There's no generated `.terminate`; type termination by hand with `client.workflows.terminate<Output>(...)`. The `input` option is required whenever the schema requires fields, optional otherwise. Run with `--check` in CI to fail when the generated files are out of date, the same way `primitive databases codegen --check` guards [database types](./working-with-databases.md#typescript-codegen). Prefer annotating by hand? `client.workflows.start`, `runSync`, `getStatus`, and `terminate` all take the same type parameters directly: `runSync<Input, Output>(...)`, `getStatus<Output>(...)`.
 
+An `outputSchema` can express a discriminated union with `oneOf`, when every member is an object and shares exactly one property declared as a distinct single-value `enum` — the discriminant is auto-detected, not named explicitly:
+
+```toml
+[[workflow.outputSchema.oneOf]]
+type = "object"
+required = [ "status", "checkoutUrl" ]
+[workflow.outputSchema.oneOf.properties.status]
+type = "string"
+enum = [ "ok" ]
+[workflow.outputSchema.oneOf.properties.checkoutUrl]
+type = "string"
+
+[[workflow.outputSchema.oneOf]]
+type = "object"
+required = [ "status", "message" ]
+[workflow.outputSchema.oneOf.properties.status]
+type = "string"
+enum = [ "error" ]
+[workflow.outputSchema.oneOf.properties.message]
+type = "string"
+```
+
+Codegen renders this as a `type` union of the member shapes, so a caller narrows on the discriminant the same way they would on any TS discriminated union:
+
+```ts
+const res = await checkout.runSync({ input: { priceId: "price_123" } });
+if (res.output?.status === "ok") {
+  console.log(res.output.checkoutUrl);   // narrowed to the "ok" member
+} else if (res.output?.status === "error") {
+  console.log(res.output.message);       // narrowed to the "error" member
+}
+```
+
 ### Applying Results to Local Data (Client Apply)
 
 A workflow runs on the server, but its result often belongs in a **document** — local-first data only clients write. Set `requiresClientApply = true` on the workflow and the run doesn't finish at the last step: it transitions to `apply_pending`, and a connected client claims it, writes the output into the document, and confirms:

@@ -32,8 +32,9 @@ primitive sync push
 - **Field types:** `string`, `number`, `boolean`, `date`, `id`, `stringset`. `enum` (string array) is valid only on a `string` field; other supported constraints are `required`, `maxLength`, `maxCount`.
 - **Category name `attrs` is reserved** — it's the read-only projected category (see **`md.self.attrs`** below), not a category you define.
 - **Limits:** up to 100 keys per category, 16 KB per category item.
-- **`readRule`/`writeRule` context:** `user.userId`, `user.role` (the caller), `resource.resourceType`, `resource.resourceId`, `resource.category` — plus `workflow.workflowKey` when the call originates from a `metadata.write`/`metadata.read` step (so `fromWorkflow('key')` works). An **app-level** owner or admin always bypasses both rules; a resource-level permission (e.g. a database's `owner`/`manager` grant) never bypasses — the rule itself is what authorizes resource-scoped callers. Omitting either rule defaults to deny.
+- **`readRule`/`writeRule` context:** `user.userId`, `user.role` (the caller), `resource.resourceType`, `resource.resourceId` (also bound as `resource.id`), `resource.category` — plus `workflow.workflowKey` when the call originates from a `metadata.write`/`metadata.read` step (so `fromWorkflow('key')` works). The membership helpers `isMemberOf`/`memberGroups`/`hasRole` are also wired, so a rule can be group-scoped (`isMemberOf('class-teachers', resource.id)`) instead of only self-scoped; memberships load once, only when the rule references a membership helper (`hasRole` needs no load — it reads only `user.role`). `hasCollectionAccess` is rejected at save time in a category rule (collection-scoped only; it can never resolve here). An **app-level** owner or admin always bypasses both rules; a resource-level permission (e.g. a database's `owner`/`manager` grant) never bypasses — the rule itself is what authorizes resource-scoped callers. Omitting either rule defaults to deny.
 - **Category authoring is admin-scoped** — define and update categories via TOML sync, or directly through the admin-gated `metadata-categories` REST route. `client.resourceMetadata` covers values only (`get`/`set`/`getBatch`).
+- **A category rule can declare its own `metadataManifest`** (same `self`/`paths`/`secrets`/`vars` shape as any other owning config) so it can reach the resource's *other* categories, declared secrets, or declared vars — see "A category rule's own manifest" below. Without one, the rule sees no `md`/`secrets`/`vars` at all (unchanged from the base case).
 
 ## Values: read, write, batch read
 
@@ -88,6 +89,28 @@ categories = ["config", "attrs"]
 ```toml novalidate
 member.create = "md.self.config.tier == \"pro\""
 ```
+
+### A category rule's own manifest
+
+The declaration above is for *other* configs (group/collection/database type, workflow definition) reading the resource they're attached to. A metadata **category config** can declare the same manifest shape on itself, letting its `readRule`/`writeRule` reach the resource's *other* categories:
+
+```toml
+# config/metadata-category-configs/class-post.post.toml
+[metadataCategoryConfig]
+resourceType = "class-post"
+category = "post"
+readRule = "isMemberOf('class-teachers', md.self.classLink.classId)"
+writeRule = "isMemberOf('class-teachers', md.self.classLink.classId)"
+
+[metadataCategoryConfig.schema.fields.title]
+type = "string"
+required = true
+
+[metadata.self]
+categories = ["classLink"]
+```
+
+Every `md.self.<category>` the rule reads must be declared here — an undeclared reference is a save-time `400`, not a silent null. `secrets.<KEY>` / `vars.<KEY>` follow the same declared-only rule as any other manifest-bearing config. A category config with no `metadataManifest` is unchanged — no `md`/`secrets`/`vars` binds at all.
 
 ### `md.self.attrs` — the projected category
 
@@ -182,6 +205,31 @@ saveAs = "output"
 - Error behavior mirrors `database.*` steps: a 4xx (schema validation, rule denial, reserved category, bad segment) is **non-retryable**; a 429 or 5xx is retryable.
 - A `runAs:"system"` run's metadata calls carry no `user.*` context (empty `{}`) and get no app-level owner/admin bypass — only `fromWorkflow('key')` can authorize a system-run write/read. A `runAs:"caller"` run's calls still get the app-level owner/admin bypass.
 
+## Create-time initial metadata
+
+{{#lang ts}}
+`collections.create()` / `databases.create()` accept an optional `initialMetadata: Record<string, Record<string, unknown>>` — category name → values, stamped once the resource exists (so `md.self` resolves) instead of via a follow-up write:
+
+```typescript
+const database = await client.databases.create({
+  title: "Class Roster",
+  databaseType: "roster",
+  initialMetadata: {
+    settings: { visibility: "class-only" },
+  },
+});
+```
+
+```bash
+primitive databases create "Class Roster" --type roster --initial-metadata '{"settings":{"visibility":"class-only"}}'
+primitive collections create "Class 42" --initial-metadata '{"settings":{"visibility":"class-only"}}'
+```
+
+- Each category is schema-validated **before** the resource is created — an invalid entry fails the whole create (all-or-nothing), not a partial create with dropped metadata.
+- The category's `writeRule` is **waived** for this stamp — creation authority already covers it. The waiver is unreachable from the regular REST write route: it never accepts a caller-supplied `resourceId`, so it can't be used to bypass `writeRule` on an existing resource.
+- Capped at 10 categories per create.
+{{/lang}}
+
 ## Metadata lifecycle
 
 A write never checks that the target resource exists — a write for a not-yet-created or already-deleted resource succeeds silently, and deleting a resource does not delete its metadata (no cascade). This is deliberate: it keeps a write to a single cheap put, and doesn't race provisioning flows that write metadata immediately after — or interleaved with — creating the resource itself.
@@ -199,10 +247,13 @@ A write never checks that the target resource exists — a write for a not-yet-c
 - Trying to create or list category configs from the client SDK — that surface is TOML-sync/admin-REST only.
 - Treating `set()` as a merge — it's a full replace of the category's data.
 - Expecting a metadata change to appear on other clients without a new read — updates are never pushed; poll for freshness, or model live client state in a document instead.
+- Using `hasCollectionAccess` in a category rule expecting it to resolve — it's rejected at save time; it only works in collection rules.
+- Expecting `initialMetadata`'s `writeRule` waiver to also apply to a later write on the same resource — it's create-only and unreachable once the resource exists.
 
 ## Related guides
 
-- **access-control** — the shared CEL identity context every rule builds on
+- **access-control** — the shared CEL identity context every rule builds on, including the membership helpers
 - **users-and-groups** — group/collection `metadataManifest` and the projected `attrs` category
 - **databases** — `md.self`/`md.caller` in operation `access` and `$md.self.*` substitution
 - **workflows** — the `metadata.write`/`metadata.read` step shapes and `fromWorkflow()`
+- **app-secrets** — the declared-only `secrets.*`/`vars.*` binding a category manifest can also reach

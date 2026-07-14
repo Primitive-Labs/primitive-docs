@@ -1,6 +1,6 @@
 # Agent Guide to Primitive App Secrets
 
-Guidelines for AI agents managing credentials in Primitive apps. App secrets are the platform's server-side store for API keys, tokens, and other credentials referenced from backend config as `{{secrets.KEY}}`. Values resolve only on the server — they never appear in the repo, client code, or anything shipped to users.
+Guidelines for AI agents managing credentials in Primitive apps. App secrets are the platform's server-side store for API keys, tokens, and other credentials referenced from backend config as `{{secrets.KEY}}`. Values resolve only on the server — they never appear in the repo, client code, or anything shipped to users. **Config vars** (below) are the non-secret twin of the same mechanism.
 
 ## CLI
 
@@ -38,9 +38,27 @@ Integration templates only match uppercase keys — `{{secrets.MY_KEY}}` with `[
 3. **Rotation is an overwrite**: `primitive secrets set KEY --value <new>` takes effect on the next resolution — no config push needed, since config references the key, not the value.
 4. After changing which keys exist, re-check references: an unresolved `{{secrets.MISSING}}` in a workflow renders the missing-path sentinel (or fails the step under `strict = true`); an integration header referencing a deleted key sends the unresolved placeholder upstream.
 
+## Config Vars
+
+The non-secret twin of app secrets: same key format (`^[A-Z][A-Z0-9_]{0,63}$`), same 2 KB value cap, same 100-per-app limit, same declared-only CEL binding — minus masking. Use a var for a plaintext app-wide scalar a rule needs to compare against (a platform-assigned group ID, say); use a secret for anything that grants access to an external system.
+
+```bash
+primitive vars set ADMIN_GROUP_ID --value grp_01ABC --summary "Admins group id"
+primitive vars list          # values ARE shown — vars are not secret
+primitive vars delete ADMIN_GROUP_ID
+```
+
+Declare a var for CEL access the same way as a secret, in the owning config's top-level manifest:
+
+```toml
+vars = ["ADMIN_GROUP_ID"]
+```
+
+A rule reads it as `vars.<KEY>`, bound only to declared keys — an undeclared `vars.KEY` is absent at evaluation (denies closed), exactly like `secrets.*`. Vars bind everywhere `secrets.*` does: workflow CEL contexts (`runIf`, `switch` `when`, predicate expressions on batch/collect steps), database operation `access`/per-param `access`, and trigger stamp `value` expressions — forwarded to the same evaluation sites `secrets.*` reaches, including a database's trigger CEL on the DO. There is no `{{vars.KEY}}` template-resolution form (vars are CEL-only, unlike secrets which also resolve in integration/webhook templates) and no client-side read API — `primitive vars list`/the admin API are the only read surfaces.
+
 ## Related guides
 
-- **integrations** — the most common consumer (auth headers, static query params)
-- **workflows** — `secrets.*` in the template/CEL context
-- **databases** — `secrets.*` in operation access rules and trigger stamps
-- **configuration** — the sync loop that carries secret-referencing TOML
+- **integrations** — the most common secret consumer (auth headers, static query params)
+- **workflows** — `secrets.*` / `vars.*` in the template/CEL context
+- **databases** — `secrets.*` / `vars.*` in operation access rules and trigger stamps
+- **configuration** — the sync loop that carries secret- and var-referencing TOML

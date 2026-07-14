@@ -1566,8 +1566,46 @@ Rules the generated code follows:
 
 - `.start` and `.getStatus` are emitted for every non-internal workflow — `.getStatus`'s `output` is bound to `<Key>Output`, so an async-only workflow with no `.runSync` still gets a typed status fetch; `.runSync` **only** when the workflow has `syncCallable = true` (the server rejects run-sync otherwise). No `.terminate` member is generated — the factory stays a start/status helper; type termination manually with `client.workflows.terminate<Output>(...)`.
 - `input` is a **required** option when the schema rejects `{}` (i.e. has required properties), optional otherwise. `workflowKey` is pinned after the options spread, so callers can't override it.
-- Type mapping mirrors the server's schema validator exactly: scalar `type` → TS scalar, scalar-only type unions → TS unions, `enum` → literal union, `object` + `properties`/`required` → interface (open objects get `[key: string]: unknown`; `additionalProperties: false` omits it), `array` + `items` → `T[]`. Anything the validator ignores (`$ref`, `oneOf`/`anyOf`/`allOf`, `format`, tuples) → `unknown`. A schema-less workflow gets `Input`/`Output` of `unknown`.
+- Type mapping mirrors the server's schema validator exactly: scalar `type` → TS scalar, scalar-only type unions → TS unions, `enum` → literal union, `object` + `properties`/`required` → interface (open objects get `[key: string]: unknown`; `additionalProperties: false` omits it), `array` + `items` → `T[]`. A qualifying discriminated-union `oneOf` (see below) → a `type` union alias. Anything else the validator ignores (`$ref`, `anyOf`/`allOf`, `format`, tuples) → `unknown`. A schema-less workflow gets `Input`/`Output` of `unknown`.
 - After a CLI upgrade, `primitive workflows codegen --check` exits non-zero when generated files are out of date — regenerate rather than hand-editing (same CI pattern as `primitive databases codegen --check`).
+
+### Discriminated-union (`oneOf`) schema outputs
+
+`inputSchema`/`outputSchema` support an opt-in tagged-union mode: a `oneOf` array whose members are **all** `type: "object"`, sharing exactly one property declared as a distinct single-literal `enum` in every member — that property is auto-detected as the discriminant (there is no way to name it explicitly). The server validates a value by branch-selecting on the discriminant and checking only the matched member; an unmatched or non-object value is a validation error.
+
+```toml
+[[workflow.outputSchema.oneOf]]
+type = "object"
+required = [ "status", "checkoutUrl" ]
+[workflow.outputSchema.oneOf.properties.status]
+type = "string"
+enum = [ "ok" ]
+[workflow.outputSchema.oneOf.properties.checkoutUrl]
+type = "string"
+
+[[workflow.outputSchema.oneOf]]
+type = "object"
+required = [ "status", "message" ]
+[workflow.outputSchema.oneOf.properties.status]
+type = "string"
+enum = [ "error" ]
+[workflow.outputSchema.oneOf.properties.message]
+type = "string"
+```
+
+Codegen renders a qualifying `oneOf` as a `type` union alias (not an `interface`) of the member object types, joined with `|` — the natural shape for a caller to narrow on the discriminant:
+
+```ts
+const res = await wf.runSync({ input: { priceId: "price_123" } });
+if (res.output?.status === "ok") res.output.checkoutUrl;   // narrowed
+```
+
+Rules and failure modes:
+
+- `anyOf` is **not** supported for tagged unions — a qualifying all-object `anyOf` throws a codegen error suggesting `oneOf`; a non-qualifying `anyOf` renders `unknown` as before.
+- A `oneOf` that looks like a tagged union but is defective — fewer than 2 members, no discriminator, or an ambiguous one (more than one candidate property) — **throws a codegen error** rather than silently falling back to `unknown`. Fix the schema (add/remove a candidate property, or give every member a distinct literal) rather than working around the error.
+- A tagged union must carry `oneOf` as its **only** top-level constraint — combining it with sibling `type`/`properties`/`required`/`additionalProperties`/`items`/`enum` is rejected; put shared constraints inside each member instead.
+- A `oneOf` with any non-object member (a scalar/mixed union) is not interpreted as a tagged union at all — it falls through to the `unknown` rendering like any other unsupported keyword, no error.
 {{/lang}}
 
 ## WebSocket events

@@ -28,6 +28,8 @@ Every operation has an access control expression written in [CEL (Common Express
 primitive databases create "Product Catalog" --type products
 ```
 
+A database can also be created with its first [resource metadata](./resource-metadata.md#stamping-metadata-at-create-time) already stamped, via `--initial-metadata` (or `initialMetadata` on `databases.create()`).
+
 ### 2. Define Operations
 
 Pull your config directory, then define operations in the synced `database-types/products.toml`:

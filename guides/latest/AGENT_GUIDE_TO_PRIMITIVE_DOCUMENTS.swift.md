@@ -1171,6 +1171,7 @@ For per-context CEL rules using `collectionType` + `contextId` (and the `hasColl
 
 ```bash
 primitive collections create "Q1 Reports" --description "Quarterly reports"
+primitive collections create "Q1 Reports" --initial-metadata '{"settings":{"visibility":"class-only"}}'
 primitive collections list
 primitive collections docs {add|remove|list} <collection-id> [<document-id>]
 primitive collections share <collection-id> --group team/engineering --permission read-write
