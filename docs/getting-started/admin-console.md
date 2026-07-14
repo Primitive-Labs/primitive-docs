@@ -6,6 +6,7 @@ The Primitive Admin Console is a web-based dashboard for managing your apps, use
 
 ### App Configuration
 - View and update app settings (name, mode, allowed origins)
+- Manage [app secrets](./app-secrets.md) (values write-only — never displayed after saving) and non-secret [config vars](./app-secrets.md#config-vars) (values shown in plain text)
 - Configure authentication providers (Google OAuth credentials, Magic Link, OTP, Passkeys)
 - Manage email templates for authentication flows
 - Set invite-only mode for controlled access

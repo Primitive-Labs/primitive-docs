@@ -293,7 +293,7 @@ now = "2026-04-27T00:00:00Z"
 # default cap (1000) fails the step instead of truncating.
 ```
 
-Workflows have no batch-write step kind. To apply a set of updates, run `forEach` over a `database.mutate` step (see `forEach` below), or use `database.applyToQuery` for query-driven updates.
+Workflows have no *database* batch-write step kind. To apply a set of database updates, run `forEach` over a `database.mutate` step (see `forEach` below), or use `database.applyToQuery` for query-driven updates. (Document writes are different: see `document.save`/`patch`/`delete` batch mode and `document.bulkUpdate` below.)
 
 ### `document.query` / `queryOne` / `count` / `save` / `patch` / `delete`
 
@@ -413,6 +413,43 @@ Rules and edge cases:
 - **Batch failures are non-retryable** — a validation or constraint failure fails the run immediately rather than retrying.
 - **Id-less batch `save` and retries.** An omitted `id` mints a fresh ULID server-side on every attempt — retrying a batch save whose records had no `id` (e.g. after a transient error) creates duplicates rather than upserting the originals. Supply explicit ids, or make the workflow idempotent some other way, if the step might retry.
 - **Projection freshness.** A batch marks the document's query projection dirty once (rebuilt on the next read) instead of updating it inline per record — the first `document.query`/`count` after a batch pays one rebuild rather than N inline upserts. Single-record writes still update the projection inline.
+
+### `document.bulkUpdate` — multi-model atomic write (`operations`)
+
+Batch mode is per-model and per-chunk atomic; `document.bulkUpdate` is the whole-blob atomic form: an ordered `operations` array spanning **any of the document's models**, applied in one transaction with one persist and one change broadcast. All-or-nothing across the entire list — a mid-list failure rolls back everything before it.
+
+Takes `documentId` **or** `documentAlias` (same alias rules as the other document steps); no step-level `modelName` — each operation names its own `model`:
+
+```toml
+[[steps]]
+id = "apply-rebalance"
+kind = "document.bulkUpdate"
+documentId = "{{ outputs.doc.documentId }}"
+saveAs = "applied"
+operations = [
+  { model = "Account",  action = "create", id = "{{ input.newAccountId }}", fields = { name = "Growth", balance = 0 } },
+  { model = "Ledger",   action = "patch",  id = "{{ input.ledgerId }}", fields = { rebalancedAt = "{{ now }}" } },
+  { model = "Position", action = "delete", id = "{{ input.staleId }}" },
+]
+```
+
+Operation shape: `{ model, action, id, fields? }`. The `action` vocabulary is exactly `create` | `patch` | `delete` — not add/update/save.
+
+| `action` | `id` | Semantics |
+|---|---|---|
+| `create` | **required, caller-supplied ULID** (must match `^[0-9A-HJKMNP-TV-Z]{26}$` — 26 uppercase Crockford chars) | Strict create — fails if the id already exists. The server never mints ids for this step. |
+| `patch` | required, non-empty string | Merges `fields` — fails if the id doesn't exist. |
+| `delete` | required, non-empty string | Removes the record; an id that doesn't exist is a no-op (contributes 0 to `deleted`). |
+
+Output: `{ applied, added, updated, deleted }` — `added`/`updated` list `{ model, id }` per committed create/patch in input order; `deleted` is the count actually removed.
+
+Rules and edge cases:
+
+- **Cap = 500 operations**, a separate constant from batch mode's 100-record chunk — and **never chunked** (chunking would break the atomicity that is this step's point). Over 500 is rejected non-retryably before any write.
+- **Mint create ids with <span v-pre>`{{ ulid }}`</span>** (template helper) for statically-known counts, or the script `ulid()` builtin when a script builds the operations array dynamically — pre-minting is what lets a later operation in the same blob reference a record an earlier operation creates.
+- **Validation-first, then fail-fast.** A structural pass (shape, cap, ULID well-formedness, known `action`) runs before any write; failures are non-retryable and name the offending operation index and model. State-dependent failures (create-collision, patch-miss, unique-index violation) abort inside the transaction — nothing commits — and are also non-retryable. Transient storage/broadcast failures stay retryable.
+- **Operations apply in listed order** within the one transaction.
+- **Caller-mode ACL is checked once** at write level: the caller needs `read-write` on the document; denial is non-retryable and nothing commits. An empty `operations` array is a clean no-op.
 
 ### `group.addMember` / `removeMember` / `removeAll` / `checkMembership` / `listMembers` / `listUserMemberships`
 
@@ -690,7 +727,7 @@ saveAs = "billingUpgrades"
 
 ### `script`
 
-Runs a sandboxed [Rhai](https://rhai.rs/) script over JSON input and returns JSON. Use it for transforms too involved for a templated `transform` step (nested reshaping, derived fields, array map/filter/reduce). The sandbox is **deterministic and side-effect-free** — no network, clock, or storage access — so script steps are safe to retry and easy to test. The [Scripts guide](AGENT_GUIDE_TO_PRIMITIVE_SCRIPTS.md) covers the script model, input/output contract, limits, error codes, and gotchas in full; this section is the step-level reference.
+Runs a sandboxed [Rhai](https://rhai.rs/) script over JSON input and returns JSON. Use it for transforms too involved for a templated `transform` step (nested reshaping, derived fields, array map/filter/reduce). The sandbox is **side-effect-free** — no network or storage access — and deterministic except for the `ulid()` builtin (mints fresh record ids, e.g. for `document.bulkUpdate` creates), so script steps are safe to retry and easy to test. The [Scripts guide](AGENT_GUIDE_TO_PRIMITIVE_SCRIPTS.md) covers the script model, input/output contract, limits, error codes, and gotchas in full; this section is the step-level reference.
 
 ```toml
 [[steps]]
@@ -936,7 +973,7 @@ When a parallel `forEach` batch's combined output exceeds the inline size limit 
 
 ### Batch database updates
 
-Workflows have no batch-write step kind — a set of database updates is a `forEach` over a `database.mutate` step (add `concurrency` to parallelize):
+Workflows have no *database* batch-write step kind — a set of database updates is a `forEach` over a `database.mutate` step (add `concurrency` to parallelize):
 
 ```toml
 [[steps]]

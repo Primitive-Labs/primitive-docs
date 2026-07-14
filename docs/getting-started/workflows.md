@@ -515,6 +515,7 @@ Every step has an `id` (unique within the workflow) and a `kind` (the step type)
 | `integration.call` | Call an external API via a configured integration |
 | `database.query` / `mutate` / `count` / `aggregate` / `pipeline` / `applyToQuery` | Run registered database operations |
 | `document.query` / `queryOne` / `count` / `save` / `patch` / `delete` | Read and write records in a document's models |
+| `document.bulkUpdate` | Apply creates, patches, and deletes across several models in one atomic write |
 | `document.resolveAlias` | Resolve a document alias to its id (or null) for conditional branching |
 | `group.addMember` / `removeMember` / `removeAll` / `checkMembership` / `listMembers` / `listUserMemberships` | Group membership operations |
 | `collection.addDocument` / `removeDocument` | Add a document to a [collection](./working-with-documents.md#collections) or remove one |
@@ -556,7 +557,7 @@ The step's result is the templated table itself — `steps.final` (and `outputs.
 
 ### `script`
 
-For data shaping that's more involved than a templated `transform` step — reshaping nested JSON, computing derived fields, filtering and mapping arrays — a `script` step runs a sandboxed [Rhai](https://rhai.rs/) script over its JSON input and returns JSON. Scripts are **deterministic and side-effect-free** (no network, no clock, no storage), so they're safe to retry and easy to test.
+For data shaping that's more involved than a templated `transform` step — reshaping nested JSON, computing derived fields, filtering and mapping arrays — a `script` step runs a sandboxed [Rhai](https://rhai.rs/) script over its JSON input and returns JSON. Scripts are **side-effect-free** (no network, no storage) and deterministic, so they're safe to retry and easy to test — with one deliberate exception: the `ulid()` builtin mints a fresh, sortable unique id on each call (for pre-minting record ids ahead of a `document.bulkUpdate` write), so a script that calls it returns different ids run to run, while a script that doesn't stays fully reproducible.
 
 A script body lives in your sync directory as `transforms/<name>.rhai` and is pushed with `primitive sync push`:
 
@@ -878,7 +879,22 @@ records = "{{ steps.rows.output.result.rows }}"   # each { id?, ...fields } — 
 
 `document.save` returns `{ saved, savedIds }` and `document.patch` returns `{ patched, patchedIds }` (each element of `records` needs an `id` for `patch`); `document.delete` returns `{ deleted }` (a non-existent id is a no-op, not an error). Re-running a batch save whose records had no `id` mints fresh ids each time rather than upserting the same ones — give records an explicit `id` if the workflow might retry.
 
-### Group Steps
+**Writing across models atomically.** Batch mode works on one model at a time, and a batch over 100 records commits chunk by chunk. When a write spans models and must land whole — create an account, adjust a ledger, retire a stale position, all or nothing — `document.bulkUpdate` applies an ordered list of `operations` across any of the document's models in a single transaction with a single change broadcast:
+
+```toml
+[[steps]]
+id = "apply-rebalance"
+kind = "document.bulkUpdate"
+documentId = "{{ outputs.doc.documentId }}"
+saveAs = "applied"
+operations = [
+  { model = "Account",  action = "create", id = "{{ input.newAccountId }}", fields = { name = "Growth", balance = 0 } },
+  { model = "Ledger",   action = "patch",  id = "{{ input.ledgerId }}", fields = { rebalancedAt = "{{ now }}" } },
+  { model = "Position", action = "delete", id = "{{ input.staleId }}" },
+]
+```
+
+Each operation names its `model`, an `action` (`create`, `patch`, or `delete` — that exact vocabulary), and an `id`; `create` and `patch` carry the record fields in `fields`. A `create` never mints its id server-side: the caller supplies a ULID (26 uppercase characters), typically from the <span v-pre>`{{ ulid }}`</span> [template helper](#built-in-helpers) or a script's `ulid()` builtin — which also lets one operation reference the id another operation in the same list just created. Up to 500 operations apply in listed order, all-or-nothing: a `create` whose id already exists or a `patch` whose id doesn't fails the whole blob and nothing commits. The step returns `{ applied, added, updated, deleted }`, where `added` and `updated` list `{ model, id }` per committed create and patch. Like the other document writes, caller-mode runs need `read-write` on the document, and `documentAlias` targeting works here too.
 
 `group.addMember`, `group.removeMember`, `group.removeAll`, `group.checkMembership`, `group.listMembers`, and `group.listUserMemberships` manage [groups](./users-and-groups.md) from a workflow:
 

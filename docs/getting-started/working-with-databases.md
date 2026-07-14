@@ -139,6 +139,8 @@ required = true
 
 **Response:** `{ data: [...records], hasMore: boolean, nextCursor?: string }`
 
+A `projection` in the definition controls which fields come back. The inclusion form `projection = { title = 1, status = 1 }` returns just those fields (plus `id`); the exclusion form `projection = { internalNotes = 0 }` strips the named fields on the server before the response is built, so an operation can expose a model while keeping sensitive columns from ever reaching the caller. `id` and `type` are always returned.
+
 A parameter can also be an array — declare `type = "array"` with a scalar `items` type, and callers pass a list for the filter to consume with `$in` / `$nin`:
 
 ```toml
@@ -585,7 +587,7 @@ Each change carries two discriminants: `op` — the underlying write — and `ch
 
 | `op` | `data` | `previousData` |
 |---|---|---|
-| `save` | The full submitted row | The pre-write row; `null` for a fresh insert |
+| `save` | The full row as persisted (the submitted row, with server-applied fields merged over it) | The pre-write row; `null` for a fresh insert |
 | `patch` | **The patched fields only**, at their new values | The pre-write row |
 | `increment` | The per-field increment **amounts** — not the resulting values | The pre-write row |
 | `addToSet` / `removeFromSet` | The values **added or removed** per field — not the resulting sets | The pre-write row |
@@ -593,7 +595,7 @@ Each change carries two discriminants: `op` — the underlying write — and `ch
 
 Everything in both columns passes through the subscription's `select` projection. An `applyToQuery` operation arrives as one `patch`/`increment`/set-op/`delete` change per matched record — there is no `applyToQuery` op on the wire. And because `data`'s shape follows `op`, an `enter` transition doesn't imply a full row: a patch that brings a row into the filter set delivers `changeType: "enter"` with only the changed fields.
 
-One addition to the table: when the type configures `timestamps`, the server-stamped fields ride along in `data` on `save` and `patch` at their persisted values (subject to `select`) — a patch's `data` is the patched fields plus the stamp. `increment` and the set ops don't stamp, so their frames carry no stamp fields.
+One addition to the table: server-applied fields — `timestamps` stamps, `autoPopulatedFields`, and trigger `set` values — ride along in `data` on `save` and `patch` at their persisted values (subject to `select`), and a server-applied value wins over what the caller submitted for the same field. A patch's `data` is the patched fields plus those server-applied fields. Subscription `filter` expressions also see them, so a filter can match on a trigger-computed field. `increment` and the set ops don't stamp, so their frames carry no server-applied fields.
 
 **Merge, don't assign.** Replacing a cached row with `change.data` on a patch silently blanks every field the write didn't touch. Key your cache on `change.id`, replace the row on `save`, merge the fields present in `data` on a `patch`, and drop the row on `delete`. For `increment` and the set ops, `data` is the *delta*, not the new value — derive the new value from `previousData` plus `data` (add the amount; union or subtract the set values), the pattern the example above follows. If your handler needs a field the write didn't include (say, a grouping key), read it from `previousData`.
 

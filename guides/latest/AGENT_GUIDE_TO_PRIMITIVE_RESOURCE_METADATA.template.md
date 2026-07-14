@@ -32,13 +32,13 @@ primitive sync push
 - **Field types:** `string`, `number`, `boolean`, `date`, `id`, `stringset`. `enum` (string array) is valid only on a `string` field; other supported constraints are `required`, `maxLength`, `maxCount`.
 - **Category name `attrs` is reserved** — it's the read-only projected category (see **`md.self.attrs`** below), not a category you define.
 - **Limits:** up to 100 keys per category, 16 KB per category item.
-- **`readRule`/`writeRule` context:** `user.userId`, `user.role` (the caller), `resource.resourceType`, `resource.resourceId` (also bound as `resource.id`), `resource.category` — plus `workflow.workflowKey` when the call originates from a `metadata.write`/`metadata.read` step (so `fromWorkflow('key')` works). The membership helpers `isMemberOf`/`memberGroups`/`hasRole` are also wired, so a rule can be group-scoped (`isMemberOf('class-teachers', resource.id)`) instead of only self-scoped; memberships load once, only when the rule references a membership helper (`hasRole` needs no load — it reads only `user.role`). `hasCollectionAccess` is rejected at save time in a category rule (collection-scoped only; it can never resolve here). An **app-level** owner or admin always bypasses both rules; a resource-level permission (e.g. a database's `owner`/`manager` grant) never bypasses — the rule itself is what authorizes resource-scoped callers. Omitting either rule defaults to deny.
-- **Category authoring is admin-scoped** — define and update categories via TOML sync, or directly through the admin-gated `metadata-categories` REST route. `client.resourceMetadata` covers values only (`get`/`set`/`getBatch`).
+- **`readRule`/`writeRule` context:** `user.userId`, `user.role` (the caller), `resource.resourceType`, `resource.resourceId` (also bound as `resource.id`), `resource.category` — plus `workflow.workflowKey` when the call originates from a `metadata.write`/`metadata.read` step (so `fromWorkflow('key')` works). When the subject is a `database`, `workflow`, or `collection`, the rule can also read the resource's own columns via **`resource.attrs.<column>`** — `database`: `databaseId`, `databaseType`, `createdBy`; `workflow`: `workflowId`, `workflowKey`, `runAs`, `createdBy`; `collection`: `collectionId`, `collectionType`, `contextId`, `name`, `createdBy`. The canonical use is creator bootstrap: `writeRule = "user.userId == resource.attrs.createdBy"`. The subject row loads lazily (a rule that never references `resource.attrs` issues no extra read) and the binding fails closed: any other resource type, an unmapped column, or a missing row denies. The membership helpers `isMemberOf`/`memberGroups`/`hasRole` are also wired, so a rule can be group-scoped (`isMemberOf('class-teachers', resource.id)`) instead of only self-scoped; memberships load once, only when the rule references a membership helper (`hasRole` needs no load — it reads only `user.role`). `hasCollectionAccess` is rejected at save time in a category rule (collection-scoped only; it can never resolve here). An **app-level** owner or admin always bypasses both rules; a resource-level permission (e.g. a database's `owner`/`manager` grant) never bypasses — the rule itself is what authorizes resource-scoped callers. Omitting either rule defaults to deny.
+- **Category authoring is admin-scoped** — define and update categories via TOML sync, or directly through the admin-gated `metadata-categories` REST route. `client.resourceMetadata` covers values only (`get`/`set`/`getBatch`/`list`/`delete`); the CLI's read-only `primitive metadata categories list`/`get` inspect the definitions without touching TOML.
 - **A category rule can declare its own `metadataManifest`** (same `self`/`paths`/`secrets` shape as any other owning config) so it can reach the resource's *other* categories or declared secrets — see "A category rule's own manifest" below. Without one, the rule sees no `md`/`secrets` at all (unchanged from the base case).
 
-## Values: read, write, batch read
+## Values: read, write, batch read, list, delete
 
-`get`/`set` take `(resourceType, resourceId, category)` positionally; `set` is a **full replace**, not a merge.
+`get`/`set`/`delete` take `(resourceType, resourceId, category)` positionally, `list` takes `(resourceType, resourceId)`; `set` is a **full replace**, not a merge.
 
 {{#lang ts}}
 ```typescript
@@ -59,6 +59,14 @@ const { results } = await client.resourceMetadata.getBatch({
 //               | { ok: false, status, code, message } } }
 // A whole-resource failure (e.g. a malformed id) instead returns
 // { resourceType, resourceId, ok: false, status, code, message } with no `categories`.
+
+const { categories } = await client.resourceMetadata.list("user", userId);
+// -> { resourceType, resourceId, categories: [{ category, data, schemaVersion }, ...] }
+// Only categories whose readRule permits the caller are returned (owner/admin sees all);
+// a resource with no stored metadata returns an empty array, not an error.
+
+const { deleted } = await client.resourceMetadata.delete("user", userId, "profile");
+// -> { resourceType, resourceId, category, deleted } — idempotent: absent item → deleted: false, not a 404.
 ```
 {{/lang}}
 
@@ -68,6 +76,10 @@ primitive metadata set user 01HXY... profile --data-file ./profile.json
 primitive metadata get user 01HXY... profile --json
 primitive metadata get-batch --resource user:01HXY...:profile,billing --resource user:01HZQ...:profile
 primitive metadata get-batch --requests '[{"resourceType":"user","resourceId":"01HXY...","categories":["profile"]}]'
+primitive metadata list user 01HXY...                # all stored categories (CLI reads as admin → shows everything)
+primitive metadata delete user 01HXY... profile      # idempotent
+primitive metadata categories list                   # read-only inspection of category definitions
+primitive metadata categories get user profile      # adds the full schema JSON
 ```
 
 - Batch: up to 50 resources, 200 expanded resource/category pairs per call — over either limit fails the **whole** call with `400 BATCH_TOO_LARGE` (checked before any read). Within limits the call is always `200`; per-item problems (missing category → `404 NOT_FOUND`, denied `readRule` → `403 FORBIDDEN`) surface inside `results[].categories[cat]`, never as a call-level failure.

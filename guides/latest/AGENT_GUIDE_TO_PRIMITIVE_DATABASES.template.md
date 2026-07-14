@@ -379,7 +379,7 @@ Codegen reads the database-type TOML from the auto-resolved sync directory (`.pr
 
 **Codegen result typing.** Result aliases are derived from each operation's `definition`, not just its `type`:
 
-- `query` with an inclusion `projection` → `QueryResult<Pick<Model, projectedFields | "id">>` (`id` is always returned). Exclusion, dynamic (`$params.*`), or nested-key projections → `QueryResult<Partial<Model>>` (excluded fields are still returned at runtime, so the type stays wide rather than promising removal). No `[models.*]` schema → `QueryResult<Record<string, unknown>>`.
+- `query` with an inclusion `projection` → `QueryResult<Pick<Model, projectedFields | "id">>` (`id` is always returned). Exclusion, dynamic (`$params.*`), or nested-key projections → `QueryResult<Partial<Model>>` (the runtime strips excluded fields server-side, but codegen can't narrow these cases statically, so the type stays wide). No `[models.*]` schema → `QueryResult<Record<string, unknown>>`.
 - `mutation` results type `results` as `MutationStepResult[]` (`{ op: "save" | "patch" | "delete" | "increment" | "addToSet" | "removeFromSet"; success: boolean; id: string; values?: Record<string, number>; error?: string }`) — every mutation op, whatever mix of step kinds it contains, types as the one `MutationResult` shape.
 - `pipeline` with `return = "<step>"` → that step's result type: a query step gets `QueryResult<…>` (projection rules above), a count step `CountResult`, an aggregate step `AggregateResult`. `return = "all"` (or no `return`) stays the generic `PipelineResult` (`{ steps: Record<string, unknown> }`) — declare a local type there if a call site needs precision.
 
@@ -782,6 +782,8 @@ required = true
 ```
 
 Definition fields: `filter` (required), `sort`, `limit` (1–1000), `projection`, `include`.
+
+`projection` values are exactly `1` (inclusion — returns the projected fields plus `id`) or `0` (exclusion — the named fields are stripped server-side before the response leaves the store, so exclusion withholds a column, it doesn't just shrink the payload). Validation, enforced both when the operation is saved and on the runtime request (400): inclusion and exclusion can't mix; an exclusion can't name `id` or `type` (system identity fields, always returned); and a query can't sort on a field its projection excludes (the sort value would leak through the pagination cursor).
 
 Callers can override `limit`, `cursor`, and `direction` at call time (effective limit is the lesser of definition and caller limits).
 
@@ -1433,7 +1435,7 @@ interface DatabaseChangeEvent {
   changeType?: "enter" | "update" | "leave";
   modelName: string;
   id: string;
-  data?: any;          // save → the FULL submitted row; patch → the patched fields' new values
+  data?: any;          // save → the full row as persisted (server-applied fields win); patch → the patched fields' new values
                        // (both plus any `timestamps`-stamped fields at their persisted values);
                        // increment/addToSet/removeFromSet → the op INPUT (amounts / values
                        // added-or-removed), not the resulting values; null on delete.
@@ -1470,7 +1472,7 @@ public struct DatabaseChangeEvent {
     public let changeType: String?
     public let modelName: String
     public let id: String
-    public let data: Any?          // save → the FULL submitted row; patch → the patched fields' new values
+    public let data: Any?          // save → the full row as persisted (server-applied fields win); patch → the patched fields' new values
                                    // (both plus any `timestamps`-stamped fields at their persisted values);
                                    // increment/addToSet/removeFromSet → the op INPUT (amounts / values
                                    // added-or-removed), not the resulting values; nil on delete.
@@ -1481,7 +1483,7 @@ public struct DatabaseChangeEvent {
 ```
 {{/lang}}
 
-**The shape of `data` follows `op`, not `changeType`.** A `save` delivers the full row; a `patch` delivers **the patched fields only, at their new values**; `increment` delivers the per-field increment **amounts** and `addToSet`/`removeFromSet` deliver the values **added or removed** per field — the op *input*, not the resulting values; `delete` delivers no `data`. When the type configures `timestamps`, the stamped fields ride along in `data` on `save` and `patch` at their persisted server values (subject to `select`) — a patch's `data` is the patched fields plus the stamp; `increment` and the set ops don't stamp, so their frames carry none. The pre-write row rides in `previousData` on all of them. An `applyToQuery` operation arrives as one `patch`/`increment`/set-op/`delete` change per matched record — there is no `applyToQuery` op on the wire. Consequences:
+**The shape of `data` follows `op`, not `changeType`.** A `save` delivers the full row; a `patch` delivers **the patched fields only, at their new values**; `increment` delivers the per-field increment **amounts** and `addToSet`/`removeFromSet` deliver the values **added or removed** per field — the op *input*, not the resulting values; `delete` delivers no `data`. Server-applied fields — `timestamps` stamps, `autoPopulatedFields`, and trigger `set` values — ride along in `data` on `save` and `patch` at their persisted server values (subject to `select`), and a server-applied value wins over the caller's submission for the same field, so a trigger that overrides a submitted value delivers the trigger's value. They are visible to the subscription `filter` too, so a filter can match on a trigger-computed field. A patch's `data` is the patched fields plus those server-applied fields; `increment` and the set ops don't stamp, so their frames carry none. The pre-write row rides in `previousData` on all of them. An `applyToQuery` operation arrives as one `patch`/`increment`/set-op/`delete` change per matched record — there is no `applyToQuery` op on the wire. Consequences:
 
 - An `enter` transition does NOT imply a full row: a patch that brings a row into the filter set is `changeType: "enter"` with only the changed fields in `data`.
 - **Merge, don't assign.** Replacing a cached row with `change.data` on a non-`save` op silently blanks every field the write didn't touch. Key the cache on `change.id`; replace on `save`, merge the fields present in `data` on `patch`, remove on `delete`.
