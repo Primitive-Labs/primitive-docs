@@ -285,7 +285,10 @@ databaseId = "{{ input.tasksDbId }}"
 operationName = "mark-overdue"      # NOTE: uses `operationName`, not `operation`
 [steps.params]
 now = "2026-04-27T00:00:00Z"
-# Output: { matched, updated, truncated? }
+# Output: { matched, affected, failed } — matched === affected + failed.
+# If the definition sets a `source.limit`, the response may add
+# `truncated: true` + `appliedLimit`; without one, a match over the
+# default cap (1000) fails the step instead of truncating.
 ```
 
 Workflows have no batch-write step kind. To apply a set of updates, run `forEach` over a `database.mutate` step (see `forEach` below), or use `database.applyToQuery` for query-driven updates.
