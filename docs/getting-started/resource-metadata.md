@@ -33,7 +33,15 @@ primitive sync push
 
 Field types are `string`, `number`, `boolean`, `date`, `id`, and `stringset`; `enum` is valid only on a `string` field. A category holds up to 100 keys and 16 KB of data, and writes are validated against the schema before they're stored.
 
-`readRule` and `writeRule` are CEL expressions evaluated against `user.*` (the caller) and `resource.*` (`resourceType`, `resourceId` — also reachable as `resource.id` — and `category`) — app-level owners and admins bypass both. The bypass is the app role only: holding a permission on the resource itself (being a database's owner or manager, say) grants no bypass — the rule is what authorizes resource-scoped callers. `writeRule` gates the write API; `readRule` gates the read API. Omit either and it defaults to deny.
+`readRule` and `writeRule` are CEL expressions evaluated against `user.*` (the caller) and `resource.*` (`resourceType`, `resourceId` — also reachable as `resource.id` — and `category`) — app-level owners and admins bypass both.
+
+When the metadata subject is a database, workflow, or collection, the rule can also read the resource's own columns through `resource.attrs` — for example, a creator-bootstrap rule that lets whoever created a database write its metadata:
+
+```toml novalidate
+writeRule = "user.userId == resource.attrs.createdBy"
+```
+
+Only those three resource types (and only a fixed set of columns per type) resolve; a rule that references `resource.attrs` on any other resource type, or a column outside the set, denies. The bypass is the app role only: holding a permission on the resource itself (being a database's owner or manager, say) grants no bypass — the rule is what authorizes resource-scoped callers. `writeRule` gates the write API; `readRule` gates the read API. Omit either and it defaults to deny.
 
 A category rule can also use the [identity context's](./access-control.md#the-identity-context) group-membership helpers, so access can be group-scoped instead of just self-scoped:
 
@@ -106,6 +114,30 @@ primitive metadata get-batch --resource user:01HXY...:profile,billing --resource
 ```
 
 A batch call covers up to 50 resources and 200 resource/category pairs total.
+
+### Listing and Deleting
+
+To see everything stored on one resource — say, while debugging why a rule isn't matching — list its categories in one call; to remove a category's data, delete it:
+
+```typescript
+const { categories } = await client.resourceMetadata.list("user", userId);
+// [{ category: "profile", data: {...}, schemaVersion }, ...] — only categories your readRule lets you see
+
+const { deleted } = await client.resourceMetadata.delete("user", userId, "profile");
+// deleted: false when nothing was stored — deleting an absent item is not an error
+```
+
+```bash
+primitive metadata list user 01HXY...
+primitive metadata delete user 01HXY... profile
+```
+
+`list` returns the categories the caller may read (each category's `readRule` applies, and app-level owners and admins see everything — the CLI reads as an admin, so it always shows all categories). The CLI can also inspect category *definitions* — schema, rules, version — without opening TOML files:
+
+```bash
+primitive metadata categories list
+primitive metadata categories get user profile
+```
 
 ## Using Metadata in Access Rules
 

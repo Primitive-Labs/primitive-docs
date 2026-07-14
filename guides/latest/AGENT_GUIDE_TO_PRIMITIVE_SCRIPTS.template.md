@@ -2,7 +2,7 @@
 
 A **script** is a sandboxed [Rhai](https://rhai.rs/) program that transforms JSON and returns JSON. Scripts are the escape hatch for data shaping too involved for a templated `transform` step — nested reshaping, derived fields, array map/filter/reduce, parsing JSON-string columns. They run inside [workflows](AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.md) as `script` steps.
 
-The sandbox is **deterministic and side-effect-free**: no network, no clock, no storage, no randomness. The same input always produces the same output, so a script step is safe to retry and reproducible to test.
+The sandbox is **side-effect-free** — no network, no storage — and deterministic with one deliberate exception: the `ulid()` builtin (see below) reads the clock and randomness to mint ids. A script that never calls `ulid()` always produces the same output for the same input, so it is safe to retry and reproducible to test; a script that calls it is intentionally non-reproducible in exactly those id values.
 
 ## The Script model
 
@@ -78,6 +78,18 @@ let config  = parse_json(input.configJson);    // "{\"limit\": 10}" → #{ "limi
 
 Input must be **strict JSON**. Trailing commas, `//` or `/* */` comments, single-quoted strings, and hex literals are rejected. Invalid input fails the step with a non-retryable `SCRIPT_RUNTIME_ERROR` carrying a positioned message — `parse_json: invalid JSON at line N column M: …` — and, when the input matches one of those non-standard forms, a hint pointing at strict JSON. Map keys are sorted at output, so a parsed-then-returned object is byte-stable.
 
+## `ulid()`
+
+`ulid()` (zero-arg) returns a fresh 26-character uppercase Crockford-base32 ULID string — a 48-bit millisecond timestamp prefix plus 80 bits of randomness, matching the `^[0-9A-HJKMNP-TV-Z]{26}$` format the `document.bulkUpdate` step requires for `create` ids. Its purpose is pre-minting record ids when a script builds a `document.bulkUpdate` `operations` array, so cross-record references can be wired without a server round-trip:
+
+```
+rows.map(|row| #{ id: ulid(), model: "Holding", action: "create", fields: row })
+```
+
+- Ids from calls within one invocation share the timestamp prefix and differ in the random suffix; there is **no monotonic ordering guarantee** between successive calls.
+- This is the sandbox's one non-deterministic surface (clock + randomness). In a durable workflow run, step-output memoization keeps minted ids stable across that run's retries.
+- For a statically-known number of ids, minting with the <span v-pre>`{{ ulid }}`</span> template helper in the step's `with` table keeps the script itself fully deterministic.
+
 ## Per-step limits
 
 Every run is bounded. A step may **lower** the ceilings with a `limits` table; requested values are clamped at the app ceiling and never raised:
@@ -148,7 +160,7 @@ primitive workflows tests create <workflow-id> --name "normalize: drops zero-qty
 primitive workflows tests run-all <workflow-id>
 ```
 
-Because the sandbox has no clock, network, or randomness, a passing case stays passing — there is no flakiness to chase.
+Because the sandbox has no network and — outside `ulid()` — no clock or randomness, a passing case stays passing; only assertions on `ulid()`-minted id *values* would flake, so assert on shape or count for those.
 
 ## Related
 

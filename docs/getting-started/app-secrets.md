@@ -71,7 +71,7 @@ primitive vars list
 primitive vars delete ADMIN_GROUP_ID
 ```
 
-Unlike secrets, vars are readable: `list` shows every value, and a var may appear unmasked in debug traces. Never store a credential in a var.
+Unlike secrets, vars are readable: `list` shows every value, and a var may appear unmasked in debug traces. Never store a credential in a var. Vars (like secrets) can also be managed from the [Admin Console](./admin-console.md), where their values display in plain text.
 
 ::: warning The CEL `vars.*` variable is declared-only
 A CEL rule reads a var as `vars.<KEY>`, bound only to the keys the owning config **declares** — the same declared-only discipline as `secrets.*`. List them in the owning config's TOML alongside any declared secrets:

@@ -332,6 +332,10 @@ Read and write [resource metadata](./resource-metadata.md) category values — c
 primitive metadata set user 01HXY... profile --data '{"tier":"pro"}'
 primitive metadata get user 01HXY... profile --json
 primitive metadata get-batch --resource user:01HXY...:profile,billing
+primitive metadata list user 01HXY...                # every stored category on a resource
+primitive metadata delete user 01HXY... profile      # idempotent
+primitive metadata categories list                   # inspect category definitions
+primitive metadata categories get user profile
 ```
 
 ### Integrations
