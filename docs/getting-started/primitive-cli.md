@@ -397,10 +397,10 @@ primitive webhooks list                    # shows each webhook's ID
 primitive webhooks get <webhook-id>
 primitive webhooks events <webhook-id>      # recent deliveries (accepted/rejected/duplicate)
 primitive webhooks rotate-secret <webhook-id>
-primitive webhooks test <webhook-id>
+primitive webhooks test <webhook-id> --payload '{"type":"charge.succeeded","data":{"id":"ch_1"}}'
 ```
 
-See [Inbound Webhooks](./workflows.md#via-inbound-webhooks).
+`--payload` is delivered and signed exactly as given — pass the event object directly, not wrapped in `{"payload": ...}`. Omit it to send a canned `webhook.test` ping instead. See [Inbound Webhooks](./workflows.md#via-inbound-webhooks).
 
 ### Cron Triggers
 

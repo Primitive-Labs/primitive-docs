@@ -332,7 +332,10 @@ Inspect webhooks and their recent deliveries (accepted, rejected, duplicate) fro
 primitive webhooks list                  # shows each webhook's ID
 primitive webhooks events <webhook-id>
 primitive webhooks rotate-secret <webhook-id>
+primitive webhooks test <webhook-id> --payload '{"type":"charge.succeeded","data":{"id":"ch_1"}}'
 ```
+
+`--payload` is delivered and signed exactly as given — pass the event object directly, not wrapped in `{"payload": ...}`. Omit it to send a canned `webhook.test` ping instead.
 
 ## Controlling Access to Workflows
 
