@@ -40,7 +40,7 @@ Integration templates only match uppercase keys — `{{secrets.MY_KEY}}` with `[
 
 ## Config Vars
 
-The non-secret twin of app secrets: same key format (`^[A-Z][A-Z0-9_]{0,63}$`), same 2 KB value cap, same 100-per-app limit, same declared-only CEL binding — minus masking. Use a var for a plaintext app-wide scalar a rule needs to compare against (a platform-assigned group ID, say); use a secret for anything that grants access to an external system.
+The non-secret twin of app secrets: same key format (`^[A-Z][A-Z0-9_]{0,63}$`), same 2 KB value cap, same 100-per-app limit, same declared-only CEL binding, plus a template-resolution form — minus masking and minus save-time validation. Use a var for a plaintext app-wide scalar a rule needs to compare against (a platform-assigned group ID, say); use a secret for anything that grants access to an external system.
 
 ```bash
 primitive vars set ADMIN_GROUP_ID --value grp_01ABC --summary "Admins group id"
@@ -48,17 +48,49 @@ primitive vars list          # values ARE shown — vars are not secret
 primitive vars delete ADMIN_GROUP_ID
 ```
 
+### Where `{{ vars.KEY }}` resolves
+
+`{{ vars.KEY }}` resolves everywhere `{{secrets.KEY}}` resolves — the same table as above: integration `requestConfig.defaultHeaders`/`requestConfig.staticQuery` (per request, at proxy time) and any workflow step-config template string (including forEach/compensate/durable-batch contexts), just before the step runs. Same grammar as secrets: uppercase key, `{{vars.KEY}}` ≡ `{{ vars.KEY }}` (whitespace-tolerant), `[A-Z][A-Z0-9_]`, max 64 chars.
+
+Two deliberate divergences from secrets, both worth tracking explicitly:
+
+1. **Never redacted.** A var resolved into a header/query value is not marked sensitive and is not masked in admin logs or the test-mode request preview — only a value substituted from `{{secrets.*}}` becomes `[redacted]`. Vars are non-secret and stay visible everywhere.
+2. **Not validated at save time.** Saving/updating an integration whose `defaultHeaders`/`staticQuery` reference a nonexistent `{{secrets.KEY}}` fails with a 400 naming the missing key. The same integration referencing a nonexistent `{{vars.KEY}}` saves successfully — the reference simply resolves to the literal `{{vars.KEY}}` placeholder at call time (the same behavior secrets fall back to only if the key is deleted *after* save).
+
+### Declared-only in CEL
+
 Declare a var for CEL access the same way as a secret, in the owning config's top-level manifest:
 
 ```toml
 vars = ["ADMIN_GROUP_ID"]
 ```
 
-A rule reads it as `vars.<KEY>`, bound only to declared keys — an undeclared `vars.KEY` is absent at evaluation (denies closed), exactly like `secrets.*`. Vars bind in workflow CEL contexts (`runIf`, `switch` `when`, predicate expressions on batch/collect steps), database operation `access`/per-param `access`, database trigger CEL, and trigger stamp `value` expressions. There is no `{{vars.KEY}}` template-resolution form (vars are CEL-only, unlike secrets which also resolve in integration/webhook templates) and no client-side read API — `primitive vars list`, the admin API, and the Admin Console's Config Vars view are the only read surfaces.
+A rule reads it as `vars.<KEY>`, bound only to declared keys — an undeclared `vars.KEY` is absent at evaluation (denies closed), exactly like `secrets.*`. Vars bind in workflow CEL contexts (`runIf`, `switch` `when`, predicate expressions on batch/collect steps), database operation `access`/per-param `access`, database trigger CEL, and trigger stamp `value` expressions. This CEL path is independent of the template-resolution form above — a config can use either or both.
+
+### Syncing vars: `vars.toml`
+
+Unlike secrets — which never appear in TOML, by design — config vars round-trip through `primitive sync` as a flat `vars.toml` at the sync directory root (sibling to `app.toml`, **not** a subdirectory): a plain top-level `KEY = "value"` table, no `[vars]` header, keys sorted:
+
+```toml
+# Per-environment non-secret config vars.
+# Bind as {{ vars.KEY }} in workflow/integration config and vars.* in CEL rules.
+# Values are checked into the repo and NOT secret — never put a credential
+# here; use `primitive secrets` for that.
+
+ADMIN_GROUP_ID = "grp_01ABC"
+API_HOST = "https://api.example.com"
+```
+
+- `sync pull` writes it; a failed fetch leaves the existing `vars.toml` untouched rather than clobbering it with an empty file.
+- `sync push` upserts changed keys and hard-deletes keys removed from the file, printing `Unsetting var KEY` for each; a missing/failed `vars.toml` read never mass-deletes.
+- `sync diff` reports var add/remove/modified rows like any other synced entity.
+- **Concurrent-edit guard**: if the server's value drifted since the last local sync (edited from the Admin Console, say), push reports `CONFLICT var: KEY` — with `Local last sync:` / `Server modified:` lines, the same pattern used for every other synced entity type — and exits non-zero. `--force` bypasses the check and overwrites/deletes unconditionally.
+
+There is no client-side read API for vars — `primitive vars list`, the admin API, `vars.toml`, and the Admin Console's Config Vars view are the only read surfaces.
 
 ## Related guides
 
-- **integrations** — the most common secret consumer (auth headers, static query params)
+- **integrations** — the most common secret and var consumer (auth headers, static query params)
 - **workflows** — `secrets.*` / `vars.*` in the template/CEL context
 - **databases** — `secrets.*` / `vars.*` in operation access rules and trigger stamps
-- **configuration** — the sync loop that carries secret- and var-referencing TOML
+- **configuration** — the sync loop that carries secret-referencing TOML and the var-carrying `vars.toml`

@@ -14,6 +14,8 @@ A **database type** is a named configuration (operations, triggers, access rules
 
 An individual database holds up to ~5 GB; the per-tenant/per-project pattern above is also how you scale past it, since each instance gets its own isolated storage.
 
+Deleting a database type (`primitive database-types delete <type>`) removes its operations and subscriptions before removing the type config, and the response reports how many of each it removed: `{ success: true, deletedOperations, deletedSubscriptions }`.
+
 ### Registered Operations
 End-user data access goes through **registered operations** — named, parameterized queries and mutations with per-operation access control. You don't write raw queries in your app. Instead, you define operations as TOML config files and sync them via the CLI.
 
@@ -160,6 +162,49 @@ required = true
 ```
 
 The server checks that the value is an array and validates each element against `items` (`string`, `number`, `boolean`, or `integer`), with element-indexed errors on mismatch; an `enum` on a string-array parameter is enforced per element.
+
+A filter can also test group membership directly with `$inGroup`, instead of pre-loading member IDs into an `$in` array client-side:
+
+```toml
+[[operations]]
+name = "team-tasks"
+type = "query"
+modelName = "task"
+access = "true"
+[operations.definition]
+filter = { assigneeId = { "$inGroup" = { type = "team", id = "$params.teamId" } } }
+
+[[operations.params]]
+name = "teamId"
+type = "string"
+required = true
+```
+
+The server expands `$inGroup` into the group's current member list before running the query — the caller needs `member.list` access on that group, or the request is rejected with `403`. A missing or empty group matches nothing (never everything), and a group's membership is capped at 5,000 expanded members per query. Pairing `$inGroup` with a caller-supplied `$in` on the same field filters to the intersection of the two.
+
+#### Caching Query Results
+
+Add a `cache` block to a query's definition to opt it into a server-side result cache:
+
+```toml
+[[operations]]
+name = "top-products"
+type = "query"
+modelName = "product"
+access = "true"
+[operations.definition]
+sort = { salesCount = -1 }
+limit = 20
+
+[operations.definition.cache]
+enabled = true
+ttlMs = 30000
+scope = "user"
+```
+
+`scope = "user"` folds the caller's identity into the cache key, so each user gets their own cached copy. `scope = "shared"` serves one entry to every caller, so its filter can't reference `$user.*` — pushing a shared-scope operation whose filter does is rejected with `400`, naming the offending filter path. `ttlMs` is clamped to a server-side ceiling (5 minutes by default).
+
+Every response from a query operation carries an `X-Cache` header: `HIT` (served from cache), `MISS` (executed and cached), or `OFF` (no `cache` block configured). With `timing: true`, a hit also reports `cacheHit: 1` in the response's `_timing` object.
 
 ### Mutations
 Create, update, or delete records. Supports `save`, `patch`, `delete`, `increment`, `addToSet`, and `removeFromSet`.

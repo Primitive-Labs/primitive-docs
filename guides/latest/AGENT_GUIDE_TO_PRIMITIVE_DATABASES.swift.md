@@ -395,7 +395,7 @@ primitive databases import-csv <database-id> <file.csv> --model <name> \
 
 `databases import` writes records in chunked batch requests: `--batch-size` sets records per request (default 5000, ceiling 25000; an invalid value fails before any write). A failing chunk is reported and the run continues by default — the command still exits non-zero at the end; `--stop-on-error` aborts the whole run (including a multi-database export dir) at the first failing chunk. Record upserts are keyed by `_id`, so re-running an import after a partial failure is safe.
 
-`database-types delete <type>` refuses with a 409 when live database instances of that type still exist — delete the instances first (`primitive databases delete <id>`) or pass `--force` to delete the type anyway (this orphans the instances). `-y`/`--yes` only skips the confirmation prompt; it does not bypass the guard.
+`database-types delete <type>` refuses with a 409 when live database instances of that type still exist — delete the instances first (`primitive databases delete <id>`) or pass `--force` to delete the type anyway (this orphans the instances). `-y`/`--yes` only skips the confirmation prompt; it does not bypass the guard. Once the 409 guard passes, the delete cascades: the type's operations and subscriptions are removed first, then the type config row is removed as the commit point — a failure removing a child leaves the whole type intact and the delete is retryable. The response reports the cascade counts: `{ success: true, deletedOperations: number, deletedSubscriptions: number }`.
 
 
 ## Database Types
@@ -788,6 +788,30 @@ Definition fields: `filter` (required), `sort`, `limit` (1–1000), `projection`
 Callers can override `limit`, `cursor`, and `direction` at call time (effective limit is the lesser of definition and caller limits).
 
 **Response:** `{ data: [...], hasMore: boolean, nextCursor?: string, prevCursor?: string }` (`prevCursor` appears from the second page on)
+
+**Cacheable queries.** Add an `[operations.definition.cache]` block to opt a query into a server-side result cache:
+
+```toml
+[[operations]]
+name = "myOrders"
+type = "query"
+modelName = "orders"
+access = "true"
+[operations.definition]
+filter = { ownerId = "$user.userId" }
+sort = { createdAt = -1 }
+
+[operations.definition.cache]
+enabled = true
+ttlMs = 30000
+scope = "user"   # or "shared"
+```
+
+- `scope = "user"` folds the caller's identity into the cache key — each user gets their own cached entry.
+- `scope = "shared"` serves one cache entry to every caller. The filter must contain no `$user.*` token — this is checked at config-save time; pushing a shared-scope operation with a `$user.*`-referencing filter is rejected with `400`, naming the offending filter path (e.g. `filter.owner`) in the error.
+- `ttlMs` is clamped to a server-side ceiling (default 300000ms / 5 minutes).
+- Every response from the operation carries an `X-Cache` header: `HIT` (served from cache), `MISS` (executed and stored), or `OFF` (no `cache` block configured — the default, fully back-compatible).
+- A cache hit still runs the op's access check per caller (a denied caller never sees a cached result) and still reports `_timing` when `timing: true` is passed, with `cacheHit: 1` marking the hit.
 
 #### Mutation — write records
 
@@ -1247,10 +1271,26 @@ The handle queries with the full filter operator grammar, sort + cursor paginati
 | `$size` | StringSet element count (number or comparison) | `{ tags: { $size: 3 } }` or `{ tags: { $size: { $gte: 1 } } }` |
 | `$or` | Matches any of the conditions | `{ $or: [{ status: "active" }, { priority: { $gte: 5 } }] }` |
 | `$and` | Matches all conditions (useful when multiple conditions target the same field) | `{ $and: [{ price: { $gte: 10 } }, { price: { $lte: 50 } }] }` |
+| `$inGroup` | Matches any current member of a group — expanded server-side into `$in` | `{ assigneeId: { $inGroup: { type: "team", id: "$params.teamId" } } }` |
 
 `$startsWith`, `$endsWith`, and `$containsText` are mutually exclusive on the same field — only one substring operator per field per query.
 
 Multiple filters on different fields are implicitly combined with AND. Use an explicit `$and` only when you need two conditions on the *same* field (e.g. a range), and combine `$or` with other top-level fields freely.
+
+#### `$inGroup` group-membership filter
+
+`$inGroup` is available on any field in a `query`, `count`, or `aggregate` filter (including inside `$and`/`$or` and pipeline read steps) — it composes into the existing filter structure rather than introducing a new grouping mechanism:
+
+```
+{ <field>: { $inGroup: { type: "<groupType>", id: "<group-id-or-substitution>" } } }
+```
+
+- The server expands `$inGroup` into `{ $in: [...memberIds] }` once per query, before it reaches the database.
+- Expansion is gated by the target group's `member.list` CEL rule — a caller who isn't allowed to list the group's members gets `403 GROUP_EXPANSION_FORBIDDEN`.
+- A missing or empty group expands to `$in: []` (matches nothing), never match-all.
+- If the same field also carries a caller-supplied `$in`, the result is the **intersection** — group membership AND the caller's list — not a replacement.
+- An invalid spec (missing or empty `type`/`id`) is rejected with `400 INVALID_IN_GROUP`.
+- Expansion is capped at 5,000 members (server-configurable); exceeding it fails with `400 GROUP_FILTER_TOO_LARGE`.
 
 Include types: `refersTo` (FK to one record), `hasMany` (target FK to this record), `refersToMany` (StringSet to multiple records). The loaded records land under `_related` on each parent (e.g. `result.data[0]._related.customer`).
 

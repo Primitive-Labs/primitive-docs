@@ -109,6 +109,8 @@ Every invocation creates a persistent **workflow run**. A run moves through `que
 
 Each step's input and output is recorded on the run, so you can always reconstruct what happened — from the CLI, from your app, or in the Admin Console's run detail view. Runs look the same whether a user, a cron trigger, or a webhook started them.
 
+The run record also carries `executionStartedAt` — when the run actually began executing, as distinct from `startedAt` (when it was requested) — plus `queueDelayMs`, the gap between the two. Both stay `null` while a run is still queued.
+
 ## Invoking Workflows
 
 Four ways to start a run, all hitting the same workflow definition:
@@ -151,6 +153,19 @@ let sub = client.events.on(.workflowStatus) { (event: WorkflowStatusEvent) in
 ```
 
 :::
+
+A third option in JavaScript: `workflows.waitFor(runId)` wraps the same status event in a single awaitable call, resolving once the run reaches a terminal state:
+
+```typescript
+const { status, output, error } = await client.workflows.waitFor(runId);
+if (status === "completed") {
+  console.log("Result:", output);
+} else if (status === "failed") {
+  console.log("Run failed:", error);
+}
+```
+
+It's event-driven, not polling, and resolves on every terminal outcome — including `"failed"` — rather than rejecting. It rejects only if the wait times out (default 15 minutes; pass `{ timeoutMs: 0 }` or `{ timeoutMs: Infinity }` to disable it) or if `runId` doesn't resolve to a run.
 
 ### From Your App (Synchronous)
 
@@ -389,6 +404,8 @@ capabilities = ["membership"]
 
 `membership` lets the workflow change group membership — the `group.addMember`, `group.removeMember`, and `group.removeAll` steps. Without the grant, those steps in a system workflow are refused. Read-only group checks never need it.
 
+Three more capabilities gate the [resource lifecycle steps](#resource-lifecycle-steps) and the [collection membership steps](#collection-steps) in a system run: `resource-provision` (`database.create`, `group.create`, `collection.create`), `resource-teardown` (`database.delete`, `group.delete`, `collection.delete`), and `resource-grant` (`collection.grantGroupPermission`, `collection.addDocument`, `collection.removeDocument`). Each is deny-by-default — a system-mode step whose capability isn't declared fails non-retryably. A system-mode create attributes the new resource to the app's system principal (`createdBy: "sys:<appId>"`); a system-mode delete may only remove a resource with that same attribution, unless the workflow also holds the escalated `resource-teardown:any` capability, which extends teardown to resources a member created.
+
 `sync push` only sets `capabilities` when it creates a workflow. To grant or revoke capabilities on a workflow that already exists, use `primitive workflows update <id> --capabilities membership` (a comma-separated list; `--capabilities ""` revokes all).
 
 [`iterate-users`](#iterate-users) is system-only — it fans out across the entire user roster, which no single caller has the standing to do. A workflow that uses it must set `runAs = "system"`, or the server rejects it when you push.
@@ -465,6 +482,8 @@ primitive workflows runs status <workflow-id> <run-id>
 primitive workflows runs steps <workflow-id> <run-id>
 ```
 
+`runs list` includes a DELAY column, and `runs status` includes "Execution started", "Queue delay", and "Create call" lines — surfacing `executionStartedAt`, `queueDelayMs`, and `createCallDurationMs` (the wall-clock time of the run's underlying create call) from the run record.
+
 The `<workflow-id>` argument to the management and runs commands (`get`, `update`, `delete`, `publish`, `runs ...`) accepts either the workflow's id or its key — `primitive workflows runs list send-digest` works as well as the ULID form. When both exist, the id wins; key lookup is scoped to the app and case-insensitive.
 
 ::: code-group
@@ -525,6 +544,7 @@ Every step has an `id` (unique within the workflow) and a `kind` (the step type)
 | `workflow.call` | Run a child workflow synchronously, inline (use `forEach` to fan out) |
 | `block.call` | Invoke a prompt, integration, script, or workflow block selected by `blockType` — a unified wrapper over the four steps above |
 | `email.send` | Send an email (template-based or inline) |
+| `notification.send` | Send a [notification](./notifications.md) (in-app inbox, push) to a user |
 | `blob.upload` / `blob.download` / `blob.signedUrl` / `blob.delete` | Write, read, sign URLs for, or delete bucket blobs |
 | `analytics.write` / `analytics.query` | Emit analytics events or query server-side aggregates |
 | `noop` | Return `{ message, payload }`; useful as a placeholder |
@@ -849,11 +869,11 @@ kind = "document.query"
 modelName = "Habit"
 saveAs = "habits"
 [steps.documentAlias]
-scope = "user"          # the caller's own alias (or "app" for an app-shared one)
+scope = "user"
 aliasKey = "tracker"
 ```
 
-Give a step either `documentId` or `documentAlias`, not both. A `user`-scoped alias always resolves to the caller's own document; an `app`-scoped alias resolves only when the caller has access to it. If the alias doesn't resolve, the step fails the same way a missing `documentId` would.
+Give a step either `documentId` or `documentAlias`, not both. A `user`-scoped alias always resolves to the caller's own document. If the alias doesn't resolve, the step fails the same way a missing `documentId` would.
 
 **Branching on whether an alias exists.** When you'd rather check than fail — "has this user set up their tracker yet?" — use `document.resolveAlias`. It returns `{ documentId }`, or `{ documentId: null }` when there's nothing to resolve, so a later step can `runIf` on the result instead of erroring:
 
@@ -933,7 +953,7 @@ collectionId = "{{ input.collectionId }}"
 documentId = "{{ steps.create.documentId }}"
 ```
 
-Both take a `collectionId` and a `documentId`, and both converge on retry: adding a document that's already a member succeeds with `{ added: false, alreadyPresent: true }` (a real add returns `{ added: true, alreadyPresent: false }`), and removing one that isn't a member succeeds with `{ removed: false, alreadyAbsent: true }`. Authorization matches the client calls exactly — `addDocument` checks the collection type's `document.add` rule plus the caller's write access to the document; `removeDocument` checks `document.remove`.
+Both take a `collectionId` and a `documentId`, and both converge on retry: adding a document that's already a member succeeds with `{ added: false, alreadyPresent: true }` (a real add returns `{ added: true, alreadyPresent: false }`), and removing one that isn't a member succeeds with `{ removed: false, alreadyAbsent: true }`. In a caller run, authorization matches the client calls exactly — `addDocument` checks the collection type's `document.add` rule plus the caller's write access to the document; `removeDocument` checks `document.remove`. In a system run, both steps instead require the `resource-grant` capability (see [Sensitive capabilities](#sensitive-capabilities)).
 
 ### Resource Lifecycle Steps
 
@@ -968,7 +988,23 @@ groupId = "{{ steps.teachers.groupId }}"
 permission = "read-write"   # or "reader"
 ```
 
-These steps run in **caller workflows only** — each acts as the starting user under exactly the rules the equivalent client call enforces, and creates resources just as if that user had created them from the app. A `runAs = "system"` workflow that reaches one fails the step: provisioning is always attributable to a member.
+These steps run in both caller and system workflows. In a caller workflow (the default), each step acts as the starting user under exactly the rules the equivalent client call enforces, creating and tearing down resources just as if that user had done it from the app. In a `runAs = "system"` workflow, each step instead needs the matching capability declared in `capabilities`: `resource-provision` for the create steps, `resource-teardown` for the delete steps, and `resource-grant` for `collection.grantGroupPermission` — without the grant, the step fails non-retryably before anything is written:
+
+```toml
+[workflow]
+key = "provision-classroom"
+name = "Provision Classroom"
+runAs = "system"
+capabilities = ["resource-provision", "resource-grant"]
+
+[[steps]]
+id = "makeDb"
+kind = "database.create"
+title = "{{ input.className }}"
+databaseType = "classroom"
+```
+
+A resource a system-mode create step produces is attributed to the app's system principal (`createdBy: "sys:<appId>"`). A system-mode delete may only remove a resource with that same attribution — deleting a resource a member created needs the escalated `resource-teardown:any` capability alongside `resource-teardown`. See [Sensitive capabilities](#sensitive-capabilities) for the full capability list.
 
 The create steps return the created resource, so later steps can wire it up (<span v-pre>`{{ steps.db.databaseId }}`</span>, <span v-pre>`{{ steps.posts.collectionId }}`</span>). `database.create` takes a `title` and `databaseType` plus optional `metadata` (validated against the type's declared metadata); `collection.create` takes a `name` plus optional `description`, `collectionType`, and `contextId`. Their ids are minted server-side, so a retried run can create a duplicate — put creates early and make later steps the fallible ones. `group.create` avoids this by accepting a caller-supplied `groupId`: re-creating an existing group succeeds with `{ created: false, alreadyExists: true }`.
 
@@ -1083,6 +1119,23 @@ to = "{{ addr }}"
 templateType = "announcement"
 ```
 
+### `notification.send`
+
+Sends a [notification](./notifications.md) to a user — the server-side equivalent of `client.notifications.send()`:
+
+```toml
+[[steps]]
+id = "notify"
+kind = "notification.send"
+toUserId = "{{ input.userId }}"
+title = "Your report is ready"
+body = "Tap to view this week's summary."
+channels = ["in-app", "ios"]
+deepLink = "myapp://reports/latest"
+```
+
+`channels` defaults to `["in-app"]`; add `"ios"` / `"android"` to also push to the recipient's registered devices. The step succeeds (`ok: true`) only when at least one requested channel actually delivered — a send that reaches nobody (every channel failed, was rate-limited, or the recipient had no registered device) reports `ok: false` even though the step ran. Set `idempotencyKey` to make a retried step re-send only the channels that still need it. See [Notifications](./notifications.md) for the full concept, client SDK, and dedupe/rate-limit reference.
+
 ### Blob Steps
 
 `blob.upload`, `blob.download`, `blob.signedUrl`, and `blob.delete` write, read, sign URLs for, and delete files in [blob buckets](./blobs-and-files.md) — the standard way to hand a generated file (a PDF report, an export) to users, and to clean one up when a flow is done with it:
@@ -1164,11 +1217,14 @@ Templates are how steps read the run context (see [How Data Flows Through a Run]
 {{ steps.<id>.field }}            # Output from a previous step (by step id)
 {{ outputs.<saveAs>.field }}      # Output from a step that used saveAs
 {{ secrets.API_KEY }}             # App secret (read-only)
+{{ user.userId }}                 # perUser.input only — the iterated user's row
 {{ input.name | default:"Anonymous" }}   # Filters with single |
 {{ input.title || "Untitled" }}            # Fallback with double || (or)
 ```
 
 When the entire string is one expression (<span v-pre>`"{{ steps.fetch.items }}"`</span>), the raw array or object is returned. Otherwise expressions are coerced to strings and interpolated.
+
+The `user` root is scoped to an [`iterate-users` step's `perUser.input`](#iterate-users) block — it isn't available elsewhere in the run context.
 
 `secrets.*` reads from your app's server-side secret store — see [App Secrets](./app-secrets.md) for managing values and where they're safe to reference.
 

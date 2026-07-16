@@ -340,7 +340,7 @@ A missing `documentId`/`modelName` (or `recordId` on a write), or a `documentId`
 
 **Caller-mode ACL.** When the run is `runAs: "caller"` (the default — see [Execution identity](#execution-identity-runas-system-workflows)), every op enforces the caller's per-document permission: `query`/`queryOne`/`count` need `reader`, `save`/`patch`/`delete` all need `read-write`. A `null`/insufficient permission throws `DocumentAccessDeniedError` (non-retryable) — a templated/user-supplied `documentId` can't bypass the ACL. `runAs: "system"` runs app-privileged (no per-caller check). Note `document.delete` deletes **records inside** a document; deleting the document itself (`client.documents.delete`) is a different, stricter operation with no workflow step — see [Deleting Documents](AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md#deleting-documents) for its permission rule.
 
-**Targeting by alias.** Supply a `documentAlias { scope, aliasKey }` block instead of `documentId` (exactly one of the two). In a caller run, `scope = "user"` resolves the caller's own alias (forces `userId = caller`); `scope = "app"` resolves an app-scoped alias after checking the caller's effective permission. In a **system** run, a `scope = "user"` alias requires an explicit subject `userId` on the block — `documentAlias { scope = "user", aliasKey, userId }` — resolved app-privileged (see [subject-user methods](#subject-user-methods-system-workflows)). A non-resolving alias fails the step like a bad `documentId` (Option A — hard fail).
+**Targeting by alias.** Supply a `documentAlias { scope, aliasKey }` block instead of `documentId` (exactly one of the two). `scope` is `"user"`. In a caller run, it resolves the caller's own alias (forces `userId = caller`). In a **system** run, it requires an explicit subject `userId` on the block — `documentAlias { scope = "user", aliasKey, userId }` — resolved app-privileged (see [subject-user methods](#subject-user-methods-system-workflows)). A non-resolving alias fails the step like a bad `documentId` (Option A — hard fail).
 
 ```toml
 [[steps]]
@@ -355,7 +355,7 @@ aliasKey = "tracker"
 
 ### `document.resolveAlias`
 
-Resolve an alias to its id for conditional branching, without failing on a miss (Option B). Top-level `scope` (`"app"` | `"user"`) + `aliasKey`. Output `{ documentId }`, or `{ documentId: null }` when the alias doesn't resolve (or the caller lacks access — never leaks existence). Caller-mode only.
+Resolve an alias to its id for conditional branching, without failing on a miss (Option B). Top-level `scope` (`"user"`) + `aliasKey`. Output `{ documentId }`, or `{ documentId: null }` when the alias doesn't resolve (or the caller lacks access — never leaks existence). Caller-mode only.
 
 ```toml
 [[steps]]
@@ -492,9 +492,29 @@ documentId = "{{ input.documentId }}"
 
 Both converge on retry (already-present add and already-absent remove are no-op successes). Membership presence is checked with a fresh read, so remove → add on the same document within one run works. Errors follow the standard convention: 4xx (except 429) non-retryable, 429/5xx retryable. Both kinds are sync-callable.
 
+**Caller vs. system.** In a caller run, authorization is exactly what's described above (`document.add`/`document.remove` CEL + caller doc access). In a `runAs:"system"` run, both kinds instead require the `resource-grant` capability (see [Sensitive capabilities](#execution-identity-runas-system-workflows)) — bypassing the CEL rule and the caller doc-access check — and are attributed to the system principal. Without the capability, the step is refused non-retryably.
+
 ### Resource lifecycle steps
 
-`database.create` / `database.delete`, `group.create` / `group.delete`, `collection.create` / `collection.delete`, and `collection.grantGroupPermission` provision and tear down resources inside a run, so one durable workflow can create a whole constellation (database + groups + collections + grants) with ordered teardown as the rollback story. All seven run in **caller mode only**: each acts as the starting user and enforces exactly the CEL rules and delete cascades of the equivalent client call. A `runAs = "system"` run fails the step non-retryably (`<kind> runs in caller mode only; it cannot run in a system-mode workflow (runAs:"system")`) before anything is written.
+`database.create` / `database.delete`, `group.create` / `group.delete`, `collection.create` / `collection.delete`, and `collection.grantGroupPermission` provision and tear down resources inside a run, so one durable workflow can create a whole constellation (database + groups + collections + grants) with ordered teardown as the rollback story. All seven run in both caller and system workflows.
+
+**Caller mode**: each step acts as the starting user and enforces exactly the CEL rules and delete cascades of the equivalent client call.
+
+**System mode (`runAs:"system"`)**: each step instead requires the matching capability declared in the workflow's `capabilities`, deny-by-default: `resource-provision` for the create steps, `resource-teardown` for the delete steps, `resource-grant` for `collection.grantGroupPermission`. Missing the capability fails the step non-retryably (`<kind> requires the '<capability>' capability in a runAs:"system" workflow (declare it in the workflow's capabilities)`) before anything is written. A system-mode create attributes the resource to the run's system principal (`createdBy: "sys:<appId>"`); a system-mode delete may target only a resource whose `createdBy` starts with `sys:`, unless the workflow also holds the escalated `resource-teardown:any` capability (needed to tear down a resource a member created). See [Sensitive capabilities](#execution-identity-runas-system-workflows) for the full capability reference.
+
+```toml
+[workflow]
+key = "provision-classroom"
+name = "Provision Classroom"
+runAs = "system"
+capabilities = ["resource-provision", "resource-grant"]
+
+[[steps]]
+id = "makeDb"
+kind = "database.create"
+title = "{{ input.className }}"
+databaseType = "classroom"
+```
 
 | Kind | Params | Output |
 |---|---|---|
@@ -624,6 +644,33 @@ textBody = "Download: {{ outputs.upload.signedUrl }}"
 ```
 
 `to` is a single address (string), not an array. Built-in templates: `magic-link`, `otp`, `document-share`, `document-share-deferred`, `collection-share`, `collection-share-deferred`, `waitlist-invite`, `waitlist-signup-notification`, `admin-invite`, `app-invite`, `access-request-created`, `access-request-resolved`. Register custom types with `primitive email-templates set <type>`. Hourly rate limit: 100 workflow emails per app per hour.
+
+### `notification.send`
+
+Sends a multi-channel notification (durable in-app inbox row + live WS mirror; push once the recipient has a registered device) to an app user. Full concept, client SDK, idempotency, and rate-limit reference: [Notifications guide](AGENT_GUIDE_TO_PRIMITIVE_NOTIFICATIONS.md).
+
+```toml
+[[steps]]
+id = "notify"
+kind = "notification.send"
+toUserId = "{{ input.userId }}"      # required
+title = "Your report is ready"       # required
+body = "Tap to view this week's summary."   # required
+channels = ["in-app", "ios"]         # optional, default ["in-app"]
+iconUrl = "https://example.com/icon.png"    # optional
+deepLink = "myapp://reports/latest"  # optional
+expiresAt = "2026-08-01T00:00:00Z"   # optional, ISO date
+idempotencyKey = "{{ input.jobId }}" # optional — see the Notifications guide's Idempotency section
+userInfo = { jobId = "{{ input.jobId }}" }   # optional, push-only
+collapseId = "report-ready"          # optional, push-only
+threadId = "reports"                 # optional, push-only (APNs)
+```
+
+Output: `{ results: [{ channel, status, notificationId?, delivered?, failed?, invalidated?, tokenAttempts?, skipReason?, retryable? }], deduplicated?, deduplicatedChannels? }` — one `results` entry per requested channel.
+
+**Verdict.** The step's `ok` is true only when at least one requested channel actually delivered — a send that reaches nobody (every channel failed, was rate-limited, or the recipient had no registered device) reports `steps.<id>.ok === false` even though the step ran and returned a result.
+
+**Retry semantics.** Single-attempt like every other step, but its error classification is more granular: a channel that failed for a transient reason (`retryable: true` on the result, including a push send where only *some* device tokens failed retryably) throws a plain error so the engine retries the whole step; a channel that failed permanently (bad channel name, unknown recipient, every channel rate-limited) throws non-retryably instead, so the run doesn't spin on a failure a retry can't fix. Set `idempotencyKey` so a retry re-sends only the channels/tokens that still need it — without one, a retry re-sends every requested channel from scratch.
 
 ### `blob.upload` / `blob.download` / `blob.signedUrl` / `blob.delete`
 
@@ -831,6 +878,7 @@ reason = "preferences backfill"
 | `secrets` | App secrets (read-only) |
 | `<asVar>` | Current item inside a `forEach` step |
 | `loop`, `iteration` | `{ index, count, first, last }` inside `forEach` (use `iteration` in CEL `runIf` since `loop` is reserved) |
+| `user` | The iterated user's row (`user.userId`, `user.role`) — only inside an `iterate-users` step's `perUser.input` block |
 | `now`, `today`, `uuid`, `ulid` | Built-in zero-arg helpers (see below) |
 
 ### Built-in template helpers
@@ -1137,11 +1185,22 @@ capabilities = ["membership"]
 
 `membership` gates the `group.addMember` / `group.removeMember` / `group.removeAll` steps in a **system** run — without the grant they reject (`group.addMember requires the 'membership' capability`). Read-only group steps (`checkMembership`, `listMembers`, `listUserMemberships`) are never gated, and caller runs are governed by access rules, not capabilities, so the gate never applies to them. When the group type carries no explicit rule set (no group type config, or one with `ruleSetId` unset), a system run holding `membership` is allowed through anyway — the granted capability stands in for a CEL rule the app never configured. A group type with an explicit rule set is still governed by that rule set, never overridden by the capability.
 
+Four more capabilities gate the nine resource-lifecycle / collection-membership step kinds in a system run (deny-by-default, checked in `resolveLifecyclePrincipal`/`authorizeSystemLifecycle`):
+
+| Capability | Gates |
+|---|---|
+| `resource-provision` | `database.create`, `group.create`, `collection.create` |
+| `resource-teardown` | `database.delete`, `group.delete`, `collection.delete` |
+| `resource-grant` | `collection.grantGroupPermission`, `collection.addDocument`, `collection.removeDocument` |
+| `resource-teardown:any` | Escalation: without it, a system-mode `*.delete` may only target a resource whose `createdBy` is `sys:<appId>`; with it, teardown also reaches resources a member created |
+
+A system-mode create attributes the resource to `sys:<appId>`. Missing capability fails the step non-retryably before anything is written; see [Resource lifecycle steps](#resource-lifecycle-steps) and [`collection.addDocument` / `collection.removeDocument`](#collectionadddocument-collectionremovedocument) for the per-kind detail.
+
 Grant or revoke `capabilities` on a workflow that already exists with `primitive workflows update <id> --capabilities <list>` (comma-separated; `""` revokes all) — `sync push` only persists `capabilities` when creating a new workflow (see above).
 
 **`iterate-users` is system-only.** A workflow containing an `iterate-users` step must set `runAs = "system"` — otherwise it's rejected at save time (`'iterate-users' is system-only and may appear only in a runAs:"system" workflow`).
 
-**The resource lifecycle steps are caller-only** — the mirror restriction. `database.create`/`delete`, `group.create`/`delete`, `collection.create`/`delete`, and `collection.grantGroupPermission` run only in `runAs:"caller"` workflows: in a system run each fails non-retryably at execution, before anything is written (`<kind> runs in caller mode only; it cannot run in a system-mode workflow (runAs:"system")`). Provisioning acts as, and is attributed to, the member who started the run — see [Resource lifecycle steps](#resource-lifecycle-steps).
+**The resource lifecycle and collection-membership steps run in both modes, capability-gated in system mode.** `database.create`/`delete`, `group.create`/`delete`, `collection.create`/`delete`, `collection.grantGroupPermission`, `collection.addDocument`, and `collection.removeDocument` all run in `runAs:"caller"` workflows under the caller's own CEL rules and doc access, exactly like the equivalent client call. In a `runAs:"system"` workflow, each instead requires its matching capability (`resource-provision`, `resource-teardown`, or `resource-grant` — see above); missing it fails the step non-retryably before anything is written. A system-mode create is attributed to the run's system principal (`createdBy: "sys:<appId>"`); a system-mode delete may only remove a resource with that attribution unless the workflow also holds `resource-teardown:any` — see [Resource lifecycle steps](#resource-lifecycle-steps).
 
 **No `accessRule` on a system workflow.** A `runAs:"system"` workflow with any non-empty `accessRule` is rejected at save time (`runAs:"system" workflows do not evaluate accessRule — remove the accessRule`) — a system run skips the rule entirely, so a constant (`"false"`), a role/group rule (`hasRole('admin')`), or a `user`-principal reference are all equally dead config. The only fix is to remove it. An absent/empty rule is fine. Enforced on every save path (create, version-create, metadata PATCH on the merged effective state, workflow-config create, and `sync push`).
 
@@ -1555,6 +1614,8 @@ primitive workflows analytics overview --days 7
 primitive workflows analytics top --days 7
 ```
 
+`runs list` includes a `DELAY` column (`queueDelayMs`); `runs status` includes "Execution started" (`executionStartedAt`), "Queue delay" (`queueDelayMs`), and "Create call" (`createCallDurationMs`, the wall-clock time of the run's underlying create call) lines. `executionStartedAt` and `queueDelayMs` are `null` while the run is still queued.
+
 All inspection commands take `--json`.
 
 Every `<workflow-id>` argument above — CRUD, draft/publish, configs, runs — accepts the workflow **key** as well as the ULID. The value is tried as an id first (the id wins when both exist), then as a key lookup scoped to the app and case-insensitive; an unknown value exits non-zero with `Workflow not found for id or key "<arg>"`. The `workflows tests` commands take the ULID. Don't generalize to cron triggers: `cron-triggers` ops take the `triggerId`, never the trigger key.
@@ -1684,6 +1745,7 @@ Requires an active WebSocket (e.g., from `client.documents.open(docId)`).
 The `workflowStatus` event uses `"completed"`. The `getStatus` method returns `"complete"`. These differ in the SDK — handle both if your code shares logic.
 
 Subscribe through `client.events.on(_:)`; hold the returned `EventSubscription` for as long as you want the handler live.
+
 
 ## Apply pattern
 

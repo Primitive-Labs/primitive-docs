@@ -11,6 +11,14 @@ export async function listGroupMembers(client: JsBaoClient) {
     limit: 50,
     cursor: page.cursor,
   });
+
+  // Join profile data in the same call with `include: "profiles"`.
+  const withProfiles = await client.groups.listMembers("team", "engineering", {
+    include: "profiles",
+  });
+  // withProfiles.items: [{ userId, userName?, userEmail?, avatarUrl, addedAt, addedBy }]
+  // avatarUrl is always present here — a URL, or null if the user has no
+  // avatar or the membership is orphaned (deleted user).
   // #endregion example
-  return { page, next };
+  return { page, next, withProfiles };
 }

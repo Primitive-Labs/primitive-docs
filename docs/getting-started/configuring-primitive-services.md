@@ -46,6 +46,7 @@ One subdirectory per kind of configuration:
 ```
 config/
   app.toml                        # App settings
+  vars.toml                       # Config vars (non-secret key/value store)
   workflows/*.toml                # Workflow definitions
   workflow-fragments/*.toml       # Reusable step blocks
   transforms/*.rhai               # Rhai scripts for workflow script steps
@@ -71,6 +72,8 @@ Every feature page in these docs that shows a TOML block — [Workflows](./workf
 - `[cors]` (when `mode = "custom"`) — `allowedOrigins`, `allowCredentials`, `allowedMethods`, `maxAge`
 
 Only the keys listed above are pushed — an omitted `[auth]` key leaves the server value untouched (it isn't cleared), and an unrecognized `[auth]` key is ignored with a warning on push. **Redirect URIs** are the one app setting not part of `app.toml`: set them with `primitive apps update --redirect-uris "<uri1>,<uri2>"` or in the [Admin Console](https://admin.primitiveapi.com).
+
+`vars.toml` round-trips your app's [config vars](./app-secrets.md#config-vars) the same way `app.toml` round-trips app settings — a flat table of non-secret key/value pairs, written by `sync pull` and applied by `sync push`.
 
 Credentials never go in these files: config that needs an API key references it as <span v-pre>`{{secrets.KEY}}`</span>, with the value stored server-side. See [App Secrets](./app-secrets.md).
 

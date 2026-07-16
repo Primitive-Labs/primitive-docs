@@ -73,6 +73,30 @@ primitive vars delete ADMIN_GROUP_ID
 
 Unlike secrets, vars are readable: `list` shows every value, and a var may appear unmasked in debug traces. Never store a credential in a var. Vars (like secrets) can also be managed from the [Admin Console](./admin-console.md), where their values display in plain text.
 
+## Syncing Config Vars
+
+Unlike secrets — which never appear in TOML — config vars are part of the [sync loop](./configuring-primitive-services.md#the-sync-loop): `primitive sync pull` writes every var to a flat `vars.toml` at the root of the sync directory, sibling to `app.toml`:
+
+```toml
+# Per-environment non-secret config vars.
+# Bind as {{ vars.KEY }} in workflow/integration config and vars.* in CEL rules.
+# Values are checked into the repo and NOT secret — never put a credential
+# here; use `primitive secrets` for that.
+
+ADMIN_GROUP_ID = "grp_01ABC"
+API_HOST = "https://api.example.com"
+```
+
+Edit `vars.toml` and run `primitive sync push` to apply changes: a changed value upserts, and removing a key from the file deletes that var on the server. `primitive sync diff` reports added, removed, and modified vars like any other synced entity. If a var changed on the server since your last pull — someone edited it from the Admin Console, say — `sync push` reports a conflict for that key and exits without applying the change; re-pull to reconcile, or pass `--force` to overwrite the server unconditionally.
+
+## Referencing Vars
+
+Beyond the CEL path below, a var also resolves as a template — the same <span v-pre>`{{ vars.KEY }}`</span> form as <span v-pre>`{{secrets.KEY}}`</span>, everywhere a secrets template resolves: integration `defaultHeaders`/`staticQuery` and workflow step config. See [API Integrations](./api-integrations.md#referencing-secrets-and-vars) for the integration-template usage.
+
+::: tip Vars are visible where secrets are hidden
+A var resolved into a template is never redacted — logs and request previews show its value, since vars aren't secret. And a <span v-pre>`{{vars.KEY}}`</span> reference to a var key that doesn't exist isn't checked when you save the config; it's left as a literal unresolved placeholder at call time, unlike a <span v-pre>`{{secrets.KEY}}`</span> reference to a missing secret, which fails the save.
+:::
+
 ::: warning The CEL `vars.*` variable is declared-only
 A CEL rule reads a var as `vars.<KEY>`, bound only to the keys the owning config **declares** — the same declared-only discipline as `secrets.*`. List them in the owning config's TOML alongside any declared secrets:
 
@@ -91,6 +115,6 @@ access = "isMemberOf('team', vars.ADMIN_GROUP_ID)"
 
 ## Next Steps
 
-- **[API Integrations](./api-integrations.md)** — The most common secret consumer: authenticated calls to external APIs
-- **[Workflows](./workflows.md)** — Reference secrets from step templates
-- **[Configuring Primitive Services](./configuring-primitive-services.md)** — The sync loop your secret-referencing config travels through
+- **[API Integrations](./api-integrations.md)** — The most common secret and var consumer: authenticated calls to external APIs
+- **[Workflows](./workflows.md)** — Reference secrets and vars from step templates
+- **[Configuring Primitive Services](./configuring-primitive-services.md)** — The sync loop your secret- and var-referencing config travels through

@@ -208,11 +208,13 @@ Discover which sign-in methods are enabled before rendering any UI:
 
 On iOS, `signInWithGoogle` and `signInWithApple` wrap the whole flow in a single call — they present the system auth sheet, run the redirect and code exchange, apply the session token, and reconnect the WebSocket. Each returns the signed-in `userId` and an `isNewUser` flag. Google derives its redirect URI from the bundled `GoogleService-Info.plist` (or pass `redirectUri:` explicitly); Apple uses the app's "Sign in with Apple" entitlement and the server's configured Apple audiences. Read `hasApple` from the auth config to decide whether to show the Apple button.
 
+Both helpers also take an optional `inviteToken`, so a pending invitation resolves atomically as part of sign-in — no follow-up `invitations.accept` call needed:
+
 ```swift
-let google = try await client.signInWithGoogle()
+let google = try await client.signInWithGoogle(inviteToken: tokenFromEmail)
 // google.userId, google.isNewUser
 
-let apple = try await client.signInWithApple()
+let apple = try await client.signInWithApple(inviteToken: tokenFromEmail)
 // apple.userId, apple.isNewUser
 ```
 

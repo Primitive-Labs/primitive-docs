@@ -692,13 +692,15 @@ Documents carry presentation fields you can update at any time.
 
 ## Document Access Requests
 
-When a user has a document link (or ID) but no permission, they can request access — the Google-Docs-style "Request access" flow. A `403` from `client.documents.get(documentId)` includes a `canRequestAccess` hint when the document accepts requests:
+When a user has a document link (or ID) but no permission, they can request access — the Google-Docs-style "Request access" flow. A `403` from `client.documents.get(documentId)` throws a typed `JsBaoApiError` whose body includes a `canRequestAccess` hint when the document accepts requests:
 
 ```typescript
+import { JsBaoApiError } from "js-bao-wss-client";
+
 try {
   await client.documents.get(documentId);
 } catch (err) {
-  if (err.code === "DOC_ACCESS_DENIED" && err.details?.canRequestAccess) {
+  if (err instanceof JsBaoApiError && err.code === "DOC_ACCESS_DENIED" && err.body?.details?.canRequestAccess) {
     // Show a "Request access" button
   }
 }

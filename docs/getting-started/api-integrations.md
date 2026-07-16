@@ -29,19 +29,22 @@ X-API-Key = "{{secrets.WEATHER_API_KEY}}"
 - **`integration.timeoutMs`** — Request timeout in milliseconds
 - **`requestConfig.baseUrl`** — The external API's base URL
 - **`requestConfig.allowedMethods`** / **`requestConfig.allowedPaths`** — Whitelist of HTTP methods and paths your app can call (trailing-`*` wildcards supported)
-- **`requestConfig.defaultHeaders`** — Headers sent on every request; use <code>&#123;&#123; secrets.KEY &#125;&#125;</code> for credentials
+- **`requestConfig.defaultHeaders`** — Headers sent on every request; use <code>&#123;&#123; secrets.KEY &#125;&#125;</code> for credentials or <code>&#123;&#123; vars.KEY &#125;&#125;</code> for non-secret values
 - **`requestConfig.staticQuery`** — Query parameters appended to every request
 
-## Referencing Secrets in Integrations
+## Referencing Secrets and Vars
 
-Credentials live in your app's secrets store. Reference one from the integration config with <code>&#123;&#123; secrets.KEY &#125;&#125;</code> — for example, an API key in a default header:
+Credentials live in your app's secrets store; non-secret config values live in its [vars store](./app-secrets.md#config-vars). Reference either from the integration config the same way — <code>&#123;&#123; secrets.KEY &#125;&#125;</code> or <code>&#123;&#123; vars.KEY &#125;&#125;</code> — for example, an API key in a default header and a non-secret account ID in a query param:
 
 ```toml
 [requestConfig.defaultHeaders]
 Authorization = "Bearer {{secrets.WEATHER_API_KEY}}"
+
+[requestConfig.staticQuery]
+account = "{{vars.ACCOUNT_ID}}"
 ```
 
-The value resolves server-side when the request is proxied and is never exposed to your client code. The reference is checked when you save the integration — naming a secret that doesn't exist fails the save — so set the secret first. Set and manage the value with `primitive secrets set`; see [App Secrets](./app-secrets.md) for the full management workflow.
+Both resolve server-side when the request is proxied and are never exposed to your client code. They diverge in two ways worth knowing: a <code>&#123;&#123; secrets.KEY &#125;&#125;</code> reference is checked when you save the integration — naming a secret that doesn't exist fails the save — while a <code>&#123;&#123; vars.KEY &#125;&#125;</code> reference isn't validated at save time, so a nonexistent var just leaves the literal placeholder unresolved at call time. And request previews and logs redact any value that resolved from a secret, but never one that resolved from a var — vars aren't secret, so they stay visible. Set and manage values with `primitive secrets set` / `primitive vars set`; see [App Secrets](./app-secrets.md) for the full management workflow.
 
 ## Syncing Configuration
 

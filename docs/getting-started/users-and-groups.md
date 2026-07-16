@@ -76,6 +76,10 @@ The `addMember` result is a discriminated union — branch on `status`:
 
 See [Sending Your Own Invitation Emails](./invitations.md#sending-your-own-invitation-emails) for what to do with `inviteToken`.
 
+List a group's members with `listMembers`, paginated. Pass `include: "profiles"` to also join each member's profile — `avatarUrl` is then always present, either a resolved URL or `null` when the user has no avatar or the membership is orphaned (the user was deleted):
+
+<<< ../../examples/users-and-groups/list-members.ts#example{ts}
+
 Via the CLI:
 
 ```bash

@@ -1052,10 +1052,7 @@ Run `npx js-bao-codegen-v2` and import as `import { TodoList, TodoItem } from "@
 
 For documents that should exist exactly once (default document, settings), use `getOrCreateWithAlias`. This single call atomically resolves an existing alias or creates a new document with that alias, eliminating race conditions when multiple clients initialize simultaneously. See [Resolve-or-create a singleton document](#resolve-or-create-a-singleton-document) above for the compiled call.
 
-**Alias scopes:**
-
-- `"user"` - Unique per user (each user can have their own document with this alias)
-- `"app"` - Unique across entire app (shared by all users)
+**Alias scope:** aliases are unique per user — each user can have their own document with a given alias.
 
 **Alias API methods:**
 
@@ -1119,7 +1116,7 @@ Documents can be shared with individual users (by userId or email), with groups,
 1. If you have a `userId` → write the direct permission record. If you only have an email → write the same record by email; the platform resolves it or defers it. No manual "accept" call is needed for the standard email-match path.
 2. **Share at the highest level that fits — `collection` > `group` > `doc`.** A collection grant propagates to every document inside it (current and future); a group add propagates to every doc that group can see. Don't add per-document grants for something already shared at the collection or group level.
 3. Use groups for team-scoped access; use direct permissions for individual access.
-4. If a user hits a 403 → parse the response's `canRequestAccess` hint and either show "Request access" or a hard-deny screen.
+4. If a user hits a 403 → read the `canRequestAccess` hint off the thrown typed error and either show "Request access" or a hard-deny screen.
 5. Read "documents I own" from `client.me.ownedDocuments()` and "documents shared directly with me" from `client.me.sharedDocuments()`. Group- and collection-scoped access is read through `groups.listDocuments` / `collections.listDocuments`.
 
 ### Quick Reference
@@ -1155,7 +1152,7 @@ await client.documents.updatePermissions(documentId, {
 try {
   await client.documents.open(documentId);
 } catch (err) {
-  if (err.details?.canRequestAccess) {
+  if (err instanceof JsBaoApiError && err.body?.details?.canRequestAccess) {
     await client.documents.requestAccess(documentId, {
       permission: "read-write",
       message: "Please grant me access",
@@ -1390,15 +1387,17 @@ The owner UI when a non-member hits a 403 they're allowed to escalate. The end-t
 
 #### Detect on `documents.get` failure
 
-The 403 body is JSON shaped `{ error, status, timestamp, code: "DOC_ACCESS_DENIED", details: { code: "DOC_ACCESS_DENIED", canRequestAccess: boolean } }`. The thrown error is a plain error whose message embeds the body — parse it and branch on `canRequestAccess`:
+The 403 body is JSON shaped `{ error, status, timestamp, code: "DOC_ACCESS_DENIED", details: { code: "DOC_ACCESS_DENIED", canRequestAccess: boolean } }`. The client throws a typed error carrying that body already parsed — branch on `canRequestAccess` directly, no message-parsing needed:
 
 {{#lang ts}}
 ```typescript
+import { JsBaoApiError } from "js-bao-wss-client";
+
 try {
   const doc = await client.documents.get(documentId);
 } catch (err) {
-  const body = parseHttpErrorBody(err); // your helper — JSON.parse the bit after "HTTP 403: "
-  if (body?.code === "DOC_ACCESS_DENIED" && body.details?.canRequestAccess) {
+  const details = err instanceof JsBaoApiError ? (err.body as any)?.details : undefined;
+  if (details?.canRequestAccess) {
     await client.documents.requestAccess(documentId, {
       permission: "read-write",                  // REQUIRED
       message: "Working on the Q2 planning deck",
@@ -1407,12 +1406,6 @@ try {
   } else {
     showHardDeniedUI();
   }
-}
-
-function parseHttpErrorBody(err: unknown): any | null {
-  const m = String((err as Error)?.message || "").match(/^HTTP \d+:\s*(.*)$/s);
-  if (!m) return null;
-  try { return JSON.parse(m[1]); } catch { return null; }
 }
 ```
 {{/lang}}
@@ -1709,11 +1702,18 @@ The permission / collection reads — `documents.getPermissions(_:)`, `collectio
 - Passing `permission: null` to remove a grant — there is no null form. Use `removePermission`.
 - Lowering a user's direct permission while they still have a higher one via group — the group wins (effective = MAX).
 - Assuming `me.sharedDocuments()` includes group- or collection-shared docs — it only carries direct `DocumentPermission` rows and pending `DocumentInvitation`s. Combine with `collections.list()` / `groups.listUserMemberships(...)` for a complete picture.
-- Showing a "request access" button without parsing the 403 body for `details.canRequestAccess`.
+- Showing a "request access" button without checking the caught error's `canRequestAccess` detail.
 - Calling `client.invitations.delete()` to cancel a single pending document share — it cascades to every share and group add linked to that invitation.
 - Polling `client.invitations.list` / `listDeferredGrants` to populate "Members + Pending" rows — those are app-level / admin surfaces; per-resource `listPendingInvitations` is the product UI source.
 
-**Sharing error codes** (server-emitted body codes; the client throws `Error("HTTP <status>: <body>")` — parse the body):
+**Sharing error codes** (server-emitted body codes):
+
+{{#lang ts}}
+The client throws a typed `JsBaoApiError` with `.status`, `.code`, and `.body` (the parsed error body) — read the code and details straight off the caught error, no manual message-parsing needed.
+{{/lang}}
+{{#lang swift}}
+The client throws a typed `JsBaoError` with `.code` and `.details` — read the code and details straight off the caught error, no manual message-parsing needed.
+{{/lang}}
 
 | Code | Endpoint | Meaning |
 |------|----------|---------|

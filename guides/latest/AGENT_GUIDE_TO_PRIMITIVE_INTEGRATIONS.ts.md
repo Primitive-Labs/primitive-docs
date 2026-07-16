@@ -21,6 +21,7 @@ This guide is verified against `js-bao-wss` source. Anything not described here 
 
 - Admin defines an `AppIntegration` (per-app, keyed by `integrationKey`) with a `requestConfig` that pins the `baseUrl`, `allowedMethods`, and `allowedPaths`.
 - Credentials are stored as **App Secrets** (`primitive secrets set KEY --value ...`), then referenced from `defaultHeaders` or `staticQuery` via `{{secrets.KEY}}` templates.
+- Non-secret config values are stored as **Config Vars** (`primitive vars set KEY --value ...`), referenced the same way via `{{vars.KEY}}` templates — see "Vars vs Secrets" below.
 - Clients call `client.integrations.call({ integrationKey, method, path, ... })`. The platform routes through `POST /app/{appId}/api/integrations/{integrationKey}/proxy`.
 - Workflows can call integrations via the `integration.call` step.
 
@@ -59,11 +60,11 @@ bodyMode = "json"                    # Optional. "json" (default) | "raw" | "mul
 responsePassthrough = true           # Optional. Parsed but not enforced; the proxy always
                                      #   returns { status, headers, body } from upstream.
 
-[requestConfig.defaultHeaders]       # Optional. Always-sent headers. {{secrets.KEY}} resolved here.
+[requestConfig.defaultHeaders]       # Optional. Always-sent headers. {{secrets.KEY}} / {{vars.KEY}} resolved here.
 Accept = "application/json"
 Authorization = "Bearer {{secrets.OPENAI_API_KEY}}"
 
-[requestConfig.staticQuery]          # Optional. Always-appended query params. {{secrets.KEY}} resolved here.
+[requestConfig.staticQuery]          # Optional. Always-appended query params. {{secrets.KEY}} / {{vars.KEY}} resolved here.
 apiVersion = "v2"
 
 [requestConfig.exampleQuery]         # Optional. For docs/test UI only. Not sent on real calls.
@@ -98,8 +99,8 @@ value = "fine-tune"
 | `requestConfig.allowedMethods` | string[] | No | `["GET"]` | Uppercased; `defaultMethod` auto-added. |
 | `requestConfig.allowedPaths` | string[] | No | `["/*"]` | **Default allows everything.** Trailing-`*` prefix match only. |
 | `requestConfig.defaultMethod` | string | No | first allowed | |
-| `requestConfig.defaultHeaders` | object | No | `{}` | `{{secrets.KEY}}` resolved per request. |
-| `requestConfig.staticQuery` | object | No | `{}` | string/number/boolean values; `{{secrets.KEY}}` resolved. |
+| `requestConfig.defaultHeaders` | object | No | `{}` | `{{secrets.KEY}}` / `{{vars.KEY}}` resolved per request. |
+| `requestConfig.staticQuery` | object | No | `{}` | string/number/boolean values; `{{secrets.KEY}}` / `{{vars.KEY}}` resolved. |
 | `requestConfig.forwardHeaders` | string[] | No | `[]` | **Lowercased.** `[]`=none, `["*"]`=all. |
 | `requestConfig.forwardQueryParams` | string[] | No | `[]` | **Lowercased.** `[]`=none, `["*"]`=all. |
 | `requestConfig.bodyMode` | string | No | `"json"` | `"json"` \| `"raw"` \| `"multipart"`. |
@@ -145,6 +146,26 @@ Behavior:
 - Secret references are validated at save time: creating or updating an integration (or creating a versioned config) whose `defaultHeaders`/`staticQuery` reference a nonexistent app secret fails with a 400 naming the missing key. Whitespace inside the braces is tolerated (`{{ secrets.KEY }}` ≡ `{{secrets.KEY}}`), but not around the dot. If a referenced secret is deleted *after* the config is saved, the proxy passes the literal `{{secrets.KEY}}` upstream and logs a server-side warning — re-create the secret or update the config.
 - Secret-key constraint: `^[A-Z][A-Z0-9_]{0,63}$` (uppercase letters, digits, underscores; starts with a letter; ≤64 chars).
 - Cache: app-secret reads are cached server-side (30s fresh / 60s stale). Updates invalidate the cache for that app.
+
+### Vars vs Secrets
+
+Config vars resolve in the same fields via `{{vars.KEY}}` — same key constraint (`^[A-Z][A-Z0-9_]{0,63}$`), same whitespace tolerance (`{{ vars.KEY }}` ≡ `{{vars.KEY}}`), same two fields (`defaultHeaders`/`staticQuery` only, resolved at proxy time).
+
+```bash
+primitive vars set ACCOUNT_ID --value acct_123 --summary "Default account id"
+```
+
+```toml
+[requestConfig.staticQuery]
+account = "{{vars.ACCOUNT_ID}}"
+```
+
+Two behaviors deliberately diverge from secrets:
+
+- **Not redacted.** Only a value substituted from `{{secrets.*}}` is marked sensitive and replaced with `[redacted]` in admin logs and the test-mode request preview. A value substituted from `{{vars.*}}` is never redacted — vars are non-secret and stay visible in both places.
+- **Not validated at save time.** Saving/updating an integration whose `defaultHeaders`/`staticQuery` reference a nonexistent `{{secrets.KEY}}` fails with a 400 naming the missing key. The same integration referencing a nonexistent `{{vars.KEY}}` saves successfully — the reference just resolves to the literal `{{vars.KEY}}` placeholder at call time (the fallback secrets only get if the key is deleted *after* save).
+
+Vars are not per-integration rows and have no cache-TTL distinction called out here beyond the shared config-vars cache; see the App Secrets guide's Config Vars section for the full CLI, the `vars.toml` sync shape, and the CEL declared-only binding path (`vars = ["KEY"]`).
 
 ### Rotation
 
@@ -361,6 +382,16 @@ primitive secrets delete OPENAI_API_KEY
 
 Values are AES-encrypted at rest using `APP_SECRETS_ENCRYPTION_KEY`. Max 100 secrets per app, max 2 KB per value.
 
+### Config Vars (for `{{vars.KEY}}` resolution)
+
+```bash
+primitive vars list [--app <app-id>] [--json]
+primitive vars set ACCOUNT_ID --value acct_123 --summary "Default account id"
+primitive vars delete ACCOUNT_ID
+```
+
+Values are plaintext (never encrypted, never masked). Max 100 vars per app, max 2 KB per value.
+
 ### Test Cases (regression suite for an integration)
 
 ```bash
@@ -542,7 +573,8 @@ The step pulls App Secrets and resolves `{{secrets.KEY}}` the same way the user-
 primitive integrations get <id> --json     # see exact stored requestConfig
 primitive integrations test <id> --method GET --path /probe --query '{"x":"1"}'
 primitive integrations logs <id> --limit 20
-primitive secrets list                      # confirm referenced keys exist
+primitive secrets list                      # confirm referenced secret keys exist
+primitive vars list                         # confirm referenced var keys exist
 ```
 
 If client calls return `INTEGRATION_NOT_FOUND` despite the integration existing, check status — drafts/archived return 404.

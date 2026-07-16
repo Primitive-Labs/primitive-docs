@@ -391,6 +391,7 @@ export default defineConfig({
         text: 'Platform Services',
         items: [
           { text: 'Workflows', link: '/getting-started/workflows' },
+          { text: 'Notifications', link: '/getting-started/notifications' },
           { text: 'Prompts', link: '/getting-started/prompts' },
           { text: 'API Integrations', link: '/getting-started/api-integrations' },
           { text: 'App Secrets', link: '/getting-started/app-secrets' },

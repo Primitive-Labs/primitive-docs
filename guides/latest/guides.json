@@ -15,7 +15,7 @@
     }
   },
   "builtAgainst": {
-    "stampedAt": "2026-07-14",
+    "stampedAt": "2026-07-16",
     "channel": "next",
     "packages": {
       "js-bao-wss-client": "2.0.4",
@@ -442,7 +442,8 @@
         "cron-triggers",
         "overlap policy",
         "timezone",
-        "schedule"
+        "schedule",
+        "notification.send"
       ],
       "useCases": [
         "Building multi-step automation pipelines",
@@ -488,7 +489,8 @@
         "database.applyToQuery",
         "cron trigger",
         "overlapPolicy",
-        "workflow run steps"
+        "workflow run steps",
+        "notification.send"
       ],
       "prerequisites": [],
       "relatedGuides": [
@@ -499,7 +501,8 @@
         "blobs",
         "analytics",
         "app-secrets",
-        "resource-metadata"
+        "resource-metadata",
+        "notifications"
       ],
       "variants": [
         {
@@ -510,6 +513,50 @@
           "language": "swift",
           "file": "AGENT_GUIDE_TO_PRIMITIVE_WORKFLOWS.swift.md"
         }
+      ]
+    },
+    {
+      "topic": "notifications",
+      "file": "AGENT_GUIDE_TO_PRIMITIVE_NOTIFICATIONS.md",
+      "description": "Multi-channel notifications (in-app inbox, push) — client SDK, notification.send step, dedupe",
+      "keywords": [
+        "notifications",
+        "push notifications",
+        "in-app inbox",
+        "APNs",
+        "FCM",
+        "device token",
+        "notification.send",
+        "idempotency",
+        "rate limit",
+        "unreadCount",
+        "registerDevice"
+      ],
+      "useCases": [
+        "Sending an in-app notification to a user",
+        "Reading and marking a user's notification inbox",
+        "Registering a device for push notifications",
+        "Sending a notification from a workflow step",
+        "Listening for live notification events over the WebSocket",
+        "Making a notification send safe to retry with idempotencyKey",
+        "Handling notification rate limits"
+      ],
+      "concepts": [
+        "notification",
+        "in-app inbox",
+        "push channel",
+        "client.notifications.send",
+        "client.notifications.list",
+        "registerDevice",
+        "tokenSuffix",
+        "notification.send step",
+        "idempotencyKey",
+        "deduplicatedChannels",
+        "NotificationRateLimitError"
+      ],
+      "prerequisites": [],
+      "relatedGuides": [
+        "workflows"
       ]
     },
     {
